@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Home, Settings, Zap, LogIn } from "lucide-react";
+import { Home, Settings, Zap, LogIn, Calendar } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
 
 const navItems = [
   { href: "/",            icon: Home,     label: "Dashboard"   },
+  { href: "/rooster",     icon: Calendar, label: "Rooster"     },
   { href: "/automations", icon: Zap,      label: "Automatisch" },
   { href: "/settings",    icon: Settings, label: "Instellingen" },
 ];

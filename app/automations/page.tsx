@@ -10,7 +10,6 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { AutomationCard } from "@/components/automations/AutomationCard";
 import { AutomationForm } from "@/components/automations/AutomationForm";
 import { DienstWekkerSection } from "@/components/automations/DienstWekkerSection";
-import { RoosterPanel } from "@/components/schedule/RoosterPanel";
 import { type Automation, type ShiftType } from "@/lib/automations";
 import { cn } from "@/lib/utils";
 
@@ -84,12 +83,10 @@ export default function AutomationsPage() {
         </div>
       </header>
 
-      <main className="px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 max-w-6xl mx-auto">
-        {/* LEFT: Automations */}
-        <div className="space-y-5">
-          <ErrorBoundary>
-            <DienstWekkerSection packs={wekkerPacks} onInstall={handleAddWekkerPack} />
-          </ErrorBoundary>
+      <main className="px-6 py-6 max-w-3xl mx-auto space-y-5">
+        <ErrorBoundary>
+          <DienstWekkerSection packs={wekkerPacks} onInstall={handleAddWekkerPack} />
+        </ErrorBoundary>
 
           {/* Engine status */}
           <div className="glass rounded-xl p-4 flex items-center gap-3 border border-green-500/15">
@@ -167,14 +164,6 @@ export default function AutomationsPage() {
               </button>
             </div>
           )}
-        </div>
-
-        {/* RIGHT: Rooster */}
-        <ErrorBoundary>
-          <div className="glass rounded-2xl p-5 border border-white/5 self-start sticky top-24">
-            <RoosterPanel />
-          </div>
-        </ErrorBoundary>
       </main>
     </div>
   );

@@ -7,12 +7,15 @@ import { RoomSection } from "@/components/room/RoomSection";
 import { LampCard } from "@/components/lamp/LampCard";
 import { SceneBar } from "@/components/scenes/SceneBar";
 import { GlobalColorPicker } from "@/components/scenes/GlobalColorPicker";
+import { NextShiftCard } from "@/components/schedule/NextShiftCard";
+import { useSchedule } from "@/hooks/useSchedule";
 import { useEffect } from "react";
 
 export default function DashboardPage() {
   const { data: devices = [], isLoading: loadingDevices } = useDevices();
   const { data: rooms = [], isLoading: loadingRooms } = useRooms();
   const { mutate: sendCommand } = useLampCommand();
+  const { nextDienst } = useSchedule();
 
   const onlineDevices = devices.filter((d) => d.status === "online");
   const onDevices = devices.filter((d) => d.current_state?.on);
@@ -94,6 +97,13 @@ export default function DashboardPage() {
         <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Scènes</p>
         <SceneBar />
       </div>
+
+      {/* Compact next shift — only when schedule has data */}
+      {nextDienst && (
+        <div className="px-6 pt-3">
+          <NextShiftCard dienst={nextDienst} compact />
+        </div>
+      )}
 
       <main className="px-6 py-5 space-y-8 max-w-5xl mx-auto">
         {loadingDevices || loadingRooms ? (

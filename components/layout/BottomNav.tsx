@@ -1,13 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Home, Zap, Settings } from "lucide-react";
+import { Home, Zap, Settings, Calendar } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/",            icon: Home,     label: "Dashboard"   },
+  { href: "/rooster",     icon: Calendar, label: "Rooster"     },
   { href: "/automations", icon: Zap,      label: "Automatisch" },
   { href: "/settings",    icon: Settings, label: "Instellingen" },
 ];
