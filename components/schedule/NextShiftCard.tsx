@@ -1,9 +1,16 @@
 "use client";
 
-import { Clock, MapPin, Timer, ChevronRight, Upload } from "lucide-react";
+import { Clock, MapPin, Timer, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
+
+/** Format ISO date string (YYYY-MM-DD) → DD-MM-YYYY veilig. */
+function formatDate(iso: string, style: "compact" | "full" = "full"): string {
+  const [year, month, day] = iso.split("-");
+  if (!year || !month || !day) return iso; // fallback: toon raw
+  return style === "compact" ? `${day}-${month}` : `${day}-${month}-${year}`;
+}
 
 interface NextShiftCardProps {
   dienst:    DienstRow | null;
@@ -49,7 +56,7 @@ export function NextShiftCard({ dienst, compact, onImport }: NextShiftCardProps)
               {isBezig ? "🟢 Nu bezig" : "⏰ Volgende dienst"}
             </p>
             <p className={cn("text-sm font-bold", colors.text)}>
-              {dienst.dag} · {dienst.startDatum.slice(8)}-{dienst.startDatum.slice(5, 7)}
+              {dienst.dag} · {formatDate(dienst.startDatum, "compact")}
             </p>
             <p className="text-xs text-slate-400">
               {dienst.startTijd}–{dienst.eindTijd} · {dienst.shiftType} · {dienst.duur}u
@@ -92,7 +99,7 @@ export function NextShiftCard({ dienst, compact, onImport }: NextShiftCardProps)
           <div>
             <p className="text-2xl font-bold text-white">{dienst.dag}</p>
             <p className="text-sm text-slate-400">
-              {dienst.startDatum.slice(8)}-{dienst.startDatum.slice(5, 7)}-{dienst.startDatum.slice(0, 4)}
+              {formatDate(dienst.startDatum, "full")}
             </p>
           </div>
           <div className="text-right">

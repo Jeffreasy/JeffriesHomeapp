@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Home, Settings, Zap, LogIn, Calendar } from "lucide-react";
+import { Home, Settings, Zap, LogIn, Calendar, Landmark } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 const navItems = [
   { href: "/",            icon: Home,     label: "Dashboard"   },
   { href: "/rooster",     icon: Calendar, label: "Rooster"     },
+  { href: "/finance",     icon: Landmark, label: "Finance"     },
   { href: "/automations", icon: Zap,      label: "Automatisch" },
   { href: "/settings",    icon: Settings, label: "Instellingen" },
 ];
@@ -103,7 +104,7 @@ export function Sidebar() {
             )}
             <div className="hidden md:flex flex-col min-w-0">
               <span className="text-xs font-semibold text-slate-200 truncate">
-                {user.firstName ?? user.username ?? "Jeffrey"}
+                {user.firstName ?? user.username ?? "Gebruiker"}
               </span>
               <span className="text-[10px] text-slate-500 truncate">
                 {user.primaryEmailAddress?.emailAddress ?? ""}

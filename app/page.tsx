@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Lightbulb, Power } from "lucide-react";
+import { Lightbulb, Power, AlertTriangle } from "lucide-react";
+import Link from "next/link";
 import { useDevices, useRooms, useLampCommand } from "@/hooks/useHomeapp";
 import { RoomSection } from "@/components/room/RoomSection";
 import { LampCard } from "@/components/lamp/LampCard";
@@ -9,10 +10,10 @@ import { SceneBar } from "@/components/scenes/SceneBar";
 import { GlobalColorPicker } from "@/components/scenes/GlobalColorPicker";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { useSchedule } from "@/hooks/useSchedule";
-import { useEffect } from "react";
+import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 
 export default function DashboardPage() {
-  const { data: devices = [], isLoading: loadingDevices } = useDevices();
+  const { data: devices = [], isLoading: loadingDevices, error: devicesError } = useDevices();
   const { data: rooms = [], isLoading: loadingRooms } = useRooms();
   const { mutate: sendCommand } = useLampCommand();
   const { nextDienst } = useSchedule();
@@ -25,19 +26,10 @@ export default function DashboardPage() {
     devices.forEach((d) => sendCommand({ id: d.id, cmd: { on: !allOn } }));
   };
 
-  // ─── Keyboard shortcut: Space = toggle all ───────────────────────────────
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.code !== "Space") return;
-      if ((e.target as HTMLElement).tagName === "INPUT") return;
-      e.preventDefault();
-      devices.forEach((d) => sendCommand({ id: d.id, cmd: { on: !allOn } }));
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [devices, allOn, sendCommand]);
+  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
+  useGlobalShortcuts({ devices, allOn, sendCommand });
 
-  // Group devices by room (stable)
+  // Group devices by room
   const devicesByRoom = rooms.map((room) => ({
     room,
     devices: devices.filter((d) => d.room_id === room.id),
@@ -106,6 +98,21 @@ export default function DashboardPage() {
       )}
 
       <main className="px-6 py-5 space-y-8 max-w-5xl mx-auto">
+        {/* ─── Error state ───────────────────────────────────────────────────── */}
+        {devicesError && (
+          <div className="glass rounded-2xl border border-red-500/20 p-4 flex items-start gap-3">
+            <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+            <div>
+              <p className="text-sm font-semibold text-red-300">Verbinding mislukt</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {devicesError instanceof Error
+                  ? devicesError.message
+                  : "Kan geen verbinding maken met de backend. Controleer of de server online is."}
+              </p>
+            </div>
+          </div>
+        )}
+
         {loadingDevices || loadingRooms ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
             {[...Array(6)].map((_, i) => (
@@ -122,10 +129,14 @@ export default function DashboardPage() {
             {devicesByRoom
               .filter(({ devices }) => devices.length > 0)
               .map(({ room, devices }) => (
-                <RoomSection key={room.id} room={room} devices={devices} />
+                <RoomSection
+                  key={room.id}
+                  room={room}
+                  devices={devices}
+                />
               ))}
 
-            {/* Unassigned */}
+            {/* Geen kamer — lampen zonder room_id */}
             {unassigned.length > 0 && (
               <section>
                 <div className="flex items-center gap-2 mb-3">
@@ -142,14 +153,22 @@ export default function DashboardPage() {
               </section>
             )}
 
-            {devices.length === 0 && (
+            {/* ─── Empty state ────────────────────────────────────────────── */}
+            {devices.length === 0 && !devicesError && (
               <div className="flex flex-col items-center justify-center py-24 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
                   <Lightbulb size={28} className="text-slate-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-slate-300">Geen lampen gevonden</h3>
                 <p className="text-sm text-slate-500 mt-1">
-                  Ga naar <span className="text-amber-400">Instellingen</span> om een lamp te registreren.
+                  Ga naar{" "}
+                  <Link
+                    href="/settings"
+                    className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
+                  >
+                    Instellingen
+                  </Link>{" "}
+                  om een lamp te registreren.
                 </p>
               </div>
             )}

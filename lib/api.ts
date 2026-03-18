@@ -102,3 +102,4 @@ export const devicesApi = {
 
   delete: (id: string) => apiFetch<void>(`/devices/${id}`, { method: "DELETE" }),
 };
+

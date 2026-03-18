@@ -10,7 +10,9 @@
 
 import type * as automations from "../automations.js";
 import type * as http from "../http.js";
+import type * as salary from "../salary.js";
 import type * as schedule from "../schedule.js";
+import type * as transactions from "../transactions.js";
 
 import type {
   ApiFromModules,
@@ -21,7 +23,9 @@ import type {
 declare const fullApi: ApiFromModules<{
   automations: typeof automations;
   http: typeof http;
+  salary: typeof salary;
   schedule: typeof schedule;
+  transactions: typeof transactions;
 }>;
 
 /**

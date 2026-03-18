@@ -10,9 +10,31 @@ import {
   saveSchedule, // localStorage cache for the automation engine
 } from "@/lib/schedule";
 
+// ─── Convex doc shape (spiegelt convex/schema.ts schedule tabel) ──────────────
+
+interface ScheduleDoc {
+  eventId:      string;
+  titel:        string;
+  startDatum:   string;
+  startTijd:    string;
+  eindDatum:    string;
+  eindTijd:     string;
+  werktijd:     string;
+  locatie:      string;
+  team:         string;
+  shiftType:    string;
+  prioriteit:   number;
+  duur:         number;
+  weeknr:       string;
+  dag:          string;
+  status:       string;
+  beschrijving: string;
+  heledag:      boolean;
+}
+
 // ─── Map Convex doc → DienstRow ───────────────────────────────────────────────
 
-function fromDoc(doc: any): DienstRow {
+function fromDoc(doc: ScheduleDoc): DienstRow {
   return {
     eventId:     doc.eventId,
     titel:       doc.titel,

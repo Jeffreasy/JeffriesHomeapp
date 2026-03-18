@@ -47,6 +47,35 @@ http.route({
   }),
 });
 
+// ─── POST /sync-salary ──────────────────────────────────────────────────────
+// Called by Google Apps Script after "Bouw Salaris Dashboard" run.
+// Body: { userId: string, salarisData: MaandRecord[] }
+// Auth: zelfde Bearer HOMEAPP_GAS_SECRET als /sync-schedule
+http.route({
+  path: "/sync-salary",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+
+    let body: any;
+    try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON" }, 400); }
+
+    const { userId, salarisData } = body;
+    if (!userId || !Array.isArray(salarisData)) {
+      return json({ ok: false, error: "userId + salarisData[] verplicht" }, 400);
+    }
+
+    try {
+      const result = await ctx.runMutation((internal as any).salary.bulkSalaryInternal, {
+        userId, salarisData,
+      });
+      return json({ ok: true, count: result.count });
+    } catch (e: any) {
+      return json({ ok: false, error: e.message ?? "DB fout" }, 500);
+    }
+  }),
+});
+
 // ─── GET /automations ───────────────────────────────────────────────────────
 // Called by Python automation engine to fetch active automations.
 // Query param: ?userId=xxx

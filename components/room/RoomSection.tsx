@@ -40,20 +40,23 @@ export function RoomSection({ room, devices }: RoomSectionProps) {
 
   return (
     <section aria-label={`Kamer ${room.name}`}>
-      {/* Room header — sticky on mobile so room name stays visible while scrolling */}
-      <div className="flex items-center justify-between mb-3 gap-2 sticky top-0 z-10 md:static py-2 -mx-1 px-1"
+      {/* Room header */}
+      <div
+        className="flex items-center justify-between mb-3 gap-2 sticky top-0 z-10 md:static py-2 -mx-1 px-1"
         style={{ background: "rgba(10,10,15,0.85)", backdropFilter: "blur(12px)" }}
       >
         <div className="flex items-center gap-2 min-w-0">
           <Home size={14} className="text-slate-500 flex-shrink-0" aria-hidden="true" />
           <h2 className="text-sm font-semibold text-slate-200 truncate">{room.name}</h2>
-          <span className="text-xs text-slate-600 flex-shrink-0" aria-label={`${onlineCount} van ${devices.length} online, ${onCount} aan`}>
+          <span
+            className="text-xs text-slate-600 flex-shrink-0"
+            aria-label={`${onlineCount} van ${devices.length} online, ${onCount} aan`}
+          >
             {onlineCount}/{devices.length} · {onCount} aan
           </span>
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          {/* Scene knop per kamer */}
           <button
             onClick={() => setShowScenes((v) => !v)}
             aria-expanded={showScenes}
@@ -75,7 +78,6 @@ export function RoomSection({ room, devices }: RoomSectionProps) {
             />
           </button>
 
-          {/* Kamer aan/uit */}
           <motion.button
             whileTap={{ scale: 0.92 }}
             onClick={toggleAll}

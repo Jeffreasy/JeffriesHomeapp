@@ -61,6 +61,7 @@ export function LampCard({ device }: LampCardProps) {
     <>
       {/* Card — min-h-[72px] ensures 48px+ touch target on mobile */}
       <div
+        data-testid={`lamp-card-${device.id}`}
         className={cn(
           "glass rounded-2xl overflow-hidden cursor-pointer select-none transition-all duration-200",
           "hover:bg-white/[0.06] hover:border-white/14",
@@ -82,13 +83,17 @@ export function LampCard({ device }: LampCardProps) {
       >
         {/* Card header */}
         <div className="p-4 flex items-center gap-3">
-          {/* Lamp icon with glow */}
+          {/* Lamp icon with glow + kleurring in RGB mode */}
           <div
             className="relative flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
             style={{
               background: isOn ? `${glowColor}22` : "rgba(255,255,255,0.05)",
               boxShadow: isOn ? `0 0 20px -4px ${glowColor}` : "none",
               transition: "background 0.4s, box-shadow 0.4s",
+              ...(isRgbMode && {
+                outline: `2px solid ${glowColor}80`,
+                outlineOffset: "2px",
+              }),
             }}
           >
             <Lightbulb

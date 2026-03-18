@@ -1,13 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { RefreshCw, Calendar, Upload, BarChart2, List } from "lucide-react";
+import { RefreshCw, Calendar, Upload, BarChart2, List, Euro } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useToast } from "@/components/ui/Toast";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { DienstItem } from "@/components/schedule/DienstItem";
 import { StatsView } from "@/components/schedule/StatsView";
+import { SalarisView } from "@/components/schedule/SalarisView";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   groupByWeekNr,
@@ -57,7 +58,7 @@ function WeekHeader({ weeknr, count, hours, open, onToggle }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = "agenda" | "statistieken";
+type Tab = "agenda" | "statistieken" | "salaris";
 
 export default function RoosterPage() {
   const {
@@ -152,8 +153,9 @@ export default function RoosterPage() {
         {/* Tabs */}
         <div className="flex gap-1">
           {([
-            { id: "agenda",         label: "Agenda",        icon: List      },
-            { id: "statistieken",   label: "Statistieken",  icon: BarChart2 },
+            { id: "agenda",       label: "Agenda",        icon: List      },
+            { id: "statistieken", label: "Statistieken",  icon: BarChart2 },
+            { id: "salaris",     label: "Salaris",       icon: Euro      },
           ] as const).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -271,6 +273,13 @@ export default function RoosterPage() {
         {tab === "statistieken" && (
           <ErrorBoundary>
             <StatsView diensten={diensten} />
+          </ErrorBoundary>
+        )}
+
+        {/* ════════════════════  SALARIS TAB  ════════════════════ */}
+        {tab === "salaris" && (
+          <ErrorBoundary>
+            <SalarisView />
           </ErrorBoundary>
         )}
 
