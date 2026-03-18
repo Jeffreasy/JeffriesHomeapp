@@ -102,6 +102,7 @@ export function useAutomations() {
 
   // NOTE: Automations worden uitgevoerd door de Python backend engine (24/7 Docker).
   // De browser is NOOIT verantwoordelijk voor het vuren van automations.
+  // lastCheck is null — de engine status is niet beschikbaar in de browser.
 
-  return { automations, add, addDienstWekkerPack, toggle, remove };
+  return { automations, add, addDienstWekkerPack, toggle, remove, lastCheck: null };
 }
