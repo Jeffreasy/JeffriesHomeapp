@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
@@ -9,10 +9,7 @@ import {
   type Automation,
   type ShiftType,
   createDienstWekkerPack,
-  shouldFire,
-  actionToCommand,
 } from "@/lib/automations";
-import { devicesApi } from "@/lib/api";
 
 // ─── Map Convex doc → Automation type ────────────────────────────────────────
 
@@ -38,13 +35,11 @@ export function useAutomations() {
   // ── Convex queries ────────────────────────────────────────────────────────
   const docs = useQuery(api.automations.list, userId ? { userId } : "skip");
   const automations: Automation[] = (docs ?? []).map(fromDoc);
-  const lastCheck = null; // shown in UI, will be updated by engine state
 
   // ── Convex mutations ──────────────────────────────────────────────────────
-  const createMutation  = useMutation(api.automations.create);
-  const toggleMutation  = useMutation(api.automations.toggle);
-  const removeMutation  = useMutation(api.automations.remove);
-  const markFiredMutation = useMutation(api.automations.markFired);
+  const createMutation        = useMutation(api.automations.create);
+  const toggleMutation        = useMutation(api.automations.toggle);
+  const removeMutation        = useMutation(api.automations.remove);
   const removeByGroupMutation = useMutation(api.automations.removeByGroup);
 
   // ── CRUD ─────────────────────────────────────────────────────────────────
@@ -105,44 +100,8 @@ export function useAutomations() {
     [userId, createMutation, removeByGroupMutation]
   );
 
-  // ── Engine: check every 15s ───────────────────────────────────────────────
-  useEffect(() => {
-    if (!userId) return;
+  // NOTE: Automations worden uitgevoerd door de Python backend engine (24/7 Docker).
+  // De browser is NOOIT verantwoordelijk voor het vuren van automations.
 
-    let deviceCache: any[] = [];
-
-    const tick = async () => {
-      if (!docs) return;
-      const current = docs.map(fromDoc);
-
-      for (const auto of current) {
-        if (!shouldFire(auto)) continue;
-
-        if (deviceCache.length === 0) {
-          try { deviceCache = await devicesApi.list(); } catch { continue; }
-        }
-
-        const targets = auto.action.deviceIds?.length
-          ? deviceCache.filter((d) => auto.action.deviceIds!.includes(d.id))
-          : deviceCache;
-
-        const cmd = actionToCommand(auto.action);
-        await Promise.allSettled(targets.map((d) => devicesApi.command(d.id, cmd)));
-
-        // Mark as fired in Convex
-        await markFiredMutation({
-          id: auto.id as Id<"automations">,
-          firedAt: new Date().toISOString(),
-        });
-
-        console.log(`[Automation] Fired: "${auto.name}"`);
-      }
-    };
-
-    tick();
-    const id = setInterval(tick, 15_000);
-    return () => clearInterval(id);
-  }, [userId, docs, markFiredMutation]);
-
-  return { automations, add, addDienstWekkerPack, toggle, remove, lastCheck };
+  return { automations, add, addDienstWekkerPack, toggle, remove };
 }
