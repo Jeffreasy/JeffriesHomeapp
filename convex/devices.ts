@@ -11,10 +11,20 @@ export const list = query({
     ctx.db.query("devices").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
 });
 
-// ─── Get single device ────────────────────────────────────────────────────────
+// ─── Get single device by v.id ───────────────────────────────────────────────
 export const get = query({
   args: { id: v.id("devices") },
   handler: async (ctx, { id }) => ctx.db.get(id),
+});
+
+// ─── Get single device by raw string ID (for HTTP actions) ───────────────────
+export const getByStringId = query({
+  args: { id: v.string() },
+  handler: async (ctx, { id }) => {
+    const normalId = ctx.db.normalizeId("devices", id);
+    if (!normalId) return null;
+    return ctx.db.get(normalId);
+  },
 });
 
 // ─── Create a new device ──────────────────────────────────────────────────────

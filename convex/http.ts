@@ -181,10 +181,7 @@ http.route({
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
     const url = new URL(req.url);
     const rawId = url.pathname.split("/").pop() ?? "";
-    const id = (ctx as any).db?.normalizeId?.("devices", rawId);
-    const device = id
-      ? await ctx.runQuery(api.devices.get, { id })
-      : null;
+    const device = await ctx.runQuery(api.devices.getByStringId, { id: rawId });
     if (!device) return json({ ok: false, error: "Niet gevonden" }, 404);
     return json({ ok: true, device });
   }),
