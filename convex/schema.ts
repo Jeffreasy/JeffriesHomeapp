@@ -2,6 +2,30 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  // ─── Devices (WiZ lampen) ──────────────────────────────────────────────────
+  devices: defineTable({
+    userId:       v.string(),
+    name:         v.string(),
+    ipAddress:    v.string(),
+    deviceType:   v.string(),              // "color_light"
+    roomId:       v.optional(v.string()),
+    manufacturer: v.optional(v.string()),
+    model:        v.optional(v.string()),
+    status:       v.string(),              // "online" | "offline"
+    lastSeen:     v.optional(v.string()),  // ISO timestamp
+    currentState: v.object({
+      on:         v.boolean(),
+      brightness: v.number(),
+      color_temp: v.number(),
+      r:          v.number(),
+      g:          v.number(),
+      b:          v.number(),
+    }),
+    commissionedAt: v.string(),            // ISO timestamp
+  })
+    .index("by_user",    ["userId"])
+    .index("by_user_ip", ["userId", "ipAddress"]),
+
   // ─── Automations ───────────────────────────────────────────────────────────
   automations: defineTable({
     userId:    v.string(), // Clerk user ID
