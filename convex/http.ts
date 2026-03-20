@@ -172,97 +172,80 @@ http.route({
   }),
 });
 
-// ─── GET /devices/{id} ───────────────────────────────────────────────────────
+// ─── GET /devices/* (single device lookup) ───────────────────────────────────
+// Convex HTTP router does NOT support {id} path params — use pathPrefix instead.
 // Called by FastAPI command endpoint to get the device IP.
 http.route({
-  path: "/devices/{id}",
+  pathPrefix: "/devices/",
   method: "GET",
   handler: httpAction(async (ctx, req) => {
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
     const url = new URL(req.url);
-    const rawId = url.pathname.split("/").pop() ?? "";
+    const rawId = url.pathname.replace(/^\/devices\//, "").split("/")[0];
+    if (!rawId) return json({ ok: false, error: "ID ontbreekt" }, 400);
     const device = await ctx.runQuery(api.devices.getByStringId, { id: rawId });
     if (!device) return json({ ok: false, error: "Niet gevonden" }, 404);
     return json({ ok: true, device });
   }),
 });
 
-// ─── PATCH /devices/{id}/state ────────────────────────────────────────────────
-// Called by FastAPI after executing a UDP command to sync state.
+// ─── PATCH /devices/* (update / state / status) ───────────────────────────────
+// Dispatches internally based on the sub-path:
+//   PATCH /devices/{id}         → update name/room/ip
+//   PATCH /devices/{id}/state   → sync state after UDP command
+//   PATCH /devices/{id}/status  → set online/offline
 http.route({
-  path: "/devices/{id}/state",
+  pathPrefix: "/devices/",
   method: "PATCH",
   handler: httpAction(async (ctx, req) => {
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
     const url = new URL(req.url);
-    const parts = url.pathname.split("/");
-    const deviceId = parts[parts.length - 2]; // /devices/{id}/state
+    const parts = url.pathname.replace(/^\/devices\//, "").split("/").filter(Boolean);
+    // parts[0] = deviceId, parts[1] = "state" | "status" | undefined
+    const deviceId = parts[0];
+    const sub      = parts[1]; // "state" | "status" | undefined
+    if (!deviceId) return json({ ok: false, error: "ID ontbreekt" }, 400);
+
     let body: any;
     try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON" }, 400); }
+
     try {
-      await ctx.runMutation(internal.devices.updateStateInternal, { deviceId, state: body });
-      return json({ ok: true });
+      if (sub === "state") {
+        // Update lamp state after UDP command executed by FastAPI
+        await ctx.runMutation(internal.devices.updateStateInternal, { deviceId, state: body });
+        return json({ ok: true });
+
+      } else if (sub === "status") {
+        // Set online/offline status from engine poll
+        const { status } = body;
+        if (!status) return json({ ok: false, error: "status verplicht" }, 400);
+        await ctx.runMutation(internal.devices.setStatusInternal, { deviceId, status });
+        return json({ ok: true });
+
+      } else {
+        // General update: name, room, ip
+        await ctx.runMutation(api.devices.update, { id: deviceId as any, ...body });
+        const device = await ctx.runQuery(api.devices.getByStringId, { id: deviceId });
+        return json({ ok: true, device });
+      }
     } catch (e: any) {
       return json({ ok: false, error: e.message ?? "DB fout" }, 500);
     }
   }),
 });
 
-// ─── PATCH /devices/{id}/status ──────────────────────────────────────────────
-// Called by automation engine to update online/offline status.
-http.route({
-  path: "/devices/{id}/status",
-  method: "PATCH",
-  handler: httpAction(async (ctx, req) => {
-    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
-    const url = new URL(req.url);
-    const parts = url.pathname.split("/");
-    const deviceId = parts[parts.length - 2];
-    let body: any;
-    try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON" }, 400); }
-    const { status } = body;
-    if (!status) return json({ ok: false, error: "status verplicht" }, 400);
-    try {
-      await ctx.runMutation(internal.devices.setStatusInternal, { deviceId, status });
-      return json({ ok: true });
-    } catch (e: any) {
-      return json({ ok: false, error: e.message ?? "DB fout" }, 500);
-    }
-  }),
-});
-
-// ─── PATCH /devices/{id} ─────────────────────────────────────────────────────
-// Called by FastAPI to update device name/room/ip.
-http.route({
-  path: "/devices/{id}",
-  method: "PATCH",
-  handler: httpAction(async (ctx, req) => {
-    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
-    const url = new URL(req.url);
-    const rawId = url.pathname.split("/").pop() ?? "";
-    let body: any;
-    try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON" }, 400); }
-    try {
-      await ctx.runMutation(api.devices.update, { id: rawId as any, ...body });
-      const device = await ctx.runQuery(api.devices.get, { id: rawId as any });
-      return json({ ok: true, device });
-    } catch (e: any) {
-      return json({ ok: false, error: e.message ?? "DB fout" }, 500);
-    }
-  }),
-});
-
-// ─── DELETE /devices/{id} ─────────────────────────────────────────────────────
+// ─── DELETE /devices/* ────────────────────────────────────────────────────────
 // Called by FastAPI to remove a device.
 http.route({
-  path: "/devices/{id}",
+  pathPrefix: "/devices/",
   method: "DELETE",
   handler: httpAction(async (ctx, req) => {
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
     const url = new URL(req.url);
-    const rawId = url.pathname.split("/").pop() ?? "";
+    const deviceId = url.pathname.replace(/^\/devices\//, "").split("/")[0];
+    if (!deviceId) return json({ ok: false, error: "ID ontbreekt" }, 400);
     try {
-      await ctx.runMutation(api.devices.remove, { id: rawId as any });
+      await ctx.runMutation(api.devices.remove, { id: deviceId as any });
       return json({ ok: true });
     } catch (e: any) {
       return json({ ok: false, error: e.message ?? "DB fout" }, 500);
