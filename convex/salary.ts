@@ -1,39 +1,82 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { query } from "./_generated/server";
+import {
+  berekenMaandloon,
+  groepeerPerMaand,
+  type ScheduleItem,
+} from "./lib/salaryCalc";
 
-// Shared field definition — gespiegeld van schema.ts
-const salaryFields = {
-  userId:             v.string(),
-  periode:            v.string(),       // "2026-03"
-  jaar:               v.number(),
-  maand:              v.number(),
-  aantalDiensten:     v.number(),
-  uurloonORT:         v.number(),
+// ─── Compute salary directly from schedule table ───────────────────────────────
+export const computeFromSchedule = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const alleDiensten = await ctx.db
+      .query("schedule")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
 
-  // Bruto componenten
-  basisLoon:          v.number(),
-  amtZeerintensief:   v.number(),
-  toeslagBalansvif:   v.number(),
-  ortTotaal:          v.number(),
-  extraUrenBedrag:    v.number(),
-  toeslagVakatieUren: v.number(),
-  reiskosten:         v.number(),
-  eenmaligTotaal:     v.number(),
-  brutoBetaling:      v.number(),
+    const items: ScheduleItem[] = alleDiensten
+      .filter((d) => d.status !== "VERWIJDERD" && !d.heledag)
+      .map((d) => ({
+        startDatum: d.startDatum,
+        startTijd:  d.startTijd,
+        eindTijd:   d.eindTijd,
+        duur:       d.duur,
+        dag:        d.dag,
+        shiftType:  d.shiftType,
+        status:     d.status,
+        heledag:    d.heledag,
+      }));
 
-  // Inhoudingen & netto
-  pensioenpremie:    v.number(),
-  loonheffingSchat:  v.number(),
-  nettoPrognose:     v.number(),
+    const perMaand  = groepeerPerMaand(items);
+    const maandKeys = Object.keys(perMaand).sort();
 
-  // Detail JSON strings (flexibel, geen nested Convex objects)
-  ortDetail:      v.optional(v.string()), // JSON: { VROEG: 45.50, ZONDAG: 89.20 }
-  eenmaligDetail: v.optional(v.string()), // JSON: [{ label, bedrag }]
+    return maandKeys.map((key) => {
+      const [jaar, maand] = key.split("-").map(Number);
+      return berekenMaandloon(jaar, maand, perMaand[key]);
+    });
+  },
+});
 
-  berekendOp: v.string(), // ISO timestamp
-};
+// ─── Huidige maand prognose ───────────────────────────────────────────────────
+export const currentMonthPrognose = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const now    = new Date();
+    const jaar   = now.getFullYear();
+    const maand  = now.getMonth() + 1;
+    const prefix = `${jaar}-${String(maand).padStart(2, "0")}`;
 
-// ─── List all salary records for current user (newest first) ─────────────────
+    const diensten = await ctx.db
+      .query("schedule")
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", userId).gte("startDatum", `${prefix}-01`)
+      )
+      .filter((q) =>
+        q.and(
+          q.lte(q.field("startDatum"), `${prefix}-31`),
+          q.neq(q.field("status"), "VERWIJDERD"),
+          q.eq(q.field("heledag"), false)
+        )
+      )
+      .collect();
+
+    const items: ScheduleItem[] = diensten.map((d) => ({
+      startDatum: d.startDatum,
+      startTijd:  d.startTijd,
+      eindTijd:   d.eindTijd,
+      duur:       d.duur,
+      dag:        d.dag,
+      shiftType:  d.shiftType,
+      status:     d.status,
+      heledag:    d.heledag,
+    }));
+
+    return berekenMaandloon(jaar, maand, items);
+  },
+});
+
+// ─── List all stored salary records (historisch, van vóór migratie) ───────────
 export const list = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
@@ -53,53 +96,5 @@ export const getByPeriode = query({
       .query("salary")
       .withIndex("by_user_periode", (q) => q.eq("userId", userId).eq("periode", periode))
       .first();
-  },
-});
-
-// ─── Internal bulk upsert (called from HTTP action) ──────────────────────────
-export const bulkSalaryInternal = internalMutation({
-  args: {
-    userId:      v.string(),
-    salarisData: v.array(v.object(salaryFields)),
-  },
-  handler: async (ctx, { userId, salarisData }) => {
-    let upserted = 0;
-
-    for (const record of salarisData) {
-      const existing = await ctx.db
-        .query("salary")
-        .withIndex("by_user_periode", (q) =>
-          q.eq("userId", userId).eq("periode", record.periode)
-        )
-        .first();
-
-      if (existing) {
-        await ctx.db.patch(existing._id, record);
-      } else {
-        await ctx.db.insert("salary", record);
-      }
-      upserted++;
-    }
-
-    return { count: upserted };
-  },
-});
-
-// ─── Direct mutation voor single-record update (optioneel, frontend gebruik) ──
-export const upsertSalary = mutation({
-  args: { userId: v.string(), record: v.object(salaryFields) },
-  handler: async (ctx, { userId, record }) => {
-    const existing = await ctx.db
-      .query("salary")
-      .withIndex("by_user_periode", (q) =>
-        q.eq("userId", userId).eq("periode", record.periode)
-      )
-      .first();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, record);
-      return existing._id;
-    }
-    return ctx.db.insert("salary", record);
   },
 });

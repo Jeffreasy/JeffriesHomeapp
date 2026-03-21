@@ -112,7 +112,8 @@ export default defineSchema({
     ortDetail:      v.optional(v.string()), // { VROEG: 45.50, ZONDAG: 89.20 }
     eenmaligDetail: v.optional(v.string()), // [{ label, bedrag }]
 
-    berekendOp: v.string(), // ISO timestamp van GAS-run
+    berekendOp: v.string(), // ISO timestamp van laatste berekening
+
   })
     .index("by_user", ["userId"])
     .index("by_user_periode", ["userId", "periode"]),
@@ -152,4 +153,25 @@ export default defineSchema({
     .index("by_user_categorie", ["userId", "categorie"])
     // Compound deduplicatie-index: zelfde CSV 2x uploaden = nul duplicaten
     .index("by_rekening_volgnr", ["rekeningIban", "volgnr"]),
+
+  // ─── Personal Events (Persoonlijke Google Agenda) ──────────────────────────
+  personalEvents: defineTable({
+    userId:            v.string(),
+    eventId:           v.string(),           // "Titel::startISO" — dedup sleutel
+    titel:             v.string(),
+    startDatum:        v.string(),           // "YYYY-MM-DD"
+    startTijd:         v.optional(v.string()), // "HH:MM" — leeg bij hele-dag events
+    eindDatum:         v.string(),
+    eindTijd:          v.optional(v.string()),
+    heledag:           v.boolean(),
+    locatie:           v.optional(v.string()),
+    beschrijving:      v.optional(v.string()),
+    status:            v.string(),           // "Aankomend" | "Voorbij" | "VERWIJDERD"
+    kalender:          v.string(),           // "Main"
+    conflictMetDienst: v.optional(v.string()),
+  })
+    .index("by_user",         ["userId"])
+    .index("by_user_date",    ["userId", "startDatum"])
+    .index("by_user_status",  ["userId", "status"])
+    .index("by_user_eventId", ["userId", "eventId"]),
 });

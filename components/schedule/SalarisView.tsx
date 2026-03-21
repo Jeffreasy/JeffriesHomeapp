@@ -39,7 +39,7 @@ function PrognoseCard({ record }: { record: SalarisRecord }) {
 
       {/* Bruto / Netto */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white/[0.04] rounded-xl p-3 border border-white/5">
+        <div className="bg-white/4 rounded-xl p-3 border border-white/5">
           <p className="text-[10px] text-slate-500 mb-1">▶ Bruto</p>
           <p className="text-xl font-bold text-white">{fmt(record.brutoBetaling)}</p>
         </div>
@@ -66,7 +66,7 @@ function PrognoseCard({ record }: { record: SalarisRecord }) {
 
       {/* ORT Detail */}
       {Object.keys(ort).length > 0 && (
-        <div className="bg-white/[0.02] rounded-lg p-3 border border-white/5 space-y-1">
+        <div className="bg-white/2 rounded-lg p-3 border border-white/5 space-y-1">
           <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-2">ORT detail</p>
           {Object.entries(ort).map(([k, v]) => (
             <div key={k} className="flex justify-between text-[11px]">
@@ -134,7 +134,7 @@ function JaarSectie({ jaar, records }: { jaar: number; records: SalarisRecord[] 
   return (
     <div className="glass rounded-2xl border border-white/5 overflow-hidden">
       {/* Jaar header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/2">
         <span className="text-sm font-bold text-slate-200">📅 {jaar}</span>
         <div className="flex items-center gap-4 text-xs">
           <span className="text-slate-500">Bruto <span className="text-slate-300 font-medium">{fmt(totBruto)}</span></span>
@@ -153,7 +153,7 @@ function JaarSectie({ jaar, records }: { jaar: number; records: SalarisRecord[] 
       </div>
 
       {/* Maand regels */}
-      <div className="divide-y divide-white/[0.03]">
+      <div className="divide-y divide-white/3">
         {sorted.map((r) => (
           <MaandRij key={r.periode} record={r} />
         ))}
@@ -168,7 +168,7 @@ function MaandRij({ record: r }: { record: SalarisRecord }) {
   }, [r.eenmaligDetail]);
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 hover:bg-white/[0.02] transition-colors">
+    <div className="flex items-center justify-between px-4 py-2.5 hover:bg-white/2 transition-colors">
       <div className="flex items-center gap-3 min-w-0">
         <span className="text-xs font-medium text-slate-400 w-8">{MAANDEN[r.maand - 1]}</span>
         <span className="text-[10px] text-slate-600">{r.aantalDiensten} diensten</span>
@@ -210,8 +210,8 @@ export function SalarisView() {
         <Euro size={36} className="text-slate-600 mx-auto mb-4" />
         <h3 className="text-base font-semibold text-slate-300 mb-1">Geen salarisdata</h3>
         <p className="text-sm text-slate-500">
-          Voer in Google Apps Script <strong>"Bouw Salaris Dashboard"</strong> uit.<br />
-          De data wordt daarna automatisch gesynchroniseerd.
+          Synchroniseer je rooster via de Sync-knop zodat diensten beschikbaar zijn.<br />
+          De salarisberekening wordt daarna automatisch gegenereerd.
         </p>
       </div>
     );

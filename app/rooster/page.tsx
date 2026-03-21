@@ -1,14 +1,17 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { RefreshCw, Calendar, Upload, BarChart2, List, Euro } from "lucide-react";
+import { RefreshCw, Calendar, Upload, BarChart2, List, Euro, CalendarDays, Zap } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
+import { useAction } from "convex/react";
+import { useUser } from "@clerk/nextjs";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useToast } from "@/components/ui/Toast";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { DienstItem } from "@/components/schedule/DienstItem";
 import { StatsView } from "@/components/schedule/StatsView";
 import { SalarisView } from "@/components/schedule/SalarisView";
+import { AfsprakenView } from "@/components/schedule/AfsprakenView";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   groupByWeekNr,
@@ -19,6 +22,8 @@ import {
 } from "@/lib/schedule";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import { api } from "@/convex/_generated/api";
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 
@@ -42,7 +47,7 @@ function WeekHeader({ weeknr, count, hours, open, onToggle }: {
 }) {
   return (
     <button onClick={onToggle}
-      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors border border-white/5">
+      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-white/3 hover:bg-white/6 transition-colors border border-white/5">
       <div className="flex items-center gap-3">
         <span className="text-xs font-bold text-slate-300">Week {weeknr}</span>
         <span className="text-[10px] text-slate-600">{count} diensten · {hours}u</span>
@@ -58,7 +63,7 @@ function WeekHeader({ weeknr, count, hours, open, onToggle }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = "agenda" | "statistieken" | "salaris";
+type Tab = "agenda" | "statistieken" | "salaris" | "afspraken";
 
 export default function RoosterPage() {
   const {
@@ -68,13 +73,31 @@ export default function RoosterPage() {
     meta,
     isLoading,
     importXlsx,
-    syncFromSheets,
     clear,
   } = useSchedule();
 
   const { success, error } = useToast();
+  const { user } = useUser();
   const fileRef = useRef<HTMLInputElement>(null);
   const today   = new Date().toISOString().slice(0, 10);
+
+  // Convex native calendar sync
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const syncNow = useAction((api as any).actions.syncSchedule.syncNow);
+  const [calSyncing, setCalSyncing] = useState(false);
+
+  const handleCalendarSync = async () => {
+    if (!user?.id) { error("Niet ingelogd"); return; }
+    setCalSyncing(true);
+    try {
+      const res = await syncNow({ userId: user.id }) as any;
+      success(`Rooster gesynchroniseerd: ${res.upserted} diensten bijgewerkt`);
+    } catch (e: any) {
+      error(`Sync mislukt: ${e.message ?? "onbekende fout"}`);
+    } finally {
+      setCalSyncing(false);
+    }
+  };
 
   const [tab,         setTab]         = useState<Tab>("agenda");
   const [showHistory, setShowHistory] = useState(false);
@@ -99,11 +122,6 @@ export default function RoosterPage() {
       return next;
     });
 
-  const handleSync = async () => {
-    const res = await syncFromSheets();
-    if (res.ok) success(`${res.count} diensten gesynchroniseerd van Google Sheets`);
-    else error(`Sync mislukt: ${res.error}`);
-  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -141,10 +159,11 @@ export default function RoosterPage() {
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-slate-200 transition-all">
               <Upload size={12} /> XLSX
             </button>
-            <button onClick={handleSync} disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-all">
-              <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
-              {isLoading ? "Bezig..." : "Sync Sheets"}
+
+            <button onClick={handleCalendarSync} disabled={calSyncing}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-all cursor-pointer disabled:opacity-50">
+              <Zap size={13} className={calSyncing ? "animate-pulse" : ""} />
+              {calSyncing ? "Syncing..." : "Sync Agenda"}
             </button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" />
           </div>
@@ -153,9 +172,10 @@ export default function RoosterPage() {
         {/* Tabs */}
         <div className="flex gap-1">
           {([
-            { id: "agenda",       label: "Agenda",        icon: List      },
-            { id: "statistieken", label: "Statistieken",  icon: BarChart2 },
-            { id: "salaris",     label: "Salaris",       icon: Euro      },
+            { id: "agenda",       label: "Agenda",       icon: List         },
+            { id: "statistieken", label: "Statistieken", icon: BarChart2    },
+            { id: "salaris",      label: "Salaris",      icon: Euro         },
+            { id: "afspraken",    label: "Afspraken",    icon: CalendarDays },
           ] as const).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -184,10 +204,10 @@ export default function RoosterPage() {
             <p className="text-sm text-slate-500 mb-5">
               Synchroniseer je dienstenrooster vanuit Google Sheets of upload een .xlsx bestand.
             </p>
-            <button onClick={handleSync} disabled={isLoading}
+            <button onClick={handleCalendarSync} disabled={calSyncing}
               className="px-5 py-2.5 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-colors inline-flex items-center gap-2 mx-auto">
-              <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
-              {isLoading ? "Bezig met syncing..." : "Sync van Google Sheets"}
+              <Zap size={13} className={calSyncing ? "animate-pulse" : ""} />
+              {calSyncing ? "Bezig met syncing..." : "Sync Google Agenda"}
             </button>
           </div>
         )}
@@ -207,7 +227,7 @@ export default function RoosterPage() {
 
             {/* Volgende dienst */}
             <ErrorBoundary>
-              <NextShiftCard dienst={nextDienst} onImport={handleSync} />
+              <NextShiftCard dienst={nextDienst} onImport={handleCalendarSync} />
             </ErrorBoundary>
 
             {/* Week groups */}
@@ -280,6 +300,13 @@ export default function RoosterPage() {
         {tab === "salaris" && (
           <ErrorBoundary>
             <SalarisView />
+          </ErrorBoundary>
+        )}
+
+        {/* ════════════════════  AFSPRAKEN TAB  ════════════════════ */}
+        {tab === "afspraken" && (
+          <ErrorBoundary>
+            <AfsprakenView />
           </ErrorBoundary>
         )}
 

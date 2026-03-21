@@ -7,7 +7,6 @@ import { api } from "@/convex/_generated/api";
 import {
   type DienstRow, type ScheduleMeta,
   parseXlsxRow, getUpcoming, getNextDienst, getThisWeek,
-  saveSchedule, // localStorage cache for the automation engine
 } from "@/lib/schedule";
 
 // ─── Convex doc shape (spiegelt convex/schema.ts schedule tabel) ──────────────
@@ -74,41 +73,6 @@ export function useSchedule() {
 
   const isLoading = docs === undefined;
 
-  // ── Sync from Google Sheets CSV ───────────────────────────────────────────
-  const syncFromSheets = useCallback(async () => {
-    if (!userId) return { ok: false, count: 0, error: "Niet ingelogd" };
-    try {
-      const res = await fetch("/api/schedule", { cache: "no-store" });
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        return { ok: false, count: 0, error: data.error ?? "Sync mislukt" };
-      }
-
-      const dienstenPayload = data.diensten.map((d: DienstRow) => ({
-        ...d,
-        userId,
-      }));
-
-      await bulkImportMutation({
-        userId,
-        diensten: dienstenPayload,
-        importedAt: data.syncedAt ?? new Date().toISOString(),
-        fileName: "Google Sheets (auto-sync)",
-      });
-
-      // Cache for the local automation engine (shouldFire reads from localStorage)
-      saveSchedule(data.diensten, {
-        importedAt: data.syncedAt ?? new Date().toISOString(),
-        fileName:   "Google Sheets (auto-sync)",
-        totalRows:  data.count,
-      });
-
-      return { ok: true, count: data.count };
-    } catch (e: any) {
-      return { ok: false, count: 0, error: e.message ?? "Verbindingsfout" };
-    }
-  }, [userId, bulkImportMutation]);
 
   // ── Import from xlsx file ─────────────────────────────────────────────────
   const importXlsx = useCallback(async (file: File) => {
@@ -152,7 +116,6 @@ export function useSchedule() {
   }, [userId, bulkImportMutation]);
 
   const clear = useCallback(async () => {
-    // Bulk import empty array effectively clears schedule
     if (!userId) return;
     await bulkImportMutation({
       userId,
@@ -170,7 +133,6 @@ export function useSchedule() {
     upcoming:   getUpcoming(diensten, 30),
     isLoading,
     importXlsx,
-    syncFromSheets,
     clear,
   };
 }

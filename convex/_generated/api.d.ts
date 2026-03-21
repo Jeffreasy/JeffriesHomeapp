@@ -8,9 +8,17 @@
  * @module
  */
 
+import type * as actions_processPendingCalendar from "../actions/processPendingCalendar.js";
+import type * as actions_syncSchedule from "../actions/syncSchedule.js";
+import type * as actions_syncTodoist from "../actions/syncTodoist.js";
 import type * as automations from "../automations.js";
+import type * as crons from "../crons.js";
 import type * as devices from "../devices.js";
 import type * as http from "../http.js";
+import type * as lib_config from "../lib/config.js";
+import type * as lib_googleAuth from "../lib/googleAuth.js";
+import type * as lib_salaryCalc from "../lib/salaryCalc.js";
+import type * as personalEvents from "../personalEvents.js";
 import type * as salary from "../salary.js";
 import type * as schedule from "../schedule.js";
 import type * as transactions from "../transactions.js";
@@ -22,9 +30,17 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "actions/processPendingCalendar": typeof actions_processPendingCalendar;
+  "actions/syncSchedule": typeof actions_syncSchedule;
+  "actions/syncTodoist": typeof actions_syncTodoist;
   automations: typeof automations;
+  crons: typeof crons;
   devices: typeof devices;
   http: typeof http;
+  "lib/config": typeof lib_config;
+  "lib/googleAuth": typeof lib_googleAuth;
+  "lib/salaryCalc": typeof lib_salaryCalc;
+  personalEvents: typeof personalEvents;
   salary: typeof salary;
   schedule: typeof schedule;
   transactions: typeof transactions;
