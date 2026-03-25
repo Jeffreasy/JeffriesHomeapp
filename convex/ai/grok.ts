@@ -223,6 +223,37 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "salarisOpvragen",
+      description: "Haal salaris/loon informatie op voor een specifieke maand. Toont bruto, netto, ORT-toeslag, basis loon, en aantal diensten. Gebruik dit als de gebruiker vraagt naar salaris, loon, ORT, of wat ze verdienen in een specifieke maand.",
+      parameters: {
+        type: "object",
+        properties: {
+          maand: { type: "number", description: "Maandnummer (1-12)" },
+          jaar: { type: "number", description: "Jaar (default: huidig jaar)" },
+        },
+        required: ["maand"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "transactiesZoeken",
+      description: "Doorzoek bank transacties op tegenpartij, omschrijving of categorie. Gebruik dit als de gebruiker vraagt naar specifieke uitgaven, betalingen, of transacties.",
+      parameters: {
+        type: "object",
+        properties: {
+          zoekterm: { type: "string", description: "Zoekterm (doorzoekt tegenpartij, omschrijving)" },
+          categorie: { type: "string", description: "Optioneel: filter op categorie", enum: ["Boodschappen", "Vaste lasten", "Vrije tijd", "Abonnementen", "Vervoer", "Zorg", "Overig"] },
+          maxAantal: { type: "number", description: "Max resultaten (default 15)" },
+        },
+        required: ["zoekterm"],
+      },
+    },
+  },
 ];
 
 // ─── Tool Execution ──────────────────────────────────────────────────────────
@@ -521,6 +552,78 @@ async function executeTool(
         });
       } catch (err) {
         return JSON.stringify({ error: `Diensten ophalen mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "salarisOpvragen": {
+      try {
+        const maand = args.maand as number;
+        const jaar = (args.jaar as number) ?? new Date().getFullYear();
+        const periode = `${jaar}-${String(maand).padStart(2, "0")}`;
+
+        // Probeer opgeslagen salaris
+        const stored = await ctx.runQuery(api.salary.getByPeriode, { userId: OWNER_USER_ID, periode });
+        if (stored) {
+          return JSON.stringify({
+            bron: "opgeslagen",
+            periode, bruto: stored.brutoBetaling, netto: stored.nettoPrognose,
+            ort: stored.ortTotaal, basisLoon: stored.basisLoon,
+            diensten: stored.aantalDiensten,
+          });
+        }
+
+        // Bereken uit rooster
+        const berekend = await ctx.runQuery(api.salary.computeFromSchedule, { userId: OWNER_USER_ID });
+        const maandData = berekend.find((s: any) => s.periode === periode);
+        if (maandData) {
+          return JSON.stringify({
+            bron: "berekend_uit_rooster",
+            periode, bruto: maandData.brutoBetaling, netto: maandData.nettoPrognose,
+            ort: maandData.ortTotaal, basisLoon: maandData.basisLoon,
+            diensten: maandData.aantalDiensten,
+            ortDetails: maandData.ortDetails,
+          });
+        }
+
+        return JSON.stringify({ error: `Geen salaris data voor ${periode}` });
+      } catch (err) {
+        return JSON.stringify({ error: `Salaris ophalen mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "transactiesZoeken": {
+      try {
+        const zoekterm = (args.zoekterm as string).toLowerCase();
+        const maxAantal = (args.maxAantal as number) ?? 15;
+        const categorie = args.categorie as string | undefined;
+
+        const allTxs = await ctx.runQuery(internal.transactions.listInternal, { userId: OWNER_USER_ID });
+        let matches = allTxs.filter((tx: any) =>
+          tx.tegenpartijNaam?.toLowerCase().includes(zoekterm) ||
+          tx.omschrijving?.toLowerCase().includes(zoekterm)
+        );
+
+        if (categorie) matches = matches.filter((tx: any) => tx.categorie === categorie);
+
+        const results = matches
+          .sort((a: any, b: any) => b.datum.localeCompare(a.datum))
+          .slice(0, maxAantal)
+          .map((tx: any) => ({
+            datum: tx.datum, bedrag: tx.bedrag,
+            tegenpartij: tx.tegenpartijNaam ?? "Onbekend",
+            omschrijving: tx.omschrijving?.slice(0, 60),
+            categorie: tx.categorie, saldo: tx.saldoNaTrn,
+          }));
+
+        const totaal = matches.reduce((s: number, tx: any) => s + tx.bedrag, 0);
+
+        return JSON.stringify({
+          zoekterm, resultaten: matches.length,
+          getoond: results.length, totaalBedrag: Math.round(totaal * 100) / 100,
+          transacties: results,
+        });
+      } catch (err) {
+        return JSON.stringify({ error: `Transacties zoeken mislukt: ${(err as Error).message}` });
       }
     }
 

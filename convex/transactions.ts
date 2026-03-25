@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -273,4 +273,14 @@ export const getStats = query({
       ibannen,
     };
   },
+});
+
+/** Interne query: alle transacties voor een user (voor AI actions). */
+export const listInternal = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) =>
+    ctx.db
+      .query("transactions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect(),
 });
