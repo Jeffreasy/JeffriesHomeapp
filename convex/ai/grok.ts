@@ -326,8 +326,23 @@ async function executeTool(
           userId,
           gmailId: args.gmailId as string,
         });
-        // Truncate HTML, geef text body + metadata
-        const body = result.text || result.html?.replace(/<[^>]+>/g, " ").slice(0, 2000) || "(geen body)";
+        // Strip HTML naar leesbare tekst: verwijder style/script blokken, dan tags, dan whitespace
+        const cleanHtml = (html: string) =>
+          html
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+            .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, "")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&amp;/gi, "&")
+            .replace(/&lt;/gi, "<")
+            .replace(/&gt;/gi, ">")
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/?(p|div|tr|li|h[1-6])[^>]*>/gi, "\n")
+            .replace(/<[^>]+>/g, "")
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+        const body = result.text || cleanHtml(result.html ?? "") || "(geen body)";
         return JSON.stringify({
           van: result.from, aan: result.to, cc: result.cc,
           onderwerp: result.subject, datum: result.date,
