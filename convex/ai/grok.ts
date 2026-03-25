@@ -20,7 +20,7 @@ import type { AgentMeta } from "./registry";
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 const GROK_MODEL   = "grok-4-1-fast";
 const OWNER_USER_ID = "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
-const MAX_TOOL_ROUNDS = 3;
+const MAX_TOOL_ROUNDS = 5;
 
 // ─── Tool Definitions (xAI function calling format) ──────────────────────────
 
@@ -149,6 +149,60 @@ const TOOLS = [
           body: { type: "string", description: "Reply body tekst" },
         },
         required: ["gmailId", "threadId", "aan", "body"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "bulkMarkeerGelezen",
+      description: "Markeer MEERDERE emails tegelijk als gelezen. Gebruik dit voor bulk operaties zoals 'markeer alle promoties als gelezen'. Geef een array van gmailIds.",
+      parameters: {
+        type: "object",
+        properties: {
+          gmailIds: { type: "array", items: { type: "string" }, description: "Array van Gmail bericht IDs" },
+          gelezen: { type: "boolean", description: "true=gelezen, false=ongelezen" },
+        },
+        required: ["gmailIds", "gelezen"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "bulkVerwijder",
+      description: "Verwijder MEERDERE emails tegelijk naar prullenbak. Gebruik dit voor bulk opruimen.",
+      parameters: {
+        type: "object",
+        properties: {
+          gmailIds: { type: "array", items: { type: "string" }, description: "Array van Gmail bericht IDs" },
+        },
+        required: ["gmailIds"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "inboxOpruimen",
+      description: "Smart inbox opruim-tool. Filtert emails op categorie, leeftijd, of afzender en voert bulk acties uit. Gebruik dit als de gebruiker vraagt om inbox op te schonen, promoties te verwijderen, of nieuwsbrieven op te ruimen.",
+      parameters: {
+        type: "object",
+        properties: {
+          filter: { 
+            type: "string", 
+            enum: ["promoties", "social", "forums", "updates", "oud_ongelezen", "van_afzender"],
+            description: "Welke emails te filteren" 
+          },
+          actie: {
+            type: "string",
+            enum: ["gelezen_markeren", "verwijderen"],
+            description: "Wat te doen met de gefilterde emails"
+          },
+          afzender: { type: "string", description: "Afzender naam/email (alleen bij filter=van_afzender)" },
+          maxAantal: { type: "number", description: "Max aantal emails om te verwerken (default 50)" },
+        },
+        required: ["filter", "actie"],
       },
     },
   },
@@ -323,6 +377,82 @@ async function executeTool(
         return JSON.stringify({ ok: true, beschrijving: `Reply verstuurd naar ${args.aan}` });
       } catch (err) {
         return JSON.stringify({ error: `Beantwoorden mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "bulkMarkeerGelezen": {
+      const gmailIds = args.gmailIds as string[];
+      if (!gmailIds.length) return JSON.stringify({ error: "Geen gmailIds opgegeven" });
+      try {
+        const result = await ctx.runAction(api.actions.sendGmail.bulkMarkGelezen, {
+          userId: OWNER_USER_ID, gmailIds, gelezen: args.gelezen as boolean,
+        });
+        return JSON.stringify({ ok: true, beschrijving: `${result.count} emails ${args.gelezen ? "gelezen" : "ongelezen"} gemarkeerd` });
+      } catch (err) {
+        return JSON.stringify({ error: `Bulk markeren mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "bulkVerwijder": {
+      const gmailIds = args.gmailIds as string[];
+      if (!gmailIds.length) return JSON.stringify({ error: "Geen gmailIds opgegeven" });
+      try {
+        const result = await ctx.runAction(api.actions.sendGmail.bulkTrash, {
+          userId: OWNER_USER_ID, gmailIds,
+        });
+        return JSON.stringify({ ok: true, beschrijving: `${result.count} emails verwijderd` });
+      } catch (err) {
+        return JSON.stringify({ error: `Bulk verwijderen mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "inboxOpruimen": {
+      try {
+        const allEmails = await ctx.runQuery(api.emails.list, { userId: OWNER_USER_ID });
+        const active = allEmails.filter((e: any) => !e.isVerwijderd);
+        const filter = args.filter as string;
+        const maxAantal = (args.maxAantal as number) ?? 50;
+        let filtered: any[] = [];
+
+        switch (filter) {
+          case "promoties":     filtered = active.filter((e: any) => e.categorie === "promotions"); break;
+          case "social":        filtered = active.filter((e: any) => e.categorie === "social"); break;
+          case "forums":        filtered = active.filter((e: any) => e.categorie === "forums"); break;
+          case "updates":       filtered = active.filter((e: any) => e.categorie === "updates"); break;
+          case "oud_ongelezen":  filtered = active.filter((e: any) => !e.isGelezen && (Date.now() - e.ontvangen > 7 * 86400000)); break;
+          case "van_afzender": {
+            const afzender = (args.afzender as string || "").toLowerCase();
+            filtered = active.filter((e: any) => e.from?.toLowerCase().includes(afzender));
+            break;
+          }
+        }
+
+        const targets = filtered.slice(0, maxAantal);
+        if (targets.length === 0) {
+          return JSON.stringify({ ok: true, beschrijving: `Geen ${filter} emails gevonden`, count: 0 });
+        }
+
+        const gmailIds = targets.map((e: any) => e.gmailId);
+        const actie = args.actie as string;
+
+        if (actie === "gelezen_markeren") {
+          await ctx.runAction(api.actions.sendGmail.bulkMarkGelezen, {
+            userId: OWNER_USER_ID, gmailIds, gelezen: true,
+          });
+        } else {
+          await ctx.runAction(api.actions.sendGmail.bulkTrash, {
+            userId: OWNER_USER_ID, gmailIds,
+          });
+        }
+
+        return JSON.stringify({
+          ok: true,
+          beschrijving: `${targets.length} ${filter} emails ${actie === "gelezen_markeren" ? "als gelezen gemarkeerd" : "verwijderd"}`,
+          count: targets.length,
+          totaalInFilter: filtered.length,
+        });
+      } catch (err) {
+        return JSON.stringify({ error: `Inbox opruimen mislukt: ${(err as Error).message}` });
       }
     }
 

@@ -222,3 +222,65 @@ export const markSter = action({
     return { ok: true };
   },
 });
+
+// ─── Bulk Operations (Gmail batchModify) ─────────────────────────────────────
+
+/** Batch markeer meerdere emails als gelezen/ongelezen. */
+export const bulkMarkGelezen = action({
+  args: {
+    userId:   v.string(),
+    gmailIds: v.array(v.string()),
+    gelezen:  v.boolean(),
+  },
+  handler: async (ctx, { userId, gmailIds, gelezen }) => {
+    if (gmailIds.length === 0) return { ok: true, count: 0 };
+
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+
+    await gmail.users.messages.batchModify({
+      userId: "me",
+      requestBody: {
+        ids: gmailIds,
+        ...(gelezen
+          ? { removeLabelIds: ["UNREAD"] }
+          : { addLabelIds: ["UNREAD"] }),
+      },
+    });
+
+    // Sync Convex state
+    for (const gmailId of gmailIds) {
+      await ctx.runMutation(internal.emails.markGelezenInternal, { userId, gmailId, isGelezen: gelezen });
+    }
+    return { ok: true, count: gmailIds.length };
+  },
+});
+
+/** Batch verwijder meerdere emails (naar prullenbak). */
+export const bulkTrash = action({
+  args: {
+    userId:   v.string(),
+    gmailIds: v.array(v.string()),
+  },
+  handler: async (ctx, { userId, gmailIds }) => {
+    if (gmailIds.length === 0) return { ok: true, count: 0 };
+
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+
+    // Gmail heeft geen batchTrash, dus batchModify met TRASH label
+    await gmail.users.messages.batchModify({
+      userId: "me",
+      requestBody: {
+        ids: gmailIds,
+        addLabelIds: ["TRASH"],
+        removeLabelIds: ["INBOX"],
+      },
+    });
+
+    for (const gmailId of gmailIds) {
+      await ctx.runMutation(internal.emails.trashInternal, { userId, gmailId, isVerwijderd: true });
+    }
+    return { ok: true, count: gmailIds.length };
+  },
+});
