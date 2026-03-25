@@ -278,20 +278,30 @@ const TOOLS = [
     type: "function" as const,
     function: {
       name: "afspraakMaken",
-      description: "Maak een nieuwe persoonlijke afspraak aan. De afspraak wordt automatisch gesynchroniseerd naar Google Calendar. Gebruik dit als de gebruiker een afspraak, event, of reminder wil aanmaken.",
+      description: `Maak een professionele persoonlijke afspraak aan met slimme templates. De afspraak wordt automatisch gesynchroniseerd naar Google Calendar met kleurcodering en herinneringen.
+
+BELANGRIJK — Professioneel Template Protocol:
+1. Titel: Gebruik een duidelijke, gestructureerde titel. Voeg een relevant emoji prefix toe (☕ sociaal, 💼 werk, 🏥 gezondheid, 🏋️ sport, 📋 admin, 🎓 studie, 🔧 onderhoud, 🎉 evenement).
+2. Beschrijving: Genereer ALTIJD een gestructureerde beschrijving met:
+   - Doel/context van de afspraak
+   - Eventuele agendapunten of voorbereiding
+   - Relevante contactinfo of locatiedetails
+3. Categorie: Classificeer het type afspraak voor kleurcodering in Google Calendar.
+4. Slimme defaults: Als gebruiker geen tijd noemt, kies logische tijden (koffie=10:00-11:00, lunch=12:30-13:30, avondeten=18:00-19:30, sport=07:00-08:00).`,
       parameters: {
         type: "object",
         properties: {
-          titel: { type: "string", description: "Titel van de afspraak" },
+          titel: { type: "string", description: "Professionele titel MET emoji prefix (bijv. '☕ Koffie met Maarten')" },
           startDatum: { type: "string", description: "Startdatum in YYYY-MM-DD formaat" },
           eindDatum: { type: "string", description: "Einddatum in YYYY-MM-DD formaat (zelfde als start voor eendaagse)" },
-          startTijd: { type: "string", description: "Starttijd HH:MM (optioneel, leeg voor hele dag)" },
-          eindTijd: { type: "string", description: "Eindtijd HH:MM (optioneel)" },
+          startTijd: { type: "string", description: "Starttijd HH:MM — gebruik slimme defaults als gebruiker geen tijd noemt" },
+          eindTijd: { type: "string", description: "Eindtijd HH:MM — gebruik slimme defaults" },
           heledag: { type: "boolean", description: "true voor hele dag event, false voor tijdsgebonden" },
           locatie: { type: "string", description: "Locatie (optioneel)" },
-          beschrijving: { type: "string", description: "Extra beschrijving (optioneel)" },
+          beschrijving: { type: "string", description: "Gestructureerde beschrijving met doel, agendapunten, en voorbereiding" },
+          categorie: { type: "string", enum: ["sociaal", "werk", "gezondheid", "sport", "admin", "studie", "onderhoud", "evenement", "overig"], description: "Type afspraak voor Google Calendar kleurcodering" },
         },
-        required: ["titel", "startDatum", "eindDatum", "heledag"],
+        required: ["titel", "startDatum", "eindDatum", "heledag", "categorie"],
       },
     },
   },
@@ -766,6 +776,13 @@ async function executeTool(
 
     case "afspraakMaken": {
       try {
+        const categorie = (args.categorie as string) ?? "overig";
+        const rawBeschrijving = (args.beschrijving as string) ?? "";
+        // Embed categorie as structured tag for processPendingCalendar color mapping
+        const beschrijving = rawBeschrijving
+          ? `${rawBeschrijving}\n\n---\n[categorie:${categorie}]`
+          : `[categorie:${categorie}]`;
+
         const result = await ctx.runMutation(api.personalEvents.create, {
           userId,
           titel: args.titel as string,
@@ -775,13 +792,24 @@ async function executeTool(
           startTijd: args.startTijd as string | undefined,
           eindTijd: args.eindTijd as string | undefined,
           locatie: args.locatie as string | undefined,
-          beschrijving: args.beschrijving as string | undefined,
+          beschrijving,
         });
+
+        const tijdInfo = args.heledag
+          ? "hele dag"
+          : `${args.startTijd ?? "?"} - ${args.eindTijd ?? "?"}`;
+
         return JSON.stringify({
           ok: true,
-          beschrijving: `Afspraak "${args.titel}" aangemaakt op ${args.startDatum}`,
+          beschrijving: `Afspraak "${args.titel}" aangemaakt`,
+          details: {
+            datum: args.startDatum,
+            tijd: tijdInfo,
+            categorie,
+            locatie: args.locatie ?? "Niet opgegeven",
+            googleSync: "Wordt automatisch gesynchroniseerd met kleurcodering en herinneringen",
+          },
           eventId: result.eventId,
-          status: "PendingCreate — wordt automatisch gesynchroniseerd naar Google Calendar",
         });
       } catch (err) {
         return JSON.stringify({ error: `Afspraak aanmaken mislukt: ${(err as Error).message}` });
