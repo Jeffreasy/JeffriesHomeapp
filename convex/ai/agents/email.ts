@@ -1,67 +1,110 @@
 /**
- * 📧 Email Director — delegeert naar 4 email sub-agents
+ * 📧 Email Agent — "De inbox specialist"
  *
- * Email Director is een hub die Grok helpt de juiste email specialist te kiezen.
- * Geeft compact overzicht + verwijzingen naar sub-agents.
+ * Geconsolideerde email agent: combineert analyse, triage, search en compose
+ * in één efficiënte agent. Vervangt de voormalige Director + 4 sub-agents.
  */
 
 import type { AgentDefinition, ContextOptions } from "../registry";
-import { emailAnalystAgent }  from "./emailAnalyst";
-import { emailComposerAgent } from "./emailComposer";
-import { emailManagerAgent }  from "./emailManager";
-import { emailReaderAgent }   from "./emailReader";
 
 export const emailAgent: AgentDefinition = {
   id:           "email",
-  naam:         "Email Director",
+  naam:         "Email Agent",
   emoji:        "📧",
-  beschrijving: "Email hub — routeert naar gespecialiseerde email sub-agents. " +
-                "Gebruik voor een snel inbox overzicht, of vraag een specifieke " +
-                "sub-agent voor gedetailleerde taken.",
+  beschrijving: "Complete email specialist. Analyseert inbox patronen, organiseert en triageert, " +
+                "zoekt en leest emails, en kan berichten versturen en beantwoorden.",
   domein:       ["emails", "emailSyncMeta"],
   capabilities: [
-    "Snel inbox overzicht geven",
-    "Routeren naar Email Analyst (📊) voor trends en patronen",
-    "Routeren naar Email Composer (✍️) voor versturen en reply",
-    "Routeren naar Email Manager (🗂️) voor organiseren en opruimen",
-    "Routeren naar Email Reader (🔍) voor zoeken en lezen",
+    "Inbox statistieken en ongelezen overzicht",
+    "Top afzenders ranking met frequentie",
+    "Email zoeken en lezen (on-demand via Gmail API)",
+    "Gelezen/ongelezen markeren, ster, prullenbak",
+    "Bulk operaties (markeer gelezen, verwijder)",
+    "Email versturen en threads beantwoorden",
+    "Inbox triage suggesties (oud/nieuwsbrieven)",
+    "Categorie verdeling (primary/social/promotions)",
   ],
-  tools: [
-    {
-      naam: "ai.router.getAgentContext",
-      type: "query",
-      beschrijving: "Sub-agent context ophalen",
-      endpoint: "GET /ai/agent/:id",
-      parameters: [
-        { naam: "agentId", type: "string", beschrijving: "Sub-agent ID", verplicht: true, enum: ["email-analyst", "email-composer", "email-manager", "email-reader"] },
-        { naam: "userId",  type: "string", beschrijving: "Gebruiker ID", verplicht: true },
-      ],
-    },
-  ],
+  tools: [],
 
   getContext: async (ctx, userId, opts?: ContextOptions) => {
-    // ── Delegation naar sub-agents (lite) ─────────────────────────────────
-    const [analyst, composer, manager, reader] = await Promise.all([
-      emailAnalystAgent.getContext(ctx, userId, { lite: true }),
-      emailComposerAgent.getContext(ctx, userId, { lite: true }),
-      emailManagerAgent.getContext(ctx, userId, { lite: true }),
-      emailReaderAgent.getContext(ctx, userId, { lite: true }),
+    const [allEmails, syncMeta] = await Promise.all([
+      ctx.db.query("emails").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("emailSyncMeta").withIndex("by_user", (q) => q.eq("userId", userId)).first(),
     ]);
 
+    const active  = allEmails.filter((e) => !e.isVerwijderd);
+    const inbox   = active.filter((e) => e.labelIds.includes("INBOX"));
+    const ongelezen = inbox.filter((e) => !e.isGelezen);
+
+    // ── Lite mode (voor dashboard delegation) ────────────────────────────
     if (opts?.lite) {
-      return { analyst, manager };
+      return {
+        totaal: active.length,
+        ongelezen: ongelezen.length,
+        prullenbak: allEmails.filter((e) => e.isVerwijderd).length,
+      };
     }
 
+    // ── Top afzenders (max 10) ────────────────────────────────────────────
+    const senderMap = new Map<string, { count: number; ongelezen: number }>();
+    for (const e of active) {
+      const sender = e.from.replace(/<.*>/, "").trim() || e.from;
+      const entry = senderMap.get(sender) ?? { count: 0, ongelezen: 0 };
+      entry.count++;
+      if (!e.isGelezen) entry.ongelezen++;
+      senderMap.set(sender, entry);
+    }
+    const topAfzenders = [...senderMap.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 10)
+      .map(([naam, data]) => ({ naam, ...data }));
+
+    // ── Categorie verdeling ──────────────────────────────────────────────
+    const categorien: Record<string, number> = {};
+    for (const e of active) {
+      const cat = e.categorie ?? "overig";
+      categorien[cat] = (categorien[cat] ?? 0) + 1;
+    }
+
+    // ── Triage suggesties ────────────────────────────────────────────────
+    const oud = ongelezen.filter((e) => Date.now() - e.ontvangen > 7 * 86400000);
+    const nieuwsbrief = ongelezen.filter((e) =>
+      e.categorie === "promotions" || e.categorie === "social" || e.categorie === "forums"
+    );
+
+    // ── Recente emails (max 15) ──────────────────────────────────────────
+    const recente = inbox
+      .sort((a, b) => b.ontvangen - a.ontvangen)
+      .slice(0, 15)
+      .map((e) => ({
+        gmailId: e.gmailId, threadId: e.threadId,
+        van: e.from.replace(/<.*>/, "").trim(),
+        onderwerp: e.subject, snippet: e.snippet.slice(0, 80),
+        datum: e.datum, gelezen: e.isGelezen,
+        categorie: e.categorie, bijlagen: e.bijlagenCount,
+      }));
+
     return {
-      overzicht: { analyst, composer, manager, reader },
-      subAgents: [
-        { id: "email-analyst",  naam: "📊 Email Analyst",  doel: "Trends, patronen, statistieken" },
-        { id: "email-composer", naam: "✍️ Email Composer", doel: "Versturen, beantwoorden" },
-        { id: "email-manager",  naam: "🗂️ Email Manager",  doel: "Organiseren, triage, opruimen" },
-        { id: "email-reader",   naam: "🔍 Email Reader",   doel: "Zoeken, lezen, bijlagen" },
-      ],
-      instructie: "Gebruik de specifieke sub-agent voor gedetailleerde taken. " +
-                  "Bijv. getAgentContext('email-analyst') voor inbox analyse.",
+      stats: {
+        totaal: active.length, inbox: inbox.length,
+        ongelezen: ongelezen.length,
+        verzonden: active.filter((e) => e.labelIds.includes("SENT")).length,
+        ster: active.filter((e) => e.isSter).length,
+        prullenbak: allEmails.filter((e) => e.isVerwijderd).length,
+      },
+      topAfzenders,
+      categorien,
+      triage: {
+        oudOngelezen: oud.length,
+        nieuwsbrieven: nieuwsbrief.length,
+        suggestie: oud.length > 5
+          ? `${oud.length} ongelezen emails ouder dan 7 dagen — bulk markeren?`
+          : nieuwsbrief.length > 10
+            ? `${nieuwsbrief.length} ongelezen nieuwsbrieven — opruimen?`
+            : "Inbox ziet er goed uit!",
+      },
+      recente,
+      syncStatus: syncMeta ? { laatsteSync: syncMeta.lastFullSync, totaalGesynct: syncMeta.totalSynced } : null,
     };
   },
 };

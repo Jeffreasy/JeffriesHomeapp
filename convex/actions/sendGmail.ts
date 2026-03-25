@@ -367,3 +367,60 @@ export const bulkTrashInternal = internalAction({
     return { ok: true, count: gmailIds.length };
   },
 });
+
+// ─── Internal Send/Reply (voor Grok AI action calling) ───────────────────────
+
+/** Internal: email versturen vanuit Grok action. */
+export const sendEmailInternal = internalAction({
+  args: {
+    userId:  v.string(),
+    to:      v.string(),
+    subject: v.string(),
+    body:    v.string(),
+    cc:      v.optional(v.string()),
+    bcc:     v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+    const raw = buildRawEmail({
+      to: args.to, subject: args.subject, body: args.body,
+      cc: args.cc, bcc: args.bcc,
+    });
+    const res = await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+    return { ok: true, messageId: res.data.id };
+  },
+});
+
+/** Internal: reply op thread vanuit Grok action. */
+export const replyToEmailInternal = internalAction({
+  args: {
+    userId:   v.string(),
+    gmailId:  v.string(),
+    threadId: v.string(),
+    to:       v.string(),
+    body:     v.string(),
+    cc:       v.optional(v.string()),
+  },
+  handler: async (_ctx, args) => {
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+    const orig = await gmail.users.messages.get({
+      userId: "me", id: args.gmailId, format: "metadata",
+      metadataHeaders: ["Subject", "Message-ID"],
+    });
+    const headers   = orig.data.payload?.headers ?? [];
+    const subject   = headers.find((h) => h.name === "Subject")?.value ?? "";
+    const messageId = headers.find((h) => h.name === "Message-ID")?.value ?? "";
+    const raw = buildRawEmail({
+      to: args.to,
+      subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+      body: args.body, cc: args.cc,
+      inReplyTo: messageId, references: messageId,
+    });
+    const res = await gmail.users.messages.send({
+      userId: "me", requestBody: { raw, threadId: args.threadId },
+    });
+    return { ok: true, messageId: res.data.id };
+  },
+});

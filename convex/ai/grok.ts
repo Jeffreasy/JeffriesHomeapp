@@ -456,7 +456,7 @@ async function executeTool(
 
     case "emailVersturen": {
       try {
-        await ctx.runAction(api.actions.sendGmail.sendEmail, {
+        await ctx.runAction(internal.actions.sendGmail.sendEmailInternal, {
           userId,
           to: args.aan as string,
           subject: args.onderwerp as string,
@@ -471,7 +471,7 @@ async function executeTool(
 
     case "emailBeantwoorden": {
       try {
-        await ctx.runAction(api.actions.sendGmail.replyToEmail, {
+        await ctx.runAction(internal.actions.sendGmail.replyToEmailInternal, {
           userId,
           gmailId: args.gmailId as string,
           threadId: args.threadId as string,

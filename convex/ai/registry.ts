@@ -73,12 +73,8 @@ import { roosterAgent }     from "./agents/rooster";
 import { financeAgent }     from "./agents/finance";
 import { automationsAgent } from "./agents/automations";
 
-// Email agents (Director + 4 sub-agents)
+// Email agent (consolidated)
 import { emailAgent }           from "./agents/email";
-import { emailAnalystAgent }    from "./agents/emailAnalyst";
-import { emailComposerAgent }   from "./agents/emailComposer";
-import { emailManagerAgent }    from "./agents/emailManager";
-import { emailReaderAgent }     from "./agents/emailReader";
 
 export const AGENT_REGISTRY: AgentDefinition[] = [
   // ── Core ──────────────────────────
@@ -88,12 +84,8 @@ export const AGENT_REGISTRY: AgentDefinition[] = [
   financeAgent,
   automationsAgent,
 
-  // ── Email Afdeling ────────────────
-  emailAgent,           // Director (hub)
-  emailAnalystAgent,    // 📊 Analyse & trends
-  emailComposerAgent,   // ✍️ Versturen & reply
-  emailManagerAgent,    // 🗂️ Triage & labels
-  emailReaderAgent,     // 🔍 Zoeken & lezen
+  // ── Email ──────────────────────────
+  emailAgent,
 ];
 
 export function getAgent(id: string): AgentDefinition | undefined {
