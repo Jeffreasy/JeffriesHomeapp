@@ -277,6 +277,27 @@ http.route({
             "by_user_status [userId, status]", "by_user_eventId [userId, eventId]",
           ],
         },
+        emails: {
+          description: "Gmail metadata + snippet — hybrid model (body on-demand via API)",
+          fields: [
+            "userId", "gmailId", "threadId", "from", "to", "cc?", "bcc?",
+            "subject", "snippet", "datum (YYYY-MM-DD)", "ontvangen (unix ms)",
+            "isGelezen", "isSter", "isVerwijderd", "isDraft",
+            "labelIds [INBOX, SENT, TRASH, ...]", "categorie? (primary|social|promotions|updates)",
+            "heeftBijlagen", "bijlagenCount", "searchText", "syncedAt",
+          ],
+          indices: [
+            "by_user [userId]", "by_user_datum [userId, datum]",
+            "by_user_thread [userId, threadId]", "by_user_gmailId [userId, gmailId]",
+            "by_user_gelezen [userId, isGelezen]",
+            "SEARCH: search_emails [searchText] filter [userId, isVerwijderd]",
+          ],
+        },
+        emailSyncMeta: {
+          description: "Gmail sync cursor — history ID voor incremental sync",
+          fields: ["userId", "historyId", "lastFullSync", "totalSynced"],
+          indices: ["by_user [userId]"],
+        },
       },
       endpoints: {
         queries: [
@@ -286,6 +307,7 @@ http.route({
           "salary.computeFromSchedule", "salary.currentMonthPrognose", "salary.list", "salary.getByPeriode",
           "transactions.listPaginated", "transactions.getStats",
           "personalEvents.list", "personalEvents.listUpcoming", "personalEvents.listByDate",
+          "emails.list", "emails.getThread", "emails.search", "emails.getStats",
         ],
         mutations: [
           "devices.create", "devices.update", "devices.remove",
@@ -300,12 +322,22 @@ http.route({
           "syncTodoist.syncTodoistNow — Sync diensten naar Todoist taken",
           "deletePersonalEvent.deleteEvent — Verwijder event uit Google Calendar + DB",
           "updatePersonalEvent.updateEvent — Update event in Google Calendar + DB",
+          "syncGmail.syncNow — Sync Gmail metadata (incremental/full)",
+          "sendGmail.sendEmail — Nieuw email versturen",
+          "sendGmail.replyToEmail — Reply op thread",
+          "sendGmail.trashEmail — Verplaats naar prullenbak",
+          "sendGmail.markGelezen — Markeer gelezen/ongelezen",
+          "sendGmail.markSter — Ster toevoegen/verwijderen",
+          "sendGmail.modifyLabels — Labels wijzigen",
+          "getGmailBody.getBody — Volledige email body ophalen (on-demand)",
+          "getGmailBody.getAttachment — Bijlage downloaden",
         ],
         crons: [
           "sync-schedule-daily (06:00 UTC)",
           "sync-personal-events-interval (elk uur)",
           "sync-todoist-daily (07:00 UTC)",
           "process-pending-calendar (elk uur)",
+          "sync-gmail (elke 5 min)",
         ],
       },
     };

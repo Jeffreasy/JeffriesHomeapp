@@ -174,4 +174,60 @@ export default defineSchema({
     .index("by_user_date",    ["userId", "startDatum"])
     .index("by_user_status",  ["userId", "status"])
     .index("by_user_eventId", ["userId", "eventId"]),
+
+  // ─── Emails (Gmail sync — metadata + snippet) ─────────────────────────────
+  emails: defineTable({
+    userId:        v.string(),
+    gmailId:       v.string(),                  // Gmail message ID
+    threadId:      v.string(),                  // Gmail thread ID
+
+    // Headers
+    from:          v.string(),                  // "Naam <email@example.com>"
+    to:            v.string(),                  // Comma-separated
+    cc:            v.optional(v.string()),
+    bcc:           v.optional(v.string()),
+    subject:       v.string(),
+    snippet:       v.string(),                  // Gmail ~100 char preview
+
+    // Timestamps
+    datum:         v.string(),                  // "YYYY-MM-DD"
+    ontvangen:     v.number(),                  // Unix ms (internalDate)
+
+    // Status flags
+    isGelezen:     v.boolean(),
+    isSter:        v.boolean(),                 // Starred
+    isVerwijderd:  v.boolean(),                 // Trash
+    isDraft:       v.boolean(),
+
+    // Labels
+    labelIds:      v.array(v.string()),         // ["INBOX", "IMPORTANT", ...]
+    categorie:     v.optional(v.string()),      // "primary" | "social" | "promotions"
+
+    // Bijlagen
+    heeftBijlagen: v.boolean(),
+    bijlagenCount: v.number(),
+
+    // Zoekbaar — subject + snippet + from + to samengevoegd
+    searchText:    v.string(),
+
+    // Sync tracking
+    syncedAt:      v.string(),                  // ISO timestamp
+  })
+    .index("by_user",          ["userId"])
+    .index("by_user_datum",    ["userId", "datum"])
+    .index("by_user_thread",   ["userId", "threadId"])
+    .index("by_user_gmailId",  ["userId", "gmailId"])
+    .index("by_user_gelezen",  ["userId", "isGelezen"])
+    .searchIndex("search_emails", {
+      searchField: "searchText",
+      filterFields: ["userId", "isVerwijderd"],
+    }),
+
+  // ─── Email Sync Meta ──────────────────────────────────────────────────────
+  emailSyncMeta: defineTable({
+    userId:       v.string(),
+    historyId:    v.string(),                   // Gmail history ID (incremental sync)
+    lastFullSync: v.string(),                   // ISO timestamp
+    totalSynced:  v.number(),
+  }).index("by_user", ["userId"]),
 });

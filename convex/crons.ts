@@ -45,4 +45,15 @@ crons.interval(
   { userId: JEFFREY_USER_ID }
 );
 
+/**
+ * Gmail sync — elke 5 minuten.
+ * Incrementele sync via Gmail History API; full sync bij eerste run.
+ */
+crons.interval(
+  "sync-gmail",
+  { minutes: 5 },
+  internal.actions.syncGmail.syncFromGmail,
+  { userId: JEFFREY_USER_ID }
+);
+
 export default crons;

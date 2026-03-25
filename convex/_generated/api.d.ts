@@ -9,7 +9,10 @@
  */
 
 import type * as actions_deletePersonalEvent from "../actions/deletePersonalEvent.js";
+import type * as actions_getGmailBody from "../actions/getGmailBody.js";
 import type * as actions_processPendingCalendar from "../actions/processPendingCalendar.js";
+import type * as actions_sendGmail from "../actions/sendGmail.js";
+import type * as actions_syncGmail from "../actions/syncGmail.js";
 import type * as actions_syncPersonalEvents from "../actions/syncPersonalEvents.js";
 import type * as actions_syncSchedule from "../actions/syncSchedule.js";
 import type * as actions_syncTodoist from "../actions/syncTodoist.js";
@@ -17,6 +20,7 @@ import type * as actions_updatePersonalEvent from "../actions/updatePersonalEven
 import type * as automations from "../automations.js";
 import type * as crons from "../crons.js";
 import type * as devices from "../devices.js";
+import type * as emails from "../emails.js";
 import type * as http from "../http.js";
 import type * as lib_config from "../lib/config.js";
 import type * as lib_fields from "../lib/fields.js";
@@ -35,7 +39,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "actions/deletePersonalEvent": typeof actions_deletePersonalEvent;
+  "actions/getGmailBody": typeof actions_getGmailBody;
   "actions/processPendingCalendar": typeof actions_processPendingCalendar;
+  "actions/sendGmail": typeof actions_sendGmail;
+  "actions/syncGmail": typeof actions_syncGmail;
   "actions/syncPersonalEvents": typeof actions_syncPersonalEvents;
   "actions/syncSchedule": typeof actions_syncSchedule;
   "actions/syncTodoist": typeof actions_syncTodoist;
@@ -43,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   automations: typeof automations;
   crons: typeof crons;
   devices: typeof devices;
+  emails: typeof emails;
   http: typeof http;
   "lib/config": typeof lib_config;
   "lib/fields": typeof lib_fields;
