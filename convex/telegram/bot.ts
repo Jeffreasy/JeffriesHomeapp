@@ -3,22 +3,21 @@
 /**
  * convex/telegram/bot.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Telegram Bot — Webhook handler + Smart Agent routing.
+ * Telegram Bot — Webhook handler + Smart Agent routing + Lamp Control.
  *
  * Flow:
  *   1. Telegram stuurt update → /telegram/webhook
- *   2. Slash commando → directe agent routing
- *   3. Vrije tekst → keyword detectie → juiste agent via Grok
- *   4. Grok antwoordt direct — nooit doorverwijzen
+ *   2. Lamp commando's → direct in command queue (geen Grok nodig)
+ *   3. Slash commando → directe agent routing via Grok
+ *   4. Vrije tekst → keyword detectie → juiste agent via Grok
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { action, internalAction } from "../_generated/server";
-import { internal } from "../_generated/api";
+import { internal, api } from "../_generated/api";
 import { v } from "convex/values";
 import { sendMessage, sendTyping, setWebhook as tgSetWebhook, getMe } from "./api";
 
-// Jeffrey's vaste userId (single-user app)
 const OWNER_USER_ID = "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
 
 // ─── Commando → Agent mapping ────────────────────────────────────────────────
@@ -36,10 +35,57 @@ const COMMAND_MAP: Record<string, { agentId: string; beschrijving: string }> = {
   "/automations": { agentId: "automations",     beschrijving: "⚙️ Automations status" },
 };
 
+// ─── Lamp Command Detection ──────────────────────────────────────────────────
+
+interface LampCommand {
+  command: { on?: boolean; brightness?: number; r?: number; g?: number; b?: number };
+  beschrijving: string;
+}
+
+function detectLampCommand(text: string): LampCommand | null {
+  const lower = text.toLowerCase();
+
+  // Aan/uit detectie
+  const uitPatterns = ["uit", "off", "uitzetten", "uitdoen", "doof", "stop"];
+  const aanPatterns = ["aan", "on", "aanzetten", "aandoen"];
+
+  const isLampRelated = ["lamp", "lampen", "licht", "lichten"].some((w) => lower.includes(w));
+  if (!isLampRelated) return null;
+
+  for (const p of uitPatterns) {
+    if (lower.includes(p)) {
+      return { command: { on: false }, beschrijving: "Lampen uitzetten" };
+    }
+  }
+
+  for (const p of aanPatterns) {
+    if (lower.includes(p)) {
+      return { command: { on: true }, beschrijving: "Lampen aanzetten" };
+    }
+  }
+
+  // Brightness detectie
+  const brightnessMatch = lower.match(/(\d+)\s*%/);
+  if (brightnessMatch) {
+    const val = Math.min(100, Math.max(1, parseInt(brightnessMatch[1])));
+    return { command: { brightness: val }, beschrijving: `Helderheid naar ${val}%` };
+  }
+
+  if (lower.includes("dim")) {
+    return { command: { brightness: 30 }, beschrijving: "Lampen dimmen (30%)" };
+  }
+
+  if (lower.includes("fel") || lower.includes("helder") || lower.includes("vol")) {
+    return { command: { brightness: 100 }, beschrijving: "Lampen vol (100%)" };
+  }
+
+  return null;
+}
+
 // ─── Smart Keyword → Agent routing ───────────────────────────────────────────
 
 const KEYWORD_ROUTES: Array<{ keywords: string[]; agentId: string }> = [
-  { keywords: ["lamp", "lampen", "licht", "lichten", "aan", "uit", "helder", "dim", "scene", "kleur", "rgb", "wiz"],
+  { keywords: ["lamp", "lampen", "licht", "lichten", "scene", "kleur", "rgb", "wiz"],
     agentId: "lampen" },
   { keywords: ["dienst", "rooster", "shift", "werk", "planning", "vrij", "weekend", "conflict", "afspraak", "agenda"],
     agentId: "rooster" },
@@ -54,14 +100,10 @@ const KEYWORD_ROUTES: Array<{ keywords: string[]; agentId: string }> = [
 function detectAgent(text: string): string {
   const lower = text.toLowerCase();
   let best = { agentId: "dashboard", score: 0 };
-
   for (const route of KEYWORD_ROUTES) {
     const score = route.keywords.filter((kw) => lower.includes(kw)).length;
-    if (score > best.score) {
-      best = { agentId: route.agentId, score };
-    }
+    if (score > best.score) best = { agentId: route.agentId, score };
   }
-
   return best.agentId;
 }
 
@@ -69,30 +111,26 @@ function detectAgent(text: string): string {
 
 function buildHelpText(): string {
   return [
-    "🏠 <b>Jeffries HomeBot</b>\n",
-    "<b>Commando's:</b>",
+    "🏠 Jeffries HomeBot\n",
+    "Commando's:",
     ...Object.entries(COMMAND_MAP).map(([cmd, { beschrijving }]) => `  ${cmd} — ${beschrijving}`),
-    "\n💬 Of vraag gewoon iets in het Nederlands!",
-    "Ik snap automatisch welke agent je nodig hebt.",
-    "\nVoorbeelden:",
+    "\n💡 Lamp bediening (directe actie):",
     '  "Doe de lampen uit"',
-    '  "Wat is mijn salaris?"',
-    '  "Hoeveel ongelezen emails?"',
-    '  "Wanneer werk ik morgen?"',
+    '  "Lampen aan"',
+    '  "Dim de lampen"',
+    '  "Lampen 50%"',
+    "\n💬 Of stel een vrije vraag!",
   ].join("\n");
 }
 
 function buildWelcomeText(): string {
   return [
-    "👋 <b>Welkom bij Jeffries HomeBot!</b>\n",
-    "Ik ben je AI-assistent, aangedreven door Grok.",
-    "Vraag me alles over je Homeapp — ik snap het wel.\n",
-    "Voorbeelden:",
-    '  💡 "Doe de lampen uit"',
-    '  📅 "Wanneer is mijn volgende dienst?"',
-    '  💰 "Wat is mijn netto salaris?"',
-    '  📧 "Hoeveel ongelezen emails heb ik?"',
-    "\nOf type /help voor alle commando's.",
+    "👋 Welkom bij Jeffries HomeBot!\n",
+    "Ik bedien je Homeapp via Grok AI.\n",
+    "💡 Zeg 'lampen uit' en ze gaan uit.",
+    "📅 Zeg 'wanneer werk ik?' en ik check je rooster.",
+    "💰 Zeg 'salaris' en ik geef je netto.\n",
+    "Type /help voor alle commando's.",
   ].join("\n");
 }
 
@@ -109,13 +147,28 @@ export const handleUpdate = internalAction({
 
     // ── /start ────────────────────────────────────────────────────────────
     if (text === "/start") {
-      await sendMessage(chatId, buildWelcomeText());
+      await sendMessage(chatId, buildWelcomeText(), { parseMode: undefined as any });
       return;
     }
 
     // ── /help ─────────────────────────────────────────────────────────────
     if (text === "/help") {
-      await sendMessage(chatId, buildHelpText());
+      await sendMessage(chatId, buildHelpText(), { parseMode: undefined as any });
+      return;
+    }
+
+    // ── Lamp commando → direct uitvoeren via command queue ────────────────
+    const lampCmd = detectLampCommand(text);
+    if (lampCmd) {
+      await ctx.runMutation(api.deviceCommands.queueCommand, {
+        userId:  OWNER_USER_ID,
+        command: lampCmd.command,
+        bron:    "telegram",
+      });
+      await sendMessage(chatId,
+        `💡 ${lampCmd.beschrijving} — commando verstuurd!`,
+        { parseMode: undefined as any },
+      );
       return;
     }
 
@@ -126,7 +179,7 @@ export const handleUpdate = internalAction({
 
     if (mapping) {
       await sendTyping(chatId);
-      const vraag = customVraag || `Geef een beknopt overzicht`;
+      const vraag = customVraag || "Geef een beknopt overzicht";
 
       const result = await ctx.runAction(internal.ai.grok.chat, {
         userId:  OWNER_USER_ID,
@@ -138,7 +191,7 @@ export const handleUpdate = internalAction({
       return;
     }
 
-    // ── Vrije tekst → Smart routing via keyword detectie ──────────────────
+    // ── Vrije tekst → Smart routing ──────────────────────────────────────
     await sendTyping(chatId);
     const detectedAgent = detectAgent(text);
 
@@ -154,11 +207,9 @@ export const handleUpdate = internalAction({
 
 async function sendReply(chatId: number, result: { ok: boolean; antwoord?: string; error?: string }) {
   if (result.ok && result.antwoord) {
-    // Telegram max 4096 chars
     const antwoord = result.antwoord.length > 4000
       ? result.antwoord.slice(0, 3997) + "..."
       : result.antwoord;
-    // Stuur als plain text (Grok output bevat markdown die Telegram HTML breekt)
     await sendMessage(chatId, antwoord, { parseMode: undefined as any });
   } else {
     await sendMessage(chatId, `❌ ${result.error ?? "Kon geen antwoord genereren"}`);

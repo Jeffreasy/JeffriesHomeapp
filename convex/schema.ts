@@ -26,6 +26,29 @@ export default defineSchema({
     .index("by_user",    ["userId"])
     .index("by_user_ip", ["userId", "ipAddress"]),
 
+  // ─── Device Commands (queue voor Telegram/AI → lokale bridge) ──────────────
+  deviceCommands: defineTable({
+    userId:    v.string(),
+    deviceId:  v.optional(v.string()),       // Specifiek device, of undefined = ALL
+    command:   v.object({
+      on:               v.optional(v.boolean()),
+      brightness:       v.optional(v.number()),
+      color_temp_mireds: v.optional(v.number()),
+      r:                v.optional(v.number()),
+      g:                v.optional(v.number()),
+      b:                v.optional(v.number()),
+      scene_id:         v.optional(v.number()),
+    }),
+    status:    v.union(v.literal("pending"), v.literal("done"), v.literal("failed")),
+    bron:      v.string(),                   // "telegram", "grok", "automation"
+    createdAt: v.string(),
+    doneAt:    v.optional(v.string()),
+    error:     v.optional(v.string()),
+  })
+    .index("by_status", ["status"])
+    .index("by_user",   ["userId"]),
+
+
   // ─── Automations ───────────────────────────────────────────────────────────
   automations: defineTable({
     userId:    v.string(), // Clerk user ID
