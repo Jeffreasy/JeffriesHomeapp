@@ -88,7 +88,7 @@ function parseEmail(msg: any, userId: string): {
 
 export const syncFromGmail = internalAction({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }): Promise<{ synced: number; mode: string }> => {
+  handler: async (ctx, { userId }): Promise<{ synced: number; mode: string; reconciled?: number }> => {
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
 
@@ -168,8 +168,8 @@ export const syncFromGmail = internalAction({
     });
 
     const messageIds = (listRes.data.messages ?? []).map((m) => m.id!);
-    if (messageIds.length === 0) return { synced: 0, mode: "full" };
 
+    // Haal alle Gmail berichten op
     const emails = [];
     for (let i = 0; i < messageIds.length; i += BATCH_SIZE) {
       const batch = messageIds.slice(i, i + BATCH_SIZE);
@@ -186,12 +186,33 @@ export const syncFromGmail = internalAction({
     }
 
     if (emails.length > 0) {
-      // Splits in batches van 50 voor Convex mutation limiet
       for (let i = 0; i < emails.length; i += 50) {
         await ctx.runMutation(internal.emails.bulkUpsertInternal, {
           emails: emails.slice(i, i + 50),
         });
       }
+    }
+
+    // ─── Reconciliatie: verwijder Convex emails die niet meer in Gmail staan ─
+    const gmailIdSet = new Set(messageIds);
+    const orphanGmailIds: string[] = [];
+
+    // Haal alle Convex emails op en vergelijk
+    const convexEmails = await ctx.runQuery(internal.emails.listAllGmailIds, { userId });
+    for (const ce of convexEmails) {
+      if (!gmailIdSet.has(ce.gmailId)) {
+        orphanGmailIds.push(ce.gmailId);
+      }
+    }
+
+    if (orphanGmailIds.length > 0) {
+      for (let i = 0; i < orphanGmailIds.length; i += 50) {
+        await ctx.runMutation(internal.emails.bulkDeleteByGmailIds, {
+          userId,
+          gmailIds: orphanGmailIds.slice(i, i + 50),
+        });
+      }
+      console.log(`[Gmail Sync] Reconciliatie: ${orphanGmailIds.length} orphan emails verwijderd`);
     }
 
     // Haal het huidige historyId op voor toekomstige incremental sync
@@ -205,7 +226,7 @@ export const syncFromGmail = internalAction({
       totalSynced: emails.length,
     });
 
-    return { synced: emails.length, mode: "full" };
+    return { synced: emails.length, mode: "full", reconciled: orphanGmailIds.length };
   },
 });
 
@@ -213,7 +234,7 @@ export const syncFromGmail = internalAction({
 
 export const syncNow = action({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }): Promise<{ synced: number; mode: string }> => {
+  handler: async (ctx, { userId }): Promise<{ synced: number; mode: string; reconciled?: number }> => {
     if (!userId) throw new Error("userId is vereist");
     return ctx.runAction(internal.actions.syncGmail.syncFromGmail, { userId });
   },

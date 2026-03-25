@@ -253,6 +253,39 @@ export const recentByCategory = query({
 
 // ─── Internal Mutations (voor sync actions) ─────────────────────────────────
 
+/** Alle gmailIds ophalen — voor reconciliatie (sync vergelijking). */
+export const listAllGmailIds = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const all = await ctx.db
+      .query("emails")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    return all.map((e) => ({ gmailId: e.gmailId, _id: e._id }));
+  },
+});
+
+/** Bulk delete emails op gmailId — voor reconciliatie (orphan cleanup). */
+export const bulkDeleteByGmailIds = internalMutation({
+  args: { userId: v.string(), gmailIds: v.array(v.string()) },
+  handler: async (ctx, { userId, gmailIds }) => {
+    let deleted = 0;
+    for (const gmailId of gmailIds) {
+      const email = await ctx.db
+        .query("emails")
+        .withIndex("by_user_gmailId", (q) =>
+          q.eq("userId", userId).eq("gmailId", gmailId)
+        )
+        .first();
+      if (email) {
+        await ctx.db.delete(email._id);
+        deleted++;
+      }
+    }
+    return { deleted };
+  },
+});
+
 /** Bulk upsert van gesyncte emails. Per gmailId: patch of insert. */
 export const bulkUpsertInternal = internalMutation({
   args: {
