@@ -220,7 +220,13 @@ export const handleUpdate = internalAction({
 
     // ── Tekst bericht ─────────────────────────────────────────────────────
     if (!message.text) return;
-    await processText(ctx, chatId, (message.text as string).trim());
+    try {
+      await processText(ctx, chatId, (message.text as string).trim());
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error("[Telegram Bot] processText crashed:", errMsg);
+      await sendMessage(chatId, `❌ Er ging iets mis: ${errMsg.slice(0, 200)}`, { parseMode: undefined as any });
+    }
   },
 });
 
