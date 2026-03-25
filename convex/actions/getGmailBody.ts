@@ -9,7 +9,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { action } from "../_generated/server";
+import { action, internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import { google } from "googleapis";
 import { createOAuthClient } from "../lib/googleAuth";
@@ -136,6 +136,33 @@ export const getAttachment = action({
     return {
       data: res.data.data ?? "",  // base64 encoded
       size: res.data.size ?? 0,
+    };
+  },
+});
+
+// ─── Internal (voor Grok AI action calling) ──────────────────────────────────
+
+/** Internal: email body ophalen vanuit Grok action. */
+export const getBodyInternal = internalAction({
+  args: { userId: v.string(), gmailId: v.string() },
+  handler: async (_ctx, { userId, gmailId }) => {
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+    const res = await gmail.users.messages.get({ userId: "me", id: gmailId, format: "full" });
+    const payload = res.data.payload;
+    if (!payload) throw new Error("Geen payload in Gmail response");
+
+    const { html, text } = extractBody(payload);
+    const attachments     = extractAttachments(payload, gmailId);
+    const headers = payload.headers ?? [];
+    const getHeader = (name: string) =>
+      headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
+
+    return {
+      gmailId, html, text,
+      from: getHeader("From"), to: getHeader("To"), cc: getHeader("Cc"),
+      date: getHeader("Date"), subject: getHeader("Subject"),
+      attachments,
     };
   },
 });

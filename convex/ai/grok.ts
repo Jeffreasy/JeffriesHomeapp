@@ -322,7 +322,7 @@ async function executeTool(
   switch (toolName) {
     case "leesEmail": {
       try {
-        const result = await ctx.runAction(api.actions.getGmailBody.getBody, {
+        const result = await ctx.runAction(internal.actions.getGmailBody.getBodyInternal, {
           userId,
           gmailId: args.gmailId as string,
         });
