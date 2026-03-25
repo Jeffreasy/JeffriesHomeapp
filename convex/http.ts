@@ -198,4 +198,121 @@ http.route({
   }),
 });
 
+// ─── GET /schema (AI Introspectie) ────────────────────────────────────────────
+// Self-documenting endpoint: retourneert tabel-definities, indices, en API surface
+// zodat Grok AI de volledige database structuur kan begrijpen.
+http.route({
+  path: "/schema",
+  method: "GET",
+  handler: httpAction(async (_ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+
+    const schema = {
+      version: "1.0",
+      tables: {
+        devices: {
+          description: "WiZ smart lampen — status, IP, state (on/brightness/color)",
+          fields: [
+            "userId", "name", "ipAddress", "deviceType", "roomId?", "manufacturer?",
+            "model?", "status (online|offline)", "lastSeen?", "currentState {on,brightness,color_temp,r,g,b}",
+            "commissionedAt",
+          ],
+          indices: ["by_user [userId]", "by_user_ip [userId, ipAddress]"],
+        },
+        automations: {
+          description: "Tijdgestuurde automatiseringen voor lampen (scènes, triggers)",
+          fields: [
+            "userId", "name", "enabled", "createdAt", "lastFiredAt?", "group?",
+            "trigger {time, days?, triggerType?, shiftType?}",
+            "action {type, sceneId?, brightness?, colorTempMireds?, colorHex?, deviceIds?}",
+          ],
+          indices: ["by_user [userId]"],
+        },
+        schedule: {
+          description: "Werkdiensten (SDB Planning) — gesynct vanuit Google Calendar",
+          fields: [
+            "userId", "eventId", "titel", "startDatum (YYYY-MM-DD)", "startTijd (HH:MM)",
+            "eindDatum", "eindTijd", "werktijd", "locatie", "team", "shiftType (Vroeg|Laat|Dienst)",
+            "prioriteit", "duur (uren)", "weeknr (2026-W13)", "dag (Maandag..Zondag)",
+            "status (Opkomend|Bezig|Gedraaid|VERWIJDERD)", "beschrijving", "heledag",
+          ],
+          indices: ["by_user [userId]", "by_user_date [userId, startDatum]", "by_user_eventId [userId, eventId]"],
+        },
+        scheduleMeta: {
+          description: "Metadata van de laatste schedule import/sync",
+          fields: ["userId", "importedAt", "fileName", "totalRows"],
+          indices: ["by_user [userId]"],
+        },
+        salary: {
+          description: "Salarisberekening per maand — bruto, ORT, netto prognose",
+          fields: [
+            "userId", "periode (2026-03)", "jaar", "maand", "aantalDiensten",
+            "uurloonORT", "basisLoon", "ortTotaal", "brutoBetaling", "nettoPrognose",
+            "ortDetail? (JSON)", "eenmaligDetail? (JSON)", "berekendOp",
+          ],
+          indices: ["by_user [userId]", "by_user_periode [userId, periode]"],
+        },
+        transactions: {
+          description: "Rabobank afschriften — CSV import met deduplicatie",
+          fields: [
+            "userId", "rekeningIban", "volgnr", "datum (YYYY-MM-DD)", "bedrag",
+            "saldoNaTrn", "code", "tegenrekeningIban?", "tegenpartijNaam?",
+            "omschrijving", "referentie?", "isInterneOverboeking", "categorie?",
+          ],
+          indices: [
+            "by_user [userId]", "by_user_datum [userId, datum]",
+            "by_user_categorie [userId, categorie]", "by_rekening_volgnr [rekeningIban, volgnr]",
+          ],
+        },
+        personalEvents: {
+          description: "Persoonlijke Google Agenda afspraken — CRUD + conflict detectie met diensten",
+          fields: [
+            "userId", "eventId (Titel::startISO)", "titel", "startDatum (YYYY-MM-DD)",
+            "startTijd? (HH:MM)", "eindDatum", "eindTijd?", "heledag", "locatie?",
+            "beschrijving?", "status (Aankomend|Voorbij|PendingCreate|VERWIJDERD)",
+            "kalender (Main)", "conflictMetDienst?",
+          ],
+          indices: [
+            "by_user [userId]", "by_user_date [userId, startDatum]",
+            "by_user_status [userId, status]", "by_user_eventId [userId, eventId]",
+          ],
+        },
+      },
+      endpoints: {
+        queries: [
+          "devices.list", "devices.get", "devices.getByStringId",
+          "automations.list",
+          "schedule.list", "schedule.getMeta", "schedule.listByDate",
+          "salary.computeFromSchedule", "salary.currentMonthPrognose", "salary.list", "salary.getByPeriode",
+          "transactions.listPaginated", "transactions.getStats",
+          "personalEvents.list", "personalEvents.listUpcoming", "personalEvents.listByDate",
+        ],
+        mutations: [
+          "devices.create", "devices.update", "devices.remove",
+          "automations.create", "automations.toggle", "automations.remove", "automations.markFired",
+          "schedule.bulkImport",
+          "transactions.importBatch", "transactions.updateCategorie",
+          "personalEvents.create", "personalEvents.updateStatus",
+        ],
+        actions: [
+          "syncSchedule.syncNow — Sync diensten vanuit Google Calendar",
+          "syncPersonalEvents.syncNow — Sync persoonlijke agenda",
+          "syncTodoist.syncTodoistNow — Sync diensten naar Todoist taken",
+          "deletePersonalEvent.deleteEvent — Verwijder event uit Google Calendar + DB",
+          "updatePersonalEvent.updateEvent — Update event in Google Calendar + DB",
+        ],
+        crons: [
+          "sync-schedule-daily (06:00 UTC)",
+          "sync-personal-events-interval (elk uur)",
+          "sync-todoist-daily (07:00 UTC)",
+          "process-pending-calendar (elk uur)",
+        ],
+      },
+    };
+
+    return json({ ok: true, schema });
+  }),
+});
+
 export default http;
+

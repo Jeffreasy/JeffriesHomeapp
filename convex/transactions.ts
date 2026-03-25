@@ -51,54 +51,8 @@ export const importBatch = mutation({
   },
 });
 
-/**
- * Eenmalige migratie: converteert bestaande datums van DD-MM-YYYY naar YYYY-MM-DD.
- *
- * Kan worden aangeroepen:
- *   A) Vanuit de app (geen args) → gebruikt Clerk auth om userId op te halen
- *   B) Vanuit Convex dashboard (args: { userId: "..." }) → auth check omzeild
- *
- * Veilig om meerdere keren te draaien. Max 500 records per run.
- * Blijf aanroepen totdat `gemigreerd: 0` terug komt.
- */
-export const migreerDatums = mutation({
-  args: { userId: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    // Bepaal userId: ofwel direct meegegeven (dashboard), ofwel via Clerk
-    let userId = args.userId;
-    if (!userId) {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) throw new Error("Niet ingelogd — geef userId mee als argument of log in via de app.");
-      userId = identity.subject;
-    }
 
-    const txs = await ctx.db
-      .query("transactions")
-      .withIndex("by_user", (q) => q.eq("userId", userId!))
-      .collect();
 
-    let gemigreerd = 0;
-    let overgeslagen = 0;
-    let verwerkt = 0;
-
-    for (const tx of txs) {
-      if (verwerkt >= 500) break;
-      verwerkt++;
-
-      const d = tx.datum;
-      // DD-MM-YYYY: koppeltekens staan op positie 2 en 5
-      const isOudFormaat = d.length === 10 && d[2] === "-" && d[5] === "-";
-
-      if (!isOudFormaat) { overgeslagen++; continue; }
-
-      const [dd, mm, yyyy] = d.split("-");
-      await ctx.db.patch(tx._id, { datum: `${yyyy}-${mm}-${dd}` });
-      gemigreerd++;
-    }
-
-    return { gemigreerd, overgeslagen, verwerkt, totaal: txs.length };
-  },
-});
 
 export const updateCategorie = mutation({
   args: { id: v.id("transactions"), categorie: v.optional(v.string()) },

@@ -1,27 +1,8 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
+import { eventFields } from "./lib/fields";
 
-// ─── Shared field definitions ─────────────────────────────────────────────────
-
-const eventFields = {
-  userId:            v.string(),
-  eventId:           v.string(),
-  titel:             v.string(),
-  startDatum:        v.string(),
-  startTijd:         v.optional(v.string()),
-  eindDatum:         v.string(),
-  eindTijd:          v.optional(v.string()),
-  heledag:           v.boolean(),
-  locatie:           v.optional(v.string()),
-  beschrijving:      v.optional(v.string()),
-  status:            v.string(),
-  kalender:          v.string(),
-  conflictMetDienst: v.optional(v.string()),
-};
-
-// ─── Queries ──────────────────────────────────────────────────────────────────
-
-/** Alle persoonlijke events voor een user, gesorteerd op startDatum ASC. */
+/** Alle persoonlijke events voor een user. Filtert VERWIJDERD server-side. */
 export const list = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
@@ -30,16 +11,17 @@ export const list = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
-    // Sorteer: Aankomend ↑ (vroegst eerst), Voorbij ↓ (meest recent eerst), VERWIJDERD onderaan
-    const order = { Aankomend: 0, Voorbij: 1, VERWIJDERD: 2 } as Record<string, number>;
-    return rows.sort((a, b) => {
-      const sA = order[a.status] ?? 1;
-      const sB = order[b.status] ?? 1;
-      if (sA !== sB) return sA - sB;
-      return a.status === "Aankomend"
-        ? a.startDatum.localeCompare(b.startDatum)
-        : b.startDatum.localeCompare(a.startDatum);
-    });
+    const order = { Aankomend: 0, PendingCreate: 0, Voorbij: 1 } as Record<string, number>;
+    return rows
+      .filter((r) => r.status !== "VERWIJDERD")
+      .sort((a, b) => {
+        const sA = order[a.status] ?? 1;
+        const sB = order[b.status] ?? 1;
+        if (sA !== sB) return sA - sB;
+        return a.status === "Aankomend" || a.status === "PendingCreate"
+          ? a.startDatum.localeCompare(b.startDatum)
+          : b.startDatum.localeCompare(a.startDatum);
+      });
   },
 });
 
@@ -214,32 +196,16 @@ export const create = mutation({
   },
 });
 
-// ─── GAS polling: haal PendingCreate events op ───────────────────────────────
-
-/** Geeft alle events terug met status "PendingCreate" voor een user. */
-export const listPending = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
-    return ctx.db
-      .query("personalEvents")
-      .withIndex("by_user_status", (q) =>
-        q.eq("userId", userId).eq("status", "PendingCreate")
-      )
-      .collect();
-  },
-});
-
-/** Interne versie voor Convex Actions. */
+/** PendingCreate events ophalen — voor processPendingCalendar action. */
 export const listPendingInternal = internalQuery({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
-    return ctx.db
+  handler: async (ctx, { userId }) =>
+    ctx.db
       .query("personalEvents")
       .withIndex("by_user_status", (q) =>
         q.eq("userId", userId).eq("status", "PendingCreate")
       )
-      .collect();
-  },
+      .collect(),
 });
 
 

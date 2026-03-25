@@ -19,6 +19,7 @@ import type * as crons from "../crons.js";
 import type * as devices from "../devices.js";
 import type * as http from "../http.js";
 import type * as lib_config from "../lib/config.js";
+import type * as lib_fields from "../lib/fields.js";
 import type * as lib_googleAuth from "../lib/googleAuth.js";
 import type * as lib_salaryCalc from "../lib/salaryCalc.js";
 import type * as personalEvents from "../personalEvents.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   devices: typeof devices;
   http: typeof http;
   "lib/config": typeof lib_config;
+  "lib/fields": typeof lib_fields;
   "lib/googleAuth": typeof lib_googleAuth;
   "lib/salaryCalc": typeof lib_salaryCalc;
   personalEvents: typeof personalEvents;
