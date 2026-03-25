@@ -59,6 +59,10 @@ function detectLampCommand(text: string): LampCommand | null {
   const isLampRelated = ["lamp", "lampen", "licht", "lichten", "scene", "sfeer"].some((w) => lower.includes(w));
   if (!isLampRelated) return null;
 
+  // Vraagzinnen → NIET als commando behandelen, laat Grok het afhandelen
+  const isQuestion = ["welke", "hoeveel", "staan", "status", "wat", "zijn er", "overzicht"].some((w) => lower.includes(w));
+  if (isQuestion) return null;
+
   // Aan/uit
   for (const p of ["uit", "off", "uitzetten", "uitdoen", "doof"]) {
     if (lower.includes(p)) return { command: { on: false }, beschrijving: "Lampen uitzetten" };
