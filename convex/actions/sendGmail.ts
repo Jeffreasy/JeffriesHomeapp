@@ -284,3 +284,86 @@ export const bulkTrash = action({
     return { ok: true, count: gmailIds.length };
   },
 });
+
+// ─── Internal versions (callable from other actions like grok.ts) ────────────
+
+/** Internal: markeer gelezen/ongelezen. */
+export const markGelezenInternal = internalAction({
+  args: { userId: v.string(), gmailId: v.string(), gelezen: v.boolean() },
+  handler: async (ctx, { userId, gmailId, gelezen }) => {
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+    await gmail.users.messages.modify({
+      userId: "me", id: gmailId,
+      requestBody: gelezen ? { removeLabelIds: ["UNREAD"] } : { addLabelIds: ["UNREAD"] },
+    });
+    await ctx.runMutation(internal.emails.markGelezenInternal, { userId, gmailId, isGelezen: gelezen });
+    return { ok: true };
+  },
+});
+
+/** Internal: markeer ster. */
+export const markSterInternal = internalAction({
+  args: { userId: v.string(), gmailId: v.string(), ster: v.boolean() },
+  handler: async (ctx, { userId, gmailId, ster }) => {
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+    await gmail.users.messages.modify({
+      userId: "me", id: gmailId,
+      requestBody: ster ? { addLabelIds: ["STARRED"] } : { removeLabelIds: ["STARRED"] },
+    });
+    await ctx.runMutation(internal.emails.markSterInternal, { userId, gmailId, isSter: ster });
+    return { ok: true };
+  },
+});
+
+/** Internal: trash email. */
+export const trashEmailInternal = internalAction({
+  args: { userId: v.string(), gmailId: v.string() },
+  handler: async (ctx, { userId, gmailId }) => {
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+    await gmail.users.messages.trash({ userId: "me", id: gmailId });
+    await ctx.runMutation(internal.emails.trashInternal, { userId, gmailId, isVerwijderd: true });
+    return { ok: true };
+  },
+});
+
+/** Internal: batch markeer gelezen. */
+export const bulkMarkGelezenInternal = internalAction({
+  args: { userId: v.string(), gmailIds: v.array(v.string()), gelezen: v.boolean() },
+  handler: async (ctx, { userId, gmailIds, gelezen }) => {
+    if (gmailIds.length === 0) return { ok: true, count: 0 };
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+    await gmail.users.messages.batchModify({
+      userId: "me",
+      requestBody: {
+        ids: gmailIds,
+        ...(gelezen ? { removeLabelIds: ["UNREAD"] } : { addLabelIds: ["UNREAD"] }),
+      },
+    });
+    for (const gmailId of gmailIds) {
+      await ctx.runMutation(internal.emails.markGelezenInternal, { userId, gmailId, isGelezen: gelezen });
+    }
+    return { ok: true, count: gmailIds.length };
+  },
+});
+
+/** Internal: batch trash. */
+export const bulkTrashInternal = internalAction({
+  args: { userId: v.string(), gmailIds: v.array(v.string()) },
+  handler: async (ctx, { userId, gmailIds }) => {
+    if (gmailIds.length === 0) return { ok: true, count: 0 };
+    const auth  = createOAuthClient();
+    const gmail = google.gmail({ version: "v1", auth });
+    await gmail.users.messages.batchModify({
+      userId: "me",
+      requestBody: { ids: gmailIds, addLabelIds: ["TRASH"], removeLabelIds: ["INBOX"] },
+    });
+    for (const gmailId of gmailIds) {
+      await ctx.runMutation(internal.emails.trashInternal, { userId, gmailId, isVerwijderd: true });
+    }
+    return { ok: true, count: gmailIds.length };
+  },
+});

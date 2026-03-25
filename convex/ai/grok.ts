@@ -336,7 +336,7 @@ async function executeTool(
 
     case "markeerGelezen": {
       try {
-        await ctx.runAction(api.actions.sendGmail.markGelezen, {
+        await ctx.runAction(internal.actions.sendGmail.markGelezenInternal, {
           userId: OWNER_USER_ID, gmailId: args.gmailId as string, gelezen: args.gelezen as boolean,
         });
         return JSON.stringify({ ok: true, beschrijving: `Email ${args.gelezen ? "gelezen" : "ongelezen"} gemarkeerd` });
@@ -347,7 +347,7 @@ async function executeTool(
 
     case "verwijderEmail": {
       try {
-        await ctx.runAction(api.actions.sendGmail.trashEmail, {
+        await ctx.runAction(internal.actions.sendGmail.trashEmailInternal, {
           userId: OWNER_USER_ID, gmailId: args.gmailId as string,
         });
         return JSON.stringify({ ok: true, beschrijving: "Email naar prullenbak verplaatst" });
@@ -358,7 +358,7 @@ async function executeTool(
 
     case "markeerSter": {
       try {
-        await ctx.runAction(api.actions.sendGmail.markSter, {
+        await ctx.runAction(internal.actions.sendGmail.markSterInternal, {
           userId: OWNER_USER_ID, gmailId: args.gmailId as string, ster: args.ster as boolean,
         });
         return JSON.stringify({ ok: true, beschrijving: `Ster ${args.ster ? "toegevoegd" : "verwijderd"}` });
@@ -401,7 +401,7 @@ async function executeTool(
       const gmailIds = args.gmailIds as string[];
       if (!gmailIds.length) return JSON.stringify({ error: "Geen gmailIds opgegeven" });
       try {
-        const result = await ctx.runAction(api.actions.sendGmail.bulkMarkGelezen, {
+        const result = await ctx.runAction(internal.actions.sendGmail.bulkMarkGelezenInternal, {
           userId: OWNER_USER_ID, gmailIds, gelezen: args.gelezen as boolean,
         });
         return JSON.stringify({ ok: true, beschrijving: `${result.count} emails ${args.gelezen ? "gelezen" : "ongelezen"} gemarkeerd` });
@@ -414,7 +414,7 @@ async function executeTool(
       const gmailIds = args.gmailIds as string[];
       if (!gmailIds.length) return JSON.stringify({ error: "Geen gmailIds opgegeven" });
       try {
-        const result = await ctx.runAction(api.actions.sendGmail.bulkTrash, {
+        const result = await ctx.runAction(internal.actions.sendGmail.bulkTrashInternal, {
           userId: OWNER_USER_ID, gmailIds,
         });
         return JSON.stringify({ ok: true, beschrijving: `${result.count} emails verwijderd` });
@@ -453,11 +453,11 @@ async function executeTool(
         const actie = args.actie as string;
 
         if (actie === "gelezen_markeren") {
-          await ctx.runAction(api.actions.sendGmail.bulkMarkGelezen, {
+          await ctx.runAction(internal.actions.sendGmail.bulkMarkGelezenInternal, {
             userId: OWNER_USER_ID, gmailIds, gelezen: true,
           });
         } else {
-          await ctx.runAction(api.actions.sendGmail.bulkTrash, {
+          await ctx.runAction(internal.actions.sendGmail.bulkTrashInternal, {
             userId: OWNER_USER_ID, gmailIds,
           });
         }
