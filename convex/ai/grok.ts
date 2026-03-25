@@ -68,6 +68,84 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "markeerGelezen",
+      description: "Markeer een email als gelezen of ongelezen in Gmail. Gebruik dit na het lezen van een email of wanneer de gebruiker vraagt om emails als gelezen te markeren.",
+      parameters: {
+        type: "object",
+        properties: {
+          gmailId: { type: "string", description: "Gmail bericht ID" },
+          gelezen: { type: "boolean", description: "true=markeer als gelezen, false=markeer als ongelezen" },
+        },
+        required: ["gmailId", "gelezen"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "verwijderEmail",
+      description: "Verplaats een email naar de prullenbak. Gebruik dit wanneer de gebruiker een email wil verwijderen of opruimen.",
+      parameters: {
+        type: "object",
+        properties: {
+          gmailId: { type: "string", description: "Gmail bericht ID" },
+        },
+        required: ["gmailId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "markeerSter",
+      description: "Voeg een ster toe of verwijder deze van een email. Gebruik dit voor belangrijke emails.",
+      parameters: {
+        type: "object",
+        properties: {
+          gmailId: { type: "string", description: "Gmail bericht ID" },
+          ster: { type: "boolean", description: "true=ster toevoegen, false=ster verwijderen" },
+        },
+        required: ["gmailId", "ster"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "emailVersturen",
+      description: "Verstuur een nieuwe email via Gmail. GEBRUIK DIT ALLEEN als de gebruiker expliciet vraagt om een email te versturen. Vraag altijd eerst om bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          aan: { type: "string", description: "Ontvanger email adres" },
+          onderwerp: { type: "string", description: "Email onderwerp" },
+          body: { type: "string", description: "Email body tekst" },
+          cc: { type: "string", description: "CC adressen (optioneel)" },
+        },
+        required: ["aan", "onderwerp", "body"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "emailBeantwoorden",
+      description: "Beantwoord een bestaande email thread. GEBRUIK DIT ALLEEN als de gebruiker expliciet vraagt om te antwoorden. Vraag altijd eerst om bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          gmailId: { type: "string", description: "Gmail bericht ID om op te antwoorden" },
+          threadId: { type: "string", description: "Thread ID" },
+          aan: { type: "string", description: "Ontvanger email adres" },
+          body: { type: "string", description: "Reply body tekst" },
+        },
+        required: ["gmailId", "threadId", "aan", "body"],
+      },
+    },
+  },
 ];
 
 // ─── Tool Execution ──────────────────────────────────────────────────────────
@@ -136,6 +214,69 @@ async function executeTool(
         return JSON.stringify({ ok: true, actie, beschrijving: `Lampen ${actie} — commando verstuurd` });
       } catch (err) {
         return JSON.stringify({ error: `Lamp commando mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "markeerGelezen": {
+      try {
+        await ctx.runAction(api.actions.sendGmail.markGelezen, {
+          userId: OWNER_USER_ID, gmailId: args.gmailId as string, gelezen: args.gelezen as boolean,
+        });
+        return JSON.stringify({ ok: true, beschrijving: `Email ${args.gelezen ? "gelezen" : "ongelezen"} gemarkeerd` });
+      } catch (err) {
+        return JSON.stringify({ error: `Markeren mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "verwijderEmail": {
+      try {
+        await ctx.runAction(api.actions.sendGmail.trashEmail, {
+          userId: OWNER_USER_ID, gmailId: args.gmailId as string,
+        });
+        return JSON.stringify({ ok: true, beschrijving: "Email naar prullenbak verplaatst" });
+      } catch (err) {
+        return JSON.stringify({ error: `Verwijderen mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "markeerSter": {
+      try {
+        await ctx.runAction(api.actions.sendGmail.markSter, {
+          userId: OWNER_USER_ID, gmailId: args.gmailId as string, ster: args.ster as boolean,
+        });
+        return JSON.stringify({ ok: true, beschrijving: `Ster ${args.ster ? "toegevoegd" : "verwijderd"}` });
+      } catch (err) {
+        return JSON.stringify({ error: `Ster mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "emailVersturen": {
+      try {
+        await ctx.runAction(api.actions.sendGmail.sendEmail, {
+          userId: OWNER_USER_ID,
+          to: args.aan as string,
+          subject: args.onderwerp as string,
+          body: args.body as string,
+          cc: args.cc as string | undefined,
+        });
+        return JSON.stringify({ ok: true, beschrijving: `Email verstuurd naar ${args.aan}` });
+      } catch (err) {
+        return JSON.stringify({ error: `Versturen mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "emailBeantwoorden": {
+      try {
+        await ctx.runAction(api.actions.sendGmail.replyToEmail, {
+          userId: OWNER_USER_ID,
+          gmailId: args.gmailId as string,
+          threadId: args.threadId as string,
+          to: args.aan as string,
+          body: args.body as string,
+        });
+        return JSON.stringify({ ok: true, beschrijving: `Reply verstuurd naar ${args.aan}` });
+      } catch (err) {
+        return JSON.stringify({ error: `Beantwoorden mislukt: ${(err as Error).message}` });
       }
     }
 
