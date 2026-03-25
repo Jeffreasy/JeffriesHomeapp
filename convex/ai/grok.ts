@@ -19,8 +19,28 @@ import type { AgentMeta } from "./registry";
 
 const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 const GROK_MODEL   = "grok-4-1-fast";
-const OWNER_USER_ID = "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
+const OWNER_USER_ID = "user_3Ax561ZvuSkGtWpKFooeY65HNtY"; // fallback
 const MAX_TOOL_ROUNDS = 5;
+
+/** CET/CEST-aware date: returns YYYY-MM-DD in Amsterdam timezone. */
+function todayCET(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+}
+
+/** Safe JSON.parse: returns parsed object or null on failure. */
+function safeJsonParse(str: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(str);
+  } catch {
+    // Try basic repairs: trailing commas, missing closing braces
+    try {
+      const cleaned = str.replace(/,\s*([}\]])/g, "$1");
+      return JSON.parse(cleaned);
+    } catch {
+      return null;
+    }
+  }
+}
 
 // ─── Tool Definitions (xAI function calling format) ──────────────────────────
 
@@ -297,12 +317,13 @@ async function executeTool(
   ctx: any,
   toolName: string,
   args: Record<string, unknown>,
+  userId: string,
 ): Promise<string> {
   switch (toolName) {
     case "leesEmail": {
       try {
         const result = await ctx.runAction(api.actions.getGmailBody.getBody, {
-          userId: OWNER_USER_ID,
+          userId,
           gmailId: args.gmailId as string,
         });
         // Truncate HTML, geef text body + metadata
@@ -322,7 +343,7 @@ async function executeTool(
       try {
         const zoekterm = (args.zoekterm as string).toLowerCase();
         const allEmails = await ctx.runQuery(api.emails.list, {
-          userId: OWNER_USER_ID,
+          userId,
         });
         const matches = allEmails
           .filter((e: any) =>
@@ -368,7 +389,7 @@ async function executeTool(
       let deviceId: string | undefined;
 
       if (lampNaam) {
-        const devices = await ctx.runQuery(api.devices.list, { userId: OWNER_USER_ID });
+        const devices = await ctx.runQuery(api.devices.list, { userId });
         const match = devices.find((d: any) =>
           d.name?.toLowerCase().includes(lampNaam.toLowerCase())
         );
@@ -377,7 +398,7 @@ async function executeTool(
 
       try {
         await ctx.runMutation(api.deviceCommands.queueCommand, {
-          userId: OWNER_USER_ID, command: cmd, bron: "grok",
+          userId, command: cmd, bron: "grok",
           ...(deviceId ? { deviceId } : {}),
         });
         const sceneNames: Record<number, string> = {
@@ -403,7 +424,7 @@ async function executeTool(
     case "markeerGelezen": {
       try {
         await ctx.runAction(internal.actions.sendGmail.markGelezenInternal, {
-          userId: OWNER_USER_ID, gmailId: args.gmailId as string, gelezen: args.gelezen as boolean,
+          userId, gmailId: args.gmailId as string, gelezen: args.gelezen as boolean,
         });
         return JSON.stringify({ ok: true, beschrijving: `Email ${args.gelezen ? "gelezen" : "ongelezen"} gemarkeerd` });
       } catch (err) {
@@ -414,7 +435,7 @@ async function executeTool(
     case "verwijderEmail": {
       try {
         await ctx.runAction(internal.actions.sendGmail.trashEmailInternal, {
-          userId: OWNER_USER_ID, gmailId: args.gmailId as string,
+          userId, gmailId: args.gmailId as string,
         });
         return JSON.stringify({ ok: true, beschrijving: "Email naar prullenbak verplaatst" });
       } catch (err) {
@@ -425,7 +446,7 @@ async function executeTool(
     case "markeerSter": {
       try {
         await ctx.runAction(internal.actions.sendGmail.markSterInternal, {
-          userId: OWNER_USER_ID, gmailId: args.gmailId as string, ster: args.ster as boolean,
+          userId, gmailId: args.gmailId as string, ster: args.ster as boolean,
         });
         return JSON.stringify({ ok: true, beschrijving: `Ster ${args.ster ? "toegevoegd" : "verwijderd"}` });
       } catch (err) {
@@ -436,7 +457,7 @@ async function executeTool(
     case "emailVersturen": {
       try {
         await ctx.runAction(api.actions.sendGmail.sendEmail, {
-          userId: OWNER_USER_ID,
+          userId,
           to: args.aan as string,
           subject: args.onderwerp as string,
           body: args.body as string,
@@ -451,7 +472,7 @@ async function executeTool(
     case "emailBeantwoorden": {
       try {
         await ctx.runAction(api.actions.sendGmail.replyToEmail, {
-          userId: OWNER_USER_ID,
+          userId,
           gmailId: args.gmailId as string,
           threadId: args.threadId as string,
           to: args.aan as string,
@@ -468,7 +489,7 @@ async function executeTool(
       if (!gmailIds.length) return JSON.stringify({ error: "Geen gmailIds opgegeven" });
       try {
         const result = await ctx.runAction(internal.actions.sendGmail.bulkMarkGelezenInternal, {
-          userId: OWNER_USER_ID, gmailIds, gelezen: args.gelezen as boolean,
+          userId, gmailIds, gelezen: args.gelezen as boolean,
         });
         return JSON.stringify({ ok: true, beschrijving: `${result.count} emails ${args.gelezen ? "gelezen" : "ongelezen"} gemarkeerd` });
       } catch (err) {
@@ -481,7 +502,7 @@ async function executeTool(
       if (!gmailIds.length) return JSON.stringify({ error: "Geen gmailIds opgegeven" });
       try {
         const result = await ctx.runAction(internal.actions.sendGmail.bulkTrashInternal, {
-          userId: OWNER_USER_ID, gmailIds,
+          userId, gmailIds,
         });
         return JSON.stringify({ ok: true, beschrijving: `${result.count} emails verwijderd` });
       } catch (err) {
@@ -491,7 +512,7 @@ async function executeTool(
 
     case "inboxOpruimen": {
       try {
-        const allEmails = await ctx.runQuery(api.emails.list, { userId: OWNER_USER_ID });
+        const allEmails = await ctx.runQuery(api.emails.list, { userId });
         const active = allEmails.filter((e: any) => !e.isVerwijderd);
         const filter = args.filter as string;
         const maxAantal = (args.maxAantal as number) ?? 50;
@@ -520,11 +541,11 @@ async function executeTool(
 
         if (actie === "gelezen_markeren") {
           await ctx.runAction(internal.actions.sendGmail.bulkMarkGelezenInternal, {
-            userId: OWNER_USER_ID, gmailIds, gelezen: true,
+            userId, gmailIds, gelezen: true,
           });
         } else {
           await ctx.runAction(internal.actions.sendGmail.bulkTrashInternal, {
-            userId: OWNER_USER_ID, gmailIds,
+            userId, gmailIds,
           });
         }
 
@@ -541,7 +562,7 @@ async function executeTool(
 
     case "dienstenOpvragen": {
       try {
-        const allSchedule = await ctx.runQuery(api.schedule.list, { userId: OWNER_USER_ID });
+        const allSchedule = await ctx.runQuery(api.schedule.list, { userId });
         const active = allSchedule.filter((s: any) => s.status !== "VERWIJDERD");
 
         let vanDatum: string;
@@ -563,7 +584,7 @@ async function executeTool(
           .sort((a: any, b: any) => a.startDatum.localeCompare(b.startDatum));
 
         // Persoonlijke afspraken voor conflictdetectie
-        const allEvents = await ctx.runQuery(api.personalEvents.list, { userId: OWNER_USER_ID });
+        const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
         const weekdaysFull = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
         const maandNamen = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
 
@@ -610,7 +631,7 @@ async function executeTool(
         const start = new Date(vanDatum + "T00:00:00");
         const end = new Date(totDatum + "T00:00:00");
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const ds = d.toISOString().slice(0, 10);
+          const ds = new Date(d.getTime()).toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
           if (!dienstDatums.has(ds)) vrijeDagen.push(ds);
         }
 
@@ -649,7 +670,7 @@ async function executeTool(
         const periode = `${jaar}-${String(maand).padStart(2, "0")}`;
 
         // Probeer opgeslagen salaris
-        const stored = await ctx.runQuery(api.salary.getByPeriode, { userId: OWNER_USER_ID, periode });
+        const stored = await ctx.runQuery(api.salary.getByPeriode, { userId, periode });
         if (stored) {
           return JSON.stringify({
             bron: "opgeslagen",
@@ -660,7 +681,7 @@ async function executeTool(
         }
 
         // Bereken uit rooster
-        const berekend = await ctx.runQuery(api.salary.computeFromSchedule, { userId: OWNER_USER_ID });
+        const berekend = await ctx.runQuery(api.salary.computeFromSchedule, { userId });
         const maandData = berekend.find((s: any) => s.periode === periode);
         if (maandData) {
           return JSON.stringify({
@@ -684,7 +705,7 @@ async function executeTool(
         const maxAantal = (args.maxAantal as number) ?? 15;
         const categorie = args.categorie as string | undefined;
 
-        const allTxs = await ctx.runQuery(internal.transactions.listInternal, { userId: OWNER_USER_ID });
+        const allTxs = await ctx.runQuery(internal.transactions.listInternal, { userId });
         let matches = allTxs.filter((tx: any) =>
           tx.tegenpartijNaam?.toLowerCase().includes(zoekterm) ||
           tx.omschrijving?.toLowerCase().includes(zoekterm)
@@ -717,7 +738,7 @@ async function executeTool(
     case "afspraakMaken": {
       try {
         const result = await ctx.runMutation(api.personalEvents.create, {
-          userId: OWNER_USER_ID,
+          userId,
           titel: args.titel as string,
           startDatum: args.startDatum as string,
           eindDatum: args.eindDatum as string,
@@ -741,16 +762,16 @@ async function executeTool(
     case "afsprakenOpvragen": {
       try {
         const aantalDagen = (args.aantalDagen as number) ?? 30;
-        const today = new Date().toISOString().slice(0, 10);
-        const endDate = new Date(Date.now() + aantalDagen * 86400000).toISOString().slice(0, 10);
+        const today = todayCET();
+        const endDate = new Date(Date.now() + aantalDagen * 86400000).toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
 
-        const allEvents = await ctx.runQuery(api.personalEvents.list, { userId: OWNER_USER_ID });
+        const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
         const upcoming = allEvents
           .filter((e: any) => e.status === "Aankomend" && e.startDatum >= today && e.startDatum <= endDate)
           .sort((a: any, b: any) => a.startDatum.localeCompare(b.startDatum));
 
         // Diensten ophalen voor conflictdetectie
-        const schedule = await ctx.runQuery(api.schedule.list, { userId: OWNER_USER_ID });
+        const schedule = await ctx.runQuery(api.schedule.list, { userId });
         const weekdays = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
 
         const afspraken = upcoming.map((e: any) => {
@@ -977,8 +998,16 @@ export const chat = action({
 
         // ── Tool calls uitvoeren ─────────────────────────────────────────
         for (const toolCall of msg.tool_calls) {
-          const toolArgs = JSON.parse(toolCall.function.arguments);
-          const toolResult = await executeTool(ctx, toolCall.function.name, toolArgs);
+          const toolArgs = safeJsonParse(toolCall.function.arguments);
+          if (!toolArgs) {
+            messages.push({
+              role: "tool",
+              content: JSON.stringify({ error: `Ongeldige JSON in tool arguments: ${toolCall.function.arguments.slice(0, 100)}` }),
+              tool_call_id: toolCall.id,
+            });
+            continue;
+          }
+          const toolResult = await executeTool(ctx, toolCall.function.name, toolArgs, userId || OWNER_USER_ID);
           messages.push({
             role: "tool",
             content: toolResult,
