@@ -198,6 +198,90 @@ http.route({
   }),
 });
 
+// ─── 🤖 Grok Agent Agency ────────────────────────────────────────────────────
+
+/**
+ * GET /ai/agents — Agent discovery endpoint.
+ * Grok ontdekt alle beschikbare agents en hun capabilities.
+ */
+http.route({
+  path: "/ai/agents",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+    const result = await ctx.runQuery(api.ai.router.listAgents, {});
+    return json({ ok: true, ...result });
+  }),
+});
+
+/**
+ * GET /ai/briefing — Daily briefing (Dashboard Agent shortcut).
+ * Query params: userId
+ */
+http.route({
+  path: "/ai/briefing",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId");
+    if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
+
+    const result = await ctx.runQuery(api.ai.router.getBriefing, { userId });
+    return json(result);
+  }),
+});
+
+/**
+ * GET /ai/agent/* — Haal context op van een specifieke agent.
+ * URL: /ai/agent/lampen?userId=xxx
+ */
+http.route({
+  pathPrefix: "/ai/agent/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+    const url = new URL(req.url);
+    const agentId = url.pathname.replace(/^\/ai\/agent\//, "").split("/")[0];
+    const userId  = url.searchParams.get("userId");
+    if (!agentId) return json({ ok: false, error: "agentId ontbreekt in URL" }, 400);
+    if (!userId)  return json({ ok: false, error: "userId verplicht" }, 400);
+
+    const result = await ctx.runQuery(api.ai.router.getAgentContext, { agentId, userId });
+    return json(result);
+  }),
+});
+
+/**
+ * POST /ai/chat — Chat met een agent via Grok AI.
+ * Body: { userId, vraag, agentId?, history? }
+ */
+http.route({
+  path: "/ai/chat",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+
+    let body: { userId?: string; vraag?: string; agentId?: string; history?: Array<{ role: "user" | "assistant"; content: string }> };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ ok: false, error: "Invalid JSON body" }, 400);
+    }
+
+    if (!body.userId) return json({ ok: false, error: "userId verplicht" }, 400);
+    if (!body.vraag)  return json({ ok: false, error: "vraag verplicht" }, 400);
+
+    const result = await ctx.runAction(api.ai.grok.chat, {
+      userId:  body.userId,
+      vraag:   body.vraag,
+      agentId: body.agentId,
+      history: body.history,
+    });
+    return json(result);
+  }),
+});
+
 // ─── Grok AI Email Endpoints ──────────────────────────────────────────────────
 
 /**
