@@ -254,6 +254,41 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "afspraakMaken",
+      description: "Maak een nieuwe persoonlijke afspraak aan. De afspraak wordt automatisch gesynchroniseerd naar Google Calendar. Gebruik dit als de gebruiker een afspraak, event, of reminder wil aanmaken.",
+      parameters: {
+        type: "object",
+        properties: {
+          titel: { type: "string", description: "Titel van de afspraak" },
+          startDatum: { type: "string", description: "Startdatum in YYYY-MM-DD formaat" },
+          eindDatum: { type: "string", description: "Einddatum in YYYY-MM-DD formaat (zelfde als start voor eendaagse)" },
+          startTijd: { type: "string", description: "Starttijd HH:MM (optioneel, leeg voor hele dag)" },
+          eindTijd: { type: "string", description: "Eindtijd HH:MM (optioneel)" },
+          heledag: { type: "boolean", description: "true voor hele dag event, false voor tijdsgebonden" },
+          locatie: { type: "string", description: "Locatie (optioneel)" },
+          beschrijving: { type: "string", description: "Extra beschrijving (optioneel)" },
+        },
+        required: ["titel", "startDatum", "eindDatum", "heledag"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "afsprakenOpvragen",
+      description: "Haal persoonlijke afspraken op. Toont aankomende events met eventuele conflicten met werkdiensten. Gebruik dit als de gebruiker vraagt naar agenda, afspraken, of wat er gepland staat.",
+      parameters: {
+        type: "object",
+        properties: {
+          aantalDagen: { type: "number", description: "Hoeveel dagen vooruit kijken (default 30)" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
 
 // ─── Tool Execution ──────────────────────────────────────────────────────────
@@ -624,6 +659,67 @@ async function executeTool(
         });
       } catch (err) {
         return JSON.stringify({ error: `Transacties zoeken mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "afspraakMaken": {
+      try {
+        const result = await ctx.runMutation(api.personalEvents.create, {
+          userId: OWNER_USER_ID,
+          titel: args.titel as string,
+          startDatum: args.startDatum as string,
+          eindDatum: args.eindDatum as string,
+          heledag: args.heledag as boolean,
+          startTijd: args.startTijd as string | undefined,
+          eindTijd: args.eindTijd as string | undefined,
+          locatie: args.locatie as string | undefined,
+          beschrijving: args.beschrijving as string | undefined,
+        });
+        return JSON.stringify({
+          ok: true,
+          beschrijving: `Afspraak "${args.titel}" aangemaakt op ${args.startDatum}`,
+          eventId: result.eventId,
+          status: "PendingCreate — wordt automatisch gesynchroniseerd naar Google Calendar",
+        });
+      } catch (err) {
+        return JSON.stringify({ error: `Afspraak aanmaken mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "afsprakenOpvragen": {
+      try {
+        const aantalDagen = (args.aantalDagen as number) ?? 30;
+        const today = new Date().toISOString().slice(0, 10);
+        const endDate = new Date(Date.now() + aantalDagen * 86400000).toISOString().slice(0, 10);
+
+        const allEvents = await ctx.runQuery(api.personalEvents.list, { userId: OWNER_USER_ID });
+        const upcoming = allEvents
+          .filter((e: any) => e.status === "Aankomend" && e.startDatum >= today && e.startDatum <= endDate)
+          .sort((a: any, b: any) => a.startDatum.localeCompare(b.startDatum));
+
+        // Diensten ophalen voor conflictdetectie
+        const schedule = await ctx.runQuery(api.schedule.list, { userId: OWNER_USER_ID });
+        const weekdays = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
+
+        const afspraken = upcoming.map((e: any) => {
+          const d = new Date(e.startDatum + "T00:00:00");
+          const dienst = schedule.find((s: any) => s.startDatum === e.startDatum && s.status !== "VERWIJDERD");
+          return {
+            titel: e.titel, datum: e.startDatum, dag: weekdays[d.getDay()],
+            tijd: e.heledag ? "Hele dag" : `${e.startTijd ?? "?"} - ${e.eindTijd ?? "?"}`,
+            locatie: e.locatie, beschrijving: e.beschrijving,
+            conflict: dienst ? `⚠️ Conflict met ${dienst.shiftType} dienst (${dienst.startTijd}-${dienst.eindTijd})` : null,
+          };
+        });
+
+        return JSON.stringify({
+          periode: `${today} t/m ${endDate}`,
+          totaal: afspraken.length,
+          metConflict: afspraken.filter((a: any) => a.conflict).length,
+          afspraken,
+        });
+      } catch (err) {
+        return JSON.stringify({ error: `Afspraken ophalen mislukt: ${(err as Error).message}` });
       }
     }
 
