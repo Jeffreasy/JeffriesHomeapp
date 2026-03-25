@@ -198,6 +198,84 @@ http.route({
   }),
 });
 
+// ─── Grok AI Email Endpoints ──────────────────────────────────────────────────
+
+/**
+ * GET /emails/ai-summary — Compact inbox digest voor Grok.
+ * Eén call = volledig inbox overzicht (stats, afzenders, ongelezen, categorieën).
+ */
+http.route({
+  path: "/emails/ai-summary",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId");
+    if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
+
+    const summary = await ctx.runQuery(api.emails.aiSummary, { userId });
+    return json({ ok: true, ...summary });
+  }),
+});
+
+/**
+ * GET /emails/search — Full-text search over alle emails.
+ * Query params: userId, q (zoekterm)
+ */
+http.route({
+  path: "/emails/search",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+    const url = new URL(req.url);
+    const userId   = url.searchParams.get("userId");
+    const zoekterm = url.searchParams.get("q") ?? "";
+    if (!userId)   return json({ ok: false, error: "userId verplicht" }, 400);
+    if (!zoekterm)  return json({ ok: false, error: "q (zoekterm) verplicht" }, 400);
+
+    const results = await ctx.runQuery(api.emails.search, { userId, zoekterm });
+    return json({ ok: true, count: results.length, results });
+  }),
+});
+
+/**
+ * GET /emails/senders — Afzender analyse (top 25 met frequentie + categorieën).
+ */
+http.route({
+  path: "/emails/senders",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId");
+    if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
+
+    const senders = await ctx.runQuery(api.emails.senderAnalysis, { userId });
+    return json({ ok: true, count: senders.length, senders });
+  }),
+});
+
+/**
+ * GET /emails — Email listing met optionele filters.
+ * Query params: userId, label? (INBOX|SENT|TRASH), ongelezen? (true/false)
+ */
+http.route({
+  path: "/emails",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+    const url = new URL(req.url);
+    const userId = url.searchParams.get("userId");
+    if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
+
+    const label = url.searchParams.get("label") ?? undefined;
+    const onlyOngelezen = url.searchParams.get("ongelezen") === "true" ? true : undefined;
+
+    const emails = await ctx.runQuery(api.emails.list, { userId, label, onlyOngelezen });
+    return json({ ok: true, count: emails.length, emails });
+  }),
+});
+
 // ─── GET /schema (AI Introspectie) ────────────────────────────────────────────
 // Self-documenting endpoint: retourneert tabel-definities, indices, en API surface
 // zodat Grok AI de volledige database structuur kan begrijpen.
@@ -308,6 +386,21 @@ http.route({
           "transactions.listPaginated", "transactions.getStats",
           "personalEvents.list", "personalEvents.listUpcoming", "personalEvents.listByDate",
           "emails.list", "emails.getThread", "emails.search", "emails.getStats",
+          "emails.aiSummary — AI inbox digest (stats + top afzenders + ongelezen + categorieën)",
+          "emails.senderAnalysis — Top 25 afzenders met frequentie en detail",
+          "emails.recentByCategory — Filter emails per categorie (primary/social/promotions)",
+        ],
+        httpRoutes: [
+          "GET /automations — Automation regels ophalen",
+          "GET /schedule/today — Vandaag's dienst ophalen",
+          "GET /devices — Alle lampen ophalen",
+          "PATCH /devices/* — Lamp state updaten",
+          "DELETE /devices/* — Lamp verwijderen",
+          "GET /emails — Email listing met label/ongelezen filter",
+          "GET /emails/ai-summary — 🤖 Grok: Compact inbox digest (één call = vol overzicht)",
+          "GET /emails/search — 🤖 Grok: Full-text search (?q=zoekterm)",
+          "GET /emails/senders — 🤖 Grok: Afzender analyse (top 25)",
+          "GET /schema — 🤖 Grok: Self-documenting API schema",
         ],
         mutations: [
           "devices.create", "devices.update", "devices.remove",
