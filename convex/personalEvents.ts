@@ -196,6 +196,57 @@ export const create = mutation({
   },
 });
 
+/**
+ * Verwijder een afspraak op basis van eventId of titel (zoekterm).
+ * Markeert status als "PendingDelete" zodat de cron het uit Google Calendar verwijdert.
+ * Als het een PendingCreate was (nog niet in Google), wordt het direct uit DB verwijderd.
+ */
+export const remove = mutation({
+  args: {
+    userId:   v.string(),
+    eventId:  v.optional(v.string()),
+    zoekterm: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, eventId, zoekterm }) => {
+    let target;
+
+    if (eventId) {
+      target = await ctx.db
+        .query("personalEvents")
+        .withIndex("by_user_eventId", (q) =>
+          q.eq("userId", userId).eq("eventId", eventId)
+        )
+        .first();
+    } else if (zoekterm) {
+      const lower = zoekterm.toLowerCase();
+      const all = await ctx.db
+        .query("personalEvents")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      target = all.find(
+        (e) =>
+          e.status !== "VERWIJDERD" &&
+          e.status !== "Voorbij" &&
+          e.titel.toLowerCase().includes(lower)
+      );
+    }
+
+    if (!target) return { ok: false, error: "Afspraak niet gevonden" };
+
+    if (target.status === "PendingCreate") {
+      await ctx.db.delete(target._id);
+      return { ok: true, beschrijving: `"${target.titel}" verwijderd (was nog niet in Google Calendar)` };
+    }
+
+    await ctx.db.patch(target._id, { status: "PendingDelete" as any });
+    return {
+      ok: true,
+      beschrijving: `"${target.titel}" wordt verwijderd uit Google Calendar`,
+      eventId: target.eventId,
+    };
+  },
+});
+
 /** PendingCreate events ophalen — voor processPendingCalendar action. */
 export const listPendingInternal = internalQuery({
   args: { userId: v.string() },
@@ -206,6 +257,18 @@ export const listPendingInternal = internalQuery({
         q.eq("userId", userId).eq("status", "PendingCreate")
       )
       .collect(),
+});
+
+/** PendingDelete events ophalen — voor processPendingCalendar delete action. */
+export const listPendingDeleteInternal = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const all = await ctx.db
+      .query("personalEvents")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    return all.filter((e) => e.status === "PendingDelete");
+  },
 });
 
 

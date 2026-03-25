@@ -298,6 +298,20 @@ const TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "afspraakVerwijderen",
+      description: "Verwijder een persoonlijke afspraak. Zoekt op titel (zoekterm). De afspraak wordt ook uit Google Calendar verwijderd. Gebruik dit als de gebruiker een afspraak wil verwijderen, annuleren, of cancelen.",
+      parameters: {
+        type: "object",
+        properties: {
+          zoekterm: { type: "string", description: "Deel van de titel om de afspraak te vinden (bijv. 'koffie')" },
+        },
+        required: ["zoekterm"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "afsprakenOpvragen",
       description: "Haal persoonlijke afspraken op. Toont aankomende events met eventuele conflicten met werkdiensten. Gebruik dit als de gebruiker vraagt naar agenda, afspraken, of wat er gepland staat.",
       parameters: {
@@ -774,6 +788,26 @@ async function executeTool(
       }
     }
 
+    case "afspraakVerwijderen": {
+      try {
+        const result = await ctx.runMutation(api.personalEvents.remove, {
+          userId,
+          zoekterm: args.zoekterm as string,
+        });
+        if (!result.ok) {
+          return JSON.stringify({ error: result.error ?? "Afspraak niet gevonden" });
+        }
+        return JSON.stringify({
+          ok: true,
+          beschrijving: result.beschrijving,
+          eventId: result.eventId,
+          status: "Wordt automatisch uit Google Calendar verwijderd",
+        });
+      } catch (err) {
+        return JSON.stringify({ error: `Afspraak verwijderen mislukt: ${(err as Error).message}` });
+      }
+    }
+
     case "afsprakenOpvragen": {
       try {
         const aantalDagen = (args.aantalDagen as number) ?? 30;
@@ -834,6 +868,7 @@ Je hebt toegang tot tools waarmee je acties kunt uitvoeren:
 - lampBedien(actie) — Lampen bedienen (scenes/kleuren/dim)
 - dienstenOpvragen(maand) — Diensten per maand ophalen
 - afspraakMaken(titel, datum, ...) — Afspraak aanmaken
+- afspraakVerwijderen(zoekterm) — Afspraak verwijderen/annuleren
 - afsprakenOpvragen() — Aankomende afspraken tonen
 - salarisOpvragen(maand) — Salaris per maand
 - transactiesZoeken(zoekterm) — Bank transacties doorzoeken

@@ -3,10 +3,8 @@
 /**
  * convex/actions/processPendingCalendar.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Convex Action: verwerkt "PendingCreate" persoonlijke afspraken uit Convex
- * en schrijft ze naar Google Calendar via googleapis.
- *
- * Vervangt GAS processPendingEvents() in PersonalCalendar.gs
+ * Convex Action: verwerkt "PendingCreate" en "PendingDelete" persoonlijke
+ * afspraken uit Convex en schrijft/verwijdert ze in Google Calendar.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -21,29 +19,25 @@ import { createOAuthClient } from "../lib/googleAuth";
 
 export const processPending = internalAction({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }): Promise<{ aangemaakt: number; gefaald: number }> => {
-    // Stap 1: Haal PendingCreate events op uit Convex
+  handler: async (ctx, { userId }): Promise<{ aangemaakt: number; gefaald: number; verwijderd: number }> => {
     const pending = await ctx.runQuery(
       internal.personalEvents.listPendingInternal,
       { userId }
     );
 
-    if (pending.length === 0) return { aangemaakt: 0, gefaald: 0 };
-
-    // Stap 2: Maak elk event aan in Google Calendar
     const auth     = createOAuthClient();
     const calendar = google.calendar({ version: "v3", auth });
-    const primaryCalendarId = "primary"; // laventejeffrey@gmail.com primaire kalender
+    const primaryCalendarId = "primary";
 
     let aangemaakt = 0;
     let gefaald    = 0;
 
+    // ─── PendingCreate verwerken ─────────────────────────────────────────────
     for (const event of pending) {
       try {
         let googleEvent;
 
         if (event.heledag) {
-          // Hele-dag event — eindDatum +1 dag (Google Calendar exclusief)
           const eindDate = new Date(event.eindDatum + "T00:00:00");
           eindDate.setDate(eindDate.getDate() + 1);
 
@@ -58,7 +52,6 @@ export const processPending = internalAction({
             },
           });
         } else {
-          // Getimed event
           const startTijd = event.startTijd ?? "09:00";
           const eindTijd  = event.eindTijd  ?? "10:00";
 
@@ -76,7 +69,6 @@ export const processPending = internalAction({
 
         const googleId = googleEvent.data.id ?? "";
 
-        // Stap 3: Status update naar "Aankomend" in Convex
         await ctx.runMutation(internal.personalEvents.updateStatusInternal, {
           userId,
           eventId: event.eventId,
@@ -87,7 +79,6 @@ export const processPending = internalAction({
         aangemaakt++;
       } catch (err: any) {
         console.error(`❌ Fout bij "${event.titel}": ${err.message}`);
-        // Markeer als mislukt zodat GAS het niet opnieuw probeert
         await ctx.runMutation(internal.personalEvents.updateStatusInternal, {
           userId,
           eventId: event.eventId,
@@ -97,7 +88,59 @@ export const processPending = internalAction({
       }
     }
 
-    return { aangemaakt, gefaald };
+    // ─── PendingDelete verwerken ─────────────────────────────────────────────
+    const pendingDeletes = await ctx.runQuery(
+      internal.personalEvents.listPendingDeleteInternal,
+      { userId }
+    );
+
+    let verwijderd = 0;
+
+    for (const event of pendingDeletes) {
+      try {
+        // Zoek het Google Calendar event op basis van titel + datum
+        const listResult = await calendar.events.list({
+          calendarId: primaryCalendarId,
+          q:          event.titel,
+          timeMin:    `${event.startDatum}T00:00:00Z`,
+          timeMax:    `${event.startDatum}T23:59:59Z`,
+          singleEvents: true,
+          maxResults: 5,
+        });
+
+        const googleEvents = listResult.data.items ?? [];
+        const match = googleEvents.find(
+          (ge) => ge.summary?.toLowerCase() === event.titel.toLowerCase()
+        );
+
+        if (match?.id) {
+          await calendar.events.delete({
+            calendarId: primaryCalendarId,
+            eventId:    match.id,
+          });
+          console.log(`🗑️ Verwijderd uit Google Calendar: "${event.titel}" (${event.startDatum})`);
+        } else {
+          console.log(`⚠️ Niet gevonden in Google Calendar: "${event.titel}" — alleen uit Convex verwijderd`);
+        }
+
+        // Verwijder uit Convex DB
+        await ctx.runMutation(internal.personalEvents.deleteInternal, {
+          userId,
+          eventId: event.eventId,
+        });
+        verwijderd++;
+      } catch (err: any) {
+        console.error(`❌ Fout bij verwijderen "${event.titel}": ${err.message}`);
+        // Bij fout toch uit DB verwijderen
+        await ctx.runMutation(internal.personalEvents.deleteInternal, {
+          userId,
+          eventId: event.eventId,
+        });
+        verwijderd++;
+      }
+    }
+
+    return { aangemaakt, gefaald, verwijderd };
   },
 });
 
@@ -105,7 +148,7 @@ export const processPending = internalAction({
 
 export const processPendingNow = action({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }): Promise<{ aangemaakt: number; gefaald: number }> => {
+  handler: async (ctx, { userId }): Promise<{ aangemaakt: number; gefaald: number; verwijderd: number }> => {
     if (!userId) throw new Error("userId is vereist");
     return ctx.runAction(internal.actions.processPendingCalendar.processPending, { userId });
   },
