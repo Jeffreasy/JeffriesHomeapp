@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useMutation } from "convex/react";
+import { useState, useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import { useTransactions }  from "@/hooks/useTransactions";
 import { CsvUploader }      from "@/components/finance/CsvUploader";
@@ -12,7 +11,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, AlertTriangle, Landmark,
-  RefreshCw, Search, X, Calendar, CreditCard, Wrench,
+  RefreshCw, Search, X, Calendar, CreditCard,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -33,47 +32,7 @@ function ibanLabel(iban: string): string {
   return IBAN_LABELS[iban] ?? iban.slice(-8);
 }
 
-// ─── Migratie Knop (eenmalig, verdwijnt als klaar) ───────────────────────────
 
-function MigratieKnop() {
-  const migreer = useMutation(api.transactions.migreerDatums);
-  const [bezig,    setBezig]    = useState(false);
-  const [resultaat, setResultaat] = useState<string | null>(null);
-  const [klaar,    setKlaar]    = useState(false);
-
-  async function run() {
-    setBezig(true);
-    setResultaat(null);
-    try {
-      let totaalGem = 0;
-      // Loop totdat geen records meer hoeven gemigreerd te worden
-      for (let i = 0; i < 10; i++) {
-        const res = await migreer({});
-        totaalGem += res.gemigreerd;
-        if (res.gemigreerd === 0) break;
-      }
-      setResultaat(`✅ Klaar — ${totaalGem} datums gemigreerd naar YYYY-MM-DD.`);
-      if (totaalGem === 0) setKlaar(true);
-    } catch (e) {
-      setResultaat(`❌ Fout: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setBezig(false);
-    }
-  }
-
-  if (klaar) return null;
-
-  return (
-    <div className="migratie-banner">
-      <Wrench size={14} />
-      <span>Datum-migratie vereist voor correcte saldo-berekeningen.</span>
-      <button className="btn btn--primary btn--sm" onClick={run} disabled={bezig}>
-        {bezig ? <><RefreshCw size={13} className="spinner" /> Bezig…</> : "Migreer nu"}
-      </button>
-      {resultaat && <span className="migratie-result">{resultaat}</span>}
-    </div>
-  );
-}
 
 // ─── Stat Card ───────────────────────────────────────────────────────────────
 
@@ -155,29 +114,7 @@ export default function FinancePage() {
     setOnlyStorneringen(false);
   };
 
-  // ── Auto-migratie bij paginalading ───────────────────────────────────────
-  // Converteert bestaande DD-MM-YYYY datums naar YYYY-MM-DD.
-  // Draait op de achtergrond, volledig transparant voor de gebruiker.
-  // Veilig: de mutatie slaat al-gemigreerde records automatisch over.
-  const migreer    = useMutation(api.transactions.migreerDatums);
-  const heeftGelopen = useRef(false);
 
-  useEffect(() => {
-    if (heeftGelopen.current) return;
-    heeftGelopen.current = true;
-
-    // Run in background — no blocking, no UI feedback needed
-    (async () => {
-      try {
-        for (let i = 0; i < 10; i++) {
-          const { gemigreerd } = await migreer({});
-          if (gemigreerd === 0) break;
-        }
-      } catch {
-        // Stil falen: migratie is best-effort, geen kritieke fout
-      }
-    })();
-  }, [migreer]);
 
   return (
     <div className="finance-page">
@@ -197,8 +134,7 @@ export default function FinancePage() {
         <div className="finance-import"><CsvUploader /></div>
       </div>
 
-      {/* ─── Datum Migratie Banner ───────────────────────────────────────── */}
-      <MigratieKnop />
+
 
       {/* ─── IBAN Tabs ───────────────────────────────────────────────────── */}
       {stats && stats.ibannen.length > 1 && (
