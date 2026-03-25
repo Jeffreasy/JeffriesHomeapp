@@ -206,6 +206,23 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "dienstenOpvragen",
+      description: "Haal diensten/shifts op voor een specifieke maand of periode. Gebruik dit als de gebruiker vraagt naar diensten buiten de huidige 7-dagen context, bijv. 'geef mij april diensten' of 'wat werk ik in mei'. Data beschikbaar van -30 tot +90 dagen.",
+      parameters: {
+        type: "object",
+        properties: {
+          maand: { type: "number", description: "Maandnummer (1-12), bijv. 4 voor april" },
+          jaar: { type: "number", description: "Jaar, bijv. 2026 (default: huidig jaar)" },
+          vanDatum: { type: "string", description: "Optioneel: startdatum YYYY-MM-DD (override maand)" },
+          totDatum: { type: "string", description: "Optioneel: einddatum YYYY-MM-DD (override maand)" },
+        },
+        required: ["maand"],
+      },
+    },
+  },
 ];
 
 // ─── Tool Execution ──────────────────────────────────────────────────────────
@@ -453,6 +470,57 @@ async function executeTool(
         });
       } catch (err) {
         return JSON.stringify({ error: `Inbox opruimen mislukt: ${(err as Error).message}` });
+      }
+    }
+
+    case "dienstenOpvragen": {
+      try {
+        const allSchedule = await ctx.runQuery(api.schedule.list, { userId: OWNER_USER_ID });
+        const active = allSchedule.filter((s: any) => s.status !== "VERWIJDERD");
+
+        let vanDatum: string;
+        let totDatum: string;
+
+        if (args.vanDatum && args.totDatum) {
+          vanDatum = args.vanDatum as string;
+          totDatum = args.totDatum as string;
+        } else {
+          const maand = args.maand as number;
+          const jaar = (args.jaar as number) ?? new Date().getFullYear();
+          vanDatum = `${jaar}-${String(maand).padStart(2, "0")}-01`;
+          const lastDay = new Date(jaar, maand, 0).getDate();
+          totDatum = `${jaar}-${String(maand).padStart(2, "0")}-${lastDay}`;
+        }
+
+        const filtered = active
+          .filter((s: any) => s.startDatum >= vanDatum && s.startDatum <= totDatum)
+          .sort((a: any, b: any) => a.startDatum.localeCompare(b.startDatum));
+
+        const weekdays = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
+        const diensten = filtered.map((s: any) => {
+          const d = new Date(s.startDatum + "T00:00:00");
+          return {
+            datum: s.startDatum, dag: weekdays[d.getDay()],
+            type: s.shiftType, titel: s.titel,
+            start: s.startTijd, eind: s.eindTijd,
+            locatie: s.locatie, duur: s.duur,
+          };
+        });
+
+        // Stats
+        const shiftTypes: Record<string, number> = {};
+        for (const d of diensten) {
+          shiftTypes[d.type ?? "Onbekend"] = (shiftTypes[d.type ?? "Onbekend"] ?? 0) + 1;
+        }
+
+        return JSON.stringify({
+          periode: `${vanDatum} t/m ${totDatum}`,
+          totaal: diensten.length,
+          verdeling: shiftTypes,
+          diensten,
+        });
+      } catch (err) {
+        return JSON.stringify({ error: `Diensten ophalen mislukt: ${(err as Error).message}` });
       }
     }
 
