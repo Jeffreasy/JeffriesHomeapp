@@ -236,11 +236,16 @@ async function saveAndReply(
   agentId?: string,
 ) {
   if (result.ok && result.antwoord) {
-    const antwoord = result.antwoord.length > 4000 ? result.antwoord.slice(0, 3997) + "..." : result.antwoord;
-    await ctx.runMutation(api.chatMessages.save, { chatId, role: "assistant" as const, content: antwoord, agentId });
-    await sendMessage(chatId, antwoord, { parseMode: undefined as any });
+    // Escape HTML entities zodat <email@addr> en dergelijke niet als tags worden geparsed
+    let antwoord = result.antwoord
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    if (antwoord.length > 4000) antwoord = antwoord.slice(0, 3997) + "...";
+    await ctx.runMutation(api.chatMessages.save, { chatId, role: "assistant" as const, content: result.antwoord, agentId });
+    await sendMessage(chatId, antwoord);
   } else {
-    await sendMessage(chatId, `❌ ${result.error ?? "Kon geen antwoord genereren"}`);
+    const escaped = (result.error ?? "Kon geen antwoord genereren")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    await sendMessage(chatId, `❌ ${escaped}`);
   }
 }
 
