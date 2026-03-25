@@ -48,6 +48,15 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_user",   ["userId"]),
 
+  // ─── Chat Messages (Telegram conversation memory) ──────────────────────────
+  chatMessages: defineTable({
+    chatId:    v.number(),                   // Telegram chat ID
+    role:      v.union(v.literal("user"), v.literal("assistant")),
+    content:   v.string(),
+    agentId:   v.optional(v.string()),       // Welke agent antwoordde
+    createdAt: v.string(),
+  })
+    .index("by_chat", ["chatId"]),
 
   // ─── Automations ───────────────────────────────────────────────────────────
   automations: defineTable({

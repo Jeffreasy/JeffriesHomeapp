@@ -31,6 +31,7 @@ import type * as ai_grok from "../ai/grok.js";
 import type * as ai_registry from "../ai/registry.js";
 import type * as ai_router from "../ai/router.js";
 import type * as automations from "../automations.js";
+import type * as chatMessages from "../chatMessages.js";
 import type * as crons from "../crons.js";
 import type * as deviceCommands from "../deviceCommands.js";
 import type * as devices from "../devices.js";
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   "ai/registry": typeof ai_registry;
   "ai/router": typeof ai_router;
   automations: typeof automations;
+  chatMessages: typeof chatMessages;
   crons: typeof crons;
   deviceCommands: typeof deviceCommands;
   devices: typeof devices;

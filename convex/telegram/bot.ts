@@ -157,6 +157,11 @@ export const handleUpdate = internalAction({
       return;
     }
 
+    // ── Sla user bericht op ──────────────────────────────────────────────
+    await ctx.runMutation(api.chatMessages.save, {
+      chatId, role: "user", content: text,
+    });
+
     // ── Lamp commando → direct uitvoeren via command queue ────────────────
     const lampCmd = detectLampCommand(text);
     if (lampCmd) {
@@ -165,12 +170,23 @@ export const handleUpdate = internalAction({
         command: lampCmd.command,
         bron:    "telegram",
       });
-      await sendMessage(chatId,
-        `💡 ${lampCmd.beschrijving} — commando verstuurd!`,
-        { parseMode: undefined as any },
-      );
+      const reply = `💡 ${lampCmd.beschrijving} — commando verstuurd!`;
+      await ctx.runMutation(api.chatMessages.save, {
+        chatId, role: "assistant", content: reply, agentId: "lampen",
+      });
+      await sendMessage(chatId, reply, { parseMode: undefined as any });
       return;
     }
+
+    // ── Laad chat history voor Grok ──────────────────────────────────────
+    const history = await ctx.runQuery(api.chatMessages.getHistory, {
+      chatId, limit: 10,
+    }) as Array<{ role: "user" | "assistant"; content: string }>;
+
+    // Format als Grok history (alles behalve het huidige bericht)
+    const grokHistory = history
+      .slice(0, -1)  // Huidig bericht zit er al in via save
+      .map((m) => ({ role: m.role, content: m.content }));
 
     // ── Slash commando routing ────────────────────────────────────────────
     const cmd = text.split(" ")[0].toLowerCase().replace(/@\w+/, "");
@@ -185,9 +201,10 @@ export const handleUpdate = internalAction({
         userId:  OWNER_USER_ID,
         vraag,
         agentId: mapping.agentId,
+        history: grokHistory,
       }) as { ok: boolean; antwoord?: string; error?: string };
 
-      await sendReply(chatId, result);
+      await saveAndReply(ctx, chatId, result, mapping.agentId);
       return;
     }
 
@@ -199,20 +216,31 @@ export const handleUpdate = internalAction({
       userId:  OWNER_USER_ID,
       vraag:   text,
       agentId: detectedAgent,
+      history: grokHistory,
     }) as { ok: boolean; antwoord?: string; error?: string };
 
-    await sendReply(chatId, result);
+    await saveAndReply(ctx, chatId, result, detectedAgent);
   },
 });
 
-async function sendReply(chatId: number, result: { ok: boolean; antwoord?: string; error?: string }) {
+async function saveAndReply(
+  ctx: any,
+  chatId: number,
+  result: { ok: boolean; antwoord?: string; error?: string },
+  agentId?: string,
+) {
   if (result.ok && result.antwoord) {
     const antwoord = result.antwoord.length > 4000
       ? result.antwoord.slice(0, 3997) + "..."
       : result.antwoord;
+    // Sla assistant response op
+    await ctx.runMutation(api.chatMessages.save, {
+      chatId, role: "assistant" as const, content: antwoord, agentId,
+    });
     await sendMessage(chatId, antwoord, { parseMode: undefined as any });
   } else {
-    await sendMessage(chatId, `❌ ${result.error ?? "Kon geen antwoord genereren"}`);
+    const errMsg = `❌ ${result.error ?? "Kon geen antwoord genereren"}`;
+    await sendMessage(chatId, errMsg);
   }
 }
 
