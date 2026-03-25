@@ -32,21 +32,51 @@ const COMMAND_MAP: Record<string, { agentId: string; beschrijving: string }> = {
 // ─── Lamp Command Detection ──────────────────────────────────────────────────
 
 interface LampCommand {
-  command: { on?: boolean; brightness?: number };
+  command: { on?: boolean; brightness?: number; scene_id?: number; r?: number; g?: number; b?: number; color_temp_mireds?: number };
   beschrijving: string;
 }
 
+const SCENE_KEYWORDS: Record<string, { id: number; naam: string }> = {
+  ocean: { id: 1, naam: "Ocean" }, romance: { id: 2, naam: "Romance" },
+  sunset: { id: 3, naam: "Sunset" }, zonsondergang: { id: 3, naam: "Sunset" },
+  party: { id: 4, naam: "Party" }, feest: { id: 4, naam: "Party" },
+  fireplace: { id: 5, naam: "Fireplace" }, openhaard: { id: 5, naam: "Fireplace" },
+  cozy: { id: 6, naam: "Cozy" }, gezellig: { id: 6, naam: "Cozy" },
+  forest: { id: 7, naam: "Forest" }, bos: { id: 7, naam: "Forest" },
+  "wake up": { id: 9, naam: "Wake Up" }, wakker: { id: 9, naam: "Wake Up" },
+  bedtime: { id: 10, naam: "Bedtime" }, slaap: { id: 10, naam: "Bedtime" },
+  nachtlamp: { id: 14, naam: "Night Light" }, nachtlicht: { id: 14, naam: "Night Light" },
+  focus: { id: 15, naam: "Focus" }, studie: { id: 15, naam: "Focus" },
+  relax: { id: 16, naam: "Relax" }, ontspan: { id: 16, naam: "Relax" },
+  "tv time": { id: 18, naam: "TV Time" }, tv: { id: 18, naam: "TV Time" }, film: { id: 18, naam: "TV Time" },
+  club: { id: 26, naam: "Club" }, kerst: { id: 27, naam: "Christmas" },
+  christmas: { id: 27, naam: "Christmas" }, kaars: { id: 29, naam: "Candlelight" },
+  kaarslicht: { id: 29, naam: "Candlelight" },
+};
+
 function detectLampCommand(text: string): LampCommand | null {
   const lower = text.toLowerCase();
-  const isLampRelated = ["lamp", "lampen", "licht", "lichten"].some((w) => lower.includes(w));
+  const isLampRelated = ["lamp", "lampen", "licht", "lichten", "scene", "sfeer"].some((w) => lower.includes(w));
   if (!isLampRelated) return null;
 
+  // Aan/uit
   for (const p of ["uit", "off", "uitzetten", "uitdoen", "doof"]) {
     if (lower.includes(p)) return { command: { on: false }, beschrijving: "Lampen uitzetten" };
   }
   for (const p of ["aan", "on", "aanzetten", "aandoen"]) {
-    if (lower.includes(p)) return { command: { on: true }, beschrijving: "Lampen aanzetten" };
+    if (lower.includes(p) && !Object.keys(SCENE_KEYWORDS).some((s) => lower.includes(s))) {
+      return { command: { on: true }, beschrijving: "Lampen aanzetten" };
+    }
   }
+
+  // Scenes
+  for (const [keyword, scene] of Object.entries(SCENE_KEYWORDS)) {
+    if (lower.includes(keyword)) {
+      return { command: { scene_id: scene.id, on: true }, beschrijving: `Scene: ${scene.naam}` };
+    }
+  }
+
+  // Helderheid
   const bm = lower.match(/(\d+)\s*%/);
   if (bm) {
     const val = Math.min(100, Math.max(1, parseInt(bm[1])));
@@ -54,8 +84,14 @@ function detectLampCommand(text: string): LampCommand | null {
   }
   if (lower.includes("dim")) return { command: { brightness: 30 }, beschrijving: "Lampen dimmen (30%)" };
   if (lower.includes("fel") || lower.includes("helder")) return { command: { brightness: 100 }, beschrijving: "Lampen vol (100%)" };
+
+  // Kleurtemperatuur
+  if (lower.includes("warm")) return { command: { color_temp_mireds: 454, on: true }, beschrijving: "Warm wit (2200K)" };
+  if (lower.includes("koud") || lower.includes("koel")) return { command: { color_temp_mireds: 154, on: true }, beschrijving: "Koel wit (6500K)" };
+
   return null;
 }
+
 
 // ─── Keyword → Agent routing ─────────────────────────────────────────────────
 
