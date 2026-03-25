@@ -63,3 +63,79 @@ export async function deleteWebhook(): Promise<unknown> {
 export async function getMe(): Promise<unknown> {
   return tgFetch("getMe", {});
 }
+
+/** Haal file path op via file_id. */
+export async function getFile(fileId: string): Promise<{ file_path: string }> {
+  return tgFetch("getFile", { file_id: fileId }) as Promise<{ file_path: string }>;
+}
+
+/** Download een Telegram file als ArrayBuffer. */
+export async function downloadFile(filePath: string): Promise<ArrayBuffer> {
+  const url = `https://api.telegram.org/file/bot${getToken()}/${filePath}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+  return res.arrayBuffer();
+}
+
+/** Transcribeer audio via Groq Whisper API. */
+export async function transcribeVoice(audioBuffer: ArrayBuffer, filename: string): Promise<string> {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) throw new Error("GROQ_API_KEY niet geconfigureerd");
+
+  // Build multipart form data
+  const boundary = "----FormBoundary" + Date.now().toString(36);
+  const header = [
+    `--${boundary}`,
+    `Content-Disposition: form-data; name="file"; filename="${filename}"`,
+    "Content-Type: audio/ogg",
+    "",
+  ].join("\r\n");
+  const modelPart = [
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="model"',
+    "",
+    "whisper-large-v3",
+  ].join("\r\n");
+  const langPart = [
+    `--${boundary}`,
+    'Content-Disposition: form-data; name="language"',
+    "",
+    "nl",
+  ].join("\r\n");
+  const footer = `\r\n--${boundary}--`;
+
+  const encoder = new TextEncoder();
+  const headerBytes  = encoder.encode(header + "\r\n");
+  const modelBytes   = encoder.encode("\r\n" + modelPart);
+  const langBytes    = encoder.encode("\r\n" + langPart);
+  const footerBytes  = encoder.encode(footer);
+  const audioBytes   = new Uint8Array(audioBuffer);
+
+  // Concat all parts
+  const body = new Uint8Array(
+    headerBytes.length + audioBytes.length + modelBytes.length + langBytes.length + footerBytes.length
+  );
+  let offset = 0;
+  body.set(headerBytes, offset);  offset += headerBytes.length;
+  body.set(audioBytes, offset);   offset += audioBytes.length;
+  body.set(modelBytes, offset);   offset += modelBytes.length;
+  body.set(langBytes, offset);    offset += langBytes.length;
+  body.set(footerBytes, offset);
+
+  const res = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${groqKey}`,
+      "Content-Type": `multipart/form-data; boundary=${boundary}`,
+    },
+    body: body,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Groq Whisper ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json() as { text: string };
+  return data.text;
+}
