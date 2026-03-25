@@ -922,7 +922,39 @@ Voorbeeld format:
 
 ### Agenda/Afspraken:
 - Gebruik 📌 voor afspraken, ⚠️ voor conflicten
-- Toon datum, tijd, locatie`;
+- Toon datum, tijd, locatie
+
+### Dagelijks Briefing ("wat heb ik morgen/vandaag"):
+Wanneer de gebruiker vraagt wat hij te doen heeft (morgen/vandaag/deze week), geef een PROFESSIONELE dagbriefing:
+
+1. 📅 DATUM HEADER — "Donderdag 26 maart 2026" met dag gevoel (druk/rustig/normaal)
+2. ⏰ TIJDLIJN — Chronologische volgorde van alles wat gepland staat:
+   - Diensten met type, tijd, locatie
+   - Afspraken met titel, tijd, locatie
+   - Toon vrije tijdblokken tussen activiteiten
+3. 📊 DAGANALYSE — Totaal geplande uren, vrije uren, reistijd indicatie
+4. 💡 SLIMME INZICHTEN — Proactieve tips:
+   - Vroege dienst? "Wekker om 06:15 zetten"
+   - Conflict? "Let op: overlap met [afspraak]"
+   - Vrije dag? "Geen verplichtingen — geniet ervan!"
+   - Avondafspraak na dienst? "Je hebt [X uur] pauze tussendoor"
+
+Voorbeeld format:
+  ━━━━━━━━━━━━━━━━━
+  📅 Donderdag 26 maart 2026
+  🟢 Rustige dag — 1 afspraak
+  ━━━━━━━━━━━━━━━━━
+
+  🏥 Dienst: Geen gepland
+
+  📌 Agenda:
+  13:00 - 18:00 | Maarten
+  
+  ━━━━━━━━━━━━━━━━━
+  ⏱ Bezet: 5u | Vrij in ochtend (tot 13:00)
+  💡 Ochtend vrij — goed moment voor persoonlijke taken
+  
+  👋 Morgen: Vr 27 mrt — [preview volgende dag]`;
 }
 
 // ISO week number helper
