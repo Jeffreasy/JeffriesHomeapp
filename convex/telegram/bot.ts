@@ -100,11 +100,11 @@ function detectLampCommand(text: string): LampCommand | null {
 // ─── Keyword → Agent routing ─────────────────────────────────────────────────
 
 const KEYWORD_ROUTES: Array<{ keywords: string[]; agentId: string }> = [
-  { keywords: ["lamp", "lampen", "licht", "lichten", "scene", "kleur", "wiz"], agentId: "lampen" },
-  { keywords: ["dienst", "rooster", "shift", "werk", "planning", "vrij", "weekend", "afspraak", "agenda"], agentId: "rooster" },
-  { keywords: ["salaris", "loon", "geld", "ort", "netto", "bruto", "transactie", "saldo", "bank"], agentId: "finance" },
+  { keywords: ["lamp", "lampen", "licht", "lichten", "scene", "kleur", "wiz", "smart home"], agentId: "lampen" },
+  { keywords: ["dienst", "rooster", "shift", "werk", "planning", "vrij", "weekend", "afspraak", "agenda", "morgen", "vandaag", "overmorgen", "schema"], agentId: "rooster" },
+  { keywords: ["salaris", "loon", "geld", "ort", "netto", "bruto", "transactie", "saldo", "bank", "uitgaven", "betaling", "kosten", "verdien"], agentId: "finance" },
   { keywords: ["email", "mail", "inbox", "ongelezen", "bericht", "stuur", "reply", "gmail"], agentId: "email" },
-  { keywords: ["automation", "automations", "cron", "sync"], agentId: "automations" },
+  { keywords: ["automation", "automations", "cron", "sync", "systeem", "status", "health"], agentId: "automations" },
 ];
 
 function detectAgent(text: string): string {

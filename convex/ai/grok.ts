@@ -847,7 +847,7 @@ ${JSON.stringify(context, null, 2)}
 ## COMMUNICATIE REGELS
 1. Antwoord ALTIJD direct — verwijs NOOIT naar een andere agent.
 2. Antwoord in het Nederlands, professioneel maar vriendelijk.
-3. GEEN markdown (geen ** of \`\`\`) — dit is Telegram plain text.
+3. ABSOLUUT GEEN markdown formatting — geen **bold**, geen *italic*, geen backtick-code, geen code blokken. Dit is Telegram plain text. Gebruik ALLEEN emoji's en lijnen voor structuur.
 4. Gebruik emoji's strategisch voor visuele structuur.
 5. Wees proactief — bied vervolgacties aan.
 
@@ -1168,7 +1168,7 @@ export const chat = action({
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
           body: JSON.stringify({
             model: GROK_MODEL, messages, tools: TOOLS,
-            stream: false, temperature: 0.3, max_tokens: 1500,
+            stream: false, temperature: 0.3, max_tokens: 2500,
           }),
         });
 
