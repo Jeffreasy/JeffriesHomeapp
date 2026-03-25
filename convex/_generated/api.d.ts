@@ -42,6 +42,8 @@ import type * as lib_salaryCalc from "../lib/salaryCalc.js";
 import type * as personalEvents from "../personalEvents.js";
 import type * as salary from "../salary.js";
 import type * as schedule from "../schedule.js";
+import type * as telegram_api from "../telegram/api.js";
+import type * as telegram_bot from "../telegram/bot.js";
 import type * as transactions from "../transactions.js";
 
 import type {
@@ -85,6 +87,8 @@ declare const fullApi: ApiFromModules<{
   personalEvents: typeof personalEvents;
   salary: typeof salary;
   schedule: typeof schedule;
+  "telegram/api": typeof telegram_api;
+  "telegram/bot": typeof telegram_bot;
   transactions: typeof transactions;
 }>;
 

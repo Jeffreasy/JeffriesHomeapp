@@ -523,5 +523,26 @@ http.route({
   }),
 });
 
+// ─── 🤖 Telegram Bot Webhook ─────────────────────────────────────────────────
+
+/**
+ * POST /telegram/webhook — Ontvangt updates van Telegram.
+ * Fire-and-forget: stuurt meteen 200 OK terug en verwerkt async.
+ */
+http.route({
+  path: "/telegram/webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      const update = await req.json();
+      // Fire-and-forget — Telegram vereist snelle 200 response
+      await ctx.runAction(internal.telegram.bot.handleUpdate, { update });
+    } catch {
+      // Nooit falen richting Telegram, anders retry storm
+    }
+    return new Response("OK", { status: 200 });
+  }),
+});
+
 export default http;
 
