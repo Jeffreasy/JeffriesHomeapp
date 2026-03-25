@@ -58,7 +58,7 @@ export const roosterAgent: AgentDefinition = {
 
   getContext: async (ctx, userId, opts?: ContextOptions) => {
     const now   = new Date();
-    const today = now.toISOString().slice(0, 10);
+    const today = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
     const weekdays = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
 
     const [allSchedule, allEvents, syncMeta] = await Promise.all([
@@ -93,7 +93,7 @@ export const roosterAgent: AgentDefinition = {
     const zevenDagen = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(now.getTime() + i * 86400000);
-      const datum = d.toISOString().slice(0, 10);
+      const datum = d.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
       const dienst = active.find((s) => s.startDatum === datum);
       const events = allEvents
         .filter((e) => e.status === "Aankomend" && e.startDatum === datum)

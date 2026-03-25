@@ -61,7 +61,7 @@ export const financeAgent: AgentDefinition = {
 
   getContext: async (ctx, userId, opts?: ContextOptions) => {
     const now     = new Date();
-    const periode = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const periode = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" }).slice(0, 7);
 
     const allSalary = await ctx.db.query("salary").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
 
@@ -75,7 +75,7 @@ export const financeAgent: AgentDefinition = {
     }
 
     // Token-safe: alleen transacties van afgelopen 30 dagen
-    const dertigDagenGeleden = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    const dertigDagenGeleden = new Date(now.getTime() - 30 * 86400000).toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
     const allTxs = await ctx.db.query("transactions").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
     const recenteTxs = allTxs.filter((tx) => tx.datum >= dertigDagenGeleden);
 

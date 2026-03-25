@@ -49,7 +49,10 @@ export const dashboardAgent: AgentDefinition = {
 
   getContext: async (ctx, userId) => {
     const now = new Date();
-    const weekdays = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
+    // CET/CEST-aware date formatting
+    const cetDate = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+    const cetDay = now.toLocaleDateString("nl-NL", { timeZone: "Europe/Amsterdam", weekday: "long" });
+    const cetTime = now.toLocaleTimeString("nl-NL", { timeZone: "Europe/Amsterdam", hour: "2-digit", minute: "2-digit", hour12: false });
 
     // ── Inter-agent delegation: lite mode ─────────────────────────────────
     // Elke sub-agent geeft een compacte samenvatting terug.
@@ -62,9 +65,9 @@ export const dashboardAgent: AgentDefinition = {
     ]);
 
     return {
-      datum:    now.toISOString().slice(0, 10),
-      dag:      weekdays[now.getDay()],
-      tijdstip: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+      datum:    cetDate,
+      dag:      cetDay,
+      tijdstip: cetTime,
 
       lampen,
       rooster,
