@@ -20,6 +20,10 @@ import type * as actions_updatePersonalEvent from "../actions/updatePersonalEven
 import type * as ai_agents_automations from "../ai/agents/automations.js";
 import type * as ai_agents_dashboard from "../ai/agents/dashboard.js";
 import type * as ai_agents_email from "../ai/agents/email.js";
+import type * as ai_agents_emailAnalyst from "../ai/agents/emailAnalyst.js";
+import type * as ai_agents_emailComposer from "../ai/agents/emailComposer.js";
+import type * as ai_agents_emailManager from "../ai/agents/emailManager.js";
+import type * as ai_agents_emailReader from "../ai/agents/emailReader.js";
 import type * as ai_agents_finance from "../ai/agents/finance.js";
 import type * as ai_agents_lampen from "../ai/agents/lampen.js";
 import type * as ai_agents_rooster from "../ai/agents/rooster.js";
@@ -59,6 +63,10 @@ declare const fullApi: ApiFromModules<{
   "ai/agents/automations": typeof ai_agents_automations;
   "ai/agents/dashboard": typeof ai_agents_dashboard;
   "ai/agents/email": typeof ai_agents_email;
+  "ai/agents/emailAnalyst": typeof ai_agents_emailAnalyst;
+  "ai/agents/emailComposer": typeof ai_agents_emailComposer;
+  "ai/agents/emailManager": typeof ai_agents_emailManager;
+  "ai/agents/emailReader": typeof ai_agents_emailReader;
   "ai/agents/finance": typeof ai_agents_finance;
   "ai/agents/lampen": typeof ai_agents_lampen;
   "ai/agents/rooster": typeof ai_agents_rooster;

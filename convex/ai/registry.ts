@@ -66,20 +66,34 @@ export function toMeta(agent: AgentDefinition): AgentMeta {
 
 // ─── Agent Registry ─────────────────────────────────────────────────────────
 
+// Core agents
 import { dashboardAgent }   from "./agents/dashboard";
 import { lampenAgent }      from "./agents/lampen";
 import { roosterAgent }     from "./agents/rooster";
 import { financeAgent }     from "./agents/finance";
-import { emailAgent }       from "./agents/email";
 import { automationsAgent } from "./agents/automations";
 
+// Email agents (Director + 4 sub-agents)
+import { emailAgent }           from "./agents/email";
+import { emailAnalystAgent }    from "./agents/emailAnalyst";
+import { emailComposerAgent }   from "./agents/emailComposer";
+import { emailManagerAgent }    from "./agents/emailManager";
+import { emailReaderAgent }     from "./agents/emailReader";
+
 export const AGENT_REGISTRY: AgentDefinition[] = [
+  // ── Core ──────────────────────────
   dashboardAgent,
   lampenAgent,
   roosterAgent,
   financeAgent,
-  emailAgent,
   automationsAgent,
+
+  // ── Email Afdeling ────────────────
+  emailAgent,           // Director (hub)
+  emailAnalystAgent,    // 📊 Analyse & trends
+  emailComposerAgent,   // ✍️ Versturen & reply
+  emailManagerAgent,    // 🗂️ Triage & labels
+  emailReaderAgent,     // 🔍 Zoeken & lezen
 ];
 
 export function getAgent(id: string): AgentDefinition | undefined {
