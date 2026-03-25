@@ -51,9 +51,6 @@ export const importBatch = mutation({
   },
 });
 
-
-
-
 export const updateCategorie = mutation({
   args: { id: v.id("transactions"), categorie: v.optional(v.string()) },
   handler: async (ctx, { id, categorie }) => {

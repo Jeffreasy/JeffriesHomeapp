@@ -66,14 +66,13 @@ export function useSchedule() {
 
   const diensten: DienstRow[] = useMemo(() => {
     if (!docs) return [];
-    // 1. Filter verwijderde records
-    const active = docs.filter(d => d.status !== "VERWIJDERD");
-    // 2. Dedupliceer op eventId (laatste doc wint)
-    const deduped = new Map<string, typeof active[0]>();
-    for (const doc of active) {
+    // Server filtert al VERWIJDERD records — hier alleen deduplicatie
+    // 1. Dedupliceer op eventId (laatste doc wint)
+    const deduped = new Map<string, typeof docs[0]>();
+    for (const doc of docs) {
       deduped.set(doc.eventId, doc);
     }
-    // 3. Deduplicate op startDatum+startTijd (zelfde dienst, ander eventId)
+    // 2. Deduplicate op startDatum+startTijd (zelfde dienst, ander eventId)
     const byKey = new Map<string, DienstRow>();
     for (const doc of deduped.values()) {
       const key = `${doc.startDatum}|${doc.startTijd}|${doc.eindTijd}`;
