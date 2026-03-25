@@ -11,7 +11,7 @@ export default defineSchema({
     roomId:       v.optional(v.string()),
     manufacturer: v.optional(v.string()),
     model:        v.optional(v.string()),
-    status:       v.string(),              // "online" | "offline"
+    status:       v.union(v.literal("online"), v.literal("offline")),
     lastSeen:     v.optional(v.string()),  // ISO timestamp
     currentState: v.object({
       on:         v.boolean(),

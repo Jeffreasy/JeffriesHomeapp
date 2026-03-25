@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Power, Home, Sparkles, ChevronDown } from "lucide-react";
+import { Power, Sparkles, ChevronDown } from "lucide-react";
 import { useLampCommand } from "@/hooks/useHomeapp";
 import { type Room, type Device } from "@/lib/api";
 import { LampCard } from "@/components/lamp/LampCard";
@@ -15,9 +15,10 @@ const ROOM_SCENE_LIST = [...CUSTOM_SCENES, ...WIZ_SCENES];
 interface RoomSectionProps {
   room: Room;
   devices: Device[];
+  onSelect?: (device: Device) => void;
 }
 
-export function RoomSection({ room, devices }: RoomSectionProps) {
+export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
   const { mutate: sendCommand } = useLampCommand();
   const { success } = useToast();
   const [showScenes, setShowScenes] = useState(false);
@@ -46,7 +47,6 @@ export function RoomSection({ room, devices }: RoomSectionProps) {
         style={{ background: "rgba(10,10,15,0.85)", backdropFilter: "blur(12px)" }}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <Home size={14} className="text-slate-500 flex-shrink-0" aria-hidden="true" />
           <h2 className="text-sm font-semibold text-slate-200 truncate">{room.name}</h2>
           <span
             className="text-xs text-slate-600 flex-shrink-0"
@@ -131,10 +131,10 @@ export function RoomSection({ room, devices }: RoomSectionProps) {
         )}
       </AnimatePresence>
 
-      {/* Lamp grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* Lamp grid — items-start prevents card stretching when one expands */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
         {devices.map((device) => (
-          <LampCard key={device.id} device={device} />
+          <LampCard key={device.id} device={device} onSelect={onSelect} />
         ))}
       </div>
     </section>

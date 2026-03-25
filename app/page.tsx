@@ -1,180 +1,303 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Lightbulb, Power, AlertTriangle } from "lucide-react";
+import {
+  Lightbulb, Calendar, CalendarDays, Landmark, Zap, ChevronRight,
+  TrendingUp, Power, Circle,
+} from "lucide-react";
 import Link from "next/link";
-import { useDevices, useRooms, useLampCommand } from "@/hooks/useHomeapp";
-import { RoomSection } from "@/components/room/RoomSection";
-import { LampCard } from "@/components/lamp/LampCard";
-import { SceneBar } from "@/components/scenes/SceneBar";
-import { GlobalColorPicker } from "@/components/scenes/GlobalColorPicker";
-import { NextShiftCard } from "@/components/schedule/NextShiftCard";
+import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
 import { useSchedule } from "@/hooks/useSchedule";
-import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
+import { useSalary } from "@/hooks/useSalary";
+import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { NextShiftCard } from "@/components/schedule/NextShiftCard";
+import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
+import { CreateEventModal } from "@/components/schedule/CreateEventModal";
+import { CUSTOM_SCENES } from "@/lib/scenes";
+
+// ─── Stat Card ───────────────────────────────────────────────────────────────
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  accent,
+  href,
+}: {
+  icon: React.ElementType;
+  label: string;
+  value: string;
+  sub?: string;
+  accent: string;
+  href: string;
+}) {
+  return (
+    <Link href={href}>
+      <motion.div
+        whileHover={{ y: -2 }}
+        whileTap={{ scale: 0.97 }}
+        className="glass rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-all cursor-pointer group"
+      >
+        <div className="flex items-start justify-between">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: `${accent}18`, border: `1px solid ${accent}30` }}
+          >
+            <Icon size={17} style={{ color: accent }} />
+          </div>
+          <ChevronRight size={14} className="text-slate-600 group-hover:text-slate-400 transition-colors mt-1" />
+        </div>
+        <div className="mt-3">
+          <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
+          <p className="text-xs font-semibold text-slate-400 mt-0.5">{label}</p>
+          {sub && <p className="text-[11px] text-slate-600 mt-0.5">{sub}</p>}
+        </div>
+      </motion.div>
+    </Link>
+  );
+}
+
+// ─── Quick Scene Pill ─────────────────────────────────────────────────────────
+
+function QuickScene({
+  scene,
+  onApply,
+}: {
+  scene: (typeof CUSTOM_SCENES)[0];
+  onApply: () => void;
+}) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.93 }}
+      onClick={onApply}
+      className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium border border-white/8 hover:border-white/15 transition-all flex-shrink-0"
+      style={{ background: `${scene.color}12` }}
+    >
+      <Circle size={8} style={{ color: scene.color, fill: scene.color }} />
+      <span className="text-slate-300">{scene.label}</span>
+    </motion.button>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { data: devices = [], isLoading: loadingDevices, error: devicesError } = useDevices();
-  const { data: rooms = [], isLoading: loadingRooms } = useRooms();
+  const { data: devices = [] } = useDevices();
   const { mutate: sendCommand } = useLampCommand();
-  const { nextDienst } = useSchedule();
+  const { nextDienst, thisWeek } = useSchedule();
+  const { huidig: salarisHuidig } = useSalary();
+  const { upcoming: upcomingEvents, eventsByDate, conflictMap } = usePersonalEvents({ diensten: thisWeek });
+
+  // Edit modal state
+  const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const handleEditEvent = (evt: PersonalEvent) => {
+    setEditEvent(evt);
+    setModalOpen(true);
+  };
 
   const onlineDevices = devices.filter((d) => d.status === "online");
   const onDevices = devices.filter((d) => d.current_state?.on);
   const allOn = onDevices.length === devices.length && devices.length > 0;
 
-  const toggleAll = () => {
+  const toggleAll = () =>
     devices.forEach((d) => sendCommand({ id: d.id, cmd: { on: !allOn } }));
+
+  const applyScene = (scene: (typeof CUSTOM_SCENES)[0]) => {
+    onlineDevices.forEach((d) =>
+      sendCommand({ id: d.id, cmd: scene.command })
+    );
   };
 
-  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
-  useGlobalShortcuts({ devices, allOn, sendCommand });
+  // Greeting
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 6 ? "Goedenacht" : hour < 12 ? "Goedemorgen" : hour < 18 ? "Goedemiddag" : "Goedenavond";
 
-  // Group devices by room
-  const devicesByRoom = rooms.map((room) => ({
-    room,
-    devices: devices.filter((d) => d.room_id === room.id),
-  }));
-  const unassigned = devices.filter((d) => !d.room_id);
+  const today = new Date().toLocaleDateString("nl-NL", {
+    weekday: "long", day: "numeric", month: "long",
+  });
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: "#0a0a0f" }}>
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 py-4">
-        <div className="flex items-center justify-between gap-2 min-w-0">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold text-white">Dashboard</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              {onlineDevices.length}/{devices.length} online · {onDevices.length} aan
-            </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-white">{greeting} 👋</h1>
+            <p className="text-sm text-slate-500 mt-0.5 capitalize">{today}</p>
           </div>
 
-          {/* Right controls */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Stats */}
-            <div className="hidden sm:flex items-center gap-3 mr-1">
-              <div className="text-center">
-                <p className="text-base font-bold text-amber-400">{onDevices.length}</p>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wide">Aan</p>
-              </div>
-              <div className="w-px h-7 bg-white/10" />
-              <div className="text-center">
-                <p className="text-base font-bold text-green-400">{onlineDevices.length}</p>
-                <p className="text-[10px] text-slate-500 uppercase tracking-wide">Online</p>
-              </div>
-            </div>
-
-            {/* Global color picker */}
-            <GlobalColorPicker />
-
-            {/* Master on/off */}
-            <motion.button
-              whileTap={{ scale: 0.93 }}
-              onClick={toggleAll}
-              title="Alles aan/uit (Spatiebalk)"
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                allOn
-                  ? "bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
-                  : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
-              }`}
-            >
-              <Power size={13} />
-              <span className="hidden sm:inline">{allOn ? "Alles uit" : "Alles aan"}</span>
-            </motion.button>
-          </div>
+          {/* Master lamp toggle */}
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            onClick={toggleAll}
+            title="Alle lampen aan/uit"
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+              allOn
+                ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                : "bg-white/5 text-slate-400 border-white/10"
+            }`}
+          >
+            <Power size={13} />
+            <span className="hidden sm:inline">{allOn ? "Uit" : "Aan"}</span>
+          </motion.button>
         </div>
       </header>
 
-      {/* Scene bar */}
-      <div className="px-6 pt-4 pb-0">
-        <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Scènes</p>
-        <SceneBar />
-      </div>
+      <main className="px-6 py-5 space-y-7 max-w-3xl mx-auto">
 
-      {/* Compact next shift — only when schedule has data */}
-      {nextDienst && (
-        <div className="px-6 pt-3">
-          <NextShiftCard dienst={nextDienst} compact />
+        {/* ─── Stats grid ──────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard
+            icon={Lightbulb}
+            label="Verlichting"
+            value={`${onDevices.length} / ${devices.length}`}
+            sub={`${onlineDevices.length} online`}
+            accent="#f59e0b"
+            href="/lampen"
+          />
+          <StatCard
+            icon={Calendar}
+            label="Diensten"
+            value={thisWeek?.length ? `${thisWeek.length}` : "—"}
+            sub="deze week"
+            accent="#60a5fa"
+            href="/rooster"
+          />
+          <StatCard
+            icon={Landmark}
+            label="Netto prognose"
+            value={
+              salarisHuidig
+                ? `€ ${salarisHuidig.nettoPrognose.toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`
+                : "—"
+            }
+            sub="deze maand"
+            accent="#34d399"
+            href="/finance"
+          />
+          <StatCard
+            icon={CalendarDays}
+            label="Afspraken"
+            value={upcomingEvents.length ? `${upcomingEvents.length}` : "—"}
+            sub="aankomend"
+            accent="#818cf8"
+            href="/rooster"
+          />
         </div>
-      )}
 
-      <main className="px-6 py-5 space-y-8 max-w-5xl mx-auto">
-        {/* ─── Error state ───────────────────────────────────────────────────── */}
-        {devicesError && (
-          <div className="glass rounded-2xl border border-red-500/20 p-4 flex items-start gap-3">
-            <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
-            <div>
-              <p className="text-sm font-semibold text-red-300">Verbinding mislukt</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                {devicesError instanceof Error
-                  ? devicesError.message
-                  : "Kan geen verbinding maken met de backend. Controleer of de server online is."}
-              </p>
-            </div>
+        {/* ─── Quick scenes ─────────────────────────────────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-slate-500 uppercase tracking-wider">Snelle scènes</p>
+            <Link href="/lampen" className="text-xs text-amber-400/70 hover:text-amber-400 transition-colors flex items-center gap-1">
+              Alle lampen <ChevronRight size={12} />
+            </Link>
           </div>
-        )}
-
-        {loadingDevices || loadingRooms ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="glass rounded-2xl h-24 animate-pulse"
-                style={{ animationDelay: `${i * 80}ms` }}
+          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {CUSTOM_SCENES.map((scene) => (
+              <QuickScene
+                key={scene.id}
+                scene={scene}
+                onApply={() => applyScene(scene)}
               />
             ))}
+            {/* Alles uit */}
+            <motion.button
+              whileTap={{ scale: 0.93 }}
+              onClick={() =>
+                onlineDevices.forEach((d) =>
+                  sendCommand({ id: d.id, cmd: { on: false } })
+                )
+              }
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium border border-white/8 hover:border-white/15 bg-white/5 transition-all flex-shrink-0"
+            >
+              <Power size={12} className="text-slate-400" />
+              <span className="text-slate-400">Uit</span>
+            </motion.button>
           </div>
-        ) : (
-          <>
-            {/* Rooms */}
-            {devicesByRoom
-              .filter(({ devices }) => devices.length > 0)
-              .map(({ room, devices }) => (
-                <RoomSection
-                  key={room.id}
-                  room={room}
-                  devices={devices}
-                />
-              ))}
+        </section>
 
-            {/* Geen kamer — lampen zonder room_id */}
-            {unassigned.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <Lightbulb size={14} className="text-slate-500" />
-                  <h2 className="text-sm font-semibold text-slate-400">
-                    Geen kamer ({unassigned.length})
-                  </h2>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {unassigned.map((d) => (
-                    <LampCard key={d.id} device={d} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* ─── Empty state ────────────────────────────────────────────── */}
-            {devices.length === 0 && !devicesError && (
-              <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
-                  <Lightbulb size={28} className="text-slate-600" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-300">Geen lampen gevonden</h3>
-                <p className="text-sm text-slate-500 mt-1">
-                  Ga naar{" "}
-                  <Link
-                    href="/settings"
-                    className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
-                  >
-                    Instellingen
-                  </Link>{" "}
-                  om een lamp te registreren.
-                </p>
-              </div>
-            )}
-          </>
+        {/* ─── Next shift ───────────────────────────────────────────────────── */}
+        {nextDienst && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Volgende dienst</p>
+              <Link href="/rooster" className="text-xs text-amber-400/70 hover:text-amber-400 transition-colors flex items-center gap-1">
+                Rooster <ChevronRight size={12} />
+              </Link>
+            </div>
+            <NextShiftCard dienst={nextDienst} compact afspraken={nextDienst ? eventsByDate[nextDienst.startDatum] : undefined} />
+          </section>
         )}
+
+        {/* ─── Aankomende afspraken ────────────────────────────────────────── */}
+        {upcomingEvents.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-slate-500 uppercase tracking-wider">Aankomende afspraken</p>
+              <Link href="/rooster" className="text-xs text-indigo-400/70 hover:text-indigo-400 transition-colors flex items-center gap-1">
+                Agenda <ChevronRight size={12} />
+              </Link>
+            </div>
+            <div className="glass rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden">
+              {upcomingEvents.slice(0, 5).map(evt => (
+                <div key={evt.eventId} className="px-3 py-0.5">
+                  <PersonalEventItem
+                    event={evt}
+                    isToday={evt.startDatum === new Date().toISOString().slice(0, 10)}
+                    onEdit={handleEditEvent}
+                    conflictInfo={conflictMap.get(evt.eventId)}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ─── Quick links grid ─────────────────────────────────────────────── */}
+        <section>
+          <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Navigeer naar</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { href: "/lampen",     icon: Lightbulb, label: "Verlichting",  sub: `${devices.length} lampen`,  accent: "#f59e0b" },
+              { href: "/rooster",    icon: Calendar,  label: "Rooster",      sub: "Diensten & agenda",          accent: "#60a5fa" },
+              { href: "/finance",    icon: Landmark,  label: "Finance",      sub: "Salaris & transacties",      accent: "#34d399" },
+              { href: "/automations",icon: Zap,       label: "Automations",  sub: "Schema & triggers",          accent: "#a78bfa" },
+            ].map(({ href, icon: Icon, label, sub, accent }) => (
+              <Link key={href} href={href}>
+                <motion.div
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="glass rounded-xl p-3.5 border border-white/5 hover:border-white/10 flex items-center gap-3 transition-all group cursor-pointer"
+                >
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${accent}15`, border: `1px solid ${accent}25` }}
+                  >
+                    <Icon size={15} style={{ color: accent }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-200 group-hover:text-white transition-colors">{label}</p>
+                    <p className="text-[11px] text-slate-500">{sub}</p>
+                  </div>
+                </motion.div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
       </main>
+
+      {/* Edit modal */}
+      <CreateEventModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditEvent(null); }}
+        editEvent={editEvent}
+      />
     </div>
   );
 }

@@ -1,17 +1,20 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { RefreshCw, Calendar, Upload, BarChart2, List, Euro, CalendarDays, Zap } from "lucide-react";
+import { RefreshCw, Calendar, Upload, BarChart2, List, Euro, CalendarDays, Zap, Plus } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useAction } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { useSchedule } from "@/hooks/useSchedule";
+import { usePersonalEvents } from "@/hooks/usePersonalEvents";
 import { useToast } from "@/components/ui/Toast";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { DienstItem } from "@/components/schedule/DienstItem";
 import { StatsView } from "@/components/schedule/StatsView";
 import { SalarisView } from "@/components/schedule/SalarisView";
 import { AfsprakenView } from "@/components/schedule/AfsprakenView";
+import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
+import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   groupByWeekNr,
@@ -20,6 +23,8 @@ import {
   teamBreakdown,
   getHistory,
 } from "@/lib/schedule";
+import { generateUnifiedTimeline } from "@/lib/unified";
+import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,7 +68,7 @@ function WeekHeader({ weeknr, count, hours, open, onToggle }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-type Tab = "agenda" | "statistieken" | "salaris" | "afspraken";
+type Tab = "overzicht" | "statistieken" | "salaris" | "afspraken_beheer";
 
 export default function RoosterPage() {
   const {
@@ -81,38 +86,75 @@ export default function RoosterPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const today   = new Date().toISOString().slice(0, 10);
 
-  // Convex native calendar sync
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const syncNow = useAction((api as any).actions.syncSchedule.syncNow);
-  const [calSyncing, setCalSyncing] = useState(false);
+  // Load personal events with smart conflict detection
+  const { 
+    upcoming: upcomingEvents,
+    eventsByDate,
+    conflictMap
+  } = usePersonalEvents({ diensten: upcoming });
 
+  // Modal control
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
+
+  const openNewEvent = () => {
+    setEditEvent(null);
+    setModalOpen(true);
+  };
+
+  const handleEditEvent = (evt: PersonalEvent) => {
+    setEditEvent(evt);
+    setModalOpen(true);
+  };
+
+  // Convex native calendar syncs
+  const syncSchedule = useAction(api.actions.syncSchedule.syncNow);
+  const syncPersonal = useAction(api.actions.syncPersonalEvents.syncPersonalNow);
+
+  const [calSyncing, setCalSyncing] = useState(false);
   const handleCalendarSync = async () => {
     if (!user?.id) { error("Niet ingelogd"); return; }
     setCalSyncing(true);
     try {
-      const res = await syncNow({ userId: user.id }) as any;
-      success(`Rooster gesynchroniseerd: ${res.upserted} diensten bijgewerkt`);
-    } catch (e: any) {
-      error(`Sync mislukt: ${e.message ?? "onbekende fout"}`);
+      const [scheduleRes, personalRes] = await Promise.allSettled([
+        syncSchedule({ userId: user.id }),
+        syncPersonal({ userId: user.id })
+      ]);
+
+      const scheduleSuccess = scheduleRes.status === "fulfilled";
+      const personalSuccess = personalRes.status === "fulfilled";
+
+      if (scheduleSuccess && personalSuccess) {
+        success("Beide agenda's gesynchroniseerd via API.");
+      } else if (scheduleSuccess || personalSuccess) {
+        // We use the same success toast, but with a different message for partial sync
+        success("Gedeeltelijk gesynchroniseerd: Een van de agenda's kon niet benaderd worden.");
+      } else {
+        throw new Error("Failed validation for both actions");
+      }
+    } catch (err: any) {
+      console.error("Cal sync fout:", err);
+      error(`Fout bij ophalen: ${err.message}`);
     } finally {
       setCalSyncing(false);
     }
   };
 
-  const [tab,         setTab]         = useState<Tab>("agenda");
+  const [tab,         setTab]         = useState<Tab>("overzicht");
   const [showHistory, setShowHistory] = useState(false);
   const [openWeeks,   setOpenWeeks]   = useState<Set<string>>(new Set());
+  const [confirmClear, setConfirmClear] = useState(false);
 
   // ── Derived for agenda tab ─────────────────────────────────────────────────
   const upcomingHours = calcTotalHours(upcoming);
   const shifts        = shiftBreakdown(upcoming);
   const teams         = teamBreakdown(upcoming);
   const history       = getHistory(diensten);
-  const weekGroups    = groupByWeekNr(upcoming);
+  const unifiedWeeks  = generateUnifiedTimeline(upcoming, upcomingEvents);
 
   // Open all weeks on first load
-  if (openWeeks.size === 0 && weekGroups.length > 0) {
-    setOpenWeeks(new Set(weekGroups.map(w => w.weeknr)));
+  if (openWeeks.size === 0 && unifiedWeeks.length > 0) {
+    setOpenWeeks(new Set(unifiedWeeks.map(w => w.weeknr)));
   }
 
   const toggleWeek = (wk: string) =>
@@ -149,33 +191,52 @@ export default function RoosterPage() {
                 : "Geen rooster gesynchroniseerd"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {meta && (
-              <button onClick={clear} className="text-xs text-slate-600 hover:text-red-400 transition-colors px-2 py-1">
-                Wissen
-              </button>
+              confirmClear ? (
+                <div className="flex items-center gap-1 bg-red-950/40 border border-red-500/20 rounded-lg px-2 py-1">
+                  <span className="text-[10px] text-red-400 font-medium">Wissen?</span>
+                  <button onClick={() => { clear(); setConfirmClear(false); }}
+                    className="text-[10px] text-red-500 font-bold px-1 hover:bg-red-500/20 rounded">Ja</button>
+                  <button onClick={() => setConfirmClear(false)}
+                    className="text-[10px] text-slate-400 px-1 hover:bg-slate-700/50 rounded">Nee</button>
+                </div>
+              ) : (
+                <button onClick={() => {
+                  setConfirmClear(true);
+                  setTimeout(() => setConfirmClear(false), 3000);
+                }} className="text-xs text-slate-600 hover:text-red-400 transition-colors px-2 py-1 hidden sm:block">
+                  Wissen
+                </button>
+              )
             )}
             <button onClick={() => fileRef.current?.click()} disabled={isLoading}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-slate-200 transition-all">
-              <Upload size={12} /> XLSX
+              className="flex items-center gap-1.5 px-2 sm:px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-400 hover:text-slate-200 transition-all">
+              <Upload size={12} /><span className="hidden sm:inline">XLSX</span>
             </button>
 
             <button onClick={handleCalendarSync} disabled={calSyncing}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-all cursor-pointer disabled:opacity-50">
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs sm:text-sm font-medium hover:bg-amber-500/25 transition-all cursor-pointer disabled:opacity-50">
               <Zap size={13} className={calSyncing ? "animate-pulse" : ""} />
-              {calSyncing ? "Syncing..." : "Sync Agenda"}
+              <span className="hidden sm:inline">{calSyncing ? "Syncing..." : "Sync Agenda"}</span>
+              <span className="sm:hidden">{calSyncing ? "..." : "Sync"}</span>
+            </button>
+            <button onClick={openNewEvent}
+              className="flex items-center justify-center w-9 h-9 sm:w-auto sm:px-3 sm:py-2 rounded-xl bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 text-sm font-medium hover:bg-indigo-500/25 transition-all cursor-pointer">
+              <Plus size={16} />
+              <span className="hidden sm:inline ml-1.5">+ Afspraak</span>
             </button>
             <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleFile} className="hidden" />
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1">
+        <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
           {([
-            { id: "agenda",       label: "Agenda",       icon: List         },
-            { id: "statistieken", label: "Statistieken", icon: BarChart2    },
-            { id: "salaris",      label: "Salaris",      icon: Euro         },
-            { id: "afspraken",    label: "Afspraken",    icon: CalendarDays },
+            { id: "overzicht",        label: "Overzicht",    icon: List         },
+            { id: "statistieken",     label: "Statistieken", icon: BarChart2    },
+            { id: "salaris",          label: "Salaris",      icon: Euro         },
+            { id: "afspraken_beheer", label: "Beheer",       icon: CalendarDays },
           ] as const).map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -212,11 +273,11 @@ export default function RoosterPage() {
           </div>
         )}
 
-        {/* ════════════════════  AGENDA TAB  ════════════════════ */}
-        {tab === "agenda" && (
+        {/* ════════════════════  OVERZICHT TAB (UNIFIED)  ════════════════════ */}
+        {tab === "overzicht" && (
           <>
             {/* Stats bar */}
-            {upcoming.length > 0 && (
+            {unifiedWeeks.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard label="Komende uren"  value={`${upcomingHours}u`} sub={`${upcoming.length} diensten`}   accent="#f59e0b" />
                 <StatCard label="Vroeg / Laat"  value={`${shifts["Vroeg"] ?? 0} / ${shifts["Laat"] ?? 0}`}          sub={`${shifts["Dienst"] ?? 0} dagdienst`} accent="#f97316" />
@@ -227,29 +288,45 @@ export default function RoosterPage() {
 
             {/* Volgende dienst */}
             <ErrorBoundary>
-              <NextShiftCard dienst={nextDienst} onImport={handleCalendarSync} />
+              <NextShiftCard
+                dienst={nextDienst}
+                onImport={handleCalendarSync}
+                afspraken={nextDienst ? eventsByDate[nextDienst.startDatum] : undefined}
+              />
             </ErrorBoundary>
 
             {/* Week groups */}
-            {weekGroups.length > 0 && (
+            {unifiedWeeks.length > 0 && (
               <section className="space-y-3">
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider">
-                  Komende {upcoming.length} diensten · per week
+                  Tijdlijn overzicht
                 </p>
-                {weekGroups.map(({ weeknr, rows }) => {
-                  const isOpen  = openWeeks.has(weeknr);
-                  const wkHours = calcTotalHours(rows);
+                {unifiedWeeks.map(({ weeknr, items, werkUren, dienstenAantal }) => {
+                  const isOpen = openWeeks.has(weeknr);
                   return (
                     <div key={weeknr}>
-                      <WeekHeader weeknr={weeknr} count={rows.length} hours={wkHours} open={isOpen} onToggle={() => toggleWeek(weeknr)} />
+                      <WeekHeader weeknr={weeknr} count={dienstenAantal} hours={werkUren} open={isOpen} onToggle={() => toggleWeek(weeknr)} />
                       <AnimatePresence initial={false}>
                         {isOpen && (
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                             <div className="mt-1 glass rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden">
-                              {rows.map(d => (
-                                <div key={d.eventId} className="px-4 py-0.5">
-                                  <DienstItem dienst={d} isToday={d.startDatum === today} />
+                              {items.map((item, idx) => (
+                                <div key={idx} className="px-4 py-0.5">
+                                  {item.type === "dienst" ? (
+                                    <DienstItem
+                                      dienst={item.data as any}
+                                      isToday={item.date === today}
+                                      afspraken={eventsByDate[item.date]}
+                                    />
+                                  ) : (
+                                    <PersonalEventItem
+                                      event={item.data as PersonalEvent}
+                                      isToday={item.date === today}
+                                      onEdit={handleEditEvent}
+                                      conflictInfo={conflictMap.get((item.data as PersonalEvent).eventId)}
+                                    />
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -277,7 +354,7 @@ export default function RoosterPage() {
                       <div className="glass rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden opacity-60">
                         {history.map(d => (
                           <div key={d.eventId} className="px-4 py-0.5">
-                            <DienstItem dienst={d} />
+                            <DienstItem dienst={d} afspraken={eventsByDate[d.startDatum]} />
                           </div>
                         ))}
                       </div>
@@ -304,13 +381,23 @@ export default function RoosterPage() {
         )}
 
         {/* ════════════════════  AFSPRAKEN TAB  ════════════════════ */}
-        {tab === "afspraken" && (
+        {tab === "afspraken_beheer" && (
           <ErrorBoundary>
-            <AfsprakenView />
+            <AfsprakenView 
+              diensten={upcoming} 
+              onEditEvent={handleEditEvent}
+            />
           </ErrorBoundary>
         )}
 
       </main>
+      
+      {/* Global modal for creating/editing events */}
+      <CreateEventModal 
+        open={modalOpen} 
+        onClose={() => { setModalOpen(false); setEditEvent(null); }} 
+        editEvent={editEvent}
+      />
     </div>
   );
 }

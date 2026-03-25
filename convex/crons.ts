@@ -15,6 +15,16 @@ crons.daily(
 );
 
 /**
+ * Geagendeerde Google Calendar sync (Primaire Agenda)
+ */
+crons.interval(
+  "sync-personal-events-interval",
+  { hours: 1 },
+  internal.actions.syncPersonalEvents.syncFromCalendar,
+  { userId: JEFFREY_USER_ID }
+);
+
+/**
  * Dagelijkse Todoist sync — elke dag om 07:00 UTC
  */
 crons.daily(

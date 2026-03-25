@@ -1,20 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Calendar, Clock, MapPin, FileText, Plus } from "lucide-react";
-import { useMutation } from "convex/react";
+import { X, Calendar, Clock, MapPin, FileText, Plus, Save } from "lucide-react";
+import { useMutation, useAction } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
+import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 
 interface CreateEventModalProps {
-  open:    boolean;
-  onClose: () => void;
+  open:       boolean;
+  onClose:    () => void;
+  editEvent?: PersonalEvent | null;
 }
 
-export function CreateEventModal({ open, onClose }: CreateEventModalProps) {
+export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalProps) {
   const { user }  = useUser();
   const createFn  = useMutation(api.personalEvents.create);
+  const updateFn  = useAction(api.actions.updatePersonalEvent.updateEvent);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -35,6 +38,24 @@ export function CreateEventModal({ open, onClose }: CreateEventModalProps) {
     setLocatie(""); setBeschrijving(""); setError("");
   };
 
+  useEffect(() => {
+    if (open) {
+      if (editEvent) {
+        setTitel(editEvent.titel);
+        setStartDatum(editEvent.startDatum);
+        setEindDatum(editEvent.eindDatum);
+        setHeledag(editEvent.heledag);
+        setStartTijd(editEvent.startTijd ?? "09:00");
+        setEindTijd(editEvent.eindTijd ?? "10:00");
+        setLocatie(editEvent.locatie ?? "");
+        setBeschrijving(editEvent.beschrijving ?? "");
+        setError("");
+      } else {
+        reset();
+      }
+    }
+  }, [open, editEvent]);
+
   const handleClose = () => { reset(); onClose(); };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +67,7 @@ export function CreateEventModal({ open, onClose }: CreateEventModalProps) {
     setLoading(true);
     setError("");
     try {
-      await createFn({
+      const payload = {
         userId:       user.id,
         titel:        titel.trim(),
         startDatum,
@@ -56,10 +77,19 @@ export function CreateEventModal({ open, onClose }: CreateEventModalProps) {
         eindTijd:     heledag ? undefined : eindTijd  || undefined,
         locatie:      locatie.trim()      || undefined,
         beschrijving: beschrijving.trim() || undefined,
-      });
+      };
+
+      if (editEvent) {
+        // Edit flow
+        const res = await updateFn({ eventId: editEvent.eventId, ...payload });
+        if (!res.ok) throw new Error(res.message);
+      } else {
+        // Create flow
+        await createFn(payload);
+      }
       handleClose();
     } catch (err: any) {
-      setError(err.message ?? "Aanmaken mislukt");
+      setError(err.message ?? "Opslaan mislukt");
     } finally {
       setLoading(false);
     }
@@ -90,7 +120,7 @@ export function CreateEventModal({ open, onClose }: CreateEventModalProps) {
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
                 <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                   <Calendar size={14} className="text-indigo-400" />
-                  Nieuwe afspraak
+                  {editEvent ? "Afspraak wijzigen" : "Nieuwe afspraak"}
                 </h2>
                 <button onClick={handleClose}
                   className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
@@ -205,11 +235,10 @@ export function CreateEventModal({ open, onClose }: CreateEventModalProps) {
 
                 {/* Info */}
                 <p className="text-[10px] text-slate-600">
-                  Afspraak verschijnt direct in de app. Run daarna{" "}
-                  <span className="text-indigo-400 font-medium">
-                    📅 Verwerk Nieuwe Afspraken
-                  </span>{" "}
-                  in Google Sheets om ook in Google Calendar te plaatsen.
+                  {editEvent
+                    ? "Wijzigingen worden direct gesynchroniseerd met Google Calendar."
+                    : "Afspraak wordt lokaal opgeslagen. Bij de volgende sync wordt deze automatisch naar Google Calendar gestuurd."
+                  }
                 </p>
 
                 {/* Actions */}
@@ -220,8 +249,8 @@ export function CreateEventModal({ open, onClose }: CreateEventModalProps) {
                   </button>
                   <button type="submit" disabled={loading}
                     className="flex-1 py-2 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 hover:bg-indigo-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
-                    <Plus size={13} />
-                    {loading ? "Aanmaken..." : "Afspraak aanmaken"}
+                    {editEvent ? <Save size={13} /> : <Plus size={13} />}
+                    {loading ? "Bezig..." : (editEvent ? "Opslaan" : "Aanmaken")}
                   </button>
                 </div>
               </form>

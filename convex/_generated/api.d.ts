@@ -8,9 +8,12 @@
  * @module
  */
 
+import type * as actions_deletePersonalEvent from "../actions/deletePersonalEvent.js";
 import type * as actions_processPendingCalendar from "../actions/processPendingCalendar.js";
+import type * as actions_syncPersonalEvents from "../actions/syncPersonalEvents.js";
 import type * as actions_syncSchedule from "../actions/syncSchedule.js";
 import type * as actions_syncTodoist from "../actions/syncTodoist.js";
+import type * as actions_updatePersonalEvent from "../actions/updatePersonalEvent.js";
 import type * as automations from "../automations.js";
 import type * as crons from "../crons.js";
 import type * as devices from "../devices.js";
@@ -30,9 +33,12 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "actions/deletePersonalEvent": typeof actions_deletePersonalEvent;
   "actions/processPendingCalendar": typeof actions_processPendingCalendar;
+  "actions/syncPersonalEvents": typeof actions_syncPersonalEvents;
   "actions/syncSchedule": typeof actions_syncSchedule;
   "actions/syncTodoist": typeof actions_syncTodoist;
+  "actions/updatePersonalEvent": typeof actions_updatePersonalEvent;
   automations: typeof automations;
   crons: typeof crons;
   devices: typeof devices;

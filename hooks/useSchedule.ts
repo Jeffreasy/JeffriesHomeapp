@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
@@ -64,7 +64,25 @@ export function useSchedule() {
   const docs    = useQuery(api.schedule.list, userId ? { userId } : "skip");
   const metaDoc = useQuery(api.schedule.getMeta, userId ? { userId } : "skip");
 
-  const diensten: DienstRow[] = (docs ?? []).map(fromDoc);
+  const diensten: DienstRow[] = useMemo(() => {
+    if (!docs) return [];
+    // 1. Filter verwijderde records
+    const active = docs.filter(d => d.status !== "VERWIJDERD");
+    // 2. Dedupliceer op eventId (laatste doc wint)
+    const deduped = new Map<string, typeof active[0]>();
+    for (const doc of active) {
+      deduped.set(doc.eventId, doc);
+    }
+    // 3. Deduplicate op startDatum+startTijd (zelfde dienst, ander eventId)
+    const byKey = new Map<string, DienstRow>();
+    for (const doc of deduped.values()) {
+      const key = `${doc.startDatum}|${doc.startTijd}|${doc.eindTijd}`;
+      if (!byKey.has(key)) {
+        byKey.set(key, fromDoc(doc));
+      }
+    }
+    return Array.from(byKey.values());
+  }, [docs]);
   const meta: ScheduleMeta | null = metaDoc
     ? { importedAt: metaDoc.importedAt, fileName: metaDoc.fileName, totalRows: metaDoc.totalRows }
     : null;
@@ -125,9 +143,18 @@ export function useSchedule() {
     });
   }, [userId, bulkImportMutation]);
 
+  const dienstenByDate = useMemo(() => {
+    const map: Record<string, DienstRow[]> = {};
+    for (const d of diensten) {
+      (map[d.startDatum] ??= []).push(d);
+    }
+    return map;
+  }, [diensten]);
+
   return {
     diensten,
     meta,
+    dienstenByDate,
     nextDienst: getNextDienst(diensten),
     thisWeek:   getThisWeek(diensten),
     upcoming:   getUpcoming(diensten, 30),

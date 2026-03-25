@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
+import { type DienstRow } from "@/lib/schedule";
+import { analyzeConflicts, type ConflictInfo } from "@/lib/conflictDetection";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +68,7 @@ export function formatDateRange(event: PersonalEvent, locale = "nl-NL"): string 
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function usePersonalEvents() {
+export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
   const { user } = useUser();
   const userId   = user?.id ?? "";
 
@@ -90,10 +92,27 @@ export function usePersonalEvents() {
     [events]
   );
 
-  const withConflicts = useMemo(
-    () => upcoming.filter((e) => !!e.conflictMetDienst),
-    [upcoming]
+  const conflictMap = useMemo(
+    () => {
+      if (!options?.diensten?.length) return new Map<string, ConflictInfo>();
+      return analyzeConflicts(upcoming, options.diensten);
+    },
+    [upcoming, options?.diensten]
   );
+
+  const withConflicts = useMemo(
+    () => upcoming.filter((e) => conflictMap.has(e.eventId)),
+    [upcoming, conflictMap]
+  );
+
+  // O(1) date lookup for components that render per-day
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, PersonalEvent[]> = {};
+    for (const e of upcoming) {
+      (map[e.startDatum] ??= []).push(e);
+    }
+    return map;
+  }, [upcoming]);
 
   const nextAppointment = upcoming[0] ?? null;
 
@@ -103,6 +122,8 @@ export function usePersonalEvents() {
     pending,
     history,
     withConflicts,
+    conflictMap,
+    eventsByDate,
     nextAppointment,
     isLoading:       events === undefined,
   };

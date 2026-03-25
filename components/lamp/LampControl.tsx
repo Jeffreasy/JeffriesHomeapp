@@ -16,6 +16,17 @@ interface LampControlProps {
 
 type Mode = "white" | "color";
 
+const COLOR_PRESETS = [
+  { hex: "#ff4500", label: "Rood" },
+  { hex: "#ff8800", label: "Oranje" },
+  { hex: "#ffcc00", label: "Geel" },
+  { hex: "#00e5ff", label: "Cyaan" },
+  { hex: "#00c2a0", label: "Teal" },
+  { hex: "#3b82f6", label: "Blauw" },
+  { hex: "#8b5cf6", label: "Indigo" },
+  { hex: "#ff69b4", label: "Roze" },
+];
+
 export function LampControl({ device }: LampControlProps) {
   const { mutate: sendCommand } = useLampCommand();
   const queryClient = useQueryClient();
@@ -51,7 +62,18 @@ export function LampControl({ device }: LampControlProps) {
   useEffect(() => {
     setLocalBrightness(state?.brightness ?? 100);
     setLocalMireds(Math.round(1_000_000 / (state?.color_temp ?? 2700)));
-  }, [state?.brightness, state?.color_temp]);
+
+    // Sync color + mode when RGB changes externally
+    const r = state?.r ?? 0;
+    const g = state?.g ?? 0;
+    const b = state?.b ?? 0;
+    if (r > 0 || g > 0 || b > 0) {
+      setLocalHex(rgbToHex(r, g, b));
+      setMode("color");
+    } else {
+      setMode("white");
+    }
+  }, [state?.brightness, state?.color_temp, state?.r, state?.g, state?.b]);
 
   // ─── Debounced API callers (200ms) ─────────────────────────────────────────
 
@@ -171,17 +193,32 @@ export function LampControl({ device }: LampControlProps) {
       {/* Color picker */}
       {mode === "color" && (
         <div className="space-y-3">
+          {/* Preset swatches */}
+          <div className="grid grid-cols-8 gap-1.5">
+            {COLOR_PRESETS.map(({ hex, label }) => (
+              <button
+                key={hex}
+                onClick={() => handleColor(hex)}
+                aria-label={label}
+                title={label}
+                className="w-full aspect-square rounded-lg border-2 transition-all hover:scale-110 active:scale-95"
+                style={{
+                  background: hex,
+                  borderColor: localHex.toLowerCase() === hex ? "white" : "transparent",
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Full color picker */}
           <HexColorPicker
             color={localHex}
             onChange={handleColor}
-            style={{ width: "100%", height: 140 }}
+            style={{ width: "100%", height: 130 }}
           />
           <div
             className="w-full h-7 rounded-xl border border-white/10"
-            style={{
-              background: localHex,
-              transition: "background 0.1s",
-            }}
+            style={{ background: localHex, transition: "background 0.1s" }}
           />
           <p className="text-center text-xs font-mono text-slate-500">{localHex.toUpperCase()}</p>
         </div>

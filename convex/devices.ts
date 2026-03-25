@@ -118,10 +118,11 @@ export const updateStateInternal = internalMutation({
 
 // ─── Internal: set online/offline status (called by automation engine) ────────
 export const setStatusInternal = internalMutation({
-  args: { deviceId: v.string(), status: v.string() },
+  args: { deviceId: v.string(), status: v.union(v.literal("online"), v.literal("offline")) },
   handler: async (ctx, { deviceId, status }) => {
     const id = ctx.db.normalizeId("devices", deviceId);
     if (!id) throw new Error("Ongeldig device ID");
     await ctx.db.patch(id, { status, lastSeen: new Date().toISOString() });
   },
 });
+

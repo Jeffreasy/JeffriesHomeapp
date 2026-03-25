@@ -25,7 +25,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <Sidebar />
 
       {/* Main content — min-w-0 prevents flex overflow bug on mobile */}
-      <div className="flex-1 min-w-0 md:ml-56 pb-20 md:pb-0">
+      <div className="flex-1 min-w-0 md:ml-56 pb-28 md:pb-0">
         {children}
       </div>
 

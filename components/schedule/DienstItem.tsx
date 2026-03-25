@@ -3,10 +3,13 @@
 import { motion } from "framer-motion";
 import { MapPin } from "lucide-react";
 import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
+import { type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { CalendarDays } from "lucide-react";
 
 interface DienstItemProps {
-  dienst: DienstRow;
-  isToday?: boolean;
+  dienst:     DienstRow;
+  isToday?:   boolean;
+  afspraken?: PersonalEvent[]; // personal events on same day
 }
 
 /** Returns a distinct color per team prefix */
@@ -19,9 +22,12 @@ function teamColor(team: string): { bg: string; text: string; border: string } {
   return { bg: "rgba(255,255,255,0.06)", text: "#94a3b8", border: "rgba(255,255,255,0.1)" };
 }
 
-export function DienstItem({ dienst, isToday }: DienstItemProps) {
+export function DienstItem({ dienst, isToday, afspraken = [] }: DienstItemProps) {
   const shift  = shiftTypeColor(dienst.shiftType);
   const team   = dienst.team ? teamColor(dienst.team) : null;
+  const isZondag   = dienst.dag === "Zondag";
+  const isZaterdag = dienst.dag === "Zaterdag";
+  const isWeekend  = isZondag || isZaterdag;
 
   return (
     <motion.div
@@ -31,13 +37,20 @@ export function DienstItem({ dienst, isToday }: DienstItemProps) {
       style={
         isToday
           ? { background: shift.accent + "10", border: `1px solid ${shift.accent}30` }
+          : isZondag
+          ? { background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.15)" }
+          : isZaterdag
+          ? { background: "rgba(234,179,8,0.03)", border: "1px solid rgba(234,179,8,0.08)" }
           : { background: "rgba(255,255,255,0.03)", border: "1px solid transparent" }
       }
     >
       {/* Date */}
       <div className="w-10 text-center flex-shrink-0">
-        <p className="text-xs font-bold text-slate-300">{dienst.startDatum.slice(8)}</p>
-        <p className="text-[10px] text-slate-600">{dienst.dag?.slice(0, 2)}</p>
+        <p className={`text-xs font-bold ${isWeekend ? "text-yellow-400" : "text-slate-300"}`}>{dienst.startDatum.slice(8)}</p>
+        <p className={`text-[10px] ${isWeekend ? "text-yellow-600" : "text-slate-600"}`}>{dienst.dag?.slice(0, 2)}</p>
+        {isZondag && (
+          <p className="text-[8px] font-bold text-yellow-500 mt-0.5">+ORT</p>
+        )}
       </div>
 
       {/* Shift type badge */}
@@ -69,6 +82,18 @@ export function DienstItem({ dienst, isToday }: DienstItemProps) {
           style={{ background: team.bg, color: team.text, border: `1px solid ${team.border}` }}
         >
           {dienst.team}
+        </span>
+      )}
+
+      {/* Afspraken badge — toont als er persoonlijke events op dezelfde dag zijn */}
+      {afspraken.length > 0 && (
+        <span
+          className="flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}
+          title={afspraken.map((e) => e.titel).join(" · ")}
+        >
+          <CalendarDays size={9} />
+          {afspraken.length}
         </span>
       )}
 

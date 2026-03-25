@@ -1,6 +1,6 @@
 "use client";
 
-import { Power, Lightbulb, Wifi, WifiOff, ChevronDown } from "lucide-react";
+import { Power, Lightbulb, Wifi, WifiOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { type Device } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
@@ -10,6 +10,8 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 
 interface LampCardProps {
   device: Device;
+  /** Desktop: called when card is clicked to open the slide panel. */
+  onSelect?: (device: Device) => void;
 }
 
 /** Returns true on mobile viewports (< 768px) — evaluated client-side only. */
@@ -25,8 +27,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-export function LampCard({ device }: LampCardProps) {
-  const [expanded, setExpanded] = useState(false);
+export function LampCard({ device, onSelect }: LampCardProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const { mutate: sendCommand, isPending } = useLampCommand();
   const isMobile = useIsMobile();
@@ -53,20 +54,18 @@ export function LampCard({ device }: LampCardProps) {
     if (isMobile) {
       setSheetOpen(true);
     } else {
-      setExpanded((v) => !v);
+      onSelect?.(device);
     }
   };
 
   return (
     <>
-      {/* Card — min-h-[72px] ensures 48px+ touch target on mobile */}
+      {/* Card */}
       <div
         data-testid={`lamp-card-${device.id}`}
         className={cn(
-          "glass rounded-2xl overflow-hidden cursor-pointer select-none transition-all duration-200",
-          "hover:bg-white/[0.06] hover:border-white/14",
-          "min-h-[72px]",
-          expanded && "ring-1 ring-amber-500/30",
+          "glass rounded-2xl overflow-hidden select-none transition-all duration-200",
+          isOnline && "cursor-pointer hover:bg-white/[0.06] hover:border-white/14",
           !isOnline && "opacity-60"
         )}
         style={{
@@ -83,7 +82,7 @@ export function LampCard({ device }: LampCardProps) {
       >
         {/* Card header */}
         <div className="p-4 flex items-center gap-3">
-          {/* Lamp icon with glow + kleurring in RGB mode */}
+          {/* Lamp icon with glow */}
           <div
             className="relative flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
             style={{
@@ -117,20 +116,7 @@ export function LampCard({ device }: LampCardProps) {
             </div>
           </div>
 
-          {/* Desktop-only expand chevron */}
-          {isOnline && !isMobile && (
-            <ChevronDown
-              size={14}
-              className="text-slate-600 hidden md:block"
-              aria-hidden="true"
-              style={{
-                transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s",
-              }}
-            />
-          )}
-
-          {/* Power toggle — w-11 h-11 = 44px touch target */}
+          {/* Power toggle */}
           <button
             onClick={togglePower}
             disabled={!isOnline || isPending}
@@ -148,8 +134,8 @@ export function LampCard({ device }: LampCardProps) {
           </button>
         </div>
 
-        {/* Brightness bar */}
-        {isOn && !expanded && (
+        {/* Brightness bar — always shown when on */}
+        {isOn && (
           <div className="px-4 pb-3">
             <div className="h-1 rounded-full bg-white/5 overflow-hidden">
               <div
@@ -163,21 +149,9 @@ export function LampCard({ device }: LampCardProps) {
             </div>
           </div>
         )}
-
-        {/* Desktop inline expand — hidden on mobile (uses BottomSheet instead) */}
-        {!isMobile && (
-          <div
-            className="overflow-hidden"
-            style={{ maxHeight: expanded ? "400px" : "0px", transition: "max-height 0.3s ease" }}
-          >
-            <div className="border-t border-white/5">
-              <LampControl device={device} />
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Mobile BottomSheet — only rendered once sheet is opened */}
+      {/* Mobile BottomSheet */}
       {isMobile && (
         <BottomSheet
           open={sheetOpen}

@@ -49,7 +49,7 @@ export const WIZ_SCENES: ScenePreset[] = [
 
 // ─── Uit ────────────────────────────────────────────────────────────────────
 export const OFF_SCENE: ScenePreset = {
-  id: "uit", label: "Alles uit", color: "#64748b", command: { on: false },
+  id: "uit", label: "Uit", color: "#64748b", command: { on: false },
 };
 
 /** Alle presets — custom + WiZ native + uit */

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Home, Settings, Zap, LogIn, Calendar, Landmark } from "lucide-react";
+import { Home, Settings, Zap, LogIn, Calendar, Landmark, Lightbulb } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
@@ -9,11 +9,12 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
 const navItems = [
-  { href: "/",            icon: Home,     label: "Dashboard"   },
-  { href: "/rooster",     icon: Calendar, label: "Rooster"     },
-  { href: "/finance",     icon: Landmark, label: "Finance"     },
-  { href: "/automations", icon: Zap,      label: "Automatisch" },
-  { href: "/settings",    icon: Settings, label: "Instellingen" },
+  { href: "/",             icon: Home,      label: "Dashboard"   },
+  { href: "/lampen",      icon: Lightbulb, label: "Lampen"      },
+  { href: "/rooster",     icon: Calendar,  label: "Rooster"     },
+  { href: "/finance",     icon: Landmark,  label: "Finance"     },
+  { href: "/automations", icon: Zap,       label: "Automatisch" },
+  { href: "/settings",    icon: Settings,  label: "Instellingen" },
 ];
 
 /** Only render Clerk UserButton on desktop to prevent portal from leaking on mobile */

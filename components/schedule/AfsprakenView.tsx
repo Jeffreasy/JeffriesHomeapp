@@ -5,17 +5,23 @@ import { useState } from "react";
 import { Calendar, AlertTriangle, Clock, Plus, Zap } from "lucide-react";
 import { useAction } from "convex/react";
 import { useUser } from "@clerk/nextjs";
-import { usePersonalEvents } from "@/hooks/usePersonalEvents";
+import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { type DienstRow } from "@/lib/schedule";
 import { useToast } from "@/components/ui/Toast";
-import { NextAppointmentCard } from "./NextAppointmentCard";
 import { PersonalEventItem } from "./PersonalEventItem";
 import { CreateEventModal } from "./CreateEventModal";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { api } from "@/convex/_generated/api";
 
-export function AfsprakenView() {
-  const { upcoming, history, withConflicts, nextAppointment, pending, isLoading } =
-    usePersonalEvents();
+interface AfsprakenViewProps {
+  diensten?:    DienstRow[];
+  onEditEvent?: (evt: PersonalEvent) => void;
+  onNewEvent?:  () => void;
+}
+
+export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenViewProps) {
+  const { upcoming, history, withConflicts, nextAppointment, pending, isLoading, conflictMap } =
+    usePersonalEvents({ diensten });
 
   const { user } = useUser();
   const { success, error } = useToast();
@@ -37,7 +43,6 @@ export function AfsprakenView() {
   };
 
   const [showHistory, setShowHistory] = useState(false);
-  const [modalOpen,   setModalOpen]   = useState(false);
   const today = new Date().toISOString().slice(0, 10);
 
   if (isLoading) {
@@ -90,9 +95,6 @@ export function AfsprakenView() {
         </div>
       )}
 
-      {/* ── Volgende afspraak ─────────────────────────────────────────────── */}
-      <NextAppointmentCard event={nextAppointment} />
-
       {/* ── In wachtrij (PendingCreate) ──────────────────────────────────── */}
       {pending.length > 0 && (
         <section className="rounded-xl border p-4 space-y-2"
@@ -133,45 +135,8 @@ export function AfsprakenView() {
         </section>
       )}
 
-      {/* ── Conflict sectie ──────────────────────────────────────────────── */}
-      {withConflicts.length > 0 && (
-        <section>
-          <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-amber-500 mb-2">
-            <AlertTriangle size={10} />
-            Conflicten met diensten ({withConflicts.length})
-          </p>
-          <div className="glass rounded-xl border border-amber-500/20 divide-y divide-white/5 overflow-hidden">
-            {withConflicts.map(e => (
-              <div key={e.eventId} className="px-4 py-0.5">
-                <PersonalEventItem event={e} isToday={e.startDatum === today} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Aankomende afspraken ──────────────────────────────────────────── */}
-      {upcoming.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <Clock size={10} />
-              Komende {upcoming.length} afspraken
-            </p>
-            <button onClick={() => setModalOpen(true)}
-              className="flex items-center gap-1 text-[10px] text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer border border-indigo-500/30 rounded-lg px-2 py-1 hover:bg-indigo-500/10">
-              <Plus size={10} /> Toevoegen
-            </button>
-          </div>
-          <div className="glass rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden">
-            {upcoming.map(e => (
-              <div key={e.eventId} className="px-4 py-0.5">
-                <PersonalEventItem event={e} isToday={e.startDatum === today} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* ── Aankomend Beheer (Optioneel) ──────────────────────────────────────── */}
+      <p className="text-xs text-slate-500 mb-2">Je actieve afspraken worden nu weergegeven in de Overzicht-tab.</p>
 
       {/* ── Geschiedenis ─────────────────────────────────────────────────── */}
       {history.length > 0 && (
@@ -194,7 +159,7 @@ export function AfsprakenView() {
                 <div className="glass rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden opacity-60">
                   {history.map(e => (
                     <div key={e.eventId} className="px-4 py-0.5">
-                      <PersonalEventItem event={e} />
+                      <PersonalEventItem event={e} onEdit={onEditEvent} />
                     </div>
                   ))}
                 </div>
@@ -205,14 +170,14 @@ export function AfsprakenView() {
       )}
       {upcoming.length === 0 && !isLoading && (
         <div className="flex justify-center pt-2">
-          <button onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 hover:bg-indigo-500/20 transition-all cursor-pointer">
-            <Plus size={14} /> Eerste afspraak aanmaken
-          </button>
+          {onNewEvent && (
+            <button onClick={onNewEvent}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 hover:bg-indigo-500/20 transition-all cursor-pointer">
+              <Plus size={14} /> Eerste afspraak aanmaken
+            </button>
+          )}
         </div>
       )}
-
-      <CreateEventModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </div>
   );
 }
