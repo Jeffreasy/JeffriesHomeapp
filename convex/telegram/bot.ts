@@ -3,23 +3,13 @@
 /**
  * convex/telegram/bot.ts
  * ─────────────────────────────────────────────────────────────────────────────
- * Telegram Bot — Webhook handler + Agent routing.
+ * Telegram Bot — Webhook handler + Smart Agent routing.
  *
  * Flow:
- *   1. Telegram stuurt update naar /telegram/webhook
- *   2. Bot detecteert commando of vrije tekst
- *   3. Routeert naar juiste agent via Grok chat
- *   4. Stuurt AI-antwoord terug naar Telegram
- *
- * Commando's:
- *   /start       — Welkomstbericht
- *   /briefing    — Daily briefing (Dashboard Agent)
- *   /lampen      — Lamp status
- *   /rooster     — Weekplanning
- *   /finance     — Salaris & transacties
- *   /email       — Inbox overzicht
- *   /help        — Alle commando's
- *   Vrije tekst  — Grok beantwoordt via Dashboard Agent
+ *   1. Telegram stuurt update → /telegram/webhook
+ *   2. Slash commando → directe agent routing
+ *   3. Vrije tekst → keyword detectie → juiste agent via Grok
+ *   4. Grok antwoordt direct — nooit doorverwijzen
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -30,9 +20,6 @@ import { sendMessage, sendTyping, setWebhook as tgSetWebhook, getMe } from "./ap
 
 // Jeffrey's vaste userId (single-user app)
 const OWNER_USER_ID = "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
-
-// Geautoriseerde Telegram chat ID's (wordt gevuld bij eerste /start)
-const ALLOWED_CHAT_IDS = new Set<number>();
 
 // ─── Commando → Agent mapping ────────────────────────────────────────────────
 
@@ -49,27 +36,67 @@ const COMMAND_MAP: Record<string, { agentId: string; beschrijving: string }> = {
   "/automations": { agentId: "automations",     beschrijving: "⚙️ Automations status" },
 };
 
+// ─── Smart Keyword → Agent routing ───────────────────────────────────────────
+
+const KEYWORD_ROUTES: Array<{ keywords: string[]; agentId: string }> = [
+  { keywords: ["lamp", "lampen", "licht", "lichten", "aan", "uit", "helder", "dim", "scene", "kleur", "rgb", "wiz"],
+    agentId: "lampen" },
+  { keywords: ["dienst", "rooster", "shift", "werk", "planning", "vrij", "weekend", "conflict", "afspraak", "agenda"],
+    agentId: "rooster" },
+  { keywords: ["salaris", "loon", "geld", "ort", "netto", "bruto", "betaling", "transactie", "uitgaven", "saldo", "bank", "rabo"],
+    agentId: "finance" },
+  { keywords: ["email", "mail", "inbox", "ongelezen", "bericht", "stuur", "verstuur", "reply", "bijlage", "gmail"],
+    agentId: "email" },
+  { keywords: ["automation", "automations", "cron", "sync", "trigger", "schema"],
+    agentId: "automations" },
+];
+
+function detectAgent(text: string): string {
+  const lower = text.toLowerCase();
+  let best = { agentId: "dashboard", score: 0 };
+
+  for (const route of KEYWORD_ROUTES) {
+    const score = route.keywords.filter((kw) => lower.includes(kw)).length;
+    if (score > best.score) {
+      best = { agentId: route.agentId, score };
+    }
+  }
+
+  return best.agentId;
+}
+
+// ─── Messages ────────────────────────────────────────────────────────────────
+
 function buildHelpText(): string {
-  const lines = [
-    "🏠 <b>Jeffries HomeBot</b> — Commando's:\n",
-    ...Object.entries(COMMAND_MAP).map(([cmd, { beschrijving }]) => `${cmd} — ${beschrijving}`),
-    "\n💬 Of stel gewoon een <i>vrije vraag</i> — Grok beantwoordt het via de juiste agent.",
-  ];
-  return lines.join("\n");
+  return [
+    "🏠 <b>Jeffries HomeBot</b>\n",
+    "<b>Commando's:</b>",
+    ...Object.entries(COMMAND_MAP).map(([cmd, { beschrijving }]) => `  ${cmd} — ${beschrijving}`),
+    "\n💬 Of vraag gewoon iets in het Nederlands!",
+    "Ik snap automatisch welke agent je nodig hebt.",
+    "\nVoorbeelden:",
+    '  "Doe de lampen uit"',
+    '  "Wat is mijn salaris?"',
+    '  "Hoeveel ongelezen emails?"',
+    '  "Wanneer werk ik morgen?"',
+  ].join("\n");
 }
 
 function buildWelcomeText(): string {
   return [
     "👋 <b>Welkom bij Jeffries HomeBot!</b>\n",
-    "Ik ben verbonden met je volledige Homeapp via Grok AI.",
-    "Ik ken je lampen, rooster, financiën, emails, en automations.\n",
-    "Probeer: <code>/briefing</code> voor een dagelijkse update,",
-    "of stel gewoon een vraag in het Nederlands.\n",
-    "Type /help voor alle commando's.",
+    "Ik ben je AI-assistent, aangedreven door Grok.",
+    "Vraag me alles over je Homeapp — ik snap het wel.\n",
+    "Voorbeelden:",
+    '  💡 "Doe de lampen uit"',
+    '  📅 "Wanneer is mijn volgende dienst?"',
+    '  💰 "Wat is mijn netto salaris?"',
+    '  📧 "Hoeveel ongelezen emails heb ik?"',
+    "\nOf type /help voor alle commando's.",
   ].join("\n");
 }
 
-// ─── Webhook Handler (wordt aangeroepen vanuit HTTP route) ────────────────────
+// ─── Webhook Handler ─────────────────────────────────────────────────────────
 
 export const handleUpdate = internalAction({
   args: { update: v.any() },
@@ -82,7 +109,6 @@ export const handleUpdate = internalAction({
 
     // ── /start ────────────────────────────────────────────────────────────
     if (text === "/start") {
-      ALLOWED_CHAT_IDS.add(chatId);
       await sendMessage(chatId, buildWelcomeText());
       return;
     }
@@ -93,15 +119,14 @@ export const handleUpdate = internalAction({
       return;
     }
 
-    // ── Commando routing ──────────────────────────────────────────────────
-    const cmd = text.split(" ")[0].toLowerCase().replace(/@\w+/, ""); // Strip @botname
+    // ── Slash commando routing ────────────────────────────────────────────
+    const cmd = text.split(" ")[0].toLowerCase().replace(/@\w+/, "");
     const customVraag = text.slice(cmd.length).trim();
     const mapping = COMMAND_MAP[cmd];
 
     if (mapping) {
       await sendTyping(chatId);
-
-      const vraag = customVraag || `Geef een overzicht als ${mapping.beschrijving}`;
+      const vraag = customVraag || `Geef een beknopt overzicht`;
 
       const result = await ctx.runAction(internal.ai.grok.chat, {
         userId:  OWNER_USER_ID,
@@ -109,40 +134,39 @@ export const handleUpdate = internalAction({
         agentId: mapping.agentId,
       }) as { ok: boolean; antwoord?: string; error?: string };
 
-      if (result.ok && result.antwoord) {
-        // Telegram HTML max 4096 chars
-        const antwoord = result.antwoord.length > 4000
-          ? result.antwoord.slice(0, 3997) + "..."
-          : result.antwoord;
-        await sendMessage(chatId, antwoord);
-      } else {
-        await sendMessage(chatId, `❌ Fout: ${result.error ?? "Onbekende fout"}`);
-      }
+      await sendReply(chatId, result);
       return;
     }
 
-    // ── Vrije vraag → Dashboard Agent via Grok ────────────────────────────
+    // ── Vrije tekst → Smart routing via keyword detectie ──────────────────
     await sendTyping(chatId);
+    const detectedAgent = detectAgent(text);
 
     const result = await ctx.runAction(internal.ai.grok.chat, {
-      userId: OWNER_USER_ID,
-      vraag:  text,
+      userId:  OWNER_USER_ID,
+      vraag:   text,
+      agentId: detectedAgent,
     }) as { ok: boolean; antwoord?: string; error?: string };
 
-    if (result.ok && result.antwoord) {
-      const antwoord = result.antwoord.length > 4000
-        ? result.antwoord.slice(0, 3997) + "..."
-        : result.antwoord;
-      await sendMessage(chatId, antwoord);
-    } else {
-      await sendMessage(chatId, `❌ ${result.error ?? "Kon geen antwoord genereren"}`);
-    }
+    await sendReply(chatId, result);
   },
 });
 
-// ─── Webhook Setup (handmatig aanroepen) ──────────────────────────────────────
+async function sendReply(chatId: number, result: { ok: boolean; antwoord?: string; error?: string }) {
+  if (result.ok && result.antwoord) {
+    // Telegram max 4096 chars
+    const antwoord = result.antwoord.length > 4000
+      ? result.antwoord.slice(0, 3997) + "..."
+      : result.antwoord;
+    // Stuur als plain text (Grok output bevat markdown die Telegram HTML breekt)
+    await sendMessage(chatId, antwoord, { parseMode: undefined as any });
+  } else {
+    await sendMessage(chatId, `❌ ${result.error ?? "Kon geen antwoord genereren"}`);
+  }
+}
 
-/** Registreer de webhook bij Telegram. Roep aan na deploy. */
+// ─── Webhook Setup ───────────────────────────────────────────────────────────
+
 export const registerWebhook = action({
   args: { webhookUrl: v.string() },
   handler: async (_ctx, { webhookUrl }) => {
@@ -153,7 +177,6 @@ export const registerWebhook = action({
   },
 });
 
-/** Check bot status. */
 export const status = action({
   args: {},
   handler: async () => {

@@ -25,28 +25,26 @@ function buildSystemPrompt(
   agentMeta: AgentMeta,
   context: Record<string, unknown>,
 ): string {
-  return `Je bent "${agentMeta.naam}" ${agentMeta.emoji} — een gespecialiseerde AI-assistent voor Jeffrey's Homeapp.
+  return `Je bent "${agentMeta.naam}" ${agentMeta.emoji} — Jeffrey's persoonlijke AI-assistent.
 
 ## Jouw Rol
 ${agentMeta.beschrijving}
 
-## Capabilities
+## Wat je kunt
 ${agentMeta.capabilities.map((c) => `- ${c}`).join("\n")}
 
-## Beschikbare Tools
-${agentMeta.tools.map((t) => `- ${t.naam} (${t.type}${t.methode ? ` ${t.methode}` : ""}): ${t.beschrijving}`).join("\n")}
-
-## Live Data (op dit moment)
+## Live Data (nu)
 \`\`\`json
 ${JSON.stringify(context, null, 2)}
 \`\`\`
 
-## Regels
-- Antwoord in het Nederlands tenzij anders gevraagd.
-- Wees beknopt, direct, en informatief.
-- Gebruik de live data hierboven — verwijs naar specifieke waarden.
-- Als de vraag buiten jouw domein valt, verwijs naar de juiste agent.
-- Beschikbare agents: ${AGENT_REGISTRY.map((a) => `${a.emoji} ${a.id}`).join(", ")}`;
+## REGELS (STRIKT)
+1. Antwoord ALTIJD direct — verwijs NOOIT naar een andere agent. Jij bent de enige assistent.
+2. Gebruik de live data hierboven in je antwoord — noem specifieke cijfers en waarden.
+3. Antwoord in het Nederlands, beknopt en informatief.
+4. Gebruik geen markdown formatting (geen ** of \`\`\`), want dit wordt in Telegram gelezen.
+5. Als je iets niet kunt doen met de beschikbare data, zeg dat eerlijk.
+6. Wees proactief — geef extra nuttige info als dat relevant is.`;
 }
 
 interface GrokResponse {
