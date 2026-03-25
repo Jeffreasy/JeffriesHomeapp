@@ -14,7 +14,7 @@
  */
 
 import { action, internalAction } from "../_generated/server";
-import { internal, api } from "../_generated/api";
+import { api } from "../_generated/api";
 import { v } from "convex/values";
 import { sendMessage, sendTyping, setWebhook as tgSetWebhook, getMe } from "./api";
 
@@ -181,7 +181,7 @@ export const handleUpdate = internalAction({
       await sendTyping(chatId);
       const vraag = customVraag || "Geef een beknopt overzicht";
 
-      const result = await ctx.runAction(internal.ai.grok.chat, {
+      const result = await ctx.runAction(api.ai.grok.chat, {
         userId:  OWNER_USER_ID,
         vraag,
         agentId: mapping.agentId,
@@ -195,7 +195,7 @@ export const handleUpdate = internalAction({
     await sendTyping(chatId);
     const detectedAgent = detectAgent(text);
 
-    const result = await ctx.runAction(internal.ai.grok.chat, {
+    const result = await ctx.runAction(api.ai.grok.chat, {
       userId:  OWNER_USER_ID,
       vraag:   text,
       agentId: detectedAgent,
