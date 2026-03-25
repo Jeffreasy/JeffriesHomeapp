@@ -56,4 +56,15 @@ crons.interval(
   { userId: JEFFREY_USER_ID }
 );
 
+/**
+ * Verwijderde emails opruimen — elke dag om 03:00 UTC (05:00 Amsterdam)
+ * Purget emails die >7 dagen geleden als verwijderd zijn gemarkeerd.
+ */
+crons.daily(
+  "purge-deleted-emails",
+  { hourUTC: 3, minuteUTC: 0 },
+  internal.emails.purgeDeletedInternal,
+  { userId: JEFFREY_USER_ID }
+);
+
 export default crons;

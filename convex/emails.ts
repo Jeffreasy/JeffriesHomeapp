@@ -375,3 +375,30 @@ export const upsertSyncMeta = internalMutation({
     }
   },
 });
+
+// ─── Cleanup ────────────────────────────────────────────────────────────────
+
+/**
+ * Permanent verwijdert emails die >7 dagen geleden als verwijderd zijn gemarkeerd.
+ * Draait als dagelijkse cron job om Convex document opslag te optimaliseren.
+ */
+export const purgeDeletedInternal = internalMutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    const deleted = await ctx.db
+      .query("emails")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect()
+      .then((rows) => rows.filter((e) => e.isVerwijderd && e.ontvangen < sevenDaysAgo));
+
+    let purged = 0;
+    for (const email of deleted) {
+      await ctx.db.delete(email._id);
+      purged++;
+    }
+
+    return { purged, remaining: deleted.length - purged };
+  },
+});
