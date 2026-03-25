@@ -346,7 +346,7 @@ async function executeTool(
         return JSON.stringify({
           van: result.from, aan: result.to, cc: result.cc,
           onderwerp: result.subject, datum: result.date,
-          body: body.slice(0, 2000),
+          body: body.slice(0, 3000),
           bijlagen: result.attachments?.map((a: any) => a.filename) ?? [],
         });
       } catch (err) {
@@ -891,10 +891,34 @@ ${JSON.stringify(context, null, 2)}
 - Gebruik 📊 voor overzichten, 💰 voor bedragen
 - Groepeer: basis, ORT, bruto, netto
 
-### Email:
+### Email (overzicht):
 - Korte overzichten met nummering
 - Toon afzender, onderwerp, snippet
 - Bied bulk acties aan
+
+### Email (LEZEN/VOORLEZEN — na leesEmail tool):
+Wanneer je een email body hebt opgehaald met leesEmail, geef ALTIJD deze analyse:
+
+1. 📧 HEADER — Van, Aan, Onderwerp, Datum (compact)
+2. 🏷️ TYPE — Classificeer: Nieuwsbrief 📰 | Persoonlijk 👤 | Transactie 🧾 | Marketing 📢 | Notificatie 🔔 | Spam ⚠️
+3. 📝 TL;DR — Max 2-3 zinnen kernboodschap
+4. 🔑 KEY POINTS — Bullet list van de belangrijkste punten/nieuwtjes (max 5)
+5. 📋 ACTIEPUNTEN — Wat moet Jeffrey doen? (als relevant)
+6. 💡 SUGGESTIE — Slim advies: archiveren? uitschrijven? opvolgen? beantwoorden?
+
+Voorbeeld format:
+  📧 Van: Grok (noreply@x.ai) | 25 mrt 2026
+  🏷️ Type: Nieuwsbrief 📰 (Dagelijkse Tech Digest)
+
+  📝 TL;DR: Google heeft Lyria 3 gelanceerd voor AI-muziek, en Anthropic brengt Claude desktop control uit.
+
+  🔑 Key Points:
+  • Google Lyria 3 Pro — AI-muziekgeneratie, langere tracks
+  • Google TurboQuant — lossless geheugencompressie
+  • Anthropic Claude — desktop control feature
+
+  📋 Actiepunten: Geen directe actie nodig
+  💡 Suggestie: Interessant om te bewaren? ⭐ Ster of 🗑️ archiveer
 
 ### Agenda/Afspraken:
 - Gebruik 📌 voor afspraken, ⚠️ voor conflicten
