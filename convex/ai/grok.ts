@@ -562,28 +562,80 @@ async function executeTool(
           .filter((s: any) => s.startDatum >= vanDatum && s.startDatum <= totDatum)
           .sort((a: any, b: any) => a.startDatum.localeCompare(b.startDatum));
 
-        const weekdays = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
+        // Persoonlijke afspraken voor conflictdetectie
+        const allEvents = await ctx.runQuery(api.personalEvents.list, { userId: OWNER_USER_ID });
+        const weekdaysFull = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
+        const maandNamen = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
+
+        // Per-week groepering
+        const weken: Record<string, any[]> = {};
+        let totaalUren = 0;
+        let weekendDiensten = 0;
+
         const diensten = filtered.map((s: any) => {
           const d = new Date(s.startDatum + "T00:00:00");
-          return {
-            datum: s.startDatum, dag: weekdays[d.getDay()],
-            type: s.shiftType, titel: s.titel,
-            start: s.startTijd, eind: s.eindTijd,
-            locatie: s.locatie, duur: s.duur,
+          const dag = weekdaysFull[d.getDay()];
+          const weekNr = getWeekNumber(d);
+          const weekKey = `Week ${weekNr}`;
+          const uren = s.duur ?? 0;
+          totaalUren += uren;
+          if (d.getDay() === 0 || d.getDay() === 6) weekendDiensten++;
+
+          // Check conflict met persoonlijke afspraken
+          const conflict = allEvents.find((e: any) =>
+            e.status === "Aankomend" && e.startDatum === s.startDatum
+          );
+
+          const entry = {
+            datum: s.startDatum, dag, weekNr, type: s.shiftType,
+            tijd: `${s.startTijd} - ${s.eindTijd}`, uren,
+            locatie: s.locatie, team: s.team,
+            conflict: conflict ? { titel: conflict.titel, tijd: conflict.heledag ? "hele dag" : `${conflict.startTijd}-${conflict.eindTijd}` } : null,
           };
+
+          if (!weken[weekKey]) weken[weekKey] = [];
+          weken[weekKey].push(entry);
+          return entry;
         });
 
-        // Stats
-        const shiftTypes: Record<string, number> = {};
+        // Shift type verdeling
+        const verdeling: Record<string, number> = {};
         for (const d of diensten) {
-          shiftTypes[d.type ?? "Onbekend"] = (shiftTypes[d.type ?? "Onbekend"] ?? 0) + 1;
+          verdeling[d.type ?? "Onbekend"] = (verdeling[d.type ?? "Onbekend"] ?? 0) + 1;
         }
 
+        // Vrije dagen (dagen in de periode zonder dienst)
+        const dienstDatums = new Set(filtered.map((s: any) => s.startDatum));
+        const vrijeDagen: string[] = [];
+        const start = new Date(vanDatum + "T00:00:00");
+        const end = new Date(totDatum + "T00:00:00");
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const ds = d.toISOString().slice(0, 10);
+          if (!dienstDatums.has(ds)) vrijeDagen.push(ds);
+        }
+
+        // Conflicten summary
+        const conflicten = diensten.filter((d: any) => d.conflict);
+
+        const maandNr = parseInt(vanDatum.slice(5, 7));
+        const jaarNr = parseInt(vanDatum.slice(0, 4));
+
         return JSON.stringify({
+          titel: `${maandNamen[maandNr]} ${jaarNr}`,
           periode: `${vanDatum} t/m ${totDatum}`,
-          totaal: diensten.length,
-          verdeling: shiftTypes,
-          diensten,
+          samenvatting: {
+            totaalDiensten: diensten.length,
+            totaalUren: Math.round(totaalUren * 10) / 10,
+            weekendDiensten,
+            vrijeDagen: vrijeDagen.length,
+            conflicten: conflicten.length,
+          },
+          verdeling,
+          perWeek: weken,
+          conflicten: conflicten.map((c: any) => ({
+            datum: c.datum, dag: c.dag, dienst: c.type,
+            afspraak: c.conflict.titel, afspraakTijd: c.conflict.tijd,
+          })),
         });
       } catch (err) {
         return JSON.stringify({ error: `Diensten ophalen mislukt: ${(err as Error).message}` });
@@ -741,22 +793,76 @@ ${agentMeta.capabilities.map((c) => `- ${c}`).join("\n")}
 
 ## Tools
 Je hebt toegang tot tools waarmee je acties kunt uitvoeren:
-- leesEmail(gmailId) — Volledige email inhoud ophalen. Gebruik gmailId uit de context hieronder.
-- zoekEmails(zoekterm) — Emails doorzoeken op onderwerp/afzender.
-- lampBedien(actie) — Lampen bedienen (aan/uit/dim/vol).
+- leesEmail(gmailId) — Volledige email inhoud ophalen
+- zoekEmails(zoekterm) — Emails doorzoeken
+- lampBedien(actie) — Lampen bedienen (scenes/kleuren/dim)
+- dienstenOpvragen(maand) — Diensten per maand ophalen
+- afspraakMaken(titel, datum, ...) — Afspraak aanmaken
+- afsprakenOpvragen() — Aankomende afspraken tonen
+- salarisOpvragen(maand) — Salaris per maand
+- transactiesZoeken(zoekterm) — Bank transacties doorzoeken
+- bulkMarkeerGelezen/bulkVerwijder/inboxOpruimen — Email bulk operaties
 
 ## Live Data (nu)
 \`\`\`json
 ${JSON.stringify(context, null, 2)}
 \`\`\`
 
-## REGELS
+## COMMUNICATIE REGELS
 1. Antwoord ALTIJD direct — verwijs NOOIT naar een andere agent.
-2. Gebruik de tools als de gebruiker om specifieke info vraagt (bijv. "lees die email" → leesEmail).
-3. Als je emails ziet in de context met gmailId, GEBRUIK leesEmail() om de inhoud op te halen als gevraagd.
-4. Antwoord in het Nederlands, beknopt.
-5. Geen markdown (geen ** of \`\`\`) — dit is voor Telegram.
-6. Wees proactief — bied aan om emails te lezen als de gebruiker vraagt over een onderwerp.`;
+2. Gebruik tools als de gebruiker om specifieke info vraagt.
+3. Antwoord in het Nederlands, professioneel maar vriendelijk.
+4. GEEN markdown (geen ** of \`\`\`) — dit is Telegram plain text.
+5. Gebruik emoji's strategisch voor visuele structuur.
+6. Wees proactief — bied vervolgacties aan.
+
+## FORMATTING REGELS PER DOMEIN
+
+### Rooster/Diensten:
+- Gebruik een duidelijke koptekst met maand, jaar en totalen
+- Groepeer diensten PER WEEK met week headers
+- Gebruik emoji's: 🌅 Vroeg, 🌆 Dienst/Laat, 🏠 Vrij, ⚠️ Conflict
+- Toon per dienst: datum (dag) | type | tijd | locatie
+- Markeer weekenddiensten met 📅
+- Toon een samenvatting onderaan: totaal uren, verdeling, vrije dagen
+- Bij conflicten: toon inline met ⚠️ en de afspraak die conflicteert
+- Voorbeeld format:
+  📅 APRIL 2026 | 12 diensten | 91.5 uur
+  
+  ━━ Week 14 ━━
+  🌅 Wo 02 | Vroeg | 07:00-15:00 | AA (8u)
+  🌅 Zo 05 | Vroeg | 07:00-14:30 | AA (7.5u)
+  
+  ━━ Week 15 ━━
+  🌆 Do 09 | Dienst | 14:45-22:00 | AA (7.25u)
+  🌆 Za 11 | Dienst | 14:45-22:00 | App. (7.25u)
+     ⚠️ Conflict: Brian (hele dag)
+  
+  ━━━━━━━━━━━━━
+  📊 5x Vroeg | 7x Dienst | 2x Weekend
+  ⏱ 91.5 uur | 🏠 18 vrije dagen
+
+### Salaris/Finance:
+- Toon bedragen met euro teken en 2 decimalen
+- Gebruik 📊 voor overzichten, 💰 voor bedragen
+- Groepeer: basis, ORT, bruto, netto
+
+### Email:
+- Korte overzichten met nummering
+- Toon afzender, onderwerp, snippet
+- Bied bulk acties aan
+
+### Agenda/Afspraken:
+- Gebruik 📌 voor afspraken, ⚠️ voor conflicten
+- Toon datum, tijd, locatie`;
+}
+
+// ISO week number helper
+function getWeekNumber(d: Date): number {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
