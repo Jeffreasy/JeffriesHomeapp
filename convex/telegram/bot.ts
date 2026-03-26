@@ -173,7 +173,7 @@ async function processText(ctx: any, chatId: number, text: string): Promise<void
 
   if (mapping) {
     await sendTyping(chatId);
-    const result = await ctx.runAction(api.ai.grok.chat, {
+    const result = await ctx.runAction(api.ai.grok.chat.chat, {
       userId: OWNER_USER_ID, vraag: customVraag || "Geef een beknopt overzicht",
       agentId: mapping.agentId, history: grokHistory,
     }) as { ok: boolean; antwoord?: string; error?: string };
@@ -184,7 +184,7 @@ async function processText(ctx: any, chatId: number, text: string): Promise<void
   // Vrije tekst → smart routing
   await sendTyping(chatId);
   const detectedAgent = detectAgent(text);
-  const result = await ctx.runAction(api.ai.grok.chat, {
+  const result = await ctx.runAction(api.ai.grok.chat.chat, {
     userId: OWNER_USER_ID, vraag: text, agentId: detectedAgent, history: grokHistory,
   }) as { ok: boolean; antwoord?: string; error?: string };
   await saveAndReply(ctx, chatId, result, detectedAgent);

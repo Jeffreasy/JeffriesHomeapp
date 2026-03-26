@@ -272,7 +272,7 @@ http.route({
     if (!body.userId) return json({ ok: false, error: "userId verplicht" }, 400);
     if (!body.vraag)  return json({ ok: false, error: "vraag verplicht" }, 400);
 
-    const result = await ctx.runAction(api.ai.grok.chat, {
+    const result = await ctx.runAction(api.ai.grok.chat.chat, {
       userId:  body.userId,
       vraag:   body.vraag,
       agentId: body.agentId,
