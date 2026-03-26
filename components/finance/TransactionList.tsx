@@ -26,8 +26,8 @@ const CODE_LABELS: Record<string, string> = {
 };
 
 const CATEGORIE_OPTIES = [
-  "Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Fastfood",
-  "Gaming", "Geldopname", "Online Winkelen", "Persoonlijk",
+  "Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie",
+  "Fastfood", "Gaming", "Geldopname", "Online Winkelen", "Persoonlijk",
   "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming",
   "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer",
   "Verzekeringen", "Zorgverzekering", "Overig",

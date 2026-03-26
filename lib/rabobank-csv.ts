@@ -72,11 +72,13 @@ const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
   // Toeslagen
   { pattern: /zorgtoeslag|belastingdienst|toeslagen/i, categorie: "Toeslagen" },
   // Vaste Lasten
-  { pattern: /siekmans|gemeente|waterschap|eneco|vattenfall|greenchoice/i, categorie: "Vaste Lasten" },
+  { pattern: /gemeente|waterschap|eneco|vattenfall|greenchoice/i, categorie: "Vaste Lasten" },
   // Geldopname
   { pattern: /geldmaat|geldautomaat|atm/i, categorie: "Geldopname" },
   // Coffeeshop
   { pattern: /sh\s*zwolle|kdl\s*bv/i, categorie: "Coffeeshop" },
+  // Familie
+  { pattern: /lavente|siekmans|terpstra/i, categorie: "Familie" },
 ];
 
 function autoCategoriseer(naam?: string, omschrijving?: string, bedrag?: number): string | undefined {

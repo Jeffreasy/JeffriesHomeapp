@@ -397,6 +397,7 @@ function suggereerCategorie(naam: string, omschrijving: string): string | null {
     { pattern: /texaco|shell|bp|tango|tinq|tankstation/i, categorie: "Brandstof" },
     { pattern: /battle\.?net|steam|xsolla|g2a|gaming|playstation|xbox|codesdirect/i, categorie: "Gaming" },
     { pattern: /tikkie|betaalverzoek/i, categorie: "Persoonlijk" },
+    { pattern: /lavente|siekmans|terpstra/i, categorie: "Familie" },
     { pattern: /albert|ah\s|jumbo|lidl|supershop|boodschap/i, categorie: "Boodschappen" },
     { pattern: /univ[eé]|asr|verzeker/i, categorie: "Verzekeringen" },
     { pattern: /geldmaat|geldautomaat/i, categorie: "Geldopname" },
