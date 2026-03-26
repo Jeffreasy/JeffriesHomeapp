@@ -29,8 +29,9 @@ const CATEGORIE_OPTIES = [
   "Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie",
   "Fastfood", "Gaming", "Geldopname", "Online Winkelen", "Persoonlijk",
   "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming",
-  "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer",
-  "Verzekeringen", "Zorgverzekering", "Overig",
+  "Telecom", "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer",
+  "Verzekeringen", "Vrienden", "Vrije Tijd", "Zakelijk",
+  "Zorgverzekering", "Overig",
 ];
 
 // ─── Inline categorie-editor ─────────────────────────────────────────────────

@@ -228,7 +228,7 @@ export const TOOLS = [
         type: "object",
         properties: {
           zoekterm: { type: "string", description: "Optioneel: zoekterm (doorzoekt tegenpartij, omschrijving). Mag leeg bij categorie-filter." },
-          categorie: { type: "string", description: "Optioneel: filter op categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
+          categorie: { type: "string", description: "Optioneel: filter op categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer", "Verzekeringen", "Vrienden", "Vrije Tijd", "Zakelijk", "Zorgverzekering"] },
           rekening: { type: "string", description: "Optioneel: filter op rekening ('betaal' of 'spaar')", enum: ["betaal", "spaar"] },
           maxAantal: { type: "number", description: "Max resultaten (default 50)" },
         },
@@ -327,7 +327,7 @@ BELANGRIJK — Professioneel Template Protocol:
         properties: {
           maand: { type: "number", description: "Maandnummer (1-12)" },
           jaar: { type: "number", description: "Jaar (default: huidig jaar)" },
-          categorie: { type: "string", description: "Optioneel: filter op specifieke categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
+          categorie: { type: "string", description: "Optioneel: filter op specifieke categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer", "Verzekeringen", "Vrienden", "Vrije Tijd", "Zakelijk", "Zorgverzekering"] },
           rekening: { type: "string", description: "Optioneel: filter op rekening ('betaal' of 'spaar')", enum: ["betaal", "spaar"] },
           top: { type: "number", description: "Aantal top uitgaven om te tonen (default 10)" },
         },
@@ -385,7 +385,7 @@ BELANGRIJK — Professioneel Template Protocol:
         type: "object",
         properties: {
           zoekterm: { type: "string", description: "Zoekterm om de transactie te vinden (tegenpartij of omschrijving)" },
-          categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
+          categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer", "Verzekeringen", "Vrienden", "Vrije Tijd", "Zakelijk", "Zorgverzekering"] },
         },
         required: ["zoekterm", "categorie"],
       },
@@ -400,7 +400,7 @@ BELANGRIJK — Professioneel Template Protocol:
         type: "object",
         properties: {
           tegenpartij: { type: "string", description: "Naam van de tegenpartij (bijv. 'Texaco', 'Albert Heijn')" },
-          categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
+          categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer", "Verzekeringen", "Vrienden", "Vrije Tijd", "Zakelijk", "Zorgverzekering"] },
         },
         required: ["tegenpartij", "categorie"],
       },

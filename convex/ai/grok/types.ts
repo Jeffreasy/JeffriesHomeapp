@@ -82,7 +82,6 @@ export const DB_CATEGORIEEN = [
   "Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood",
   "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk",
   "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom",
-  "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering",
+  "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer", "Verzekeringen",
+  "Vrienden", "Vrije Tijd", "Zakelijk", "Zorgverzekering",
 ] as const;
-
-

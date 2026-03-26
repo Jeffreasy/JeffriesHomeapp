@@ -308,25 +308,29 @@ export const bulkUpdateCategorieInternal = internalMutation({
 // ─── Relabel: re-apply auto-categorization to uncategorized transactions ─────
 
 const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
-  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g/i, categorie: "Gaming" },
+  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g|driffle|skine\.com|chesscom|vintrica|google\s*play|flashpay/i, categorie: "Gaming" },
   { pattern: /videoland|netflix|spotify|apple\.com|disney|prime\s*video/i, categorie: "Streaming" },
   { pattern: /btc\s*direct|bitvavo|coinbase|kraken|skrill/i, categorie: "Crypto" },
-  { pattern: /figma|canva|notion|reclaim|todoist|adobe|openai|github|vercel|microsoft|noordcode/i, categorie: "SaaS" },
-  { pattern: /parfumado|bol\.?com|amazon|zalando|coolblue|creative\s*fabrica|bitsandparts|winparts|nyx/i, categorie: "Online Winkelen" },
-  { pattern: /univ[eé]|asr|nationale.nederlanden|cz\s|vgz|menzis/i, categorie: "Verzekeringen" },
+  { pattern: /figma|canva|notion|reclaim|todoist|adobe|openai|github|vercel|microsoft|noordcode|go\s*daddy|tazapay/i, categorie: "SaaS" },
+  { pattern: /parfumado|bol\.?com|amazon|zalando|coolblue|creative\s*fabrica|bitsandparts|winparts|nyx|klarna|tapijtenloods|gamma|hema|kruidvat|veral|insonder|babassu|xxl\s*nutrition/i, categorie: "Online Winkelen" },
+  { pattern: /univ[eé]|asr|nationale.nederlanden|cz\s|vgz|menzis|anwb/i, categorie: "Verzekeringen" },
   { pattern: /zorgverzekering|zorgpremie|eigen\s*risico/i, categorie: "Zorgverzekering" },
   { pattern: /odido|t-mobile|kpn|vodafone|tele2|cm\.com/i, categorie: "Telecom" },
   { pattern: /shell|bp|tango|tamoil|tinq|texaco|total\s*energies|esso/i, categorie: "Brandstof" },
-  { pattern: /ns\.nl|connexxion|arriva|ov-chipkaart|ov\s*betalen|parkeer|park\.\s*|qcarwash/i, categorie: "Vervoer" },
-  { pattern: /jumbo|albert\s*heijn|ah\s*\w|lidl|aldi|dirk|supershop|deka\s*markt|spar\s|plus\s|coop\s|vomar|welkoop|bruna/i, categorie: "Boodschappen" },
+  { pattern: /ns\.nl|connexxion|arriva|ov-chipkaart|ov\s*betalen|parkeer|park\.\s*|qcarwash|tmc\*|q\s*park|h-wijk/i, categorie: "Vervoer" },
+  { pattern: /jumbo|albert\s*heijn|ah\s*\w|lidl|aldi|dirk|supershop|deka\s*markt|spar\s|plus\s|coop\s|vomar|welkoop|bruna|visscher\s*vis/i, categorie: "Boodschappen" },
   { pattern: /mcdonald|burger\s*king|kfc|subway|dominos|kwalitaria|takeaway|thuisbezorgd/i, categorie: "Fastfood" },
   { pattern: /basic.?fit|fitness|sportschool/i, categorie: "Sport" },
   { pattern: /s\s*heeren\s*loo|heeren\s*loo|zorggroep/i, categorie: "Salaris" },
-  { pattern: /zorgtoeslag|belastingdienst|toeslagen/i, categorie: "Toeslagen" },
-  { pattern: /gemeente|waterschap|eneco|vattenfall|greenchoice/i, categorie: "Vaste Lasten" },
+  { pattern: /zorgtoeslag|belastingdienst|toeslagen|^belasting$/i, categorie: "Toeslagen" },
+  { pattern: /gemeente|waterschap|eneco|vattenfall|greenchoice|rabobank\s*nederland|cjib|bng\*/i, categorie: "Vaste Lasten" },
   { pattern: /geldmaat|geldautomaat|atm/i, categorie: "Geldopname" },
   { pattern: /sh\s*zwolle|kdl\s*bv/i, categorie: "Coffeeshop" },
-  { pattern: /lavente|siekmans|terpstra/i, categorie: "Familie" },
+  { pattern: /lavente|siekmans|terpstra|weissgerber|bone|gebhardt|brandenburg/i, categorie: "Familie" },
+  { pattern: /brouwers|somerville|van\s*der\s*klis/i, categorie: "Vrienden" },
+  { pattern: /toprak|henke|panhuis/i, categorie: "Zakelijk" },
+  { pattern: /cebu|cuna\s*hotel|bdounibank|topsins|presse\s*du\s*haut|tabac\s*de\s*morillon|sas\s*m\s*j\s*s/i, categorie: "Vakantie" },
+  { pattern: /veluwse\s*bron|schaak/i, categorie: "Vrije Tijd" },
 ];
 
 function autoCategorie(naam?: string, omschrijving?: string, bedrag?: number): string | undefined {
