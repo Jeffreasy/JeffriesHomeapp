@@ -305,3 +305,65 @@ export const bulkUpdateCategorieInternal = internalMutation({
   },
 });
 
+// ─── Relabel: re-apply auto-categorization to uncategorized transactions ─────
+
+const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
+  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g/i, categorie: "Gaming" },
+  { pattern: /videoland|netflix|spotify|apple\.com|disney|prime\s*video/i, categorie: "Streaming" },
+  { pattern: /btc\s*direct|bitvavo|coinbase|kraken|skrill/i, categorie: "Crypto" },
+  { pattern: /figma|canva|notion|reclaim|todoist|adobe|openai|github|vercel|microsoft|noordcode/i, categorie: "SaaS" },
+  { pattern: /parfumado|bol\.?com|amazon|zalando|coolblue|creative\s*fabrica|bitsandparts|winparts|nyx/i, categorie: "Online Winkelen" },
+  { pattern: /univ[eé]|asr|nationale.nederlanden|cz\s|vgz|menzis/i, categorie: "Verzekeringen" },
+  { pattern: /zorgverzekering|zorgpremie|eigen\s*risico/i, categorie: "Zorgverzekering" },
+  { pattern: /odido|t-mobile|kpn|vodafone|tele2|cm\.com/i, categorie: "Telecom" },
+  { pattern: /shell|bp|tango|tamoil|tinq|texaco|total\s*energies|esso/i, categorie: "Brandstof" },
+  { pattern: /ns\.nl|connexxion|arriva|ov-chipkaart|ov\s*betalen|parkeer|park\.\s*|qcarwash/i, categorie: "Vervoer" },
+  { pattern: /jumbo|albert\s*heijn|ah\s*\w|lidl|aldi|dirk|supershop|deka\s*markt|spar\s|plus\s|coop\s|vomar|welkoop|bruna/i, categorie: "Boodschappen" },
+  { pattern: /mcdonald|burger\s*king|kfc|subway|dominos|kwalitaria|takeaway|thuisbezorgd/i, categorie: "Fastfood" },
+  { pattern: /basic.?fit|fitness|sportschool/i, categorie: "Sport" },
+  { pattern: /s\s*heeren\s*loo|heeren\s*loo|zorggroep/i, categorie: "Salaris" },
+  { pattern: /zorgtoeslag|belastingdienst|toeslagen/i, categorie: "Toeslagen" },
+  { pattern: /gemeente|waterschap|eneco|vattenfall|greenchoice/i, categorie: "Vaste Lasten" },
+  { pattern: /geldmaat|geldautomaat|atm/i, categorie: "Geldopname" },
+  { pattern: /sh\s*zwolle|kdl\s*bv/i, categorie: "Coffeeshop" },
+  { pattern: /lavente|siekmans|terpstra/i, categorie: "Familie" },
+];
+
+function autoCategorie(naam?: string, omschrijving?: string, bedrag?: number): string | undefined {
+  const haystack = `${naam ?? ""} ${omschrijving ?? ""}`;
+  if (/supertank/i.test(haystack)) {
+    return (bedrag !== undefined && Math.abs(bedrag) < 25) ? "Fastfood" : "Brandstof";
+  }
+  for (const r of CATEGORIE_REGELS) {
+    if (r.pattern.test(haystack)) return r.categorie;
+  }
+  return undefined;
+}
+
+/** Re-apply auto-categorization rules to all uncategorized transactions. */
+export const relabelAll = internalMutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const all = await ctx.db
+      .query("transactions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    let updated = 0;
+    let skipped = 0;
+    const changes: Record<string, number> = {};
+
+    for (const tx of all) {
+      if (tx.categorie) { skipped++; continue; }
+
+      const cat = autoCategorie(tx.tegenpartijNaam ?? undefined, tx.omschrijving, tx.bedrag);
+      if (cat) {
+        await ctx.db.patch(tx._id, { categorie: cat });
+        changes[cat] = (changes[cat] ?? 0) + 1;
+        updated++;
+      }
+    }
+
+    return { updated, skipped, stillUnlabeled: all.length - skipped - updated, changes };
+  },
+});

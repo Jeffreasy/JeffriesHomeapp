@@ -43,26 +43,26 @@ const EIGEN_REKENINGEN = new Set([
 
 const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
   // Gaming
-  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect/i, categorie: "Gaming" },
+  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g/i, categorie: "Gaming" },
   // Streaming
   { pattern: /videoland|netflix|spotify|apple\.com|disney|prime\s*video/i, categorie: "Streaming" },
   // Crypto
   { pattern: /btc\s*direct|bitvavo|coinbase|kraken|skrill/i, categorie: "Crypto" },
   // SaaS
-  { pattern: /figma|canva|notion|reclaim|todoist|adobe|openai|github|vercel/i, categorie: "SaaS" },
+  { pattern: /figma|canva|notion|reclaim|todoist|adobe|openai|github|vercel|microsoft|noordcode/i, categorie: "SaaS" },
   // Online Winkelen
-  { pattern: /parfumado|bol\.com|amazon|zalando|coolblue|creative\s*fabrica|bitsandparts/i, categorie: "Online Winkelen" },
+  { pattern: /parfumado|bol\.?com|amazon|zalando|coolblue|creative\s*fabrica|bitsandparts|winparts|nyx/i, categorie: "Online Winkelen" },
   // Verzekeringen (+ Unive zonder accent)
   { pattern: /univ[eé]|asr|nationale.nederlanden|cz\s|vgz|menzis/i, categorie: "Verzekeringen" },
   { pattern: /zorgverzekering|zorgpremie|eigen\s*risico/i, categorie: "Zorgverzekering" },
   // Telecom
   { pattern: /odido|t-mobile|kpn|vodafone|tele2|cm\.com/i, categorie: "Telecom" },
-  // Brandstof (+ Texaco; Supertank handled separately — amount-dependent)
-  { pattern: /shell|bp|tango|tamoil|tinq|texaco|total\s*energies/i, categorie: "Brandstof" },
+  // Brandstof (+ Texaco, Esso; Supertank handled separately — amount-dependent)
+  { pattern: /shell|bp|tango|tamoil|tinq|texaco|total\s*energies|esso/i, categorie: "Brandstof" },
   // OV / Vervoer
-  { pattern: /ns\.nl|connexxion|arriva|ov-chipkaart|ov\s*betalen|parkeer|park\.\s*/i, categorie: "Vervoer" },
-  // Boodschappen (+ Supershop, Deka, Spar, Plus, Coop, Vomar)
-  { pattern: /jumbo|albert\s*heijn|ah\s*\w|lidl|aldi|dirk|supershop|deka\s*markt|spar\s|plus\s|coop\s|vomar/i, categorie: "Boodschappen" },
+  { pattern: /ns\.nl|connexxion|arriva|ov-chipkaart|ov\s*betalen|parkeer|park\.\s*|qcarwash/i, categorie: "Vervoer" },
+  // Boodschappen (+ Supershop, Deka, Spar, Plus, Coop, Vomar, Welkoop, Bruna)
+  { pattern: /jumbo|albert\s*heijn|ah\s*\w|lidl|aldi|dirk|supershop|deka\s*markt|spar\s|plus\s|coop\s|vomar|welkoop|bruna/i, categorie: "Boodschappen" },
   // Fastfood (+ Kwalitaria, Takeaway)
   { pattern: /mcdonald|burger\s*king|kfc|subway|dominos|kwalitaria|takeaway|thuisbezorgd/i, categorie: "Fastfood" },
   // Sport
