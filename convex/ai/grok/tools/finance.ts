@@ -51,16 +51,21 @@ export async function handleSaldoOpvragen(ctx: any, _args: Record<string, unknow
 
 export async function handleTransactiesZoeken(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
-    const zoekterm = (args.zoekterm as string).toLowerCase();
-    const maxAantal = (args.maxAantal as number) ?? 15;
+    const zoekterm = (args.zoekterm as string | undefined)?.toLowerCase();
+    const maxAantal = (args.maxAantal as number) ?? 50;
     const categorie = args.categorie as string | undefined;
     const rekening = args.rekening as string | undefined;
 
     const allTxs = await ctx.runQuery(internal.transactions.listInternal, { userId });
-    let matches = allTxs.filter((tx: any) =>
-      tx.tegenpartijNaam?.toLowerCase().includes(zoekterm) ||
-      tx.omschrijving?.toLowerCase().includes(zoekterm)
-    );
+    let matches = allTxs;
+
+    // Filter by search term if provided
+    if (zoekterm) {
+      matches = matches.filter((tx: any) =>
+        tx.tegenpartijNaam?.toLowerCase().includes(zoekterm) ||
+        tx.omschrijving?.toLowerCase().includes(zoekterm)
+      );
+    }
 
     if (categorie) matches = matches.filter((tx: any) => tx.categorie === categorie);
     if (rekening) {

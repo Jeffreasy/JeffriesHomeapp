@@ -223,16 +223,16 @@ export const TOOLS = [
     type: "function" as const,
     function: {
       name: "transactiesZoeken",
-      description: "Doorzoek bank transacties op tegenpartij, omschrijving of categorie. Toont volledige details inclusief rekening, saldo, code en referentie. Gebruik dit als de gebruiker vraagt naar specifieke uitgaven, betalingen, of transacties.",
+      description: "Doorzoek bank transacties op tegenpartij, omschrijving of categorie. Kan ook ALLE transacties van een specifieke categorie ophalen zonder zoekterm. Toont volledige details inclusief rekening, saldo, code en referentie. Gebruik dit voor: specifieke uitgaven zoeken, alle transacties van een categorie opvragen, of betalingen aan een tegenpartij bekijken.",
       parameters: {
         type: "object",
         properties: {
-          zoekterm: { type: "string", description: "Zoekterm (doorzoekt tegenpartij, omschrijving)" },
+          zoekterm: { type: "string", description: "Optioneel: zoekterm (doorzoekt tegenpartij, omschrijving). Mag leeg bij categorie-filter." },
           categorie: { type: "string", description: "Optioneel: filter op categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
           rekening: { type: "string", description: "Optioneel: filter op rekening ('betaal' of 'spaar')", enum: ["betaal", "spaar"] },
-          maxAantal: { type: "number", description: "Max resultaten (default 15)" },
+          maxAantal: { type: "number", description: "Max resultaten (default 50)" },
         },
-        required: ["zoekterm"],
+        required: [],
       },
     },
   },

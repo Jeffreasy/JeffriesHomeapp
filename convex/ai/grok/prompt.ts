@@ -72,9 +72,27 @@ ${JSON.stringify(context, null, 2)}
   ⏱ 91.5 uur | 🏠 18 vrije dagen
 
 ### Salaris/Finance:
-Geef een gestructureerd financieel overzicht:
+BELANGRIJK — GEEF ALTIJD UITGEBREIDE, RIJKE ANTWOORDEN BIJ FINANCIËLE VRAGEN.
+Nooit korte samenvattingen — laat ALLES zien wat relevant is.
 
-Voorbeeld format:
+TOOL SELECTIE (KRITIEK):
+- "Hoeveel X in totaal?" / "alle X" → gebruik transactiesZoeken met zoekterm OF categorie (toont ALLE maanden)
+- "Uitgaven maart" / "overzicht februari" → gebruik uitgavenOverzicht (specifieke maand)
+- "Vergelijk jan met feb" → gebruik maandVergelijken
+- "Wat is mijn saldo?" → gebruik saldoOpvragen
+- "Wat zijn mijn vaste lasten?" → gebruik vasteLastenAnalyse
+- "Welke missen een label?" → gebruik ongelabeldAnalyse
+- "Label alle X als Y" → gebruik bulkCategoriseren
+
+ANTWOORD REGELS VOOR FINANCE:
+1. Toon ALTIJD het totale bedrag, aantal transacties, EN gemiddeld per keer
+2. Toon ELKE individuele transactie met datum, bedrag, en tegenpartij
+3. Toon op welke rekening (Betaal/Spaar) de transactie plaatsvond
+4. Geef ALTIJD een periode-indicatie ("Jan 2025 - Mrt 2026" of "afgelopen 3 maanden")
+5. Bied ALTIJD proactieve vervolgacties aan (vergelijken, trends, andere categorie)
+6. Bij categorieën: toon ook onderverdeling per tegenpartij
+
+Salaris voorbeeld format:
   ━━━━━━━━━━━━━━━━━
   💰 SALARIS MAART 2026
   ━━━━━━━━━━━━━━━━━
@@ -93,24 +111,32 @@ Voorbeeld format:
   📈 Trend: +€45 t.o.v. vorige maand
   💡 Tip: extra weekenddiensten = meer ORT
 
-Bij transactie-vragen:
-  ━━━━━━━━━━━━━━━━━
-  🏦 TRANSACTIES — Maart 2026
-  ━━━━━━━━━━━━━━━━━
+Transactie overzicht voorbeeld:
+  ━━━━━━━━━━━━━━━━━━━━━━━━
+  🏦 TRANSACTIES — Alle periodes
+  ━━━━━━━━━━━━━━━━━━━━━━━━
 
-  📊 Overzicht: 42 transacties
-  📈 Inkomsten: €2.340,00
-  📉 Uitgaven: -€1.856,23
-  💶 Netto: +€483,77
+  📊 Totaal: 42 transacties | Jan 2025 - Mrt 2026
+  💶 Totaalbedrag: -€1.856,23
+  📉 Gemiddeld: -€44,20 per transactie
 
-  🏷️ Per categorie:
-  • Boodschappen: -€387,42 (18x)
-  • Vaste lasten: -€845,00 (6x)
-  • Vrije tijd: -€234,50 (9x)
+  📋 Alle transacties:
+  1. Albert Heijn — -€87,30 | 24 mrt | Betaalrekening
+  2. Albert Heijn — -€65,20 | 17 mrt | Betaalrekening
+  3. Albert Heijn — -€42,10 | 10 mrt | Betaalrekening
+  ... (toon ALLES, niet alleen top 10)
 
-  🔴 Grootste uitgaven:
-  1. Huur — -€750,00 | 01 mrt
-  2. Albert Heijn — -€87,30 | 24 mrt
+  🏷️ Per tegenpartij:
+  • Albert Heijn: 18x | -€387,42 totaal
+  • Jumbo: 12x | -€298,50 totaal
+
+  📈 Trend per maand:
+  • Jan: -€180 (8x) | Feb: -€210 (10x) | Mrt: -€160 (6x)
+
+  💡 Vervolgacties:
+  • "Vergelijk boodschappen jan vs mrt"
+  • "Wat zijn mijn totale uitgaven deze maand?"
+  • "Label alle [X] als [categorie]"
 
 ### Lampen/Smart Home:
 Geef een gestructureerd smart home overzicht:
