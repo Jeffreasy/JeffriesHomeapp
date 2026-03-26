@@ -43,7 +43,7 @@ const EIGEN_REKENINGEN = new Set([
 
 const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
   // Gaming
-  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g|driffle|skine\.com|chesscom|vintrica|google\s*play|flashpay/i, categorie: "Gaming" },
+  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g|driffle|skine\.com|chesscom|vintrica|google\s*play|flashpay|paypal|online\s*payment/i, categorie: "Gaming" },
   // Streaming
   { pattern: /videoland|netflix|spotify|apple\.com|disney|prime\s*video/i, categorie: "Streaming" },
   // Crypto
@@ -70,7 +70,7 @@ const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
   // Salaris
   { pattern: /s\s*heeren\s*loo|heeren\s*loo|zorggroep/i, categorie: "Salaris" },
   // Toeslagen
-  { pattern: /zorgtoeslag|belastingdienst|toeslagen|^belasting$/i, categorie: "Toeslagen" },
+  { pattern: /zorgtoeslag|belastingdienst|toeslagen|\bbelasting\b/i, categorie: "Toeslagen" },
   // Vaste Lasten
   { pattern: /gemeente|waterschap|eneco|vattenfall|greenchoice|rabobank\s*nederland|cjib|bng\*/i, categorie: "Vaste Lasten" },
   // Geldopname
@@ -84,7 +84,7 @@ const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
   // Zakelijk
   { pattern: /toprak|henke|panhuis/i, categorie: "Zakelijk" },
   // Vakantie
-  { pattern: /cebu|cuna\s*hotel|bdounibank|topsins|presse\s*du\s*haut|tabac\s*de\s*morillon|sas\s*m\s*j\s*s/i, categorie: "Vakantie" },
+  { pattern: /cebu|cuna\s*hotel|bdounibank|topsinb|presse\s*du\s*haut|tabac\s*de\s*morillon|sas\s*m\s*j\s*s/i, categorie: "Vakantie" },
   // Vrije Tijd
   { pattern: /veluwse\s*bron|schaak/i, categorie: "Vrije Tijd" },
 ];

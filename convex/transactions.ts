@@ -308,7 +308,7 @@ export const bulkUpdateCategorieInternal = internalMutation({
 // ─── Relabel: re-apply auto-categorization to uncategorized transactions ─────
 
 const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
-  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g|driffle|skine\.com|chesscom|vintrica|google\s*play|flashpay/i, categorie: "Gaming" },
+  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g|driffle|skine\.com|chesscom|vintrica|google\s*play|flashpay|paypal|online\s*payment/i, categorie: "Gaming" },
   { pattern: /videoland|netflix|spotify|apple\.com|disney|prime\s*video/i, categorie: "Streaming" },
   { pattern: /btc\s*direct|bitvavo|coinbase|kraken|skrill/i, categorie: "Crypto" },
   { pattern: /figma|canva|notion|reclaim|todoist|adobe|openai|github|vercel|microsoft|noordcode|go\s*daddy|tazapay/i, categorie: "SaaS" },
@@ -322,14 +322,14 @@ const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
   { pattern: /mcdonald|burger\s*king|kfc|subway|dominos|kwalitaria|takeaway|thuisbezorgd/i, categorie: "Fastfood" },
   { pattern: /basic.?fit|fitness|sportschool/i, categorie: "Sport" },
   { pattern: /s\s*heeren\s*loo|heeren\s*loo|zorggroep/i, categorie: "Salaris" },
-  { pattern: /zorgtoeslag|belastingdienst|toeslagen|^belasting$/i, categorie: "Toeslagen" },
+  { pattern: /zorgtoeslag|belastingdienst|toeslagen|\bbelasting\b/i, categorie: "Toeslagen" },
   { pattern: /gemeente|waterschap|eneco|vattenfall|greenchoice|rabobank\s*nederland|cjib|bng\*/i, categorie: "Vaste Lasten" },
   { pattern: /geldmaat|geldautomaat|atm/i, categorie: "Geldopname" },
   { pattern: /sh\s*zwolle|kdl\s*bv/i, categorie: "Coffeeshop" },
   { pattern: /lavente|siekmans|terpstra|weissgerber|bone|gebhardt|brandenburg/i, categorie: "Familie" },
   { pattern: /brouwers|somerville|van\s*der\s*klis/i, categorie: "Vrienden" },
   { pattern: /toprak|henke|panhuis/i, categorie: "Zakelijk" },
-  { pattern: /cebu|cuna\s*hotel|bdounibank|topsins|presse\s*du\s*haut|tabac\s*de\s*morillon|sas\s*m\s*j\s*s/i, categorie: "Vakantie" },
+  { pattern: /cebu|cuna\s*hotel|bdounibank|topsinb|presse\s*du\s*haut|tabac\s*de\s*morillon|sas\s*m\s*j\s*s/i, categorie: "Vakantie" },
   { pattern: /veluwse\s*bron|schaak/i, categorie: "Vrije Tijd" },
 ];
 
