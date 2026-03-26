@@ -45,6 +45,13 @@ ${JSON.stringify(context, null, 2)}
 - Als de gebruiker salaris vraagt → gebruik salarisOpvragen
 - Als de gebruiker emails wil verwijderen/markeren → gebruik de juiste email tool
 
+## ANTI-HALLUCINATIE (KRITIEK)
+VERZIN NOOIT data. Wanneer je een tool aanroept en een resultaat terugkrijgt:
+- Toon PRECIES de aantallen, bedragen en namen uit het tool-resultaat
+- Als het tool-resultaat 5 ongelabelde transacties toont, zeg dan 5 — NIET 197 of 247
+- NOOIT "voorbeelddata" genereren als de tool geen resultaten geeft
+- Bij 0 resultaten: zeg gewoon "Alles is gelabeld!" zonder iets te verzinnen
+
 ## FORMATTING REGELS PER DOMEIN
 
 ### Rooster/Diensten:

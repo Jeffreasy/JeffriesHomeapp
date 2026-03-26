@@ -384,27 +384,40 @@ export async function handleOngelabeldAnalyse(ctx: any, _args: Record<string, un
       percentage: Math.round((ongelabeld.length / allTxs.length) * 100),
       patronen,
       tip: "Gebruik 'label alle [tegenpartij] als [categorie]' om in bulk te categoriseren.",
+      instructie: "TOON ALLEEN DEZE DATA. VERZIN GEEN EXTRA TRANSACTIES OF AANTALLEN. Als er 0 ongelabeld zijn, zeg dat dan.",
     });
   } catch (err) {
     return JSON.stringify({ error: `Ongelabeld analyse mislukt: ${(err as Error).message}` });
   }
 }
 
-// Simpele suggestie-engine op basis van bekende patronen
+// Suggestie-engine — synced met CATEGORIE_REGELS in rabobank-csv.ts
 function suggereerCategorie(naam: string, omschrijving: string): string | null {
   const haystack = `${naam} ${omschrijving}`.toLowerCase();
   const hints: Array<{ pattern: RegExp; categorie: string }> = [
-    { pattern: /texaco|shell|bp|tango|tinq|tankstation/i, categorie: "Brandstof" },
-    { pattern: /battle\.?net|steam|xsolla|g2a|gaming|playstation|xbox|codesdirect/i, categorie: "Gaming" },
+    { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a|codesdirect|kinguin|kingboost|moonflash|cleverbridge|k4g|driffle|skine|chesscom|vintrica|google\s*play|flashpay/i, categorie: "Gaming" },
+    { pattern: /videoland|netflix|spotify|apple\.com|disney|prime\s*video/i, categorie: "Streaming" },
+    { pattern: /btc\s*direct|bitvavo|coinbase|kraken|skrill/i, categorie: "Crypto" },
+    { pattern: /figma|canva|notion|reclaim|todoist|adobe|openai|github|vercel|microsoft|noordcode|go\s*daddy|tazapay/i, categorie: "SaaS" },
+    { pattern: /parfumado|bol\.?com|amazon|zalando|coolblue|creative\s*fabrica|bitsandparts|winparts|nyx|klarna|tapijtenloods|gamma|hema|kruidvat|veral|insonder|babassu|xxl\s*nutrition/i, categorie: "Online Winkelen" },
+    { pattern: /univ[eé]|asr|nationale.nederlanden|cz\s|vgz|menzis|anwb/i, categorie: "Verzekeringen" },
+    { pattern: /odido|t-mobile|kpn|vodafone|tele2|cm\.com/i, categorie: "Telecom" },
+    { pattern: /texaco|shell|bp|tango|tamoil|tinq|esso|supertank|total\s*energies/i, categorie: "Brandstof" },
+    { pattern: /ns\.nl|connexxion|arriva|ov|parkeer|qcarwash|tmc|q\s*park/i, categorie: "Vervoer" },
+    { pattern: /jumbo|albert|ah\s|lidl|aldi|dirk|supershop|deka|spar\s|plus\s|coop\s|vomar|welkoop|bruna|visscher/i, categorie: "Boodschappen" },
+    { pattern: /mcdonald|burger\s*king|kfc|subway|dominos|kwalitaria|takeaway|thuisbezorgd/i, categorie: "Fastfood" },
+    { pattern: /basic.?fit|fitness|sportschool/i, categorie: "Sport" },
+    { pattern: /s\s*heeren\s*loo|heeren\s*loo|zorggroep/i, categorie: "Salaris" },
+    { pattern: /zorgtoeslag|belastingdienst|toeslagen|belasting/i, categorie: "Toeslagen" },
+    { pattern: /gemeente|waterschap|eneco|vattenfall|greenchoice|rabobank\s*nederland|cjib|bng/i, categorie: "Vaste Lasten" },
+    { pattern: /geldmaat|geldautomaat|atm/i, categorie: "Geldopname" },
+    { pattern: /sh\s*zwolle|kdl\s*bv/i, categorie: "Coffeeshop" },
+    { pattern: /lavente|siekmans|terpstra|weissgerber|bone|gebhardt|brandenburg/i, categorie: "Familie" },
+    { pattern: /brouwers|somerville|van\s*der\s*klis/i, categorie: "Vrienden" },
+    { pattern: /toprak|henke|panhuis/i, categorie: "Zakelijk" },
+    { pattern: /cebu|cuna\s*hotel|bdounibank|topsins|presse\s*du\s*haut|tabac\s*de\s*morillon/i, categorie: "Vakantie" },
+    { pattern: /veluwse\s*bron|schaak/i, categorie: "Vrije Tijd" },
     { pattern: /tikkie|betaalverzoek/i, categorie: "Persoonlijk" },
-    { pattern: /lavente|siekmans|terpstra/i, categorie: "Familie" },
-    { pattern: /albert|ah\s|jumbo|lidl|supershop|boodschap/i, categorie: "Boodschappen" },
-    { pattern: /univ[eé]|asr|verzeker/i, categorie: "Verzekeringen" },
-    { pattern: /geldmaat|geldautomaat/i, categorie: "Geldopname" },
-    { pattern: /mcdonald|kfc|burger\s*king|kwalitaria|takeaway/i, categorie: "Fastfood" },
-    { pattern: /sh\s*zwolle|kdl\s*bv|coffeeshop/i, categorie: "Coffeeshop" },
-    { pattern: /cm\.com|odido|kpn/i, categorie: "Telecom" },
-    { pattern: /creative\s*fabrica|bol\.com|amazon|bitsandparts/i, categorie: "Online Winkelen" },
   ];
   for (const h of hints) {
     if (h.pattern.test(haystack)) return h.categorie;
