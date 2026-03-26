@@ -40,10 +40,12 @@ export const chat = action({
     error?: string;
     beschikbaar?: Array<{ id: string; naam: string }>;
   }> => {
+    const startTime = Date.now();
     const apiKey = process.env.GROK_API_KEY;
     if (!apiKey) return { ok: false, error: "GROK_API_KEY niet geconfigureerd" };
 
     const targetId = agentId ?? "dashboard";
+    const toolsUsed: string[] = [];
 
     // ── Haal live agent context op ─────────────────────────────────────────
     const result: AgentContextResult = await ctx.runQuery(
@@ -97,6 +99,8 @@ export const chat = action({
 
         // ── Geen tool calls → klaar ──────────────────────────────────────
         if (choice.finish_reason !== "tool_calls" || !msg.tool_calls?.length) {
+          const duration = Date.now() - startTime;
+          console.log(`[Grok] ✅ ${targetId} | ${duration}ms | ${round + 1} round(s) | tools: [${toolsUsed.join(", ") || "none"}] | tokens: ${totalTokens?.total_tokens ?? "?"}`);
           return {
             ok: true,
             agent: { id: targetId, naam: result.agent.naam, emoji: result.agent.emoji },
@@ -116,7 +120,10 @@ export const chat = action({
             });
             continue;
           }
+          const toolStart = Date.now();
           const toolResult = await executeTool(ctx, toolCall.function.name, toolArgs, userId || OWNER_USER_ID);
+          const toolDuration = Date.now() - toolStart;
+          toolsUsed.push(`${toolCall.function.name}(${toolDuration}ms)`);
           messages.push({
             role: "tool",
             content: toolResult,
@@ -127,6 +134,8 @@ export const chat = action({
       }
 
       // Max rounds bereikt
+      const duration = Date.now() - startTime;
+      console.log(`[Grok] ⚠️ MAX_ROUNDS | ${targetId} | ${duration}ms | tools: [${toolsUsed.join(", ")}] | tokens: ${totalTokens?.total_tokens ?? "?"}`);
       const lastMsg = messages[messages.length - 1];
       return {
         ok: true,
@@ -135,6 +144,8 @@ export const chat = action({
         tokens: totalTokens,
       };
     } catch (err: unknown) {
+      const duration = Date.now() - startTime;
+      console.error(`[Grok] ❌ ERROR | ${targetId} | ${duration}ms | tools: [${toolsUsed.join(", ")}] | ${(err as Error).message}`);
       return { ok: false, error: `Grok request failed: ${(err as Error).message}` };
     }
   },
