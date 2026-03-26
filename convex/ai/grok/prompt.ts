@@ -6,6 +6,10 @@
  */
 
 import type { AgentMeta } from "../registry";
+import { TOOLS } from "./tools/definitions";
+
+// Generate tool list dynamically from definitions — never out of sync
+const toolList = TOOLS.map((t) => `- ${t.function.name} — ${t.function.description.split(".")[0]}`).join("\n");
 
 export function buildSystemPrompt(agentMeta: AgentMeta, context: Record<string, unknown>): string {
   return `Je bent "${agentMeta.naam}" ${agentMeta.emoji} — Jeffrey's persoonlijke AI-assistent.
@@ -18,16 +22,7 @@ ${agentMeta.capabilities.map((c) => `- ${c}`).join("\n")}
 
 ## Tools
 Je hebt toegang tot tools waarmee je acties kunt uitvoeren:
-- leesEmail(gmailId) — Volledige email inhoud ophalen
-- zoekEmails(zoekterm) — Emails doorzoeken
-- lampBedien(actie) — Lampen bedienen (scenes/kleuren/dim)
-- dienstenOpvragen(maand) — Diensten per maand ophalen
-- afspraakMaken(titel, datum, ...) — Afspraak aanmaken
-- afspraakVerwijderen(zoekterm) — Afspraak verwijderen/annuleren
-- afsprakenOpvragen() — Aankomende afspraken tonen
-- salarisOpvragen(maand) — Salaris per maand
-- transactiesZoeken(zoekterm) — Bank transacties doorzoeken
-- bulkMarkeerGelezen/bulkVerwijder/inboxOpruimen — Email bulk operaties
+${toolList}
 
 ## Live Data (nu)
 \`\`\`json

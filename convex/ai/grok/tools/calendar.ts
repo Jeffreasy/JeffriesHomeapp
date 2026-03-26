@@ -8,6 +8,54 @@
 import { api } from "../../../_generated/api";
 import { todayCET } from "../types";
 
+export async function handleAfspraakBewerken(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
+  try {
+    const zoekterm = (args.zoekterm as string).toLowerCase();
+    const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
+    const match = allEvents.find((e: any) =>
+      e.status === "Aankomend" && e.titel?.toLowerCase().includes(zoekterm)
+    );
+
+    if (!match) {
+      return JSON.stringify({ error: `Geen aankomende afspraak gevonden met "${args.zoekterm}"` });
+    }
+
+    const result = await ctx.runAction(api.actions.updatePersonalEvent.updateEvent, {
+      userId,
+      eventId: match.eventId,
+      titel: (args.titel as string) ?? match.titel,
+      startDatum: (args.startDatum as string) ?? match.startDatum,
+      eindDatum: (args.eindDatum as string) ?? match.eindDatum,
+      heledag: (args.heledag as boolean) ?? match.heledag,
+      startTijd: (args.startTijd as string) ?? match.startTijd,
+      eindTijd: (args.eindTijd as string) ?? match.eindTijd,
+      locatie: (args.locatie as string) ?? match.locatie,
+      beschrijving: (args.beschrijving as string) ?? match.beschrijving,
+    });
+
+    if (!result.ok) {
+      return JSON.stringify({ error: result.message });
+    }
+
+    const wijzigingen: string[] = [];
+    if (args.titel) wijzigingen.push(`titel → "${args.titel}"`);
+    if (args.startDatum) wijzigingen.push(`datum → ${args.startDatum}`);
+    if (args.startTijd) wijzigingen.push(`tijd → ${args.startTijd}`);
+    if (args.locatie) wijzigingen.push(`locatie → "${args.locatie}"`);
+    if (args.beschrijving) wijzigingen.push("beschrijving bijgewerkt");
+
+    return JSON.stringify({
+      ok: true,
+      beschrijving: `Afspraak "${match.titel}" bijgewerkt`,
+      wijzigingen,
+      googleSync: "Automatisch gesynchroniseerd naar Google Calendar",
+    });
+  } catch (err) {
+    return JSON.stringify({ error: `Afspraak bewerken mislukt: ${(err as Error).message}` });
+  }
+}
+
+
 export async function handleAfspraakMaken(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
     const categorie = (args.categorie as string) ?? "overig";

@@ -109,27 +109,29 @@ export const chat = action({
           };
         }
 
-        // ── Tool calls uitvoeren ─────────────────────────────────────────
-        for (const toolCall of msg.tool_calls) {
-          const toolArgs = safeJsonParse(toolCall.function.arguments);
-          if (!toolArgs) {
-            messages.push({
-              role: "tool",
-              content: JSON.stringify({ error: `Ongeldige JSON in tool arguments: ${toolCall.function.arguments.slice(0, 100)}` }),
+        // ── Tool calls uitvoeren (parallel) ────────────────────────────────
+        const toolResults = await Promise.all(
+          msg.tool_calls.map(async (toolCall) => {
+            const toolArgs = safeJsonParse(toolCall.function.arguments);
+            if (!toolArgs) {
+              return {
+                role: "tool" as const,
+                content: JSON.stringify({ error: `Ongeldige JSON in tool arguments: ${toolCall.function.arguments.slice(0, 100)}` }),
+                tool_call_id: toolCall.id,
+              };
+            }
+            const toolStart = Date.now();
+            const result = await executeTool(ctx, toolCall.function.name, toolArgs, userId || OWNER_USER_ID);
+            const toolDuration = Date.now() - toolStart;
+            toolsUsed.push(`${toolCall.function.name}(${toolDuration}ms)`);
+            return {
+              role: "tool" as const,
+              content: result,
               tool_call_id: toolCall.id,
-            });
-            continue;
-          }
-          const toolStart = Date.now();
-          const toolResult = await executeTool(ctx, toolCall.function.name, toolArgs, userId || OWNER_USER_ID);
-          const toolDuration = Date.now() - toolStart;
-          toolsUsed.push(`${toolCall.function.name}(${toolDuration}ms)`);
-          messages.push({
-            role: "tool",
-            content: toolResult,
-            tool_call_id: toolCall.id,
-          });
-        }
+            };
+          })
+        );
+        for (const tr of toolResults) messages.push(tr);
         // Loop door → Grok krijgt tool results en antwoordt
       }
 

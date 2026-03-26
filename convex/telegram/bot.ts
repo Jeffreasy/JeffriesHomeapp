@@ -22,10 +22,10 @@ const COMMAND_MAP: Record<string, { agentId: string; beschrijving: string }> = {
   "/rooster":     { agentId: "rooster",         beschrijving: "📅 Weekplanning" },
   "/finance":     { agentId: "finance",         beschrijving: "💰 Salaris & transacties" },
   "/email":       { agentId: "email",           beschrijving: "📧 Inbox overzicht" },
-  "/inbox":       { agentId: "email-analyst",   beschrijving: "📊 Inbox analyse" },
-  "/compose":     { agentId: "email-composer",  beschrijving: "✍️ Email componeren" },
-  "/triage":      { agentId: "email-manager",   beschrijving: "🗂️ Inbox triage" },
-  "/search":      { agentId: "email-reader",    beschrijving: "🔍 Email zoeken" },
+  "/inbox":       { agentId: "email",           beschrijving: "📊 Inbox analyse" },
+  "/compose":     { agentId: "email",           beschrijving: "✍️ Email componeren" },
+  "/triage":      { agentId: "email",           beschrijving: "🗂️ Inbox triage" },
+  "/search":      { agentId: "email",           beschrijving: "🔍 Email zoeken" },
   "/automations": { agentId: "automations",     beschrijving: "⚙️ Automations status" },
 };
 

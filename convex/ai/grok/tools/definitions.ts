@@ -294,4 +294,43 @@ BELANGRIJK — Professioneel Template Protocol:
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "afspraakBewerken",
+      description: "Bewerk een bestaande persoonlijke afspraak. Wijzig titel, datum, tijd, locatie of beschrijving. De wijziging wordt automatisch gesynchroniseerd naar Google Calendar. Gebruik dit als de gebruiker een afspraak wil verzetten, verplaatsen, of details wil aanpassen.",
+      parameters: {
+        type: "object",
+        properties: {
+          zoekterm: { type: "string", description: "Deel van de titel om de afspraak te vinden (bijv. 'koffie')" },
+          titel: { type: "string", description: "Nieuwe titel (optioneel, alleen als deze wijzigt)" },
+          startDatum: { type: "string", description: "Nieuwe startdatum YYYY-MM-DD (optioneel)" },
+          eindDatum: { type: "string", description: "Nieuwe einddatum YYYY-MM-DD (optioneel)" },
+          startTijd: { type: "string", description: "Nieuwe starttijd HH:MM (optioneel)" },
+          eindTijd: { type: "string", description: "Nieuwe eindtijd HH:MM (optioneel)" },
+          heledag: { type: "boolean", description: "Hele dag event (optioneel)" },
+          locatie: { type: "string", description: "Nieuwe locatie (optioneel)" },
+          beschrijving: { type: "string", description: "Nieuwe beschrijving (optioneel)" },
+        },
+        required: ["zoekterm"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "uitgavenOverzicht",
+      description: "Haal een volledig financieel overzicht op voor een specifieke maand. Toont totale inkomsten, uitgaven, netto resultaat, verdeling per categorie, en top uitgaven. Gebruik dit als de gebruiker vraagt naar uitgaven, financieel overzicht, of kosten van een maand.",
+      parameters: {
+        type: "object",
+        properties: {
+          maand: { type: "number", description: "Maandnummer (1-12)" },
+          jaar: { type: "number", description: "Jaar (default: huidig jaar)" },
+          categorie: { type: "string", description: "Optioneel: filter op specifieke categorie", enum: ["Boodschappen", "Vaste lasten", "Vrije tijd", "Abonnementen", "Vervoer", "Zorg", "Overig"] },
+          top: { type: "number", description: "Aantal top uitgaven om te tonen (default 10)" },
+        },
+        required: ["maand"],
+      },
+    },
+  },
 ];

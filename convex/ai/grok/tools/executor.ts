@@ -13,9 +13,9 @@ import {
 } from "./email";
 import { handleLampBedien } from "./smarthome";
 import { handleDienstenOpvragen, handleSalarisOpvragen } from "./schedule";
-import { handleTransactiesZoeken } from "./finance";
+import { handleTransactiesZoeken, handleUitgavenOverzicht } from "./finance";
 import {
-  handleAfspraakMaken, handleAfspraakVerwijderen, handleAfsprakenOpvragen,
+  handleAfspraakBewerken, handleAfspraakMaken, handleAfspraakVerwijderen, handleAfsprakenOpvragen,
 } from "./calendar";
 
 // ─── Tool name → handler mapping ─────────────────────────────────────────────
@@ -44,11 +44,13 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
 
   // Finance
   transactiesZoeken:  handleTransactiesZoeken,
+  uitgavenOverzicht:  handleUitgavenOverzicht,
 
   // Calendar
-  afspraakMaken:      handleAfspraakMaken,
+  afspraakMaken:       handleAfspraakMaken,
+  afspraakBewerken:    handleAfspraakBewerken,
   afspraakVerwijderen: handleAfspraakVerwijderen,
-  afsprakenOpvragen:  handleAfsprakenOpvragen,
+  afsprakenOpvragen:   handleAfsprakenOpvragen,
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
