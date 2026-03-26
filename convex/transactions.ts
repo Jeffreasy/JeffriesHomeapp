@@ -1,4 +1,4 @@
-import { mutation, query, internalQuery } from "./_generated/server";
+import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -284,3 +284,24 @@ export const listInternal = internalQuery({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect(),
 });
+
+/** Interne mutation: bulk categorie update (voor Grok AI). */
+export const bulkUpdateCategorieInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    ids: v.array(v.id("transactions")),
+    categorie: v.string(),
+  },
+  handler: async (ctx, { userId, ids, categorie }) => {
+    let updated = 0;
+    for (const id of ids) {
+      const tx = await ctx.db.get(id);
+      if (tx && tx.userId === userId) {
+        await ctx.db.patch(id, { categorie });
+        updated++;
+      }
+    }
+    return { updated };
+  },
+});
+

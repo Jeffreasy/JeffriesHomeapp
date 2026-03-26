@@ -16,6 +16,7 @@ import { handleDienstenOpvragen, handleSalarisOpvragen } from "./schedule";
 import {
   handleSaldoOpvragen, handleTransactiesZoeken, handleUitgavenOverzicht,
   handleMaandVergelijken, handleVasteLastenAnalyse, handleCategorieWijzigen,
+  handleBulkCategoriseren, handleOngelabeldAnalyse,
 } from "./finance";
 import {
   handleAfspraakBewerken, handleAfspraakMaken, handleAfspraakVerwijderen, handleAfsprakenOpvragen,
@@ -52,6 +53,8 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   maandVergelijken:    handleMaandVergelijken,
   vasteLastenAnalyse:  handleVasteLastenAnalyse,
   categorieWijzigen:   handleCategorieWijzigen,
+  bulkCategoriseren:   handleBulkCategoriseren,
+  ongelabeldAnalyse:   handleOngelabeldAnalyse,
 
   // Calendar
   afspraakMaken:       handleAfspraakMaken,

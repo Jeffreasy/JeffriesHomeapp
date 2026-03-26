@@ -79,10 +79,10 @@ export const IBAN_LABELS: Record<string, string> = {
 };
 
 export const DB_CATEGORIEEN = [
-  "Boodschappen", "Brandstof", "Crypto", "Fastfood", "Gaming",
-  "Interne Overboeking", "Online Winkelen", "SaaS", "SaaS Abonnementen",
-  "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen",
-  "Vaste Lasten", "Verzekeringen", "Zorgverzekering",
+  "Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Fastfood", "Gaming",
+  "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk",
+  "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom",
+  "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering",
 ] as const;
 
 

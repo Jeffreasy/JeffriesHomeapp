@@ -42,26 +42,51 @@ const EIGEN_REKENINGEN = new Set([
 // ─── Auto-categorisatie ──────────────────────────────────────────────────────
 
 const CATEGORIE_REGELS: Array<{ pattern: RegExp; categorie: string }> = [
-  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall/i, categorie: "Gaming" },
-  { pattern: /videoland|netflix|spotify|apple\.com|disney|videoland/i, categorie: "Streaming" },
-  { pattern: /btc\s*direct|bitvavo|coinbase|kraken|skrill/i,         categorie: "Crypto" },
-  { pattern: /figma|canva|notion|reclaim|todoist|adobe/i,            categorie: "SaaS" },
-  { pattern: /parfumado|bol\.com|amazon|zalando|coolblue/i,          categorie: "Online Winkelen" },
-  { pattern: /univé|asr|nationale.nederlanden|cz\s|vgz|menzis/i,    categorie: "Verzekeringen" },
-  { pattern: /zorgverzekering|zorgpremie|eigen\s*risico/i,           categorie: "Zorgverzekering" },
-  { pattern: /odido|t-mobile|kpn|vodafone|tele2/i,                  categorie: "Telecom" },
-  { pattern: /shell|bp|supertank|tango|tamoil|tinq/i,               categorie: "Brandstof" },
-  { pattern: /ns\.nl|connexxion|arriva|ov-chipkaart|ov\s*betalen/i,  categorie: "OV" },
-  { pattern: /jumbo|albert\s*heijn|ah\s*\d|lidl|aldi|dirk/i,        categorie: "Boodschappen" },
-  { pattern: /mcdonald|kdl\s*bv|burger\s*king|kfc|subway|dominos/i, categorie: "Fastfood" },
-  { pattern: /basic.?fit|fitness|sportschool/i,                      categorie: "Sport" },
-  { pattern: /s\s*heeren\s*loo|heeren\s*loo|zorggroep/i,             categorie: "Salaris" },
-  { pattern: /zorgtoeslag|belastingdienst|toeslagen/i,               categorie: "Toeslagen" },
-  { pattern: /siekmans/i,                                            categorie: "Vaste Lasten" },
+  // Gaming
+  { pattern: /kilo\s*code|blizzard|steam|epic\s*games|paymentwall|battle\.?net|xsolla|g2a\.?com|codesdirect/i, categorie: "Gaming" },
+  // Streaming
+  { pattern: /videoland|netflix|spotify|apple\.com|disney|prime\s*video/i, categorie: "Streaming" },
+  // Crypto
+  { pattern: /btc\s*direct|bitvavo|coinbase|kraken|skrill/i, categorie: "Crypto" },
+  // SaaS
+  { pattern: /figma|canva|notion|reclaim|todoist|adobe|openai|github|vercel/i, categorie: "SaaS" },
+  // Online Winkelen
+  { pattern: /parfumado|bol\.com|amazon|zalando|coolblue|creative\s*fabrica|bitsandparts/i, categorie: "Online Winkelen" },
+  // Verzekeringen (+ Unive zonder accent)
+  { pattern: /univ[eé]|asr|nationale.nederlanden|cz\s|vgz|menzis/i, categorie: "Verzekeringen" },
+  { pattern: /zorgverzekering|zorgpremie|eigen\s*risico/i, categorie: "Zorgverzekering" },
+  // Telecom
+  { pattern: /odido|t-mobile|kpn|vodafone|tele2|cm\.com/i, categorie: "Telecom" },
+  // Brandstof (+ Texaco; Supertank handled separately — amount-dependent)
+  { pattern: /shell|bp|tango|tamoil|tinq|texaco|total\s*energies/i, categorie: "Brandstof" },
+  // OV / Vervoer
+  { pattern: /ns\.nl|connexxion|arriva|ov-chipkaart|ov\s*betalen|parkeer|park\.\s*/i, categorie: "Vervoer" },
+  // Boodschappen (+ Supershop, Deka, Spar, Plus, Coop, Vomar)
+  { pattern: /jumbo|albert\s*heijn|ah\s*\w|lidl|aldi|dirk|supershop|deka\s*markt|spar\s|plus\s|coop\s|vomar/i, categorie: "Boodschappen" },
+  // Fastfood (+ Kwalitaria, Takeaway)
+  { pattern: /mcdonald|burger\s*king|kfc|subway|dominos|kwalitaria|takeaway|thuisbezorgd/i, categorie: "Fastfood" },
+  // Sport
+  { pattern: /basic.?fit|fitness|sportschool/i, categorie: "Sport" },
+  // Salaris
+  { pattern: /s\s*heeren\s*loo|heeren\s*loo|zorggroep/i, categorie: "Salaris" },
+  // Toeslagen
+  { pattern: /zorgtoeslag|belastingdienst|toeslagen/i, categorie: "Toeslagen" },
+  // Vaste Lasten
+  { pattern: /siekmans|gemeente|waterschap|eneco|vattenfall|greenchoice/i, categorie: "Vaste Lasten" },
+  // Geldopname
+  { pattern: /geldmaat|geldautomaat|atm/i, categorie: "Geldopname" },
+  // Coffeeshop
+  { pattern: /sh\s*zwolle|kdl\s*bv/i, categorie: "Coffeeshop" },
 ];
 
-function autoCategoriseer(naam?: string, omschrijving?: string): string | undefined {
+function autoCategoriseer(naam?: string, omschrijving?: string, bedrag?: number): string | undefined {
   const haystack = `${naam ?? ""} ${omschrijving ?? ""}`;
+
+  // Edge case: Supertank — under €25 is shop/fastfood, above is fuel
+  if (/supertank/i.test(haystack)) {
+    return (bedrag !== undefined && Math.abs(bedrag) < 25) ? "Fastfood" : "Brandstof";
+  }
+
   for (const r of CATEGORIE_REGELS) {
     if (r.pattern.test(haystack)) return r.categorie;
   }
@@ -191,7 +216,7 @@ export async function parseRabobankCsv(file: File): Promise<ParseResult> {
       oorspBedrag:          oorspRaw !== 0 ? oorspRaw : undefined,
       oorspMunt:            row["Oorspr munt"]?.trim() || undefined,
       isInterneOverboeking: isIntern,
-      categorie:            isIntern ? "Interne Overboeking" : autoCategoriseer(naam, omschrijving),
+      categorie:            isIntern ? "Interne Overboeking" : autoCategoriseer(naam, omschrijving, parseNlBedrag(row["Bedrag"] ?? "")),
     };
   });
 

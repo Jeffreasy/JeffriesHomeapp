@@ -26,10 +26,11 @@ const CODE_LABELS: Record<string, string> = {
 };
 
 const CATEGORIE_OPTIES = [
-  "Gaming", "Streaming", "Crypto", "SaaS", "Online Winkelen",
-  "Verzekeringen", "Zorgverzekering", "Telecom", "Brandstof", "OV",
-  "Boodschappen", "Fastfood", "Sport", "Salaris", "Toeslagen",
-  "Vaste Lasten", "Overig",
+  "Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Fastfood",
+  "Gaming", "Geldopname", "Online Winkelen", "Persoonlijk",
+  "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming",
+  "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer",
+  "Verzekeringen", "Zorgverzekering", "Overig",
 ];
 
 // ─── Inline categorie-editor ─────────────────────────────────────────────────

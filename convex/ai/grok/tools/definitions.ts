@@ -228,7 +228,7 @@ export const TOOLS = [
         type: "object",
         properties: {
           zoekterm: { type: "string", description: "Zoekterm (doorzoekt tegenpartij, omschrijving)" },
-          categorie: { type: "string", description: "Optioneel: filter op categorie", enum: ["Boodschappen", "Brandstof", "Crypto", "Fastfood", "Gaming", "Interne Overboeking", "Online Winkelen", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Verzekeringen", "Zorgverzekering"] },
+          categorie: { type: "string", description: "Optioneel: filter op categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
           rekening: { type: "string", description: "Optioneel: filter op rekening ('betaal' of 'spaar')", enum: ["betaal", "spaar"] },
           maxAantal: { type: "number", description: "Max resultaten (default 15)" },
         },
@@ -327,7 +327,7 @@ BELANGRIJK — Professioneel Template Protocol:
         properties: {
           maand: { type: "number", description: "Maandnummer (1-12)" },
           jaar: { type: "number", description: "Jaar (default: huidig jaar)" },
-          categorie: { type: "string", description: "Optioneel: filter op specifieke categorie", enum: ["Boodschappen", "Brandstof", "Crypto", "Fastfood", "Gaming", "Interne Overboeking", "Online Winkelen", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Verzekeringen", "Zorgverzekering"] },
+          categorie: { type: "string", description: "Optioneel: filter op specifieke categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
           rekening: { type: "string", description: "Optioneel: filter op rekening ('betaal' of 'spaar')", enum: ["betaal", "spaar"] },
           top: { type: "number", description: "Aantal top uitgaven om te tonen (default 10)" },
         },
@@ -380,14 +380,41 @@ BELANGRIJK — Professioneel Template Protocol:
     type: "function" as const,
     function: {
       name: "categorieWijzigen",
-      description: "Wijzig de categorie van een transactie. Zoek de transactie op basis van tegenpartij of omschrijving en ken een nieuwe categorie toe. Gebruik dit als de gebruiker een transactie wil herindelen of een categorie wil toewijzen.",
+      description: "Wijzig de categorie van een enkele transactie. Zoek de transactie op basis van tegenpartij of omschrijving en ken een nieuwe categorie toe. Gebruik dit als de gebruiker een specifieke transactie wil herindelen.",
       parameters: {
         type: "object",
         properties: {
           zoekterm: { type: "string", description: "Zoekterm om de transactie te vinden (tegenpartij of omschrijving)" },
-          categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Crypto", "Fastfood", "Gaming", "Interne Overboeking", "Online Winkelen", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Verzekeringen", "Zorgverzekering"] },
+          categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
         },
         required: ["zoekterm", "categorie"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "bulkCategoriseren",
+      description: "Wijzig de categorie van ALLE transacties van een bepaalde tegenpartij in één keer. Gebruik dit als de gebruiker zegt 'label alle Texaco als Brandstof' of 'alle AH als Boodschappen'.",
+      parameters: {
+        type: "object",
+        properties: {
+          tegenpartij: { type: "string", description: "Naam van de tegenpartij (bijv. 'Texaco', 'Albert Heijn')" },
+          categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Vervoer", "Verzekeringen", "Zorgverzekering"] },
+        },
+        required: ["tegenpartij", "categorie"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "ongelabeldAnalyse",
+      description: "Analyseer transacties zonder categorie. Toont patronen (gegroepeerd per tegenpartij), aantallen, en AI-suggesties voor categorieën. Gebruik dit als de gebruiker vraagt 'welke transacties missen een label', 'hoeveel zijn ongelabeld', of 'help me categoriseren'.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
       },
     },
   },

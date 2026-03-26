@@ -305,3 +305,103 @@ export async function handleCategorieWijzigen(ctx: any, args: Record<string, unk
     return JSON.stringify({ error: `Categorie wijzigen mislukt: ${(err as Error).message}` });
   }
 }
+
+// ─── 7. Bulk Categoriseren ───────────────────────────────────────────────────
+
+export async function handleBulkCategoriseren(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
+  try {
+    const tegenpartij = (args.tegenpartij as string).toLowerCase();
+    const categorie = args.categorie as string;
+
+    const allTxs = await ctx.runQuery(internal.transactions.listInternal, { userId });
+    const matches = allTxs.filter((tx: any) =>
+      tx.tegenpartijNaam?.toLowerCase().includes(tegenpartij)
+    );
+
+    if (matches.length === 0) {
+      return JSON.stringify({ error: `Geen transacties gevonden voor "${args.tegenpartij}"` });
+    }
+
+    const ids = matches.map((tx: any) => tx._id);
+    const result = await ctx.runMutation(internal.transactions.bulkUpdateCategorieInternal, {
+      userId, ids, categorie,
+    });
+
+    return JSON.stringify({
+      ok: true,
+      beschrijving: `${result.updated} transacties van "${args.tegenpartij}" gecategoriseerd als "${categorie}"`,
+      bijgewerkt: result.updated,
+      totaalGevonden: matches.length,
+    });
+  } catch (err) {
+    return JSON.stringify({ error: `Bulk categoriseren mislukt: ${(err as Error).message}` });
+  }
+}
+
+// ─── 8. Ongelabeld Analyse ───────────────────────────────────────────────────
+
+export async function handleOngelabeldAnalyse(ctx: any, _args: Record<string, unknown>, userId: string): Promise<string> {
+  try {
+    const allTxs = await ctx.runQuery(internal.transactions.listInternal, { userId });
+    const ongelabeld = allTxs.filter((tx: any) => !tx.categorie);
+
+    if (ongelabeld.length === 0) {
+      return JSON.stringify({ bericht: "Alle transacties hebben een categorie! 🎉", ongelabeld: 0, totaal: allTxs.length });
+    }
+
+    // Groepeer op tegenpartij
+    const partijMap = new Map<string, { count: number; totaal: number; voorbeeld: string }>();
+    for (const tx of ongelabeld) {
+      const naam = tx.tegenpartijNaam ?? "Onbekend";
+      const prev = partijMap.get(naam);
+      if (!prev) {
+        partijMap.set(naam, { count: 1, totaal: tx.bedrag, voorbeeld: tx.omschrijving?.slice(0, 60) ?? "" });
+      } else {
+        prev.count++;
+        prev.totaal = Math.round((prev.totaal + tx.bedrag) * 100) / 100;
+      }
+    }
+
+    const patronen = Array.from(partijMap.entries())
+      .sort(([, a], [, b]) => b.count - a.count)
+      .slice(0, 20)
+      .map(([naam, data]) => ({
+        tegenpartij: naam,
+        aantalTransacties: data.count,
+        totaalBedrag: data.totaal,
+        voorbeeldOmschrijving: data.voorbeeld,
+        suggestie: suggereerCategorie(naam, data.voorbeeld),
+      }));
+
+    return JSON.stringify({
+      totaalOngelabeld: ongelabeld.length,
+      totaalTransacties: allTxs.length,
+      percentage: Math.round((ongelabeld.length / allTxs.length) * 100),
+      patronen,
+      tip: "Gebruik 'label alle [tegenpartij] als [categorie]' om in bulk te categoriseren.",
+    });
+  } catch (err) {
+    return JSON.stringify({ error: `Ongelabeld analyse mislukt: ${(err as Error).message}` });
+  }
+}
+
+// Simpele suggestie-engine op basis van bekende patronen
+function suggereerCategorie(naam: string, omschrijving: string): string | null {
+  const haystack = `${naam} ${omschrijving}`.toLowerCase();
+  const hints: Array<{ pattern: RegExp; categorie: string }> = [
+    { pattern: /texaco|shell|bp|tango|tinq|tankstation/i, categorie: "Brandstof" },
+    { pattern: /battle\.?net|steam|xsolla|g2a|gaming|playstation|xbox|codesdirect/i, categorie: "Gaming" },
+    { pattern: /tikkie|betaalverzoek/i, categorie: "Persoonlijk" },
+    { pattern: /albert|ah\s|jumbo|lidl|supershop|boodschap/i, categorie: "Boodschappen" },
+    { pattern: /univ[eé]|asr|verzeker/i, categorie: "Verzekeringen" },
+    { pattern: /geldmaat|geldautomaat/i, categorie: "Geldopname" },
+    { pattern: /mcdonald|kfc|burger\s*king|kwalitaria|takeaway/i, categorie: "Fastfood" },
+    { pattern: /sh\s*zwolle|kdl\s*bv|coffeeshop/i, categorie: "Coffeeshop" },
+    { pattern: /cm\.com|odido|kpn/i, categorie: "Telecom" },
+    { pattern: /creative\s*fabrica|bol\.com|amazon|bitsandparts/i, categorie: "Online Winkelen" },
+  ];
+  for (const h of hints) {
+    if (h.pattern.test(haystack)) return h.categorie;
+  }
+  return null;
+}
