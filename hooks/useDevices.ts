@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery as useConvexQuery } from "convex/react";
+import { useQuery as useConvexQuery, useMutation as useConvexMutation } from "convex/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/convex/_generated/api";
 import { devicesApi, type Device, type DeviceCommand } from "@/lib/api";
@@ -53,23 +53,28 @@ export function useDevices() {
   };
 }
 
-// ─── Lamp Command (still via FastAPI — needs local network for UDP) ────────────
+// ─── Lamp Command (via Convex queue → local bridge picks up) ──────────────────
 
 export function useLampCommand() {
-  const queryClient = useQueryClient();
+  const queueCmd = useConvexMutation(api.deviceCommands.queueForUser);
 
-  return useMutation({
-    mutationFn: ({ id, cmd }: { id: string; cmd: DeviceCommand }) =>
-      devicesApi.command(id, cmd),
-
-    onError: (err) => {
-      console.warn("[LampCommand] FastAPI onbereikbaar:", err);
+  return {
+    mutate: ({ id, cmd }: { id: string; cmd: DeviceCommand }) => {
+      queueCmd({
+        deviceId: id,
+        command: {
+          on:                cmd.on,
+          brightness:        cmd.brightness,
+          color_temp_mireds: cmd.color_temp_mireds,
+          r:                 cmd.r,
+          g:                 cmd.g,
+          b:                 cmd.b,
+          scene_id:          cmd.scene_id,
+        },
+      }).catch((err: unknown) => console.warn("[LampCommand] queue failed:", err));
     },
-
-    onSettled: () => {
-      // Don't invalidate — Convex provides real-time updates
-    },
-  });
+    isPending: false,
+  };
 }
 
 // ─── Device Update (rename, room assign) ─────────────────────────────────────

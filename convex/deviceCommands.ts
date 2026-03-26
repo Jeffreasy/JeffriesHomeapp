@@ -42,6 +42,26 @@ export const queueCommand = mutation({
   },
 });
 
+/** Auth-aware: queue commando vanuit de web-UI. */
+export const queueForUser = mutation({
+  args: {
+    deviceId: v.optional(v.string()),
+    command:  v.object(commandShape),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Niet ingelogd");
+    return ctx.db.insert("deviceCommands", {
+      userId:    identity.subject,
+      deviceId:  args.deviceId,
+      command:   args.command,
+      status:    "pending",
+      bron:      "web-ui",
+      createdAt: new Date().toISOString(),
+    });
+  },
+});
+
 /** Haal pending commands op (voor lokale bridge polling). */
 export const listPending = query({
   args: {},
