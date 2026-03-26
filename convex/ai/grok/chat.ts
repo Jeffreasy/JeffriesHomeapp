@@ -121,12 +121,12 @@ export const chat = action({
               };
             }
             const toolStart = Date.now();
-            const result = await executeTool(ctx, toolCall.function.name, toolArgs, userId || OWNER_USER_ID);
+            const toolResult = await executeTool(ctx, toolCall.function.name, toolArgs, userId || OWNER_USER_ID);
             const toolDuration = Date.now() - toolStart;
             toolsUsed.push(`${toolCall.function.name}(${toolDuration}ms)`);
             return {
               role: "tool" as const,
-              content: result,
+              content: toolResult,
               tool_call_id: toolCall.id,
             };
           })

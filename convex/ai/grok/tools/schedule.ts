@@ -6,10 +6,7 @@
  */
 
 import { api } from "../../../_generated/api";
-import { getWeekNumber } from "../types";
-
-const WEEKDAYS = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
-const MAAND_NAMEN = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
+import { getWeekNumber, WEEKDAYS, MAAND_NAMEN } from "../types";
 
 export async function handleDienstenOpvragen(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {

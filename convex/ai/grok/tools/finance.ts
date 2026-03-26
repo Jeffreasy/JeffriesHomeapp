@@ -6,6 +6,7 @@
  */
 
 import { internal } from "../../../_generated/api";
+import { MAAND_NAMEN } from "../types";
 
 export async function handleTransactiesZoeken(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
@@ -42,8 +43,6 @@ export async function handleTransactiesZoeken(ctx: any, args: Record<string, unk
     return JSON.stringify({ error: `Transacties zoeken mislukt: ${(err as Error).message}` });
   }
 }
-
-const MAAND_NAMEN = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
 
 export async function handleUitgavenOverzicht(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {

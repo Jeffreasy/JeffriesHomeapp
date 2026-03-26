@@ -5,9 +5,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { JEFFREY_USER_ID } from "../../lib/config";
+
 export const GROK_API_URL = "https://api.x.ai/v1/chat/completions";
 export const GROK_MODEL   = "grok-4-1-fast";
-export const OWNER_USER_ID = "user_3Ax561ZvuSkGtWpKFooeY65HNtY"; // fallback
+export const OWNER_USER_ID = JEFFREY_USER_ID;
 export const MAX_TOOL_ROUNDS = 5;
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -63,3 +65,9 @@ export function getWeekNumber(d: Date): number {
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
+
+// ─── Shared Constants ────────────────────────────────────────────────────────
+
+export const MAAND_NAMEN = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
+export const WEEKDAYS = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
+

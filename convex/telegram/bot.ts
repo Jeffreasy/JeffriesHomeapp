@@ -11,8 +11,9 @@ import { action, internalAction } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
 import { sendMessage, sendTyping, setWebhook as tgSetWebhook, getMe, getFile, downloadFile, transcribeVoice } from "./api";
+import { JEFFREY_USER_ID } from "../lib/config";
 
-const OWNER_USER_ID = "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
+const OWNER_USER_ID = JEFFREY_USER_ID;
 
 // ─── Commando → Agent mapping ────────────────────────────────────────────────
 
