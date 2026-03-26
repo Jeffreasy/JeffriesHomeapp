@@ -85,6 +85,12 @@ export const listPaginated = query({
     ibanFilter:       v.optional(v.string()),
     maandFilter:      v.optional(v.string()), // "YYYY-MM"
     zoekterm:         v.optional(v.string()),
+    categorieFilter:  v.optional(v.string()),
+    richting:         v.optional(v.string()), // "in" | "uit"
+    minBedrag:        v.optional(v.number()),
+    maxBedrag:        v.optional(v.number()),
+    datumVan:         v.optional(v.string()), // "YYYY-MM-DD"
+    datumTot:         v.optional(v.string()), // "YYYY-MM-DD"
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -99,11 +105,21 @@ export const listPaginated = query({
       rekeningIban: string;
       tegenpartijNaam?: string;
       omschrijving: string;
+      bedrag: number;
+      categorie?: string;
+      datum: string;
     }) => {
       if (args.excludeIntern    && t.isInterneOverboeking)             return false;
       if (args.onlyStorneringen && t.code !== "st")                     return false;
       if (args.codeFilter       && t.code !== args.codeFilter)          return false;
       if (args.ibanFilter       && t.rekeningIban !== args.ibanFilter)  return false;
+      if (args.categorieFilter  && t.categorie !== args.categorieFilter) return false;
+      if (args.richting === "in"  && t.bedrag <= 0)                     return false;
+      if (args.richting === "uit" && t.bedrag >= 0)                     return false;
+      if (args.minBedrag !== undefined && Math.abs(t.bedrag) < args.minBedrag) return false;
+      if (args.maxBedrag !== undefined && Math.abs(t.bedrag) > args.maxBedrag) return false;
+      if (args.datumVan && t.datum < args.datumVan)                     return false;
+      if (args.datumTot && t.datum > args.datumTot)                     return false;
       if (zoek) {
         const naam   = (t.tegenpartijNaam ?? "").toLowerCase();
         const omschr = t.omschrijving.toLowerCase();
@@ -112,12 +128,13 @@ export const listPaginated = query({
       return true;
     };
 
-    // ─── Pad A: maandfilter actief ───────────────────────────────────────────
-    // Gebruik datum-index om direct het juiste datumbereik op te halen.
-    // Geen paginering nodig; een maand heeft maximaal ~150 transacties.
-    if (args.maandFilter) {
-      const vanDatum = args.maandFilter + "-01";
-      const totDatum = args.maandFilter + "-31"; // ISO-string vergelijking klopt t/m de 31e
+    // ─── Pad A: datumbereik of maandfilter actief ─────────────────────────────
+    const effectiefVan = args.datumVan ?? (args.maandFilter ? args.maandFilter + "-01" : undefined);
+    const effectiefTot = args.datumTot ?? (args.maandFilter ? args.maandFilter + "-31" : undefined);
+
+    if (effectiefVan || effectiefTot) {
+      const vanDatum = effectiefVan ?? "0000-00-00";
+      const totDatum = effectiefTot ?? "9999-99-99";
 
       const txs = await ctx.db
         .query("transactions")
@@ -134,10 +151,9 @@ export const listPaginated = query({
       };
     }
 
-    // ─── Pad B: geen maandfilter → gepagineerd ───────────────────────────────
-    // Voor zoekterm en andere filters halen we een grotere batch op zodat de kans
-    // op een lege pagina na filtering klein is.
-    const batchSize = zoek || args.onlyStorneringen ? 200 : args.numItems;
+    // ─── Pad B: geen datumfilter → gepagineerd ───────────────────────────────
+    const hasHeavyFilter = zoek || args.onlyStorneringen || args.categorieFilter || args.richting;
+    const batchSize = hasHeavyFilter ? 200 : args.numItems;
 
     const result = await ctx.db
       .query("transactions")
@@ -165,22 +181,30 @@ export const listPaginated = query({
  * kasstromen maar WEL in het bankbalans. Wij moeten saldoNaTrn gebruiken.
  */
 export const getStats = query({
-  args: { ibanFilter: v.optional(v.string()) },
+  args: {
+    ibanFilter:  v.optional(v.string()),
+    jaarFilter:  v.optional(v.string()), // "2025" | "2026"
+  },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return null;
     const userId = identity.subject;
 
-    // Haal alle transacties 1x op (geen dubbele scan)
+    // Haal alle transacties 1x op
     const alleTxs = await ctx.db
       .query("transactions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
     // Filter op IBAN als geselecteerd
-    const txs = args.ibanFilter
+    let txs = args.ibanFilter
       ? alleTxs.filter((t) => t.rekeningIban === args.ibanFilter)
       : alleTxs;
+
+    // Filter op jaar als geselecteerd
+    if (args.jaarFilter) {
+      txs = txs.filter((t) => t.datum.startsWith(args.jaarFilter!));
+    }
 
     const extern = txs.filter((t) => !t.isInterneOverboeking);
 

@@ -12,6 +12,13 @@ export type TransactionFilter = {
   ibanFilter?:       string;
   maandFilter?:      string; // "YYYY-MM"
   zoekterm?:         string;
+  categorieFilter?:  string;
+  richting?:         string; // "in" | "uit"
+  minBedrag?:        number;
+  maxBedrag?:        number;
+  datumVan?:         string; // "YYYY-MM-DD"
+  datumTot?:         string; // "YYYY-MM-DD"
+  jaarFilter?:       string; // "2025" | "2026"
 };
 
 const PAGE_SIZE = 50;
@@ -20,8 +27,7 @@ export function useTransactions(filter: TransactionFilter = {}) {
   const [cursor, setCursor] = useState<string | null>(null);
   const deferredZoek = useDeferredValue(filter.zoekterm ?? "");
 
-  // ⚠️ BUGFIX: Cursor MOET gereset worden bij elke filterwijziging.
-  // Anders pagineer je door de verkeerde dataset heen.
+  // Cursor reset bij elke filterwijziging
   useEffect(() => {
     setCursor(null);
   }, [
@@ -30,6 +36,13 @@ export function useTransactions(filter: TransactionFilter = {}) {
     filter.codeFilter,
     filter.ibanFilter,
     filter.maandFilter,
+    filter.categorieFilter,
+    filter.richting,
+    filter.minBedrag,
+    filter.maxBedrag,
+    filter.datumVan,
+    filter.datumTot,
+    filter.jaarFilter,
     deferredZoek,
   ]);
 
@@ -42,11 +55,17 @@ export function useTransactions(filter: TransactionFilter = {}) {
     ibanFilter:       filter.ibanFilter,
     maandFilter:      filter.maandFilter,
     zoekterm:         deferredZoek.trim() || undefined,
+    categorieFilter:  filter.categorieFilter,
+    richting:         filter.richting,
+    minBedrag:        filter.minBedrag,
+    maxBedrag:        filter.maxBedrag,
+    datumVan:         filter.jaarFilter ? filter.datumVan ?? `${filter.jaarFilter}-01-01` : filter.datumVan,
+    datumTot:         filter.jaarFilter ? filter.datumTot ?? `${filter.jaarFilter}-12-31` : filter.datumTot,
   });
 
-  // Stats zijn gefilterd op geselecteerde IBAN voor correcte grafieken + totalen
   const stats = useQuery(api.transactions.getStats, {
     ibanFilter: filter.ibanFilter,
+    jaarFilter: filter.jaarFilter,
   });
 
   const importBatch     = useMutation(api.transactions.importBatch);

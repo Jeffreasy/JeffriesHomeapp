@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useTransactions }  from "@/hooks/useTransactions";
 import { CsvUploader }      from "@/components/finance/CsvUploader";
 import { TransactionList }  from "@/components/finance/TransactionList";
+import { FilterPanel }      from "@/components/finance/FilterPanel";
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip,
@@ -14,6 +15,7 @@ import {
   RefreshCw, Search, X, Calendar, CreditCard,
   PieChart as PieChartIcon, BarChart3, Wallet, Hash,
   ArrowUpRight, ArrowDownRight, Receipt, ShoppingBag,
+  CalendarDays,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -187,18 +189,27 @@ function SectionHeader({ icon: Icon, title, subtitle }: {
 // ─── Finance Dashboard ────────────────────────────────────────────────────────
 
 export default function FinancePage() {
-  const [ibanFilter,       setIbanFilter]       = useState<string | undefined>();
-  const [excludeIntern,    setExcludeIntern]    = useState(true);
-  const [onlyStorneringen, setOnlyStorneringen] = useState(false);
-  const [maandFilter,      setMaandFilter]      = useState<string | undefined>();
-  const [zoekterm,         setZoekterm]         = useState("");
-  const [activeCat,        setActiveCat]        = useState<string | undefined>();
-  const [chartView,        setChartView]        = useState<"saldo" | "inuit">("saldo");
+  const [ibanFilter,  setIbanFilter]  = useState<string | undefined>();
+  const [zoekterm,    setZoekterm]    = useState("");
+  const [chartView,   setChartView]   = useState<"saldo" | "inuit">("saldo");
+  const [jaarFilter,  setJaarFilter]  = useState<string>("2026");
+  const [filters, setFilters] = useState({
+    excludeIntern: true,
+    onlyStorneringen: false,
+    maandFilter: undefined as string | undefined,
+    categorieFilter: undefined as string | undefined,
+    richting: undefined as string | undefined,
+    codeFilter: undefined as string | undefined,
+    minBedrag: undefined as number | undefined,
+    maxBedrag: undefined as number | undefined,
+    datumVan: undefined as string | undefined,
+    datumTot: undefined as string | undefined,
+  });
 
   const {
     transactions, stats, totalCount, isLoading, isSearching,
     isDone, loadMore, updateCategorie,
-  } = useTransactions({ ibanFilter, excludeIntern, onlyStorneringen, maandFilter, zoekterm });
+  } = useTransactions({ ibanFilter, zoekterm, jaarFilter: jaarFilter || undefined, ...filters });
 
   const handleCategorie = useCallback(
     (id: Id<"transactions">, cat: string | undefined) => updateCategorie(id, cat),
@@ -207,14 +218,26 @@ export default function FinancePage() {
 
   const handleIbanTab = (iban: string | undefined) => {
     setIbanFilter(iban);
-    setMaandFilter(undefined);
-    setOnlyStorneringen(false);
-    setActiveCat(undefined);
+    setFilters((f) => ({ ...f, maandFilter: undefined, onlyStorneringen: false, categorieFilter: undefined }));
+  };
+
+  const updateFilters = (partial: Partial<typeof filters>) => {
+    setFilters((f) => ({ ...f, ...partial }));
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      excludeIntern: true, onlyStorneringen: false,
+      maandFilter: undefined, categorieFilter: undefined,
+      richting: undefined, codeFilter: undefined,
+      minBedrag: undefined, maxBedrag: undefined,
+      datumVan: undefined, datumTot: undefined,
+    });
+    setZoekterm("");
   };
 
   const toggleCategoryFilter = (cat: string) => {
-    setActiveCat((prev) => (prev === cat ? undefined : cat));
-    setZoekterm(activeCat === cat ? "" : cat);
+    setFilters((f) => ({ ...f, categorieFilter: f.categorieFilter === cat ? undefined : cat }));
   };
 
   return (
@@ -233,6 +256,20 @@ export default function FinancePage() {
           </div>
         </div>
         <div className="finance-import"><CsvUploader /></div>
+      </div>
+
+      {/* ─── Jaar Tabs ────────────────────────────────────────────────── */}
+      <div className="jaar-tabs">
+        {["2026", "2025", ""].map((jaar) => (
+          <button
+            key={jaar || "all"}
+            className={`jaar-tab ${jaarFilter === jaar ? "jaar-tab--active" : ""}`}
+            onClick={() => setJaarFilter(jaar)}
+          >
+            <CalendarDays size={14} />
+            {jaar || "Alles"}
+          </button>
+        ))}
       </div>
 
       {/* ─── IBAN Tabs ───────────────────────────────────────────────────── */}
@@ -265,8 +302,8 @@ export default function FinancePage() {
           <AlertTriangle size={16} />
           <span><strong>{stats.storneringen} stornering(en)</strong> gevonden</span>
           <button className="stornering-banner__link"
-            onClick={() => setOnlyStorneringen((v) => !v)}>
-            {onlyStorneringen ? "Toon alles" : "Toon alleen storneringen"}
+            onClick={() => updateFilters({ onlyStorneringen: !filters.onlyStorneringen })}>
+            {filters.onlyStorneringen ? "Toon alles" : "Toon alleen storneringen"}
           </button>
         </motion.div>
       )}
@@ -419,7 +456,7 @@ export default function FinancePage() {
                 count={cat.count}
                 percentage={cat.percentage}
                 onClick={() => toggleCategoryFilter(cat.categorie)}
-                isActive={activeCat === cat.categorie}
+                isActive={filters.categorieFilter === cat.categorie}
               />
             ))}
           </div>
@@ -448,35 +485,19 @@ export default function FinancePage() {
       {/* ─── Transactielijst ─────────────────────────────────────────────── */}
       <div className="finance-list-section glass">
         <div className="finance-list-header">
-          <SearchBar value={zoekterm} onChange={(v) => { setZoekterm(v); if (!v) setActiveCat(undefined); }} />
-          <div className="finance-filters">
-            {stats && stats.maanden.length > 0 && (
-              <div className="maand-select-wrap">
-                <Calendar size={14} className="maand-select__icon" />
-                <select className="maand-select" value={maandFilter ?? ""}
-                  onChange={(e) => setMaandFilter(e.target.value || undefined)}>
-                  <option value="">Alle maanden</option>
-                  {stats.maanden.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-            )}
-            <label className="finance-filter-toggle">
-              <input type="checkbox" checked={excludeIntern}
-                onChange={(e) => setExcludeIntern(e.target.checked)} />
-              Verberg intern
-            </label>
-            <label className="finance-filter-toggle">
-              <input type="checkbox" checked={onlyStorneringen}
-                onChange={(e) => setOnlyStorneringen(e.target.checked)} />
-              Storneringen
-            </label>
-          </div>
+          <SearchBar value={zoekterm} onChange={setZoekterm} />
+          <FilterPanel
+            filters={filters}
+            onChange={updateFilters}
+            onReset={resetFilters}
+            availableMaanden={stats?.maanden}
+          />
         </div>
 
         <div className="finance-list-meta">
           {isLoading || isSearching
             ? <span className="finance-list-meta__loading"><RefreshCw size={13} className="spinner" /> Laden…</span>
-            : <span>{transactions.length.toLocaleString("nl")} transacties{maandFilter && ` in ${maandFilter}`}{zoekterm && ` voor "${zoekterm}"`}</span>
+            : <span>{transactions.length.toLocaleString("nl")} transacties{filters.maandFilter && ` in ${filters.maandFilter}`}{zoekterm && ` voor "${zoekterm}"`}</span>
           }
         </div>
 
