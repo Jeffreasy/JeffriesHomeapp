@@ -4,11 +4,24 @@ import { mutation, query, internalMutation } from "./_generated/server";
 // ─── Default state helper ─────────────────────────────────────────────────────
 const DEFAULT_STATE = { on: false, brightness: 100, color_temp: 4000, r: 0, g: 0, b: 0 };
 
-// ─── List all devices for a user ──────────────────────────────────────────────
+// ─── List all devices for a user (internal/legacy — takes explicit userId) ────
 export const list = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) =>
     ctx.db.query("devices").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+});
+
+// ─── List devices for authenticated user (frontend) ──────────────────────────
+export const listForUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    return ctx.db
+      .query("devices")
+      .withIndex("by_user", (q) => q.eq("userId", identity.subject))
+      .collect();
+  },
 });
 
 // ─── Get single device by v.id ───────────────────────────────────────────────

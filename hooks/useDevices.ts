@@ -1,24 +1,59 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery as useConvexQuery } from "convex/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/convex/_generated/api";
 import { devicesApi, type Device, type DeviceCommand } from "@/lib/api";
 
-// ─── Devices ──────────────────────────────────────────────────────────────────
+// ─── Map Convex camelCase → app snake_case Device interface ───────────────────
 
-export function useDevices() {
-  return useQuery({
-    queryKey: ["devices"],
-    queryFn: devicesApi.list,
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-    select: (data) =>
-      [...data].sort((a, b) =>
-        a.commissioned_at.localeCompare(b.commissioned_at)
-      ),
-  });
+type ConvexDevice = {
+  _id: string;
+  name: string;
+  deviceType: string;
+  roomId?: string;
+  ipAddress: string;
+  currentState: { on: boolean; brightness: number; color_temp: number; r: number; g: number; b: number };
+  status: "online" | "offline";
+  lastSeen?: string;
+  commissionedAt: string;
+  manufacturer?: string;
+  model?: string;
+};
+
+function toDevice(d: ConvexDevice): Device {
+  return {
+    id: d._id,
+    name: d.name,
+    device_type: d.deviceType,
+    room_id: d.roomId ?? null,
+    ip_address: d.ipAddress ?? null,
+    current_state: d.currentState,
+    status: d.status,
+    last_seen: d.lastSeen ?? null,
+    commissioned_at: d.commissionedAt,
+    manufacturer: d.manufacturer ?? null,
+    model: d.model ?? null,
+  };
 }
 
-// ─── Lamp Command (with optimistic update for on/off) ─────────────────────────
+// ─── Devices (Convex-first — works in prod without local FastAPI) ─────────────
+
+export function useDevices() {
+  const raw = useConvexQuery(api.devices.listForUser);
+
+  const devices = (raw ?? []).map(toDevice).sort((a, b) =>
+    a.commissioned_at.localeCompare(b.commissioned_at)
+  );
+
+  return {
+    data: devices,
+    isLoading: raw === undefined,
+    error: null as Error | null,
+  };
+}
+
+// ─── Lamp Command (still via FastAPI — needs local network for UDP) ────────────
 
 export function useLampCommand() {
   const queryClient = useQueryClient();
@@ -27,37 +62,12 @@ export function useLampCommand() {
     mutationFn: ({ id, cmd }: { id: string; cmd: DeviceCommand }) =>
       devicesApi.command(id, cmd),
 
-    // Optimistic update only for on/off — not for rapid color changes
-    onMutate: async ({ id, cmd }): Promise<{ prev: unknown }> => {
-      const isRapidChange =
-        cmd.r !== undefined ||
-        cmd.g !== undefined ||
-        cmd.b !== undefined ||
-        cmd.brightness !== undefined ||
-        cmd.color_temp_mireds !== undefined;
-
-      await queryClient.cancelQueries({ queryKey: ["devices"] });
-      const prev = queryClient.getQueryData(["devices"]);
-
-      if (!isRapidChange) {
-        queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
-          old?.map((d) =>
-            d.id === id
-              ? { ...d, current_state: { ...d.current_state, ...cmd } }
-              : d
-          )
-        );
-      }
-
-      return { prev };
-    },
-
-    onError: (_err, _vars, ctx: { prev: unknown } | undefined) => {
-      if (ctx?.prev) queryClient.setQueryData(["devices"], ctx.prev);
+    onError: (err) => {
+      console.warn("[LampCommand] FastAPI onbereikbaar:", err);
     },
 
     onSettled: () => {
-      // Don't invalidate after every rapid command to avoid flicker
+      // Don't invalidate — Convex provides real-time updates
     },
   });
 }
