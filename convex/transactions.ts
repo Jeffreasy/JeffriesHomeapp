@@ -240,35 +240,108 @@ export const getStats = query({
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([maand, { saldo }]) => ({ maand, saldo }));
 
-    // ─── Uitgaven per categorie ────────────────────────────────────────────────
-    const categorieMap = new Map<string, number>();
+    // ─── Uitgaven per categorie (with counts & percentage) ──────────────────────
+    const categorieMap = new Map<string, { bedrag: number; count: number }>();
     for (const t of extern) {
       if (t.bedrag >= 0) continue;
       const cat = t.categorie ?? "Overig";
-      categorieMap.set(cat, (categorieMap.get(cat) ?? 0) + Math.abs(t.bedrag));
+      const prev = categorieMap.get(cat) ?? { bedrag: 0, count: 0 };
+      categorieMap.set(cat, { bedrag: prev.bedrag + Math.abs(t.bedrag), count: prev.count + 1 });
     }
+    const totalUitAbs = Math.abs(totaalUit);
     const uitPerCategorie = Array.from(categorieMap.entries())
-      .sort(([, a], [, b]) => b - a)
-      .map(([categorie, bedrag]) => ({ categorie, bedrag: Math.round(bedrag * 100) / 100 }));
+      .sort(([, a], [, b]) => b.bedrag - a.bedrag)
+      .map(([categorie, { bedrag, count }]) => ({
+        categorie,
+        bedrag: Math.round(bedrag * 100) / 100,
+        count,
+        percentage: totalUitAbs > 0 ? Math.round((bedrag / totalUitAbs) * 1000) / 10 : 0,
+      }));
+
+    // ─── Inkomsten per categorie ─────────────────────────────────────────────
+    const inkomstMap = new Map<string, { bedrag: number; count: number }>();
+    for (const t of extern) {
+      if (t.bedrag <= 0) continue;
+      const cat = t.categorie ?? "Overig";
+      const prev = inkomstMap.get(cat) ?? { bedrag: 0, count: 0 };
+      inkomstMap.set(cat, { bedrag: prev.bedrag + t.bedrag, count: prev.count + 1 });
+    }
+    const inPerCategorie = Array.from(inkomstMap.entries())
+      .sort(([, a], [, b]) => b.bedrag - a.bedrag)
+      .map(([categorie, { bedrag, count }]) => ({
+        categorie,
+        bedrag: Math.round(bedrag * 100) / 100,
+        count,
+      }));
+
+    // ─── In/Uit per maand (for area chart) ───────────────────────────────────
+    const maandInUitMap = new Map<string, { inkomsten: number; uitgaven: number }>();
+    for (const t of extern) {
+      const maand = t.datum.slice(0, 7);
+      const prev = maandInUitMap.get(maand) ?? { inkomsten: 0, uitgaven: 0 };
+      if (t.bedrag > 0) prev.inkomsten += t.bedrag;
+      else prev.uitgaven += Math.abs(t.bedrag);
+      maandInUitMap.set(maand, prev);
+    }
+    const inUitPerMaand = Array.from(maandInUitMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([maand, { inkomsten, uitgaven }]) => ({
+        maand,
+        inkomsten: Math.round(inkomsten * 100) / 100,
+        uitgaven: Math.round(uitgaven * 100) / 100,
+        netto: Math.round((inkomsten - uitgaven) * 100) / 100,
+      }));
+
+    // ─── Top merchants ───────────────────────────────────────────────────────
+    const merchantMap = new Map<string, { bedrag: number; count: number }>();
+    for (const t of extern) {
+      if (t.bedrag >= 0 || !t.tegenpartijNaam) continue;
+      const naam = t.tegenpartijNaam;
+      const prev = merchantMap.get(naam) ?? { bedrag: 0, count: 0 };
+      merchantMap.set(naam, { bedrag: prev.bedrag + Math.abs(t.bedrag), count: prev.count + 1 });
+    }
+    const topMerchants = Array.from(merchantMap.entries())
+      .sort(([, a], [, b]) => b.bedrag - a.bedrag)
+      .slice(0, 10)
+      .map(([naam, { bedrag, count }]) => ({
+        naam,
+        bedrag: Math.round(bedrag * 100) / 100,
+        count,
+      }));
 
     // ─── Beschikbare maanden voor dropdown ────────────────────────────────────
     const maanden = Array.from(new Set(txs.map((t) => t.datum.slice(0, 7)))).sort();
 
+    // ─── Gemiddeld per maand ─────────────────────────────────────────────────
+    const aantalMaanden = Math.max(maanden.length, 1);
+    const gemiddeldUit = Math.round((Math.abs(totaalUit) / aantalMaanden) * 100) / 100;
+    const gemiddeldIn = Math.round((totaalIn / aantalMaanden) * 100) / 100;
+
     return {
-      // Kasstromen (EXCL. beginbalans — informatief)
+      // Kasstromen
       totaalIn:       Math.round(totaalIn  * 100) / 100,
       totaalUit:      Math.round(Math.abs(totaalUit) * 100) / 100,
       nettoStroom:    Math.round(nettoStroom * 100) / 100,
+      gemiddeldIn,
+      gemiddeldUit,
 
-      // Echte bankbalans (INCL. beginbalans)
+      // Echte bankbalans
       huidigSaldo,
       huidigSaldoPerIban,
+
+      // Categorieën
+      uitPerCategorie,
+      inPerCategorie,
+      aantalCategorieen: categorieMap.size,
+
+      // Grafieken
+      saldoPerMaand,
+      inUitPerMaand,
+      topMerchants,
 
       // Overige
       storneringen,
       aantalTxs:      txs.length,
-      saldoPerMaand,
-      uitPerCategorie,
       maanden,
       ibannen,
     };

@@ -99,9 +99,12 @@ export function TransactionList({ transactions, onCategorie, isDone, onLoadMore,
           <div key={tx._id}>
             {showDateHeader && (
               <div className="tx-date-header">
-                {new Date(tx.datum + "T00:00:00").toLocaleDateString("nl-NL", {
-                  weekday: "long", day: "numeric", month: "long",
-                })}
+                {(() => {
+                  const d = new Date(tx.datum + "T00:00:00");
+                  return isNaN(d.getTime())
+                    ? tx.datum
+                    : d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+                })()}
               </div>
             )}
             <div

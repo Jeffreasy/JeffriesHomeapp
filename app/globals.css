@@ -710,6 +710,225 @@ a,
   margin-left: 4px;
 }
 
+/* ─── Chart Toggle ──────────────────────────────────────────────────────────── */
+
+.chart-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.chart-toggles {
+  display: flex;
+  gap: 4px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+}
+.chart-toggle {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+.chart-toggle:hover { color: var(--color-text); background: rgba(255,255,255,0.06); }
+.chart-toggle--active {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* ─── Section Header ────────────────────────────────────────────────────────── */
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.section-header__icon { color: var(--color-primary); flex-shrink: 0; }
+.section-header__title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.section-header__sub {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+/* ─── Category Grid ─────────────────────────────────────────────────────────── */
+
+.category-section {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+}
+.category-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .category-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.category-card {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s;
+  overflow: hidden;
+  text-align: left;
+  font-family: var(--font-sans);
+  min-width: 0;
+  color: var(--color-text);
+}
+.category-card:hover {
+  border-color: var(--cat-color, var(--color-border-hover));
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
+}
+.category-card--active {
+  border-color: var(--cat-color, var(--color-primary));
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.1);
+}
+.category-card__bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 0 2px 0 0;
+  transition: width 0.4s ease;
+}
+.category-card__content {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.category-card__name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.category-card__amount {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.category-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--color-text-subtle);
+}
+
+/* ─── Merchant List ─────────────────────────────────────────────────────────── */
+
+.merchants-section {
+  padding: 20px;
+}
+.merchant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.merchant-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  transition: background 0.12s;
+  border-radius: var(--radius-sm);
+}
+.merchant-row:last-child { border-bottom: none; }
+.merchant-row:hover { background: rgba(255,255,255,0.03); }
+.merchant-rank {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.merchant-info {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.merchant-naam {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.merchant-count {
+  font-size: 0.7rem;
+  color: var(--color-text-subtle);
+  white-space: nowrap;
+}
+.merchant-bedrag {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* ─── Main chart wider ──────────────────────────────────────────────────────── */
+
+.finance-chart--main { grid-column: 1 / -1; }
+@media (min-width: 900px) {
+  .finance-charts { grid-template-columns: 1fr 320px; }
+  .finance-chart--main { grid-column: 1; }
+}
+
+/* ─── IBAN tab saldo ────────────────────────────────────────────────────────── */
+
+.iban-tab__saldo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-left: 4px;
+  opacity: 0.8;
+}
+
 /* ─── Migratie Banner ───────────────────────────────────────────────────────── */
 
 .migratie-banner {
