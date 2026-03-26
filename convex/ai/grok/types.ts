@@ -71,3 +71,18 @@ export function getWeekNumber(d: Date): number {
 export const MAAND_NAMEN = ["", "Januari", "Februari", "Maart", "April", "Mei", "Juni", "Juli", "Augustus", "September", "Oktober", "November", "December"];
 export const WEEKDAYS = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
 
+// ─── Finance Constants ───────────────────────────────────────────────────────
+
+export const IBAN_LABELS: Record<string, string> = {
+  "NL41RABO0348147740": "Spaarrekening",
+  "NL20RABO0198574215": "Betaalrekening",
+};
+
+export const DB_CATEGORIEEN = [
+  "Boodschappen", "Brandstof", "Crypto", "Fastfood", "Gaming",
+  "Interne Overboeking", "Online Winkelen", "SaaS", "SaaS Abonnementen",
+  "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen",
+  "Vaste Lasten", "Verzekeringen", "Zorgverzekering",
+] as const;
+
+

@@ -223,12 +223,13 @@ export const TOOLS = [
     type: "function" as const,
     function: {
       name: "transactiesZoeken",
-      description: "Doorzoek bank transacties op tegenpartij, omschrijving of categorie. Gebruik dit als de gebruiker vraagt naar specifieke uitgaven, betalingen, of transacties.",
+      description: "Doorzoek bank transacties op tegenpartij, omschrijving of categorie. Toont volledige details inclusief rekening, saldo, code en referentie. Gebruik dit als de gebruiker vraagt naar specifieke uitgaven, betalingen, of transacties.",
       parameters: {
         type: "object",
         properties: {
           zoekterm: { type: "string", description: "Zoekterm (doorzoekt tegenpartij, omschrijving)" },
-          categorie: { type: "string", description: "Optioneel: filter op categorie", enum: ["Boodschappen", "Vaste lasten", "Vrije tijd", "Abonnementen", "Vervoer", "Zorg", "Overig"] },
+          categorie: { type: "string", description: "Optioneel: filter op categorie", enum: ["Boodschappen", "Brandstof", "Crypto", "Fastfood", "Gaming", "Interne Overboeking", "Online Winkelen", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Verzekeringen", "Zorgverzekering"] },
+          rekening: { type: "string", description: "Optioneel: filter op rekening ('betaal' of 'spaar')", enum: ["betaal", "spaar"] },
           maxAantal: { type: "number", description: "Max resultaten (default 15)" },
         },
         required: ["zoekterm"],
@@ -320,16 +321,73 @@ BELANGRIJK — Professioneel Template Protocol:
     type: "function" as const,
     function: {
       name: "uitgavenOverzicht",
-      description: "Haal een volledig financieel overzicht op voor een specifieke maand. Toont totale inkomsten, uitgaven, netto resultaat, verdeling per categorie, en top uitgaven. Gebruik dit als de gebruiker vraagt naar uitgaven, financieel overzicht, of kosten van een maand.",
+      description: "Haal een volledig financieel overzicht op voor een specifieke maand. Toont inkomsten, uitgaven (exclusief interne overboekingen), netto resultaat, eindsaldo, categorie-verdeling, en top uitgaven. Gebruik dit als de gebruiker vraagt naar uitgaven, financieel overzicht, of kosten van een maand.",
       parameters: {
         type: "object",
         properties: {
           maand: { type: "number", description: "Maandnummer (1-12)" },
           jaar: { type: "number", description: "Jaar (default: huidig jaar)" },
-          categorie: { type: "string", description: "Optioneel: filter op specifieke categorie", enum: ["Boodschappen", "Vaste lasten", "Vrije tijd", "Abonnementen", "Vervoer", "Zorg", "Overig"] },
+          categorie: { type: "string", description: "Optioneel: filter op specifieke categorie", enum: ["Boodschappen", "Brandstof", "Crypto", "Fastfood", "Gaming", "Interne Overboeking", "Online Winkelen", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Verzekeringen", "Zorgverzekering"] },
+          rekening: { type: "string", description: "Optioneel: filter op rekening ('betaal' of 'spaar')", enum: ["betaal", "spaar"] },
           top: { type: "number", description: "Aantal top uitgaven om te tonen (default 10)" },
         },
         required: ["maand"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "saldoOpvragen",
+      description: "Haal het huidige saldo op van alle bankrekeningen. Toont saldo per rekening (betaal + spaar) en totaal. Gebruik dit als de gebruiker vraagt naar saldo, bankstand, hoeveel er op de rekening staat, of financieel overzicht wil.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "maandVergelijken",
+      description: "Vergelijk de financiën van twee maanden side-by-side. Toont verschil in inkomsten, uitgaven en netto resultaat per categorie. Gebruik dit als de gebruiker vraagt 'geef ik meer uit', 'vergelijk februari met maart', of trends wil zien.",
+      parameters: {
+        type: "object",
+        properties: {
+          maand1: { type: "number", description: "Eerste maand (1-12)" },
+          maand2: { type: "number", description: "Tweede maand (1-12)" },
+          jaar1: { type: "number", description: "Jaar van eerste maand (default: huidig jaar)" },
+          jaar2: { type: "number", description: "Jaar van tweede maand (default: zelfde als jaar1)" },
+        },
+        required: ["maand1", "maand2"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "vasteLastenAnalyse",
+      description: "Analyseer terugkerende (vaste) uitgaven. Detecteert betalingen die in 3 of meer maanden voorkomen (abonnementen, verzekeringen, vaste lasten). Toont gemiddeld bedrag per maand en totaal. Gebruik dit als de gebruiker vraagt naar vaste lasten, abonnementen, terugkerende kosten, of maandelijkse verplichtingen.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "categorieWijzigen",
+      description: "Wijzig de categorie van een transactie. Zoek de transactie op basis van tegenpartij of omschrijving en ken een nieuwe categorie toe. Gebruik dit als de gebruiker een transactie wil herindelen of een categorie wil toewijzen.",
+      parameters: {
+        type: "object",
+        properties: {
+          zoekterm: { type: "string", description: "Zoekterm om de transactie te vinden (tegenpartij of omschrijving)" },
+          categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Crypto", "Fastfood", "Gaming", "Interne Overboeking", "Online Winkelen", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vaste Lasten", "Verzekeringen", "Zorgverzekering"] },
+        },
+        required: ["zoekterm", "categorie"],
       },
     },
   },

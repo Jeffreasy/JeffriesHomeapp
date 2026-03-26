@@ -13,7 +13,10 @@ import {
 } from "./email";
 import { handleLampBedien } from "./smarthome";
 import { handleDienstenOpvragen, handleSalarisOpvragen } from "./schedule";
-import { handleTransactiesZoeken, handleUitgavenOverzicht } from "./finance";
+import {
+  handleSaldoOpvragen, handleTransactiesZoeken, handleUitgavenOverzicht,
+  handleMaandVergelijken, handleVasteLastenAnalyse, handleCategorieWijzigen,
+} from "./finance";
 import {
   handleAfspraakBewerken, handleAfspraakMaken, handleAfspraakVerwijderen, handleAfsprakenOpvragen,
 } from "./calendar";
@@ -43,8 +46,12 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   salarisOpvragen:    handleSalarisOpvragen,
 
   // Finance
-  transactiesZoeken:  handleTransactiesZoeken,
-  uitgavenOverzicht:  handleUitgavenOverzicht,
+  saldoOpvragen:       handleSaldoOpvragen,
+  transactiesZoeken:   handleTransactiesZoeken,
+  uitgavenOverzicht:   handleUitgavenOverzicht,
+  maandVergelijken:    handleMaandVergelijken,
+  vasteLastenAnalyse:  handleVasteLastenAnalyse,
+  categorieWijzigen:   handleCategorieWijzigen,
 
   // Calendar
   afspraakMaken:       handleAfspraakMaken,
