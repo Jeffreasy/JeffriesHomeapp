@@ -18,7 +18,7 @@ import {
 } from "recharts";
 import {
   TrendingUp, TrendingDown, AlertTriangle, Landmark,
-  RefreshCw, CreditCard, Download,
+  RefreshCw, CreditCard, Download, Filter, RotateCcw,
   PieChart as PieChartIcon, BarChart3, Hash,
   ArrowUpRight, ArrowDownRight, Receipt, ShoppingBag,
   CalendarDays,
@@ -433,6 +433,14 @@ export default function FinancePage() {
           <div className="finance-empty">
             <Landmark size={44} opacity={0.2} />
             <p>Nog geen transacties. Upload je Rabobank CSV hierboven.</p>
+          </div>
+        ) : transactions.length === 0 && !isLoading ? (
+          <div className="finance-empty">
+            <Filter size={36} opacity={0.25} />
+            <p>Geen transacties gevonden voor de huidige filters.</p>
+            <button className="btn btn--ghost btn--sm" onClick={resetFilters}>
+              <RotateCcw size={13} /> Filters resetten
+            </button>
           </div>
         ) : (
           <TransactionList

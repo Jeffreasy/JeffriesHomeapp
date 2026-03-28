@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Filter, X, ChevronDown, ChevronUp,
   ArrowUpRight, ArrowDownRight, ArrowLeftRight,
@@ -104,8 +105,16 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
       )}
 
       {/* Expanded filter panel */}
-      {expanded && (
-        <div className="filter-panel__body">
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            className="filter-panel__body"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            style={{ overflow: "hidden" }}
+          >
           {/* Richting */}
           <FilterGroup icon={ArrowLeftRight} title="Richting" defaultOpen>
             <div className="filter-radio-group">
@@ -231,8 +240,9 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
               Alleen storneringen
             </label>
           </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
