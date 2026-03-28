@@ -110,10 +110,11 @@ export const processPending = internalAction({
 
         const googleId = googleEvent.data.id ?? "";
 
-        await ctx.runMutation(internal.personalEvents.updateStatusInternal, {
+        // Promote: eventId omzetten naar het echte Google Calendar ID
+        await ctx.runMutation(internal.personalEvents.promoteToGoogleInternal, {
           userId,
-          eventId: event.eventId,
-          status:  "Aankomend",
+          oldEventId: event.eventId,
+          googleId,
         });
 
         console.log(`✅ Aangemaakt: "${event.titel}" (${event.startDatum}) → Google ID: ${googleId}`);
@@ -139,29 +140,26 @@ export const processPending = internalAction({
 
     for (const event of pendingDeletes) {
       try {
-        // Zoek het Google Calendar event op basis van titel + datum
-        const listResult = await calendar.events.list({
-          calendarId: primaryCalendarId,
-          q:          event.titel,
-          timeMin:    `${event.startDatum}T00:00:00Z`,
-          timeMax:    `${event.startDatum}T23:59:59Z`,
-          singleEvents: true,
-          maxResults: 5,
-        });
+        const isPending = event.eventId.includes("::pending::");
 
-        const googleEvents = listResult.data.items ?? [];
-        const match = googleEvents.find(
-          (ge) => ge.summary?.toLowerCase() === event.titel.toLowerCase()
-        );
-
-        if (match?.id) {
-          await calendar.events.delete({
-            calendarId: primaryCalendarId,
-            eventId:    match.id,
-          });
-          console.log(`🗑️ Verwijderd uit Google Calendar: "${event.titel}" (${event.startDatum})`);
+        if (!isPending) {
+          // Echte Google Calendar ID — directe delete
+          try {
+            await calendar.events.delete({
+              calendarId: primaryCalendarId,
+              eventId:    event.eventId,
+            });
+            console.log(`🗑️ Verwijderd uit Google Calendar: "${event.titel}" (ID: ${event.eventId})`);
+          } catch (deleteErr: any) {
+            // 404/410 = al verwijderd, accepteer dit
+            if (!deleteErr.message?.includes("404") && !deleteErr.message?.includes("410")) {
+              throw deleteErr;
+            }
+            console.log(`⚠️ Al verwijderd in Google Calendar: "${event.titel}"`);
+          }
         } else {
-          console.log(`⚠️ Niet gevonden in Google Calendar: "${event.titel}" — alleen uit Convex verwijderd`);
+          // Legacy pending-format: nooit in Google aangekomen, skip Google delete
+          console.log(`⚠️ Pending event "${event.titel}" — nooit naar Google gestuurd, alleen lokaal verwijderen`);
         }
 
         // Verwijder uit Convex DB

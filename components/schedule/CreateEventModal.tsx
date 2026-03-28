@@ -8,6 +8,29 @@ import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 
+const CATEGORIES = [
+  { id: "sociaal",     emoji: "☕", label: "Sociaal" },
+  { id: "werk",        emoji: "💼", label: "Werk" },
+  { id: "gezondheid",  emoji: "🏥", label: "Gezondheid" },
+  { id: "sport",       emoji: "🏋️", label: "Sport" },
+  { id: "admin",       emoji: "📋", label: "Admin" },
+  { id: "studie",      emoji: "🎓", label: "Studie" },
+  { id: "onderhoud",   emoji: "🔧", label: "Onderhoud" },
+  { id: "evenement",   emoji: "🎉", label: "Evenement" },
+  { id: "overig",      emoji: "📌", label: "Overig" },
+] as const;
+
+type CategoryId = typeof CATEGORIES[number]["id"];
+
+function parseCategoryFromDescription(desc?: string): CategoryId {
+  const match = desc?.match(/\[categorie:(\w+)\]/);
+  return (match?.[1] as CategoryId) ?? "overig";
+}
+
+function stripCategoryTag(desc: string): string {
+  return desc.replace(/\s*\[categorie:\w+\]/, "").trim();
+}
+
 interface CreateEventModalProps {
   open:       boolean;
   onClose:    () => void;
@@ -29,13 +52,14 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
   const [eindTijd,     setEindTijd]     = useState("10:00");
   const [locatie,      setLocatie]      = useState("");
   const [beschrijving, setBeschrijving] = useState("");
+  const [categorie,    setCategorie]    = useState<CategoryId>("overig");
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
 
   const reset = () => {
     setTitel(""); setStartDatum(today); setEindDatum(today);
     setHeledag(true); setStartTijd("09:00"); setEindTijd("10:00");
-    setLocatie(""); setBeschrijving(""); setError("");
+    setLocatie(""); setBeschrijving(""); setCategorie("overig"); setError("");
   };
 
   useEffect(() => {
@@ -48,7 +72,8 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
         setStartTijd(editEvent.startTijd ?? "09:00");
         setEindTijd(editEvent.eindTijd ?? "10:00");
         setLocatie(editEvent.locatie ?? "");
-        setBeschrijving(editEvent.beschrijving ?? "");
+        setCategorie(parseCategoryFromDescription(editEvent.beschrijving));
+        setBeschrijving(stripCategoryTag(editEvent.beschrijving ?? ""));
         setError("");
       } else {
         reset();
@@ -67,6 +92,11 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
     setLoading(true);
     setError("");
     try {
+      const rawDesc = beschrijving.trim();
+      const fullDesc = rawDesc
+        ? `${rawDesc} [categorie:${categorie}]`
+        : `[categorie:${categorie}]`;
+
       const payload = {
         userId:       user.id,
         titel:        titel.trim(),
@@ -76,7 +106,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
         startTijd:    heledag ? undefined : startTijd || undefined,
         eindTijd:     heledag ? undefined : eindTijd  || undefined,
         locatie:      locatie.trim()      || undefined,
-        beschrijving: beschrijving.trim() || undefined,
+        beschrijving: fullDesc || undefined,
       };
 
       if (editEvent) {
@@ -213,6 +243,30 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
                     placeholder="bijv. Amsterdam"
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
+                </div>
+
+                {/* Categorie */}
+                <div>
+                  <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                    Categorie
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {CATEGORIES.map(({ id, emoji, label }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setCategorie(id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border cursor-pointer ${
+                          categorie === id
+                            ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
+                            : "bg-white/3 text-slate-500 border-white/8 hover:bg-white/6 hover:text-slate-300"
+                        }`}
+                      >
+                        <span>{emoji}</span>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Beschrijving */}

@@ -2,10 +2,19 @@ import { v } from "convex/values";
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { eventFields } from "./lib/fields";
 
+// ─── Auth helper ──────────────────────────────────────────────────────────────
+
+async function requireAuth(ctx: { auth: { getUserIdentity: () => Promise<any> } }) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Niet ingelogd");
+  return identity.subject as string; // Clerk user ID
+}
+
 /** Alle persoonlijke events voor een user. Filtert VERWIJDERD server-side. */
 export const list = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const userId = args.userId || await requireAuth(ctx);
     const rows = await ctx.db
       .query("personalEvents")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -27,8 +36,9 @@ export const list = query({
 
 /** Alleen aankomende events — voor de NextAppointmentCard. */
 export const listUpcoming = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const userId = args.userId || await requireAuth(ctx);
     return ctx.db
       .query("personalEvents")
       .withIndex("by_user_status", (q) =>
@@ -43,12 +53,13 @@ export const listUpcoming = query({
 
 /** Events op een specifieke datum — voor conflict overlay in het rooster. */
 export const listByDate = query({
-  args: { userId: v.string(), date: v.string() },
-  handler: async (ctx, { userId, date }) => {
+  args: { userId: v.optional(v.string()), date: v.string() },
+  handler: async (ctx, args) => {
+    const userId = args.userId || await requireAuth(ctx);
     return ctx.db
       .query("personalEvents")
       .withIndex("by_user_date", (q) =>
-        q.eq("userId", userId).eq("startDatum", date)
+        q.eq("userId", userId).eq("startDatum", args.date)
       )
       .filter((q) => q.neq(q.field("status"), "VERWIJDERD"))
       .collect();
@@ -166,7 +177,7 @@ export const bulkUpsertFromCalendar = internalMutation({
  */
 export const create = mutation({
   args: {
-    userId:       v.string(),
+    userId:       v.optional(v.string()),
     titel:        v.string(),
     startDatum:   v.string(),   // "YYYY-MM-DD"
     eindDatum:    v.string(),
@@ -177,9 +188,10 @@ export const create = mutation({
     beschrijving: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = args.userId || await requireAuth(ctx);
     const eventId = `${args.titel}::pending::${Date.now()}`;
     await ctx.db.insert("personalEvents", {
-      userId:       args.userId,
+      userId,
       eventId,
       titel:        args.titel,
       startDatum:   args.startDatum,
@@ -203,22 +215,23 @@ export const create = mutation({
  */
 export const remove = mutation({
   args: {
-    userId:   v.string(),
+    userId:   v.optional(v.string()),
     eventId:  v.optional(v.string()),
     zoekterm: v.optional(v.string()),
   },
-  handler: async (ctx, { userId, eventId, zoekterm }) => {
+  handler: async (ctx, args) => {
+    const userId = args.userId || await requireAuth(ctx);
     let target;
 
-    if (eventId) {
+    if (args.eventId) {
       target = await ctx.db
         .query("personalEvents")
         .withIndex("by_user_eventId", (q) =>
-          q.eq("userId", userId).eq("eventId", eventId)
+          q.eq("userId", userId).eq("eventId", args.eventId!)
         )
         .first();
-    } else if (zoekterm) {
-      const lower = zoekterm.toLowerCase();
+    } else if (args.zoekterm) {
+      const lower = args.zoekterm.toLowerCase();
       const all = await ctx.db
         .query("personalEvents")
         .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -238,7 +251,7 @@ export const remove = mutation({
       return { ok: true, beschrijving: `"${target.titel}" verwijderd (was nog niet in Google Calendar)` };
     }
 
-    await ctx.db.patch(target._id, { status: "PendingDelete" as any });
+    await ctx.db.patch(target._id, { status: "PendingDelete" });
     return {
       ok: true,
       beschrijving: `"${target.titel}" wordt verwijderd uit Google Calendar`,
@@ -262,12 +275,34 @@ export const listPendingInternal = internalQuery({
 /** PendingDelete events ophalen — voor processPendingCalendar delete action. */
 export const listPendingDeleteInternal = internalQuery({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
-    const all = await ctx.db
+  handler: async (ctx, { userId }) =>
+    ctx.db
       .query("personalEvents")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-    return all.filter((e) => e.status === "PendingDelete");
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", userId).eq("status", "PendingDelete")
+      )
+      .collect(),
+});
+
+/** Promote pending event naar Google Calendar ID — na succesvolle insert. */
+export const promoteToGoogleInternal = internalMutation({
+  args: {
+    userId:      v.string(),
+    oldEventId:  v.string(),
+    googleId:    v.string(),
+  },
+  handler: async (ctx, { userId, oldEventId, googleId }) => {
+    const existing = await ctx.db
+      .query("personalEvents")
+      .withIndex("by_user_eventId", (q) =>
+        q.eq("userId", userId).eq("eventId", oldEventId)
+      )
+      .first();
+    if (!existing) return;
+    await ctx.db.patch(existing._id, {
+      eventId: googleId,
+      status:  "Aankomend",
+    });
   },
 });
 
@@ -277,22 +312,23 @@ export const listPendingDeleteInternal = internalQuery({
 /** Publieke status-update (voor GAS via http route). */
 export const updateStatus = mutation({
   args: {
-    userId:   v.string(),
+    userId:   v.optional(v.string()),
     eventId:  v.string(),
     status:   v.string(),           // "Aankomend" | "Fout"
     googleId: v.optional(v.string()), // Google Calendar event ID
   },
-  handler: async (ctx, { userId, eventId, status, googleId }) => {
+  handler: async (ctx, args) => {
+    const userId = args.userId || await requireAuth(ctx);
     const existing = await ctx.db
       .query("personalEvents")
       .withIndex("by_user_eventId", (q) =>
-        q.eq("userId", userId).eq("eventId", eventId)
+        q.eq("userId", userId).eq("eventId", args.eventId)
       )
       .first();
-    if (!existing) throw new Error(`Event ${eventId} niet gevonden`);
+    if (!existing) throw new Error(`Event ${args.eventId} niet gevonden`);
 
-    const patch: Record<string, string> = { status };
-    if (googleId) patch.kalender = "Main"; // bewaar Google ID in kalender-veld als referentie
+    const patch: Record<string, string> = { status: args.status };
+    if (args.googleId) patch.kalender = "Main";
     await ctx.db.patch(existing._id, patch);
     return { ok: true };
   },
