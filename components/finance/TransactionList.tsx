@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { TrendingDown, TrendingUp, AlertTriangle, ChevronDown } from "lucide-react";
+import { CATEGORIE_OPTIES, CODE_LABELS } from "@/lib/finance-constants";
 import type { Id } from "@/convex/_generated/dataModel";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -17,22 +18,6 @@ export interface TransactionRow {
   isInterneOverboeking: boolean;
   categorie?:           string;
 }
-
-const CODE_LABELS: Record<string, string> = {
-  tb: "Overboeking", bc: "Betaalopdracht", id: "Incasso",
-  ei: "Europese Incasso", ba: "Bankopdracht", bg: "Bankgiro",
-  cb: "Creditcard", db: "Debetkaart", st: "Stornering",
-  sb: "SEPA", ga: "Geldautomaat", gb: "Geldautomaat", kh: "Kascheque",
-};
-
-const CATEGORIE_OPTIES = [
-  "Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie",
-  "Fastfood", "Gaming", "Geldopname", "Online Winkelen", "Persoonlijk",
-  "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming",
-  "Telecom", "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer",
-  "Verzekeringen", "Vrienden", "Vrije Tijd", "Zakelijk",
-  "Zorgverzekering", "Overig",
-];
 
 // ─── Inline categorie-editor ─────────────────────────────────────────────────
 
@@ -86,7 +71,6 @@ export function TransactionList({ transactions, onCategorie, isDone, onLoadMore,
     return <div className="tx-empty"><p>Geen transacties gevonden voor deze filters.</p></div>;
   }
 
-  // Groepeer op datum voor sub-headers
   let lastDatum = "";
 
   return (

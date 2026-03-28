@@ -4,27 +4,10 @@ import { useState } from "react";
 import {
   Filter, X, ChevronDown, ChevronUp,
   ArrowUpRight, ArrowDownRight, ArrowLeftRight,
-  Tag, Calendar, DollarSign, FileText, RotateCcw,
+  Tag, Calendar, Euro, FileText, RotateCcw,
 } from "lucide-react";
+import { CATEGORIE_OPTIES, CODE_LABELS } from "@/lib/finance-constants";
 import type { TransactionFilter } from "@/hooks/useTransactions";
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-const CATEGORIE_OPTIES = [
-  "Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie",
-  "Fastfood", "Gaming", "Geldopname", "Online Winkelen", "Persoonlijk",
-  "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming",
-  "Telecom", "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer",
-  "Verzekeringen", "Vrienden", "Vrije Tijd", "Zakelijk",
-  "Zorgverzekering", "Overig",
-];
-
-const CODE_LABELS: Record<string, string> = {
-  tb: "Overboeking", bc: "Betaalopdracht", id: "Incasso",
-  ei: "Europese Incasso", ba: "Bankopdracht", bg: "Bankgiro",
-  cb: "Creditcard", db: "Debetkaart", st: "Stornering",
-  sb: "SEPA", ga: "Geldautomaat", gb: "Geldautomaat", kh: "Kascheque",
-};
 
 // ─── Active Filter Chip ──────────────────────────────────────────────────────
 
@@ -69,7 +52,6 @@ interface FilterPanelProps {
 export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] }: FilterPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
-  // Count active filters
   const activeCount = [
     filters.categorieFilter,
     filters.richting,
@@ -80,10 +62,9 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
     filters.maandFilter,
     filters.codeFilter,
     filters.onlyStorneringen,
-    filters.excludeIntern === false, // default is true, so only count when explicitly false
+    filters.excludeIntern === false,
   ].filter(Boolean).length;
 
-  // Active filter chips
   const chips: Array<{ label: string; onRemove: () => void }> = [];
   if (filters.categorieFilter) chips.push({ label: `Categorie: ${filters.categorieFilter}`, onRemove: () => onChange({ categorieFilter: undefined }) });
   if (filters.richting) chips.push({ label: filters.richting === "in" ? "Alleen inkomsten" : "Alleen uitgaven", onRemove: () => onChange({ richting: undefined }) });
@@ -157,7 +138,7 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
           </FilterGroup>
 
           {/* Bedragbereik */}
-          <FilterGroup icon={DollarSign} title="Bedragbereik">
+          <FilterGroup icon={Euro} title="Bedragbereik">
             <div className="filter-range">
               <div className="filter-range__field">
                 <label className="filter-range__label">Min (€)</label>

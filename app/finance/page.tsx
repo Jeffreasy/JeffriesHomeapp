@@ -1,189 +1,56 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useTransactions }  from "@/hooks/useTransactions";
 import { CsvUploader }      from "@/components/finance/CsvUploader";
 import { TransactionList }  from "@/components/finance/TransactionList";
 import { FilterPanel }      from "@/components/finance/FilterPanel";
+import { StatCard }          from "@/components/finance/StatCard";
+import { SearchBar }         from "@/components/finance/SearchBar";
+import { CategoryCard }      from "@/components/finance/CategoryCard";
+import { SectionHeader }     from "@/components/finance/SectionHeader";
+import { ChartTooltip, PieTooltip } from "@/components/finance/ChartTooltips";
+import { eur, eurExact, ibanLabel, getCatColor } from "@/lib/finance-constants";
 import {
-  LineChart, Line, BarChart, Bar, AreaChart, Area,
+  BarChart, Bar, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, ReferenceLine, Legend,
+  ResponsiveContainer, CartesianGrid, ReferenceLine, Legend, Label,
 } from "recharts";
 import {
   TrendingUp, TrendingDown, AlertTriangle, Landmark,
-  RefreshCw, Search, X, Calendar, CreditCard,
-  PieChart as PieChartIcon, BarChart3, Wallet, Hash,
+  RefreshCw, CreditCard, Download,
+  PieChart as PieChartIcon, BarChart3, Hash,
   ArrowUpRight, ArrowDownRight, Receipt, ShoppingBag,
   CalendarDays,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { TransactionRow } from "@/components/finance/TransactionList";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── CSV Export ──────────────────────────────────────────────────────────────
 
-const eur = (n: number) =>
-  n.toLocaleString("nl-NL", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
-
-const eurExact = (n: number) =>
-  n.toLocaleString("nl-NL", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
-
-// ─── IBAN label helpers ───────────────────────────────────────────────────────
-
-const IBAN_LABELS: Record<string, string> = {
-  "NL41RABO0348147740": "Spaarrekening",
-  "NL20RABO0198574215": "Betaalrekening",
-};
-
-function ibanLabel(iban: string): string {
-  return IBAN_LABELS[iban] ?? iban.slice(-8);
-}
-
-// ─── Category color palette ──────────────────────────────────────────────────
-
-const CATEGORY_COLORS: Record<string, string> = {
-  Boodschappen:       "#22c55e",
-  Brandstof:          "#f97316",
-  Coffeeshop:         "#8b5cf6",
-  Crypto:             "#06b6d4",
-  Familie:            "#ec4899",
-  Fastfood:           "#ef4444",
-  Gaming:             "#3b82f6",
-  Geldopname:         "#a855f7",
-  "Interne Overboeking": "#475569",
-  "Online Winkelen":  "#f59e0b",
-  Persoonlijk:        "#14b8a6",
-  SaaS:               "#6366f1",
-  "SaaS Abonnementen":"#818cf8",
-  Salaris:            "#22c55e",
-  Sport:              "#10b981",
-  Streaming:          "#e879f9",
-  Telecom:            "#0ea5e9",
-  Toeslagen:          "#84cc16",
-  Vakantie:           "#fbbf24",
-  "Vaste Lasten":     "#64748b",
-  Vervoer:            "#0891b2",
-  Verzekeringen:      "#f43f5e",
-  Vrienden:           "#d946ef",
-  "Vrije Tijd":       "#2dd4bf",
-  Zakelijk:           "#78716c",
-  Zorgverzekering:    "#fb7185",
-  Overig:             "#94a3b8",
-};
-
-function getCatColor(cat: string): string {
-  return CATEGORY_COLORS[cat] ?? "#64748b";
-}
-
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-
-function StatCard({ label, value, sub, icon: Icon, accent = false, warning = false, className = "" }: {
-  label: string; value: string; sub?: string;
-  icon: React.ElementType; accent?: boolean; warning?: boolean; className?: string;
-}) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className={["finance-stat", accent && "finance-stat--accent", warning && "finance-stat--warning", className].filter(Boolean).join(" ")}>
-      <div className="finance-stat__icon"><Icon size={20} /></div>
-      <div className="finance-stat__body">
-        <span className="finance-stat__value">{value}</span>
-        <span className="finance-stat__label">{label}</span>
-        {sub && <span className="finance-stat__sub">{sub}</span>}
-      </div>
-    </motion.div>
+function exportCsv(transactions: TransactionRow[]) {
+  const header = "Datum,Tegenpartij,Omschrijving,Bedrag,Code,Categorie";
+  const DQ = String.fromCharCode(34);
+  const escQ = (s: string) => s.replaceAll(DQ, DQ + DQ);
+  const rows = transactions.map((tx) =>
+    [
+      tx.datum,
+      `"${escQ(tx.tegenpartijNaam ?? "Onbekend")}"`,
+      `"${escQ(tx.omschrijving)}"`,
+      tx.bedrag.toFixed(2).replace(".", ","),
+      tx.code,
+      tx.categorie ?? "Overig",
+    ].join(",")
   );
-}
-
-// ─── Recharts custom tooltip ──────────────────────────────────────────────────
-
-interface TooltipItem { name: string; value: number; color: string; }
-interface TooltipProps { active?: boolean; payload?: TooltipItem[]; label?: string; }
-
-function ChartTooltip({ active, payload, label }: TooltipProps) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="chart-tooltip">
-      <p className="chart-tooltip__label">{label}</p>
-      {payload.map((p) => (
-        <p key={p.name} className="chart-tooltip__value" style={{ color: p.color }}>
-          {p.name}: {eur(p.value)}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-// ─── Pie tooltip ──────────────────────────────────────────────────────────────
-
-function PieTooltip({ active, payload }: TooltipProps) {
-  if (!active || !payload?.length) return null;
-  const item = payload[0];
-  return (
-    <div className="chart-tooltip">
-      <p className="chart-tooltip__label">{item.name}</p>
-      <p className="chart-tooltip__value" style={{ color: item.color }}>{eurExact(item.value)}</p>
-    </div>
-  );
-}
-
-// ─── Zoekbalk ────────────────────────────────────────────────────────────────
-
-function SearchBar({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="search-bar">
-      <Search size={15} className="search-bar__icon" />
-      <input className="search-bar__input" type="search"
-        placeholder="Zoek op naam of omschrijving…"
-        value={value} onChange={(e) => onChange(e.target.value)} />
-      {value && (
-        <button className="search-bar__clear" onClick={() => onChange("")} aria-label="Wis zoekopdracht">
-          <X size={14} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ─── Category Card ───────────────────────────────────────────────────────────
-
-function CategoryCard({ categorie, bedrag, count, percentage, onClick, isActive }: {
-  categorie: string; bedrag: number; count: number; percentage: number;
-  onClick: () => void; isActive: boolean;
-}) {
-  const color = getCatColor(categorie);
-  return (
-    <motion.button
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className={`category-card ${isActive ? "category-card--active" : ""}`}
-      onClick={onClick}
-      style={{ "--cat-color": color } as React.CSSProperties}
-    >
-      <div className="category-card__bar" style={{ width: `${Math.min(percentage, 100)}%`, background: color }} />
-      <div className="category-card__content">
-        <span className="category-card__name">{categorie}</span>
-        <span className="category-card__amount">{eur(bedrag)}</span>
-      </div>
-      <div className="category-card__meta">
-        <span>{count}x</span>
-        <span>{percentage}%</span>
-      </div>
-    </motion.button>
-  );
-}
-
-// ─── Section Header ──────────────────────────────────────────────────────────
-
-function SectionHeader({ icon: Icon, title, subtitle }: {
-  icon: React.ElementType; title: string; subtitle?: string;
-}) {
-  return (
-    <div className="section-header">
-      <Icon size={18} className="section-header__icon" />
-      <h2 className="section-header__title">{title}</h2>
-      {subtitle && <span className="section-header__sub">{subtitle}</span>}
-    </div>
-  );
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `transacties-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Finance Dashboard ────────────────────────────────────────────────────────
@@ -239,6 +106,21 @@ export default function FinancePage() {
   const toggleCategoryFilter = (cat: string) => {
     setFilters((f) => ({ ...f, categorieFilter: f.categorieFilter === cat ? undefined : cat }));
   };
+
+  // MoM delta: bereken client-side vanuit stats.inUitPerMaand
+  const momDelta = useMemo(() => {
+    if (!stats || stats.inUitPerMaand.length < 2) return null;
+    const arr = stats.inUitPerMaand;
+    const curr = arr[arr.length - 1];
+    const prev = arr[arr.length - 2];
+    const inDelta = prev.inkomsten > 0
+      ? Math.round(((curr.inkomsten - prev.inkomsten) / prev.inkomsten) * 1000) / 10
+      : 0;
+    const uitDelta = prev.uitgaven > 0
+      ? Math.round(((curr.uitgaven - prev.uitgaven) / prev.uitgaven) * 1000) / 10
+      : 0;
+    return { inkomstenDelta: inDelta, uitgavenDelta: uitDelta };
+  }, [stats]);
 
   return (
     <div className="finance-page">
@@ -321,15 +203,20 @@ export default function FinancePage() {
           <StatCard
             label="Totaal inkomsten"
             value={eur(stats.totaalIn)}
-            sub={`gem. ${eur(stats.gemiddeldIn)} /mnd`}
+            sub={momDelta
+              ? `${momDelta.inkomstenDelta >= 0 ? "+" : ""}${momDelta.inkomstenDelta}% vs vorige mnd`
+              : `gem. ${eur(stats.gemiddeldIn)} /mnd`}
             icon={TrendingUp}
             accent
           />
           <StatCard
             label="Totaal uitgaven"
             value={eur(stats.totaalUit)}
-            sub={`gem. ${eur(stats.gemiddeldUit)} /mnd`}
+            sub={momDelta
+              ? `${momDelta.uitgavenDelta >= 0 ? "+" : ""}${momDelta.uitgavenDelta}% vs vorige mnd`
+              : `gem. ${eur(stats.gemiddeldUit)} /mnd`}
             icon={TrendingDown}
+            warning={momDelta ? momDelta.uitgavenDelta > 10 : false}
           />
           <StatCard
             label="Netto stroom"
@@ -410,30 +297,60 @@ export default function FinancePage() {
             </div>
 
             {/* Donut chart */}
-            <div className="finance-chart glass">
+            <div className="finance-chart glass" role="img" aria-label={`Uitgaven verdeling donut chart: ${stats.aantalCategorieen} categorieën, totaal ${eur(stats.totaalUit)}`}>
               <h2 className="finance-chart__title">
                 <PieChartIcon size={16} /> Uitgaven verdeling
+                <span className="finance-chart__subtitle">{stats.aantalCategorieen} categorieën</span>
               </h2>
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie
-                    data={stats.uitPerCategorie.slice(0, 12)}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={95}
-                    paddingAngle={2}
-                    dataKey="bedrag"
-                    nameKey="categorie"
-                    strokeWidth={0}
-                  >
-                    {stats.uitPerCategorie.slice(0, 12).map((entry) => (
-                      <Cell key={entry.categorie} fill={getCatColor(entry.categorie)} opacity={0.85} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<PieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="donut-layout">
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={stats.uitPerCategorie.slice(0, 12)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="bedrag"
+                      nameKey="categorie"
+                      strokeWidth={0}
+                    >
+                      {stats.uitPerCategorie.slice(0, 12).map((entry) => (
+                        <Cell key={entry.categorie} fill={getCatColor(entry.categorie)} opacity={0.85} />
+                      ))}
+                      <Label
+                        position="center"
+                        content={() => (
+                          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central">
+                            <tspan x="50%" dy="-7" fill="#f1f5f9" fontSize="0.95rem" fontWeight="700">
+                              {eur(stats.totaalUit)}
+                            </tspan>
+                            <tspan x="50%" dy="16" fill="#64748b" fontSize="0.6rem">
+                              totaal uitgaven
+                            </tspan>
+                          </text>
+                        )}
+                      />
+                    </Pie>
+                    <Tooltip content={<PieTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="donut-legend">
+                  {stats.uitPerCategorie.slice(0, 12).map((entry) => (
+                    <button
+                      key={entry.categorie}
+                      className={`donut-legend__item ${filters.categorieFilter === entry.categorie ? "donut-legend__item--active" : ""}`}
+                      onClick={() => toggleCategoryFilter(entry.categorie)}
+                      title={`Filter op ${entry.categorie}`}
+                    >
+                      <span className="donut-legend__dot" style={{ background: getCatColor(entry.categorie) }} />
+                      <span className="donut-legend__name">{entry.categorie}</span>
+                      <span className="donut-legend__pct">{((entry.bedrag / stats.totaalUit) * 100).toFixed(0)}%</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </>
@@ -475,7 +392,9 @@ export default function FinancePage() {
                   <span className="merchant-naam">{m.naam}</span>
                   <span className="merchant-count">{m.count}x</span>
                 </div>
-                <span className="merchant-bedrag">{eurExact(m.bedrag)}</span>
+                <span className="merchant-bedrag">
+                  {m.bedrag.toLocaleString("nl-NL", { style: "currency", currency: "EUR", minimumFractionDigits: 2 })}
+                </span>
               </div>
             ))}
           </div>
@@ -499,6 +418,15 @@ export default function FinancePage() {
             ? <span className="finance-list-meta__loading"><RefreshCw size={13} className="spinner" /> Laden…</span>
             : <span>{transactions.length.toLocaleString("nl")} transacties{filters.maandFilter && ` in ${filters.maandFilter}`}{zoekterm && ` voor "${zoekterm}"`}</span>
           }
+          {transactions.length > 0 && (
+            <button
+              className="btn btn--ghost btn--sm"
+              onClick={() => exportCsv(transactions)}
+              title="Exporteer gefilterde transacties als CSV"
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          )}
         </div>
 
         {totalCount === 0 ? (
