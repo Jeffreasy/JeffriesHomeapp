@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { TrendingUp, Euro, Landmark, Briefcase, FileUp } from "lucide-react";
+import { TrendingUp, Euro, Landmark, Briefcase, FileUp, ArrowRight } from "lucide-react";
 import { useSalary, type SalarisRecord } from "@/hooks/useSalary";
 import { useLoonstroken, type LoonstrookRecord } from "@/hooks/useLoonstroken";
 import { LoonstrookUploader } from "./LoonstrookUploader";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -252,11 +253,16 @@ export function SalarisView() {
         <VergelijkingSectie berekend={records} werkelijkByPeriode={loonstroken.byPeriode} />
       )}
 
-      {/* Disclaimer */}
+      {/* Disclaimer + Finance link */}
       <p className="text-[10px] text-slate-700 text-center leading-relaxed">
         {"\u2248"} Netto prognose is een schatting op basis van de 2026-loonheffingstabel.
         De exacte verrekening door {"'"}s Heeren Loo kan afwijken door tijdvakfactor en heffingskortingen.
       </p>
+      {loonstroken.count > 0 && (
+        <Link href="/finance" className="flex items-center justify-center gap-1.5 text-xs text-indigo-400/70 hover:text-indigo-400 transition-colors py-2">
+          Bekijk salaris in Finance overzicht <ArrowRight size={12} />
+        </Link>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useSalary } from "@/hooks/useSalary";
+import { useLoonstroken } from "@/hooks/useLoonstroken";
 import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
@@ -88,7 +89,16 @@ export default function DashboardPage() {
   const { mutate: sendCommand } = useLampCommand();
   const { nextDienst, thisWeek } = useSchedule();
   const { huidig: salarisHuidig } = useSalary();
+  const loonstroken = useLoonstroken();
   const { upcoming: upcomingEvents, eventsByDate, conflictMap } = usePersonalEvents({ diensten: thisWeek });
+
+  // Werkelijk salaris (loonstrook) of berekend (prognose)
+  const nu = new Date();
+  const huidigePeriode = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, "0")}`;
+  const werkelijkNetto = loonstroken.byPeriode.get(huidigePeriode)?.netto;
+  const nettoLabel = werkelijkNetto ? "Netto salaris" : "Netto prognose";
+  const nettoValue = werkelijkNetto ?? salarisHuidig?.nettoPrognose;
+  const nettoSub = werkelijkNetto ? "loonstrook" : "berekend";
 
   // Edit modal state
   const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
@@ -170,15 +180,15 @@ export default function DashboardPage() {
           />
           <StatCard
             icon={Landmark}
-            label="Netto prognose"
+            label={nettoLabel}
             value={
-              salarisHuidig
-                ? `€ ${salarisHuidig.nettoPrognose.toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`
+              nettoValue
+                ? `€ ${nettoValue.toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`
                 : "—"
             }
-            sub="deze maand"
+            sub={nettoSub}
             accent="#34d399"
-            href="/finance"
+            href="/rooster"
           />
           <StatCard
             icon={CalendarDays}

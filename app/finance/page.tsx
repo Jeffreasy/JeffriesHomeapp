@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useTransactions }  from "@/hooks/useTransactions";
+import { useLoonstroken }   from "@/hooks/useLoonstroken";
 import { CsvUploader }      from "@/components/finance/CsvUploader";
 import { TransactionList }  from "@/components/finance/TransactionList";
 import { FilterPanel }      from "@/components/finance/FilterPanel";
@@ -21,7 +22,7 @@ import {
   RefreshCw, CreditCard, Download, Filter, RotateCcw,
   PieChart as PieChartIcon, BarChart3, Hash,
   ArrowUpRight, ArrowDownRight, Receipt, ShoppingBag,
-  CalendarDays,
+  CalendarDays, Wallet,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -60,6 +61,7 @@ export default function FinancePage() {
   const [zoekterm,    setZoekterm]    = useState("");
   const [chartView,   setChartView]   = useState<"saldo" | "inuit">("saldo");
   const [jaarFilter,  setJaarFilter]  = useState<string>("2026");
+  const loonstroken = useLoonstroken();
   const [filters, setFilters] = useState({
     excludeIntern: true,
     onlyStorneringen: false,
@@ -121,6 +123,26 @@ export default function FinancePage() {
       : 0;
     return { inkomstenDelta: inDelta, uitgavenDelta: uitDelta };
   }, [stats]);
+
+  // Loonstroken: meest recente + maandelijks gemiddelde
+  const salarisStat = useMemo(() => {
+    if (loonstroken.count === 0) return null;
+    const records = loonstroken.records;
+    const latest = records[records.length - 1];
+    const prev = records.length >= 2 ? records[records.length - 2] : null;
+    const delta = prev ? latest.netto - prev.netto : 0;
+    const gemNetto = loonstroken.totaalNetto / records.length;
+    return { latest, delta, gemNetto };
+  }, [loonstroken]);
+
+  // Merge loonstroken netto into inUitPerMaand for chart overlay
+  const inUitMetSalaris = useMemo(() => {
+    if (!stats) return [];
+    return stats.inUitPerMaand.map((m: any) => {
+      const ls = loonstroken.byPeriode.get(m.maand);
+      return { ...m, salaris: ls?.netto ?? null };
+    });
+  }, [stats, loonstroken.byPeriode]);
 
   return (
     <div className="finance-page">
@@ -239,6 +261,17 @@ export default function FinancePage() {
             icon={AlertTriangle}
             warning={stats.storneringen > 0}
           />
+          {salarisStat && (
+            <StatCard
+              label="Netto Salaris"
+              value={eur(salarisStat.latest.netto)}
+              sub={salarisStat.delta !== 0
+                ? `${salarisStat.delta >= 0 ? "+" : ""}${eur(salarisStat.delta)} vs vorige mnd`
+                : `gem. ${eur(salarisStat.gemNetto)} /mnd`}
+              icon={Wallet}
+              accent
+            />
+          )}
         </div>
       )}
 
@@ -282,7 +315,7 @@ export default function FinancePage() {
                       fill="url(#saldoGradient)" dot={false} activeDot={{ r: 5, fill: "#f59e0b", strokeWidth: 0 }} />
                   </AreaChart>
                 ) : (
-                  <BarChart data={stats.inUitPerMaand} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+                  <BarChart data={inUitMetSalaris} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="maand" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false}
@@ -291,6 +324,9 @@ export default function FinancePage() {
                     <Legend wrapperStyle={{ fontSize: "0.75rem", color: "#64748b" }} />
                     <Bar dataKey="inkomsten" name="Inkomsten" fill="#22c55e" radius={[4, 4, 0, 0]} opacity={0.85} />
                     <Bar dataKey="uitgaven" name="Uitgaven" fill="#ef4444" radius={[4, 4, 0, 0]} opacity={0.7} />
+                    {loonstroken.count > 0 && (
+                      <Bar dataKey="salaris" name="Netto Salaris" fill="#818cf8" radius={[4, 4, 0, 0]} opacity={0.75} />
+                    )}
                   </BarChart>
                 )}
               </ResponsiveContainer>
