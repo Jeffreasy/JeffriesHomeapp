@@ -23,7 +23,6 @@ export interface PersonalEvent {
   beschrijving?:     string;
   status:            "Aankomend" | "Voorbij" | "VERWIJDERD" | string;
   kalender:          string;
-  conflictMetDienst?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

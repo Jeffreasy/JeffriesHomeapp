@@ -34,7 +34,7 @@ export const list = query({
   },
 });
 
-/** Alleen aankomende events — voor de NextAppointmentCard. */
+/** Alleen aankomende events — voor dashboard en widgets. */
 export const listUpcoming = query({
   args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
@@ -210,8 +210,9 @@ export const create = mutation({
 
 /**
  * Verwijder een afspraak op basis van eventId of titel (zoekterm).
- * Markeert status als "PendingDelete" zodat de cron het uit Google Calendar verwijdert.
- * Als het een PendingCreate was (nog niet in Google), wordt het direct uit DB verwijderd.
+ * ⚠️ LEGACY: Niet meer actief gebruikt. De primaire delete flow is nu
+ * deletePersonalEvent.deleteEvent (instant dual-write).
+ * Deze mutation wordt bewaard als safety net voor eventuele oude PendingDelete records.
  */
 export const remove = mutation({
   args: {

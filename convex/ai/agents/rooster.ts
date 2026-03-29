@@ -70,10 +70,21 @@ export const roosterAgent: AgentDefinition = {
     const active = allSchedule.filter((s) => s.status !== "VERWIJDERD");
     const komend = active.filter((s) => s.startDatum >= today).sort((a, b) => a.startDatum.localeCompare(b.startDatum));
 
+    /** On-the-fly conflict detectie: vergelijkt event × dienst op dezelfde datum. */
+    const detectConflict = (e: any): string | null => {
+      const dienst = active.find((s) => s.startDatum === e.startDatum);
+      if (!dienst) return null;
+      if (e.heledag || !e.startTijd) return `Hele dag — dienst ${dienst.shiftType} (${dienst.startTijd}-${dienst.eindTijd})`;
+      if (e.startTijd && e.eindTijd && e.startTijd < dienst.eindTijd && e.eindTijd > dienst.startTijd) {
+        return `Overlap met ${dienst.shiftType} (${dienst.startTijd}-${dienst.eindTijd})`;
+      }
+      return null;
+    };
+
     // ── Lite mode (voor dashboard) ────────────────────────────────────────
     if (opts?.lite) {
       const dienstVandaag = active.find((s) => s.startDatum === today);
-      const conflicten = allEvents.filter((e) => e.status === "Aankomend" && e.conflictMetDienst).length;
+      const conflicten = allEvents.filter((e) => e.status === "Aankomend" && detectConflict(e)).length;
       return {
         dienstVandaag: dienstVandaag ? { type: dienstVandaag.shiftType, titel: dienstVandaag.titel } : null,
         komendeDiensten: komend.length,
@@ -97,7 +108,7 @@ export const roosterAgent: AgentDefinition = {
       const dienst = active.find((s) => s.startDatum === datum);
       const events = allEvents
         .filter((e) => e.status === "Aankomend" && e.startDatum === datum)
-        .map((e) => ({ titel: e.titel, tijd: e.startTijd, conflict: e.conflictMetDienst }));
+        .map((e) => ({ titel: e.titel, tijd: e.startTijd, conflict: detectConflict(e) }));
 
       zevenDagen.push({
         datum,
@@ -114,9 +125,9 @@ export const roosterAgent: AgentDefinition = {
 
     // ── Conflicten (max 10) ───────────────────────────────────────────────
     const conflicten = allEvents
-      .filter((e) => e.status === "Aankomend" && e.conflictMetDienst)
+      .filter((e) => e.status === "Aankomend" && detectConflict(e))
       .slice(0, 10)
-      .map((e) => ({ afspraak: e.titel, datum: e.startDatum, dienstConflict: e.conflictMetDienst }));
+      .map((e) => ({ afspraak: e.titel, datum: e.startDatum, dienstConflict: detectConflict(e) }));
 
     return {
       vandaag: today,
@@ -134,7 +145,7 @@ export const roosterAgent: AgentDefinition = {
         .filter((e) => e.status === "Aankomend" && e.startDatum >= today)
         .sort((a, b) => a.startDatum.localeCompare(b.startDatum))
         .slice(0, 10) // Token limit
-        .map((e) => ({ titel: e.titel, datum: e.startDatum, tijd: e.startTijd ?? "Hele dag", locatie: e.locatie, conflict: e.conflictMetDienst })),
+        .map((e) => ({ titel: e.titel, datum: e.startDatum, tijd: e.startTijd ?? "Hele dag", locatie: e.locatie, conflict: detectConflict(e) })),
       syncInfo: syncMeta ? { laatsteSyncOp: syncMeta.importedAt, bron: syncMeta.fileName, totaalRijen: syncMeta.totalRows } : null,
     };
   },

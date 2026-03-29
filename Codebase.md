@@ -275,8 +275,8 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 **Calendar tools detail:**
 - `afspraakMaken` → `personalEvents.create()` (PendingCreate → cron push met Google Calendar kleuren)
-- `afspraakBewerken` → `updatePersonalEvent.updateEvent()` (instant dual-write naar Google + Convex)
-- `afspraakVerwijderen` → `deletePersonalEvent.deleteEvent()` (instant dual-write — zoekt op titel)
+- `afspraakBewerken` → `updatePersonalEvent.updateEvent()` (instant dual-write — met disambiguatie bij meerdere matches)
+- `afspraakVerwijderen` → `deletePersonalEvent.deleteEvent()` (instant dual-write — met disambiguatie bij meerdere matches)
 - `afsprakenOpvragen` → Query met inline conflict detectie tegen diensten
 
 ---
@@ -398,18 +398,17 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `Sidebar` | ~150 | Desktop nav met route links, active indicator, Clerk UserButton |
 | `BottomNav` | ~100 | Mobile bottom navigation met animated indicator |
 
-### 9.2 Schedule (9)
+### 9.2 Schedule (8)
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
 | **StatsView** | 368 | Jaar/maand statistieken met interactieve kaarten, ShiftBar (horizontaal gestapeld), TeamSplit badges, MonthDetail (week breakdown) |
 | **SalarisView** | 260 | PrognoseCard (bruto/netto + ORT detail), JaarSectie met custom bar chart, MaandRij met breakdown, TotaalCard grid |
 | **CreateEventModal** | 318 | Full CRUD modal (create + edit) met 9 categorieën, hele-dag toggle, animated visibility, `[categorie:xxx]` tag in beschrijving |
-| **NextShiftCard** | ~270 | Volgende dienst kaart met conflict warnings, countdown timer |
+| **NextShiftCard** | 223 | Volgende dienst kaart met conflict warnings, countdown timer, DRY conflictMap |
 | **AfsprakenView** | ~240 | Afspraken CRUD lijst met edit/delete, conflict indicators |
 | **PersonalEventItem** | ~230 | Event kaart met categorie badge, conflict chip, edit/delete buttons |
 | **DienstItem** | ~120 | Dienst kaart met shift type badge, team indicator, status icon |
-| **NextAppointmentCard** | ~70 | Volgende afspraak kaart (compact) |
 | **RoosterPanel** | ~120 | Wrapper panel voor rooster pagina |
 
 ### 9.3 Finance (8)
@@ -485,8 +484,13 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 - **Command queue:** Telegram/AI → `deviceCommands` tabel → FastAPI bridge pollt → UDP naar lampen (decoupled)
 - **Dual-write email:** Gmail API call + Convex mutation in elke operatie (consistency)
 - **On-demand body:** Email bodies nooit opgeslagen → altijd vers uit Gmail API (50KB × 1000s besparing)
-- **Pending lifecycle:** PendingCreate → (cron) → promoted met Google ID; PendingDelete → (cron) → hard delete
+- **Pending lifecycle:** PendingCreate → (cron) → promoted met Google ID; PendingDelete → legacy (instant delete is nu primair pad)
 - **Incremental sync:** Gmail History API (delta's), met full sync fallback bij verlopen historyId
+
+### AI Conflict Detectie
+- **On-the-fly:** Rooster agent `getContext()` berekent conflicten real-time via `detectConflict()` helper (event × dienst op dezelfde datum)
+- **Client-side:** `conflictDetection.ts` in `usePersonalEvents()` hook (3-level: hard/soft/info)
+- **Schema veld:** `conflictMetDienst` in personalEvents schema is deprecated (nooit actief geschreven)
 
 ### Query Patterns
 - **Dual pagination:** Transacties: daterange → `collect()` (pad A) vs full → `paginate()` (pad B)
@@ -548,12 +552,12 @@ convex/
 │   │       ├── email.ts               # 194 regels
 │   │       ├── finance.ts             # 427 regels
 │   │       ├── schedule.ts            # 135 regels
-│   │       ├── calendar.ts            # 166 regels
+│   │       ├── calendar.ts            # 206 regels
 │   │       └── smarthome.ts           # 68 regels
 │   └── agents/
 │       ├── dashboard.ts               # 83 regels
 │       ├── lampen.ts                  # 126 regels
-│       ├── rooster.ts                 # 142 regels
+│       ├── rooster.ts                 # 152 regels
 │       ├── finance.ts                 # 137 regels
 │       ├── email.ts                   # 111 regels
 │       └── automations.ts             # 118 regels
@@ -562,7 +566,7 @@ convex/
     └── api.ts                         # 142 regels
 ```
 
-### Frontend (46 bestanden)
+### Frontend (45 bestanden)
 ```
 app/
 ├── page.tsx                           # 334 regels (Dashboard)
@@ -589,7 +593,7 @@ hooks/
 ├── useRooms.ts                        # ~45 regels
 ├── useHomeapp.ts                      # ~15 regels
 ├── useSchedule.ts                     # ~155 regels
-├── usePersonalEvents.ts               # ~130 regels
+├── usePersonalEvents.ts               # 129 regels
 ├── useSalary.ts                       # ~100 regels
 ├── useTransactions.ts                 # ~85 regels
 ├── useAutomations.ts                  # ~110 regels
@@ -610,7 +614,6 @@ components/
 │   ├── AfsprakenView.tsx              # ~240 regels
 │   ├── PersonalEventItem.tsx          # ~230 regels
 │   ├── DienstItem.tsx                 # ~120 regels
-│   ├── NextAppointmentCard.tsx        # ~70 regels
 │   └── RoosterPanel.tsx              # ~120 regels
 ├── finance/
 │   ├── CsvUploader.tsx                # 195 regels
@@ -646,7 +649,7 @@ components/
 | **Agent context getters** | 6 |
 | **Frontend pages** | 6 |
 | **React hooks** | 11 |
-| **UI components** | 26 |
+| **UI components** | 25 |
 | **Lib modules** | 14 (9 frontend + 5 backend) |
 | **Cron jobs** | 6 |
 | **Auto-categorisatie regels** | 24 regex patterns |

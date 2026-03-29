@@ -44,5 +44,5 @@ export const eventFields = {
   beschrijving:      v.optional(v.string()),
   status:            v.string(),            // "Aankomend" | "Voorbij" | "PendingCreate" | "VERWIJDERD"
   kalender:          v.string(),            // "Main"
-  conflictMetDienst: v.optional(v.string()),
+  conflictMetDienst: v.optional(v.string()), // ⚠️ DEPRECATED — nooit actief geschreven, bewaard voor schema-compat
 };

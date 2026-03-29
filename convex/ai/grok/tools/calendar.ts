@@ -8,17 +8,42 @@
 import { api } from "../../../_generated/api";
 import { todayCET } from "../types";
 
+/** Corrigeert Google's +1 dag quirk voor hele-dag events. */
+function displayEndDate(e: any): string {
+  if (!e.heledag) return e.eindDatum || e.startDatum;
+  const raw = e.eindDatum;
+  if (!raw || raw.length < 10) return e.startDatum;
+  const d = new Date(raw + "T12:00:00");
+  if (isNaN(d.getTime())) return e.startDatum;
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function handleAfspraakBewerken(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
     const zoekterm = (args.zoekterm as string).toLowerCase();
     const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
-    const match = allEvents.find((e: any) =>
+    const matches = allEvents.filter((e: any) =>
       e.status === "Aankomend" && e.titel?.toLowerCase().includes(zoekterm)
     );
 
-    if (!match) {
+    if (matches.length === 0) {
       return JSON.stringify({ error: `Geen aankomende afspraak gevonden met "${args.zoekterm}"` });
     }
+
+    // Meerdere matches? Geef lijst terug zodat Grok kan disambigueren
+    if (matches.length > 1) {
+      return JSON.stringify({
+        error: `Meerdere afspraken gevonden met "${args.zoekterm}"`,
+        opties: matches.map((e: any) => ({
+          titel: e.titel, datum: e.startDatum,
+          tijd: e.heledag ? "hele dag" : `${e.startTijd}-${e.eindTijd}`,
+        })),
+        hint: "Vraag de gebruiker welke bedoeld wordt en gebruik een specifiekere zoekterm.",
+      });
+    }
+
+    const match = matches[0];
 
     const result = await ctx.runAction(api.actions.updatePersonalEvent.updateEvent, {
       userId,
@@ -100,14 +125,27 @@ export async function handleAfspraakVerwijderen(ctx: any, args: Record<string, u
     // Zoek de afspraak op titel
     const zoekterm = (args.zoekterm as string).toLowerCase();
     const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
-    const match = allEvents.find((e: any) =>
+    const matches = allEvents.filter((e: any) =>
       e.status !== "VERWIJDERD" && e.status !== "Voorbij" &&
       e.titel?.toLowerCase().includes(zoekterm)
     );
 
-    if (!match) {
+    if (matches.length === 0) {
       return JSON.stringify({ error: `Geen aankomende afspraak gevonden met "${args.zoekterm}"` });
     }
+
+    if (matches.length > 1) {
+      return JSON.stringify({
+        error: `Meerdere afspraken gevonden met "${args.zoekterm}"`,
+        opties: matches.map((e: any) => ({
+          titel: e.titel, datum: e.startDatum,
+          tijd: e.heledag ? "hele dag" : `${e.startTijd}-${e.eindTijd}`,
+        })),
+        hint: "Vraag de gebruiker welke bedoeld wordt en gebruik een specifiekere zoekterm.",
+      });
+    }
+
+    const match = matches[0];
 
     // Instant dual-write: verwijder uit Google Calendar + Convex DB in één stap
     const result = await ctx.runAction(api.actions.deletePersonalEvent.deleteEvent, {
@@ -146,8 +184,10 @@ export async function handleAfsprakenOpvragen(ctx: any, args: Record<string, unk
     const afspraken = upcoming.map((e: any) => {
       const d = new Date(e.startDatum + "T00:00:00");
       const dienst = schedule.find((s: any) => s.startDatum === e.startDatum && s.status !== "VERWIJDERD");
+      const endDatum = displayEndDate(e);
       return {
         titel: e.titel, datum: e.startDatum, dag: weekdays[d.getDay()],
+        eindDatum: e.startDatum !== endDatum ? endDatum : undefined,
         tijd: e.heledag ? "Hele dag" : `${e.startTijd ?? "?"} - ${e.eindTijd ?? "?"}`,
         locatie: e.locatie, beschrijving: e.beschrijving,
         conflict: dienst ? `⚠️ Conflict met ${dienst.shiftType} dienst (${dienst.startTijd}-${dienst.eindTijd})` : null,
