@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { StickyNote, Plus, ChevronRight, Pin } from "lucide-react";
+import { StickyNote, Plus, ChevronRight, Pin, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
 
@@ -11,11 +11,16 @@ export function QuickNote() {
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Parse #tags from the text input
   const handleQuickSave = async () => {
     if (!text.trim()) return;
     setSaving(true);
     try {
-      await create({ inhoud: text.trim() });
+      const { cleanText, extractedTags } = parseHashTags(text.trim());
+      await create({
+        inhoud: cleanText,
+        tags: extractedTags.length > 0 ? extractedTags : undefined,
+      });
       setText("");
     } finally {
       setSaving(false);
@@ -23,11 +28,19 @@ export function QuickNote() {
   };
 
   const recent = notes.slice(0, 3);
+  const totalPinned = notes.filter((n) => n.isPinned).length;
 
   return (
     <section>
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-slate-500 uppercase tracking-wider">Notities</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-slate-500 uppercase tracking-wider">Notities</p>
+          {notes.length > 0 && (
+            <span className="text-[10px] text-slate-600 bg-white/5 px-1.5 py-0.5 rounded-md tabular-nums">
+              {notes.length}{totalPinned > 0 ? ` · ${totalPinned} 📌` : ""}
+            </span>
+          )}
+        </div>
         <Link
           href="/notities"
           className="text-xs text-amber-400/70 hover:text-amber-400 transition-colors flex items-center gap-1"
@@ -42,7 +55,7 @@ export function QuickNote() {
           <StickyNote size={14} className="text-amber-400/50 shrink-0" />
           <input
             type="text"
-            placeholder="Snel iets noteren..."
+            placeholder="Snel noteren... (#tag voor labels)"
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -66,11 +79,21 @@ export function QuickNote() {
             </motion.button>
           )}
         </div>
+        {/* Show extracted tags preview */}
+        {text.includes("#") && (
+          <div className="px-3 pb-2 flex items-center gap-1">
+            {parseHashTags(text).extractedTags.map((t) => (
+              <span key={t} className="text-[10px] text-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                #{t}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Recent notes */}
       {!isLoading && recent.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           {recent.map((note) => (
             <RecentNoteRow key={note._id} note={note} />
           ))}
@@ -82,6 +105,7 @@ export function QuickNote() {
 
 function RecentNoteRow({ note }: { note: NoteRecord }) {
   const displayTitle = note.titel || note.inhoud.slice(0, 50);
+  const checklistInfo = getQuickChecklistInfo(note.inhoud);
 
   return (
     <Link href="/notities">
@@ -94,10 +118,16 @@ function RecentNoteRow({ note }: { note: NoteRecord }) {
           className="w-1.5 h-1.5 rounded-full shrink-0"
           style={{ background: note.kleur ?? "#475569" }}
         />
-        <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate">
+        <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate flex-1 min-w-0">
           {displayTitle}
         </span>
-        <span className="text-[10px] text-slate-600 ml-auto shrink-0">
+        {checklistInfo && (
+          <span className="text-[10px] text-slate-600 shrink-0 tabular-nums">
+            <ListChecks size={9} className="inline mr-0.5" />
+            {checklistInfo}
+          </span>
+        )}
+        <span className="text-[10px] text-slate-600 shrink-0">
           {formatCompact(note.gewijzigd)}
         </span>
       </motion.div>
@@ -105,10 +135,34 @@ function RecentNoteRow({ note }: { note: NoteRecord }) {
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function parseHashTags(text: string) {
+  const tagPattern = /#([a-zA-Z\u00C0-\u024F0-9_-]+)/g;
+  const extractedTags: string[] = [];
+  let match;
+  while ((match = tagPattern.exec(text)) !== null) {
+    const tag = match[1].toLowerCase();
+    if (!extractedTags.includes(tag)) extractedTags.push(tag);
+  }
+  const cleanText = text.replace(tagPattern, "").replace(/\s{2,}/g, " ").trim();
+  return { cleanText, extractedTags };
+}
+
+function getQuickChecklistInfo(text: string): string | null {
+  const lines = text.split("\n");
+  const total = lines.filter((l) => /^- \[[ x]\] /i.test(l)).length;
+  if (total === 0) return null;
+  const done = lines.filter((l) => /^- \[x\] /i.test(l)).length;
+  return `${done}/${total}`;
+}
+
 function formatCompact(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const hrs = Math.floor(diff / 3600000);
   if (hrs < 1) return "nu";
   if (hrs < 24) return `${hrs}u`;
-  return `${Math.floor(hrs / 24)}d`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d`;
+  return `${Math.floor(days / 7)}w`;
 }

@@ -22,6 +22,7 @@ import type * as ai_agents_dashboard from "../ai/agents/dashboard.js";
 import type * as ai_agents_email from "../ai/agents/email.js";
 import type * as ai_agents_finance from "../ai/agents/finance.js";
 import type * as ai_agents_lampen from "../ai/agents/lampen.js";
+import type * as ai_agents_notes from "../ai/agents/notes.js";
 import type * as ai_agents_rooster from "../ai/agents/rooster.js";
 import type * as ai_grok_chat from "../ai/grok/chat.js";
 import type * as ai_grok_prompt from "../ai/grok/prompt.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   "ai/agents/email": typeof ai_agents_email;
   "ai/agents/finance": typeof ai_agents_finance;
   "ai/agents/lampen": typeof ai_agents_lampen;
+  "ai/agents/notes": typeof ai_agents_notes;
   "ai/agents/rooster": typeof ai_agents_rooster;
   "ai/grok/chat": typeof ai_grok_chat;
   "ai/grok/prompt": typeof ai_grok_prompt;

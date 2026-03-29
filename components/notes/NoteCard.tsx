@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Pin, Archive, Trash2, Edit3, Tag } from "lucide-react";
+import { Pin, Archive, Trash2, Tag, ListChecks } from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
 
 interface NoteCardProps {
@@ -10,15 +10,30 @@ interface NoteCardProps {
   onTogglePin: (id: NoteRecord["_id"]) => void;
   onArchive:   (id: NoteRecord["_id"]) => void;
   onDelete:    (id: NoteRecord["_id"]) => void;
+  onUpdateContent?: (id: NoteRecord["_id"], inhoud: string) => void;
   masked?:     boolean;
 }
 
-const KLEUR_OPACITY = "25"; // hex opacity for card tint
+const KLEUR_OPACITY = "25";
 
-export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, masked }: NoteCardProps) {
+export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpdateContent, masked }: NoteCardProps) {
   const displayTitle = note.titel || note.inhoud.slice(0, 50);
   const preview = note.inhoud.length > 120 ? note.inhoud.slice(0, 120) + "…" : note.inhoud;
   const age = formatAge(note.gewijzigd);
+  const checklistInfo = getChecklistInfo(note.inhoud);
+
+  // Toggle a specific checkbox line in the note content
+  const toggleCheckbox = (lineIndex: number) => {
+    if (!onUpdateContent) return;
+    const lines = note.inhoud.split("\n");
+    const line = lines[lineIndex];
+    if (UNCHECKED.test(line)) {
+      lines[lineIndex] = line.replace("- [ ]", "- [x]");
+    } else if (CHECKED.test(line)) {
+      lines[lineIndex] = line.replace(/- \[x\]/i, "- [ ]");
+    }
+    onUpdateContent(note._id, lines.join("\n"));
+  };
 
   return (
     <motion.div
@@ -48,13 +63,31 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, maske
         </h3>
 
         {/* Content preview — with checklist support */}
-        <div className="text-xs text-slate-500 line-clamp-3 mb-3 leading-relaxed">
-          {masked ? "•••• •••• ••••" : renderPreview(preview)}
+        <div className="text-xs text-slate-500 line-clamp-4 mb-2 leading-relaxed">
+          {masked ? "•••• •••• ••••" : renderPreview(preview, onUpdateContent ? toggleCheckbox : undefined)}
         </div>
 
         {/* Checklist progress (if applicable) */}
-        {!masked && hasChecklist(note.inhoud) && (
-          <ChecklistProgress inhoud={note.inhoud} />
+        {!masked && checklistInfo.total > 0 && (
+          <div className="flex items-center gap-2 mb-2">
+            <ListChecks size={10} className="text-slate-600 shrink-0" />
+            <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${checklistInfo.pct}%`,
+                  background: checklistInfo.pct === 100
+                    ? "#22c55e"
+                    : checklistInfo.pct > 50
+                      ? "#f59e0b"
+                      : "#64748b",
+                }}
+              />
+            </div>
+            <span className="text-[10px] text-slate-600 shrink-0 tabular-nums">
+              {checklistInfo.done}/{checklistInfo.total}
+            </span>
+          </div>
         )}
 
         {/* Footer: tags + time + actions */}
@@ -69,6 +102,9 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, maske
                 {tag}
               </span>
             ))}
+            {(note.tags ?? []).length > 2 && (
+              <span className="text-[10px] text-slate-600">+{(note.tags ?? []).length - 2}</span>
+            )}
             <span className="text-[10px] text-slate-600">{age}</span>
           </div>
 
@@ -102,6 +138,8 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, maske
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function formatAge(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
@@ -111,26 +149,31 @@ function formatAge(iso: string): string {
   if (hrs < 24) return `${hrs}u`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d`;
-  return `${Math.floor(days / 7)}w`;
+  if (days < 30) return `${Math.floor(days / 7)}w`;
+  return new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
 }
-
-// ─── Checklist helpers ────────────────────────────────────────────────────────
 
 const UNCHECKED = /^- \[ \] (.+)$/;
 const CHECKED   = /^- \[x\] (.+)$/i;
 
-function hasChecklist(text: string): boolean {
-  return UNCHECKED.test(text) || CHECKED.test(text);
+function getChecklistInfo(text: string) {
+  const lines = text.split("\n");
+  const total = lines.filter((l) => UNCHECKED.test(l) || CHECKED.test(l)).length;
+  const done  = lines.filter((l) => CHECKED.test(l)).length;
+  return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
-function renderPreview(text: string) {
+function renderPreview(text: string, onToggle?: (lineIdx: number) => void) {
   const lines = text.split("\n").slice(0, 4);
   return lines.map((line, i) => {
     const unchecked = UNCHECKED.exec(line);
     if (unchecked) {
       return (
         <div key={i} className="flex items-start gap-1.5">
-          <span className="mt-0.5 w-3 h-3 rounded-[3px] border border-white/20 shrink-0" />
+          <span
+            onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(i); } : undefined}
+            className={`mt-0.5 w-3 h-3 rounded-[3px] border border-white/20 shrink-0 ${onToggle ? "cursor-pointer hover:border-amber-400/50" : ""}`}
+          />
           <span>{unchecked[1]}</span>
         </div>
       );
@@ -139,7 +182,10 @@ function renderPreview(text: string) {
     if (checked) {
       return (
         <div key={i} className="flex items-start gap-1.5">
-          <span className="mt-0.5 w-3 h-3 rounded-[3px] bg-emerald-500/40 border border-emerald-500/50 shrink-0 flex items-center justify-center text-[7px] text-emerald-300">✓</span>
+          <span
+            onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(i); } : undefined}
+            className={`mt-0.5 w-3 h-3 rounded-[3px] bg-emerald-500/40 border border-emerald-500/50 shrink-0 flex items-center justify-center text-[7px] text-emerald-300 ${onToggle ? "cursor-pointer hover:bg-emerald-500/60" : ""}`}
+          >✓</span>
           <span className="line-through text-slate-600">{checked[1]}</span>
         </div>
       );
@@ -147,27 +193,3 @@ function renderPreview(text: string) {
     return <div key={i}>{line}</div>;
   });
 }
-
-function ChecklistProgress({ inhoud }: { inhoud: string }) {
-  const lines = inhoud.split("\n");
-  const total   = lines.filter((l) => UNCHECKED.test(l) || CHECKED.test(l)).length;
-  const done    = lines.filter((l) => CHECKED.test(l)).length;
-  if (total === 0) return null;
-  const pct = Math.round((done / total) * 100);
-
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all"
-          style={{
-            width: `${pct}%`,
-            background: pct === 100 ? "#22c55e" : "#f59e0b",
-          }}
-        />
-      </div>
-      <span className="text-[10px] text-slate-600 shrink-0">{done}/{total}</span>
-    </div>
-  );
-}
-

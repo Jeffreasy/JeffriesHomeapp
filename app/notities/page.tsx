@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  StickyNote, Plus, Search, Pin, Archive, Tag,
-  Eye, EyeOff, Filter,
+  StickyNote, Plus, Search, Archive, Tag,
+  Eye, EyeOff, Filter, ArrowDownAZ, ArrowUpDown, Clock,
 } from "lucide-react";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
 import { usePrivacy } from "@/hooks/usePrivacy";
@@ -13,6 +13,7 @@ import { NoteEditor } from "@/components/notes/NoteEditor";
 import type { Id } from "@/convex/_generated/dataModel";
 
 type ViewMode = "active" | "archived";
+type SortMode = "recent" | "oldest" | "title";
 
 export default function NotitiesPage() {
   const {
@@ -22,21 +23,76 @@ export default function NotitiesPage() {
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy();
 
   const [viewMode, setViewMode] = useState<ViewMode>("active");
+  const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editNote, setEditNote] = useState<NoteRecord | null>(null);
 
-  // Filter notes
-  const displayed = (viewMode === "active" ? notes : archived).filter((n) => {
-    if (tagFilter && !(n.tags ?? []).includes(tagFilter)) return false;
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // ─── Keyboard shortcuts ─────────────────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't trigger when typing in inputs
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        handleNew();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // ─── Sort + Filter ──────────────────────────────────────────────
+  const displayed = useMemo(() => {
+    let list = viewMode === "active" ? [...notes] : [...archived];
+
+    // Tag filter
+    if (tagFilter) {
+      list = list.filter((n) => (n.tags ?? []).includes(tagFilter));
+    }
+
+    // Search filter
     if (search.trim()) {
       const q = search.toLowerCase();
-      const haystack = `${n.titel ?? ""} ${n.inhoud} ${(n.tags ?? []).join(" ")}`.toLowerCase();
-      if (!haystack.includes(q)) return false;
+      list = list.filter((n) => {
+        const haystack = `${n.titel ?? ""} ${n.inhoud} ${(n.tags ?? []).join(" ")}`.toLowerCase();
+        return haystack.includes(q);
+      });
     }
-    return true;
-  });
+
+    // Sort (pinned always first in active view)
+    list.sort((a, b) => {
+      if (viewMode === "active" && a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+      switch (sortMode) {
+        case "oldest": return a.gewijzigd.localeCompare(b.gewijzigd);
+        case "title":  return (a.titel ?? a.inhoud).localeCompare(b.titel ?? b.inhoud, "nl");
+        default:       return b.gewijzigd.localeCompare(a.gewijzigd);
+      }
+    });
+
+    return list;
+  }, [notes, archived, viewMode, tagFilter, search, sortMode]);
+
+  // Tag counts for filter chips
+  const tagCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    const source = viewMode === "active" ? notes : archived;
+    for (const n of source) {
+      for (const t of n.tags ?? []) {
+        map.set(t, (map.get(t) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [notes, archived, viewMode]);
 
   const handleEdit = (note: NoteRecord) => {
     setEditNote(note);
@@ -62,9 +118,22 @@ export default function NotitiesPage() {
     }
   };
 
+  // Inline checkbox toggle (update content without opening the editor)
+  const handleUpdateContent = async (id: Id<"notes">, inhoud: string) => {
+    await update(id, { inhoud });
+  };
+
+  const cycleSortMode = () => {
+    const modes: SortMode[] = ["recent", "oldest", "title"];
+    const idx = modes.indexOf(sortMode);
+    setSortMode(modes[(idx + 1) % modes.length]);
+  };
+
+  const sortLabel = { recent: "Nieuwst", oldest: "Oudst", title: "A→Z" }[sortMode];
+
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: "#0a0a0f" }}>
-      {/* ─── Header ────────────────────────────────────────────────────── */}
+      {/* ─── Header ──────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 py-4">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           <div className="flex items-center gap-3">
@@ -99,26 +168,46 @@ export default function NotitiesPage() {
               onClick={handleNew}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer"
             >
-              <Plus size={14} /> Nieuw
+              <Plus size={14} />
+              <span className="hidden sm:inline">Nieuw</span>
+              <kbd className="hidden sm:inline text-[9px] text-amber-400/40 bg-amber-500/10 px-1 rounded">N</kbd>
             </motion.button>
           </div>
         </div>
       </header>
 
-      <main className="px-6 py-5 max-w-4xl mx-auto space-y-5">
-        {/* ─── Search + Filters ──────────────────────────────────────── */}
+      <main className="px-6 py-5 max-w-4xl mx-auto space-y-4">
+        {/* ─── Search + Sort + View ────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Search */}
           <div className="flex-1 flex items-center gap-2 px-3 py-2 glass rounded-xl border border-white/5">
             <Search size={14} className="text-slate-500 shrink-0" />
             <input
+              ref={searchRef}
               type="text"
-              placeholder="Zoek in notities..."
+              placeholder="Zoek in notities... (Ctrl+K)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-600 outline-none"
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="text-slate-600 hover:text-slate-400 cursor-pointer"
+              >
+                <span className="text-xs">✕</span>
+              </button>
+            )}
           </div>
+
+          {/* Sort */}
+          <button
+            onClick={cycleSortMode}
+            className="flex items-center gap-1.5 px-3 py-2 glass rounded-xl border border-white/5 text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
+          >
+            {sortMode === "title" ? <ArrowDownAZ size={13} /> : sortMode === "oldest" ? <Clock size={13} /> : <ArrowUpDown size={13} />}
+            {sortLabel}
+          </button>
 
           {/* View toggle */}
           <div className="flex items-center gap-1 glass rounded-xl border border-white/5 p-1">
@@ -171,12 +260,13 @@ export default function NotitiesPage() {
                 }`}
               >
                 <Tag size={8} /> {tag}
+                <span className="text-slate-600 ml-0.5">{tagCounts.get(tag) ?? 0}</span>
               </button>
             ))}
           </div>
         )}
 
-        {/* ─── Notes Grid ────────────────────────────────────────────── */}
+        {/* ─── Notes Grid ──────────────────────────────────────────── */}
         {isLoading ? (
           <div className="text-center py-16">
             <div className="w-8 h-8 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin mx-auto" />
@@ -184,16 +274,28 @@ export default function NotitiesPage() {
         ) : displayed.length === 0 ? (
           <div className="text-center py-16">
             <StickyNote size={32} className="text-slate-600 mx-auto mb-3" />
-            <p className="text-sm text-slate-500 mb-4">
+            <p className="text-sm text-slate-500 mb-1">
               {search || tagFilter ? "Geen notities gevonden" : "Nog geen notities"}
             </p>
-            {!search && !tagFilter && (
+            {search || tagFilter ? (
               <button
-                onClick={handleNew}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                onClick={() => { setSearch(""); setTagFilter(null); }}
+                className="text-xs text-amber-400/60 hover:text-amber-400 cursor-pointer"
               >
-                <Plus size={12} /> Eerste notitie maken
+                Filters wissen
               </button>
+            ) : (
+              <div className="space-y-2 mt-4">
+                <button
+                  onClick={handleNew}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <Plus size={12} /> Eerste notitie maken
+                </button>
+                <p className="text-[10px] text-slate-600">
+                  Druk op <kbd className="px-1 py-0.5 bg-white/5 rounded text-slate-400">N</kbd> voor een nieuwe notitie
+                </p>
+              </div>
             )}
           </div>
         ) : (
@@ -207,6 +309,7 @@ export default function NotitiesPage() {
                   onTogglePin={togglePin}
                   onArchive={archive}
                   onDelete={handleDelete}
+                  onUpdateContent={handleUpdateContent}
                   masked={privacyOn}
                 />
               ))}
@@ -215,7 +318,7 @@ export default function NotitiesPage() {
         )}
       </main>
 
-      {/* ─── Editor Modal ──────────────────────────────────────────── */}
+      {/* ─── Editor Modal ────────────────────────────────────────── */}
       <AnimatePresence>
         {editorOpen && (
           <NoteEditor

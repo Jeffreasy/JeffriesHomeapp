@@ -76,6 +76,9 @@ import { automationsAgent } from "./agents/automations";
 // Email agent (consolidated)
 import { emailAgent }           from "./agents/email";
 
+// Notes agent
+import { notesAgent }           from "./agents/notes";
+
 export const AGENT_REGISTRY: AgentDefinition[] = [
   // ── Core ──────────────────────────
   dashboardAgent,
@@ -86,6 +89,9 @@ export const AGENT_REGISTRY: AgentDefinition[] = [
 
   // ── Email ──────────────────────────
   emailAgent,
+
+  // ── Notes ──────────────────────────
+  notesAgent,
 ];
 
 export function getAgent(id: string): AgentDefinition | undefined {
