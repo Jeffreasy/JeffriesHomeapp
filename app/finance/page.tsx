@@ -161,11 +161,11 @@ export default function FinancePage() {
             </p>
           </div>
         </div>
-        <div className="finance-import" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div className="finance-import flex items-center gap-2">
           <button
             onClick={togglePrivacy}
             title={privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer shrink-0 ${
               privacyOn
                 ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/30"
                 : "bg-white/5 text-slate-500 border-white/10 hover:text-slate-300"
