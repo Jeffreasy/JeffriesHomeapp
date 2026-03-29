@@ -602,7 +602,8 @@ hooks/
 ├── useAutomations.ts                  # ~110 regels
 ├── useGlobalShortcuts.ts              # ~30 regels
 ├── useDebounce.ts                     # ~35 regels
-├── useLoonstroken.ts                  # 75 regels
+├── useLoonstroken.ts                  # 87 regels
+├── usePrivacy.ts                      # 38 regels — privacy toggle (localStorage)
 └── useSwipe.ts                        # ~30 regels
 
 components/
