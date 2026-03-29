@@ -33,24 +33,25 @@ graph TB
         Lampen["/lampen"]
         Rooster["/rooster"]
         Finance["/finance"]
+        Notities["/notities"]
         Automations["/automations"]
         Settings["/settings"]
     end
 
     subgraph ConvexBackend["Convex Backend"]
-        Schema["Schema (12 tabellen)"]
+        Schema["Schema (14 tabellen)"]
         HTTP["HTTP Router"]
-        DataModules["Data Modules (6)"]
+        DataModules["Data Modules (7)"]
         Actions["9 Server Actions"]
-        AgentCtx["6 Agent Context Getters"]
+        AgentCtx["7 Agent Context Getters"]
         Crons["6 Cron Jobs"]
         AI["Grok AI Engine"]
     end
 
     subgraph FrontendLib["Frontend Libraries"]
-        Hooks["11 Hooks"]
+        Hooks["12 Hooks"]
         Libs["9 Lib Modules"]
-        Components["26 UI Components"]
+        Components["31 UI Components"]
     end
 
     subgraph External["Externe Services"]
@@ -76,7 +77,7 @@ graph TB
 
 ---
 
-## 3. Database Schema (12 tabellen)
+## 3. Database Schema (14 tabellen)
 
 | Tabel | Beschrijving | Key Fields | Indices |
 |-------|-------------|------------|---------|
@@ -91,6 +92,8 @@ graph TB
 | **personalEvents** | Persoonlijke Google Agenda | eventId, titel, startDatum, heledag, status (Aankomend/PendingCreate/PendingDelete/Voorbij/VERWIJDERD), kalender | `by_user`, `by_user_date`, `by_user_status`, `by_user_eventId` |
 | **emails** | Gmail metadata + snippet | gmailId, threadId, from, subject, snippet, searchText, isGelezen, isSter, isVerwijderd, categorie | `by_user`, `by_user_datum`, `by_user_thread`, `by_user_gmailId`, `search_emails` (FTS) |
 | **emailSyncMeta** | Gmail sync cursor (incremental) | historyId, lastFullSync, totalSynced | `by_user` |
+| **loonstroken** | Uploaded loonstrook data | userId, jaar, periode, brutoloon, nettoloon, uren | `by_user`, `by_user_periode` |
+| **notes** | Persoonlijke notities | userId, titel?, inhoud, tags?, kleur?, isPinned, isArchived, aangemaakt, gewijzigd | `by_user`, `by_user_pinned`, `search_notes` (FTS) |
 
 ---
 
@@ -214,7 +217,7 @@ graph TB
 - `ToolParameter` — naam, type, beschrijving, verplicht, enum?, default?
 - `toMeta()` — Strip `getContext` voor API responses
 
-**Registry:** Array van 6 `AgentDefinition` objecten, opzoekbaar via `getAgent(id)`
+**Registry:** Array van 7 `AgentDefinition` objecten, opzoekbaar via `getAgent(id)`
 
 ### 6.2 Agent Context Getters
 
@@ -228,6 +231,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **finance** | salaris huidig (bruto/netto/ort) + periode | Salary history (6 maanden) + 30-dagen categorie verdeling + top 10 uitgaven + in/uit balans |
 | **email** | totaal/ongelezen/prullenbak | Stats (inbox/ongelezen/ster/verzonden) + top 10 afzenders + categorie verdeling + triage suggesties + 15 recente emails |
 | **automations** | totaal/actief | Alle regels met triggers + 5 cron jobs info + sync health (rooster/gmail/todoist/calendar) |
+| **notes** | totaal/pin count + recente titels | Alle notities (id/titel/inhoud/tags/isPinned/aangemaakt/gewijzigd) + pin count |
 
 **Key pattern:** Dashboard agent roept alle andere agents aan met `{ lite: true }` — voorkomt enorme context window bij de briefing.
 
@@ -263,7 +267,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 - **Lamp command detectie** (`detectLampCommand()`): Direct aan/uit/dim/scene zonder AI
 - **Voice support:** Groq Whisper STT → transcriptie → processText()
 
-**22 Grok Tools** ([definitions.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/ai/grok/tools/definitions.ts), 422 regels):
+**22 Grok Tools + 3 Notes Tools = 25 totaal** ([definitions.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/ai/grok/tools/definitions.ts), 467 regels):
 
 | Domein | Tools | Handler |
 |--------|-------|---------|
@@ -272,6 +276,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | Schedule | dienstenOpvragen, salarisOpvragen | `schedule.ts` |
 | Calendar | afspraakMaken, afspraakBewerken, afspraakVerwijderen, afsprakenOpvragen | `calendar.ts` |
 | Finance | saldoOpvragen, transactiesZoeken, uitgavenOverzicht, maandVergelijken, vasteLastenAnalyse, categorieWijzigen, bulkCategoriseren, ongelabeldAnalyse | `finance.ts` |
+| Notes | notitieMaken, notitiesZoeken, notitiePinnen | `notes.ts` |
 
 **Calendar tools detail:**
 - `afspraakMaken` → `personalEvents.create()` (PendingCreate → cron push met Google Calendar kleuren)
@@ -385,10 +390,12 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `useGlobalShortcuts` | Native `useEffect` + keydown | Spatiebalk = master toggle lampen |
 | `useDebounce` / `useDebouncedCallback` | Custom | Debounced values en callbacks (voor sliders) |
 | `useSwipe` | Touch events | Swipe gesture detectie voor BottomSheet |
+| `useNotes` | Convex `useQuery` | Notes CRUD + split (active/archived/pinned) + allTags + `NoteRecord` type export |
+| `usePrivacy` | Zustand persist | Privacy toggle (mask sensitive data) |
 
 ---
 
-## 9. UI Components — Volledige Analyse (26 components)
+## 9. UI Components — Volledige Analyse (31 components)
 
 ### 9.1 Layout (3)
 
@@ -412,7 +419,15 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **LoonstrookUploader** | 207 | PDF drag-drop uploader (multi-file), preview tabel, Convex bulk import, pdfjs-dist parsing |
 | **RoosterPanel** | ~120 | Wrapper panel voor rooster pagina |
 
-### 9.3 Finance (8)
+### 9.3 Notes (3)
+
+| Component | Regels | Functie |
+|-----------|--------|---------|
+| **NoteCard** | 210 | Kaart met kleur-tint, pin/archief/delete hover-acties, inline checkbox toggling (klik checkbox → direct DB update), tag overflow (+N), 3-kleur progress bar, ARIA checkbox roles |
+| **NoteEditor** | 292 | Modal editor met auto-resize textarea, Ctrl+Enter save, Esc close, ListChecks insert, auto-continue checklist op Enter, woord/teken teller, kleur picker, tag input, body scroll lock |
+| **QuickNote** | 174 | Dashboard widget: inline quick-capture met #tag auto-extractie en live preview, recente notities met checklist progress, compact datum formatting |
+
+### 9.4 Finance (8)
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
@@ -425,7 +440,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **SearchBar** | ~20 | Zoekbalk component |
 | **SectionHeader** | ~12 | Sectie header component |
 
-### 9.4 Lamp (3)
+### 9.5 Lamp (3)
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
@@ -433,7 +448,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **LampControl** | 229 | Full control panel: brightness slider, mode toggle (white/color), color temp slider (mireds 153-455), HexColorPicker + 8 preset swatches, **debounced API** (200ms brightness/temp, 120ms color) |
 | **LampDetailPanel** | ~150 | Desktop slide-out panel met LampControl + device info |
 
-### 9.5 Automations (3)
+### 9.6 Automations (3)
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
@@ -441,7 +456,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **AutomationForm** | ~230 | Multi-step form: naam, trigger (tijd/dagen/diensttype), actie (scene/brightness/color/toggle), device selectie |
 | **DienstWekkerSection** | ~70 | Pre-built automation packs (Vroeg/Laat/Dienst) met kleurcodering, one-click install/remove |
 
-### 9.6 Overige directories
+### 9.7 Overige directories
 
 | Directory | Contents |
 |-----------|----------|
