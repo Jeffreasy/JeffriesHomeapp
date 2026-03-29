@@ -42,7 +42,7 @@ function StatCard({
       >
         <div className="flex items-start justify-between">
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: `${accent}18`, border: `1px solid ${accent}30` }}
           >
             <Icon size={17} style={{ color: accent }} />
@@ -72,7 +72,7 @@ function QuickScene({
     <motion.button
       whileTap={{ scale: 0.93 }}
       onClick={onApply}
-      className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium border border-white/8 hover:border-white/15 transition-all flex-shrink-0"
+      className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium border border-white/8 hover:border-white/15 transition-all shrink-0"
       style={{ background: `${scene.color}12` }}
     >
       <Circle size={8} style={{ color: scene.color, fill: scene.color }} />
@@ -214,7 +214,7 @@ export default function DashboardPage() {
                   sendCommand({ id: d.id, cmd: { on: false } })
                 )
               }
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium border border-white/8 hover:border-white/15 bg-white/5 transition-all flex-shrink-0"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium border border-white/8 hover:border-white/15 bg-white/5 transition-all shrink-0"
             >
               <Power size={12} className="text-slate-400" />
               <span className="text-slate-400">Uit</span>
@@ -306,7 +306,7 @@ export default function DashboardPage() {
                   className="glass rounded-xl p-3.5 border border-white/5 hover:border-white/10 flex items-center gap-3 transition-all group cursor-pointer"
                 >
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                     style={{ background: `${accent}15`, border: `1px solid ${accent}25` }}
                   >
                     <Icon size={15} style={{ color: accent }} />

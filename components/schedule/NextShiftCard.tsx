@@ -190,12 +190,12 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
         <div className="space-y-1.5 text-sm">
           {dienst.locatie && (
             <div className="flex items-center gap-2 text-slate-300">
-              <MapPin size={13} className="text-slate-500 flex-shrink-0" />
+              <MapPin size={13} className="text-slate-500 shrink-0" />
               <span className="truncate">{dienst.locatie}</span>
             </div>
           )}
           <div className="flex items-center gap-2 text-slate-300">
-            <Timer size={13} className="text-slate-500 flex-shrink-0" />
+            <Timer size={13} className="text-slate-500 shrink-0" />
             <span>{dienst.duur} uur · Team {dienst.team || "?"}</span>
           </div>
         </div>
