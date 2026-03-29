@@ -4,6 +4,7 @@ import { Clock, MapPin, Timer, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { type ConflictInfo } from "@/lib/conflictDetection";
 import { cn } from "@/lib/utils";
 
 /** Format ISO date string (YYYY-MM-DD) → DD-MM-YYYY veilig. */
@@ -32,9 +33,10 @@ interface NextShiftCardProps {
   compact?:   boolean;
   onImport?:  () => void;
   afspraken?: PersonalEvent[];
+  conflictMap?: Map<string, ConflictInfo>;
 }
 
-export function NextShiftCard({ dienst, compact, onImport, afspraken = [] }: NextShiftCardProps) {
+export function NextShiftCard({ dienst, compact, onImport, afspraken = [], conflictMap }: NextShiftCardProps) {
   if (!dienst) {
     return (
       <div className={cn(
@@ -63,6 +65,25 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [] }: Nex
   const isTomorrow   = relativeDay === "morgen";
   const isZondag     = dienst.dag === "Zondag";
   const isZaterdag   = dienst.dag === "Zaterdag";
+
+  /** Resolve conflict display — uses conflictMap (accurate) when available; inline fallback otherwise. */
+  const resolveConflict = (evt: PersonalEvent) => {
+    const ci = conflictMap?.get(evt.eventId);
+    const isHeledag = evt.heledag || !evt.startTijd;
+    const level = ci?.level
+      ?? (isHeledag ? "soft"
+        : (evt.startTijd && evt.eindTijd && evt.startTijd < dienst.eindTijd && evt.eindTijd > dienst.startTijd) ? "hard"
+        : "info");
+    return {
+      textClass: level === "hard" ? "text-red-400" : level === "soft" ? "text-amber-400" : "text-blue-400",
+      textColor: level === "hard" ? "#ef4444" : level === "soft" ? "#f59e0b" : "#60a5fa",
+      bg:     level === "hard" ? "rgba(239,68,68,0.10)" : level === "soft" ? "rgba(245,158,11,0.10)" : "rgba(96,165,250,0.08)",
+      border: level === "hard" ? "rgba(239,68,68,0.25)" : level === "soft" ? "rgba(245,158,11,0.25)" : "rgba(96,165,250,0.20)",
+      icon:      level === "hard" ? "⚠" : isHeledag ? "📅" : "ℹ",
+      timeLabel: isHeledag ? "hele dag" : `${evt.startTijd}–${evt.eindTijd}`,
+      suffix:    level === "hard" ? " — overlapt!" : "",
+    };
+  };
 
   // ── Compact card (dashboard) ──────────────────────────────────────────────────
   if (compact) {
@@ -100,19 +121,10 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [] }: Nex
             {afspraken.length > 0 && (
               <div className="mt-1.5 space-y-0.5">
                 {afspraken.map(evt => {
-                  // Determine conflict level inline
-                  const isHeledag = evt.heledag || !evt.startTijd;
-                  const hasTimeOverlap = !isHeledag && evt.startTijd && evt.eindTijd && dienst
-                    && evt.startTijd < dienst.eindTijd && evt.eindTijd > dienst.startTijd;
-                  
-                  const levelColor = hasTimeOverlap ? "text-red-400" : isHeledag ? "text-amber-400" : "text-blue-400";
-                  const icon = hasTimeOverlap ? "⚠" : isHeledag ? "📅" : "ℹ";
-                  const timeLabel = isHeledag ? "hele dag" : `${evt.startTijd}–${evt.eindTijd}`;
-                  const suffix = hasTimeOverlap ? " — overlapt!" : "";
-
+                  const c = resolveConflict(evt);
                   return (
-                    <p key={evt.eventId} className={`text-[10px] font-medium ${levelColor}`}>
-                      {icon} {evt.titel} · {timeLabel}{suffix}
+                    <p key={evt.eventId} className={`text-[10px] font-medium ${c.textClass}`}>
+                      {c.icon} {evt.titel} · {c.timeLabel}{c.suffix}
                     </p>
                   );
                 })}
@@ -192,30 +204,14 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [] }: Nex
         {afspraken.length > 0 && (
           <div className="mt-3 space-y-1">
             {afspraken.map(evt => {
-              const isHeledag = evt.heledag || !evt.startTijd;
-              const hasTimeOverlap = !isHeledag && evt.startTijd && evt.eindTijd && dienst
-                && evt.startTijd < dienst.eindTijd && evt.eindTijd > dienst.startTijd;
-
-              const bgColor = hasTimeOverlap
-                ? "rgba(239,68,68,0.10)" : isHeledag
-                ? "rgba(245,158,11,0.10)" : "rgba(96,165,250,0.08)";
-              const borderColor = hasTimeOverlap
-                ? "rgba(239,68,68,0.25)" : isHeledag
-                ? "rgba(245,158,11,0.25)" : "rgba(96,165,250,0.20)";
-              const textColor = hasTimeOverlap
-                ? "#ef4444" : isHeledag
-                ? "#f59e0b" : "#60a5fa";
-              const icon = hasTimeOverlap ? "⚠" : isHeledag ? "📅" : "ℹ";
-              const timeLabel = isHeledag ? "hele dag" : `${evt.startTijd}–${evt.eindTijd}`;
-              const suffix = hasTimeOverlap ? " — overlapt!" : "";
-
+              const c = resolveConflict(evt);
               return (
                 <div key={evt.eventId}
                   className="flex items-center gap-2 text-xs px-3 py-2 rounded-xl"
-                  style={{ background: bgColor, border: `1px solid ${borderColor}`, color: textColor }}
+                  style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.textColor }}
                 >
-                  <span>{icon}</span>
-                  <span>{evt.titel} · {timeLabel}{suffix}</span>
+                  <span>{c.icon}</span>
+                  <span>{evt.titel} · {c.timeLabel}{c.suffix}</span>
                 </div>
               );
             })}

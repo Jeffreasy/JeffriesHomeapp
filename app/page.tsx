@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Lightbulb, Calendar, CalendarDays, Landmark, Zap, ChevronRight,
-  TrendingUp, Power, Circle,
+  TrendingUp, Power, Circle, Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
@@ -97,6 +97,7 @@ export default function DashboardPage() {
     setEditEvent(evt);
     setModalOpen(true);
   };
+  const openNewEvent = () => { setEditEvent(null); setModalOpen(true); };
 
   const onlineDevices = devices.filter((d) => d.status === "online");
   const onDevices = devices.filter((d) => d.current_state?.on);
@@ -230,33 +231,63 @@ export default function DashboardPage() {
                 Rooster <ChevronRight size={12} />
               </Link>
             </div>
-            <NextShiftCard dienst={nextDienst} compact afspraken={nextDienst ? eventsByDate[nextDienst.startDatum] : undefined} />
+            <NextShiftCard dienst={nextDienst} compact afspraken={nextDienst ? eventsByDate[nextDienst.startDatum] : undefined} conflictMap={conflictMap} />
           </section>
         )}
 
         {/* ─── Aankomende afspraken ────────────────────────────────────────── */}
-        {upcomingEvents.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Aankomende afspraken</p>
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-slate-500 uppercase tracking-wider">Aankomende afspraken</p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openNewEvent}
+                className="flex items-center gap-1 text-xs text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/25 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+              >
+                <Plus size={11} /> Nieuw
+              </button>
               <Link href="/rooster" className="text-xs text-indigo-400/70 hover:text-indigo-400 transition-colors flex items-center gap-1">
                 Agenda <ChevronRight size={12} />
               </Link>
             </div>
-            <div className="glass rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden">
-              {upcomingEvents.slice(0, 5).map(evt => (
-                <div key={evt.eventId} className="px-3 py-0.5">
-                  <PersonalEventItem
-                    event={evt}
-                    isToday={evt.startDatum === new Date().toISOString().slice(0, 10)}
-                    onEdit={handleEditEvent}
-                    conflictInfo={conflictMap.get(evt.eventId)}
-                  />
-                </div>
-              ))}
+          </div>
+
+          {upcomingEvents.length > 0 ? (
+            <>
+              <div className="glass rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden">
+                {upcomingEvents.slice(0, 5).map(evt => (
+                  <div key={evt.eventId} className="px-3 py-0.5">
+                    <PersonalEventItem
+                      event={evt}
+                      isToday={evt.startDatum === new Date().toISOString().slice(0, 10)}
+                      onEdit={handleEditEvent}
+                      conflictInfo={conflictMap.get(evt.eventId)}
+                    />
+                  </div>
+                ))}
+              </div>
+              {upcomingEvents.length > 5 && (
+                <Link
+                  href="/rooster"
+                  className="block text-center text-xs text-indigo-400/70 hover:text-indigo-400 mt-2 transition-colors"
+                >
+                  +{upcomingEvents.length - 5} meer bekijken
+                </Link>
+              )}
+            </>
+          ) : (
+            <div className="glass rounded-xl border border-dashed border-white/10 p-6 text-center">
+              <CalendarDays size={24} className="text-slate-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-500 mb-3">Geen aankomende afspraken</p>
+              <button
+                onClick={openNewEvent}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/25 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+              >
+                <Plus size={12} /> Afspraak aanmaken
+              </button>
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* ─── Quick links grid ─────────────────────────────────────────────── */}
         <section>

@@ -21,6 +21,8 @@ const COMMAND_MAP: Record<string, { agentId: string; beschrijving: string }> = {
   "/briefing":    { agentId: "dashboard",      beschrijving: "📊 Dagelijkse briefing" },
   "/lampen":      { agentId: "lampen",          beschrijving: "💡 Lamp status" },
   "/rooster":     { agentId: "rooster",         beschrijving: "📅 Weekplanning" },
+  "/afspraak":    { agentId: "rooster",         beschrijving: "📌 Afspraak beheren" },
+  "/agenda":      { agentId: "rooster",         beschrijving: "📌 Agenda overzicht" },
   "/finance":     { agentId: "finance",         beschrijving: "💰 Salaris & transacties" },
   "/email":       { agentId: "email",           beschrijving: "📧 Inbox overzicht" },
   "/inbox":       { agentId: "email",           beschrijving: "📊 Inbox analyse" },

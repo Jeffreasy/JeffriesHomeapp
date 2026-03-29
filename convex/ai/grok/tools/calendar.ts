@@ -61,7 +61,7 @@ export async function handleAfspraakMaken(ctx: any, args: Record<string, unknown
     const categorie = (args.categorie as string) ?? "overig";
     const rawBeschrijving = (args.beschrijving as string) ?? "";
     const beschrijving = rawBeschrijving
-      ? `${rawBeschrijving}\n\n---\n[categorie:${categorie}]`
+      ? `${rawBeschrijving} [categorie:${categorie}]`
       : `[categorie:${categorie}]`;
 
     const result = await ctx.runMutation(api.personalEvents.create, {
@@ -97,16 +97,32 @@ export async function handleAfspraakMaken(ctx: any, args: Record<string, unknown
 
 export async function handleAfspraakVerwijderen(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
-    const result = await ctx.runMutation(api.personalEvents.remove, {
-      userId, zoekterm: args.zoekterm as string,
-    });
-    if (!result.ok) {
-      return JSON.stringify({ error: result.error ?? "Afspraak niet gevonden" });
+    // Zoek de afspraak op titel
+    const zoekterm = (args.zoekterm as string).toLowerCase();
+    const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
+    const match = allEvents.find((e: any) =>
+      e.status !== "VERWIJDERD" && e.status !== "Voorbij" &&
+      e.titel?.toLowerCase().includes(zoekterm)
+    );
+
+    if (!match) {
+      return JSON.stringify({ error: `Geen aankomende afspraak gevonden met "${args.zoekterm}"` });
     }
+
+    // Instant dual-write: verwijder uit Google Calendar + Convex DB in één stap
+    const result = await ctx.runAction(api.actions.deletePersonalEvent.deleteEvent, {
+      userId, eventId: match.eventId,
+    });
+
+    if (!result.ok) {
+      return JSON.stringify({ error: result.message ?? "Verwijderen mislukt" });
+    }
+
     return JSON.stringify({
-      ok: true, beschrijving: result.beschrijving,
-      eventId: result.eventId,
-      status: "Wordt automatisch uit Google Calendar verwijderd",
+      ok: true,
+      beschrijving: `"${match.titel}" verwijderd uit Google Calendar`,
+      eventId: match.eventId,
+      status: "Direct verwijderd uit Google Calendar en lokale database",
     });
   } catch (err) {
     return JSON.stringify({ error: `Afspraak verwijderen mislukt: ${(err as Error).message}` });
