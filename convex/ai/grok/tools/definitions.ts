@@ -418,4 +418,49 @@ BELANGRIJK — Professioneel Template Protocol:
       },
     },
   },
+  // ──────────────── Notes tools ────────────────────────────────────────────
+  {
+    type: "function" as const,
+    function: {
+      name: "notitieMaken",
+      description: "Maak een nieuwe persoonlijke notitie aan. Gebruik dit als de gebruiker zegt 'schrijf op', 'noteer', 'onthoud', 'maak een notitie', of een boodschappenlijst dicteert.",
+      parameters: {
+        type: "object",
+        properties: {
+          inhoud:  { type: "string", description: "De tekst van de notitie. Gebruik '- [ ] item' syntax voor checklist items." },
+          titel:   { type: "string", description: "Optionele korte titel voor de notitie" },
+          tags:    { type: "array", items: { type: "string" }, description: "Optionele tags (bijv. ['boodschappen', 'werk'])" },
+        },
+        required: ["inhoud"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "notitiesZoeken",
+      description: "Doorzoek persoonlijke notities op inhoud. Gebruik dit als de gebruiker vraagt 'wat had ik genoteerd over...', 'zoek in mijn notities', of 'heb ik een notitie over...'.",
+      parameters: {
+        type: "object",
+        properties: {
+          zoekterm: { type: "string", description: "Zoekterm om in notities te zoeken" },
+        },
+        required: ["zoekterm"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "notitiePinnen",
+      description: "Pin of unpin een notitie zodat deze bovenaan blijft staan. Gebruik dit als de gebruiker vraagt 'pin die notitie', 'maak deze belangrijk', of 'zet bovenaan'.",
+      parameters: {
+        type: "object",
+        properties: {
+          noteId: { type: "string", description: "Het ID van de notitie om te pinnen/unpinnen" },
+        },
+        required: ["noteId"],
+      },
+    },
+  },
 ];

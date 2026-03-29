@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Home, Settings, Zap, LogIn, Calendar, Landmark, Lightbulb } from "lucide-react";
+import { Home, Settings, Zap, LogIn, Calendar, Landmark, Lightbulb, StickyNote } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
@@ -9,12 +9,13 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 
 const navItems = [
-  { href: "/",             icon: Home,      label: "Dashboard"   },
-  { href: "/lampen",      icon: Lightbulb, label: "Lampen"      },
-  { href: "/rooster",     icon: Calendar,  label: "Rooster"     },
-  { href: "/finance",     icon: Landmark,  label: "Finance"     },
-  { href: "/automations", icon: Zap,       label: "Automatisch" },
-  { href: "/settings",    icon: Settings,  label: "Instellingen" },
+  { href: "/",             icon: Home,       label: "Dashboard"    },
+  { href: "/lampen",      icon: Lightbulb,  label: "Lampen"       },
+  { href: "/rooster",     icon: Calendar,   label: "Rooster"      },
+  { href: "/finance",     icon: Landmark,   label: "Finance"      },
+  { href: "/notities",   icon: StickyNote, label: "Notities"     },
+  { href: "/automations", icon: Zap,        label: "Automatisch"  },
+  { href: "/settings",    icon: Settings,   label: "Instellingen" },
 ];
 
 /** Only render Clerk UserButton on desktop to prevent portal from leaking on mobile */
@@ -47,7 +48,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-white/5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
             <Home size={16} className="text-amber-400" />
           </div>
           <span className="hidden md:block text-sm font-bold text-white tracking-tight">Homeapp</span>
@@ -69,7 +70,7 @@ export function Sidebar() {
                     : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
                 )}
               >
-                <Icon size={17} className="flex-shrink-0" />
+                <Icon size={17} className="shrink-0" />
                 <span className="hidden md:block font-medium">{label}</span>
               </motion.div>
             </Link>
@@ -82,7 +83,7 @@ export function Sidebar() {
         {!isLoaded ? (
           /* Loading skeleton */
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse flex-shrink-0" />
+            <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse shrink-0" />
             <div className="hidden md:flex flex-col gap-1.5 flex-1">
               <div className="h-2.5 w-20 bg-white/5 rounded animate-pulse" />
               <div className="h-2 w-28 bg-white/5 rounded animate-pulse" />
@@ -94,7 +95,7 @@ export function Sidebar() {
               <UserButton
                 appearance={{
                   elements: {
-                    avatarBox: "w-8 h-8 flex-shrink-0",
+                    avatarBox: "w-8 h-8 shrink-0",
                     userButtonPopoverCard: {
                       background: "#111118",
                       border: "1px solid rgba(255,255,255,0.1)",
@@ -115,7 +116,7 @@ export function Sidebar() {
         ) : (
           <SignInButton mode="redirect" >
             <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-all text-sm border border-transparent hover:border-amber-500/20">
-              <LogIn size={17} className="flex-shrink-0" />
+              <LogIn size={17} className="shrink-0" />
               <span className="hidden md:block font-medium">Inloggen</span>
             </button>
           </SignInButton>

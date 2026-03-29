@@ -30,6 +30,7 @@ import type * as ai_grok_tools_definitions from "../ai/grok/tools/definitions.js
 import type * as ai_grok_tools_email from "../ai/grok/tools/email.js";
 import type * as ai_grok_tools_executor from "../ai/grok/tools/executor.js";
 import type * as ai_grok_tools_finance from "../ai/grok/tools/finance.js";
+import type * as ai_grok_tools_notes from "../ai/grok/tools/notes.js";
 import type * as ai_grok_tools_schedule from "../ai/grok/tools/schedule.js";
 import type * as ai_grok_tools_smarthome from "../ai/grok/tools/smarthome.js";
 import type * as ai_grok_types from "../ai/grok/types.js";
@@ -48,6 +49,7 @@ import type * as lib_fields from "../lib/fields.js";
 import type * as lib_googleAuth from "../lib/googleAuth.js";
 import type * as lib_salaryCalc from "../lib/salaryCalc.js";
 import type * as loonstroken from "../loonstroken.js";
+import type * as notes from "../notes.js";
 import type * as personalEvents from "../personalEvents.js";
 import type * as salary from "../salary.js";
 import type * as schedule from "../schedule.js";
@@ -84,6 +86,7 @@ declare const fullApi: ApiFromModules<{
   "ai/grok/tools/email": typeof ai_grok_tools_email;
   "ai/grok/tools/executor": typeof ai_grok_tools_executor;
   "ai/grok/tools/finance": typeof ai_grok_tools_finance;
+  "ai/grok/tools/notes": typeof ai_grok_tools_notes;
   "ai/grok/tools/schedule": typeof ai_grok_tools_schedule;
   "ai/grok/tools/smarthome": typeof ai_grok_tools_smarthome;
   "ai/grok/types": typeof ai_grok_types;
@@ -102,6 +105,7 @@ declare const fullApi: ApiFromModules<{
   "lib/googleAuth": typeof lib_googleAuth;
   "lib/salaryCalc": typeof lib_salaryCalc;
   loonstroken: typeof loonstroken;
+  notes: typeof notes;
   personalEvents: typeof personalEvents;
   salary: typeof salary;
   schedule: typeof schedule;

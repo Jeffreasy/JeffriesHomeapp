@@ -21,6 +21,9 @@ import {
 import {
   handleAfspraakBewerken, handleAfspraakMaken, handleAfspraakVerwijderen, handleAfsprakenOpvragen,
 } from "./calendar";
+import {
+  handleNotitieMaken, handleNotitiesZoeken, handleNotitiePinnen,
+} from "./notes";
 
 // ─── Tool name → handler mapping ─────────────────────────────────────────────
 
@@ -61,6 +64,11 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   afspraakBewerken:    handleAfspraakBewerken,
   afspraakVerwijderen: handleAfspraakVerwijderen,
   afsprakenOpvragen:   handleAfsprakenOpvragen,
+
+  // Notes
+  notitieMaken:        handleNotitieMaken,
+  notitiesZoeken:      handleNotitiesZoeken,
+  notitiePinnen:       handleNotitiePinnen,
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

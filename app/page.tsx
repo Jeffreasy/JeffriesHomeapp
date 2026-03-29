@@ -17,6 +17,7 @@ import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { CUSTOM_SCENES } from "@/lib/scenes";
+import { QuickNote } from "@/components/notes/QuickNote";
 
 // ─── Stat Card ───────────────────────────────────────────────────────────────
 
@@ -314,6 +315,9 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
+
+        {/* ─── Quick Notes ─────────────────────────────────────────────── */}
+        <QuickNote />
 
         {/* ─── Quick links grid ─────────────────────────────────────────────── */}
         <section>
