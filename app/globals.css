@@ -1067,6 +1067,13 @@ a,
     justify-content: space-between;
   }
   .finance-import { flex-shrink: 0; min-width: 340px; }
+  /* Compact uploader in header context */
+  .finance-import .finance-uploader { min-height: auto; }
+  .finance-import .dropzone {
+    padding: 16px 20px;
+    gap: 6px;
+  }
+  .finance-import .dropzone__icon { display: none; }
 }
 
 /* ─── List header responsive ────────────────────────────────────────────────── */
