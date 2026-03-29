@@ -39,7 +39,7 @@ export function useNotes() {
   const archiveNote = useMutation(api.notes.archive);
   const removeNote  = useMutation(api.notes.remove);
 
-  // Split into active + archived, pinned first
+  // Split into active + archived
   const { active, archived, pinned } = useMemo(() => {
     if (!raw) return { active: [], archived: [], pinned: [] };
 
@@ -55,12 +55,6 @@ export function useNotes() {
         if (n.isPinned) pin.push(n);
       }
     }
-
-    // Sort: pinned first, then by gewijzigd desc
-    act.sort((a, b) => {
-      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-      return b.gewijzigd.localeCompare(a.gewijzigd);
-    });
 
     return { active: act, archived: arch, pinned: pin };
   }, [raw]);

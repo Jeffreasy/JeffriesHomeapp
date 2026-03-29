@@ -36,8 +36,13 @@ export function QuickNote() {
         <div className="flex items-center gap-2">
           <p className="text-xs text-slate-500 uppercase tracking-wider">Notities</p>
           {notes.length > 0 && (
-            <span className="text-[10px] text-slate-600 bg-white/5 px-1.5 py-0.5 rounded-md tabular-nums">
-              {notes.length}{totalPinned > 0 ? ` · ${totalPinned} 📌` : ""}
+            <span className="inline-flex items-center gap-1 text-[10px] text-slate-600 bg-white/5 px-1.5 py-0.5 rounded-md tabular-nums">
+              {notes.length}
+              {totalPinned > 0 && (
+                <span className="inline-flex items-center gap-0.5">
+                  · {totalPinned} <Pin size={9} className="text-amber-400 fill-amber-400" />
+                </span>
+              )}
             </span>
           )}
         </div>

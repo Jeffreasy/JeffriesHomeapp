@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Pin, Archive, Trash2, Tag, ListChecks } from "lucide-react";
+import { Pin, Archive, Trash2, Tag, ListChecks, Check } from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
 
 interface NoteCardProps {
@@ -18,19 +18,20 @@ const KLEUR_OPACITY = "25";
 
 export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpdateContent, masked }: NoteCardProps) {
   const displayTitle = note.titel || note.inhoud.slice(0, 50);
-  const preview = note.inhoud.length > 120 ? note.inhoud.slice(0, 120) + "…" : note.inhoud;
   const age = formatAge(note.gewijzigd);
   const checklistInfo = getChecklistInfo(note.inhoud);
+  const allLines = note.inhoud.split("\n");
 
-  // Toggle a specific checkbox line in the note content
-  const toggleCheckbox = (lineIndex: number) => {
+  // Toggle a specific checkbox line in the ORIGINAL content by original line index
+  const toggleCheckbox = (originalLineIndex: number) => {
     if (!onUpdateContent) return;
-    const lines = note.inhoud.split("\n");
-    const line = lines[lineIndex];
+    const lines = [...allLines];
+    const line = lines[originalLineIndex];
+    if (!line) return;
     if (UNCHECKED.test(line)) {
-      lines[lineIndex] = line.replace("- [ ]", "- [x]");
+      lines[originalLineIndex] = line.replace("- [ ]", "- [x]");
     } else if (CHECKED.test(line)) {
-      lines[lineIndex] = line.replace(/- \[x\]/i, "- [ ]");
+      lines[originalLineIndex] = line.replace(/- \[x\]/i, "- [ ]");
     }
     onUpdateContent(note._id, lines.join("\n"));
   };
@@ -64,14 +65,14 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
 
         {/* Content preview — with checklist support */}
         <div className="text-xs text-slate-500 line-clamp-4 mb-2 leading-relaxed">
-          {masked ? "•••• •••• ••••" : renderPreview(preview, onUpdateContent ? toggleCheckbox : undefined)}
+          {masked ? "•••• •••• ••••" : renderPreview(allLines, onUpdateContent ? toggleCheckbox : undefined)}
         </div>
 
         {/* Checklist progress (if applicable) */}
         {!masked && checklistInfo.total > 0 && (
           <div className="flex items-center gap-2 mb-2">
-            <ListChecks size={10} className="text-slate-600 shrink-0" />
-            <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden">
+            <ListChecks size={10} className="text-slate-600 shrink-0" aria-hidden="true" />
+            <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden" role="progressbar" aria-valuenow={checklistInfo.pct} aria-valuemin={0} aria-valuemax={100}>
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
@@ -98,7 +99,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
                 key={tag}
                 className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 bg-white/5 px-1.5 py-0.5 rounded-md"
               >
-                <Tag size={8} />
+                <Tag size={8} aria-hidden="true" />
                 {tag}
               </span>
             ))}
@@ -113,21 +114,21 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
             <button
               onClick={(e) => { e.stopPropagation(); onTogglePin(note._id); }}
               className="p-1 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
-              title={note.isPinned ? "Losmaken" : "Vastpinnen"}
+              aria-label={note.isPinned ? "Losmaken" : "Vastpinnen"}
             >
               <Pin size={12} className={note.isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onArchive(note._id); }}
               className="p-1 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
-              title="Archiveren"
+              aria-label="Archiveren"
             >
               <Archive size={12} className="text-slate-500" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(note._id); }}
               className="p-1 rounded-md hover:bg-red-500/20 transition-colors cursor-pointer"
-              title="Verwijderen"
+              aria-label="Verwijderen"
             >
               <Trash2 size={12} className="text-slate-500 hover:text-red-400" />
             </button>
@@ -163,15 +164,25 @@ function getChecklistInfo(text: string) {
   return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
-function renderPreview(text: string, onToggle?: (lineIdx: number) => void) {
-  const lines = text.split("\n").slice(0, 4);
-  return lines.map((line, i) => {
+/**
+ * Renders first 4 lines of content with checkbox support.
+ * Uses ORIGINAL line indices for toggleCheckbox so the correct line is mutated.
+ */
+function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void) {
+  const previewLines = allLines.slice(0, 4);
+  return previewLines.map((line, previewIdx) => {
+    // The preview index IS the original index since we slice from the start
+    const originalIdx = previewIdx;
+
     const unchecked = UNCHECKED.exec(line);
     if (unchecked) {
       return (
-        <div key={i} className="flex items-start gap-1.5">
+        <div key={originalIdx} className="flex items-start gap-1.5">
           <span
-            onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(i); } : undefined}
+            role="checkbox"
+            aria-checked="false"
+            aria-label={unchecked[1]}
+            onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(originalIdx); } : undefined}
             className={`mt-0.5 w-3 h-3 rounded-[3px] border border-white/20 shrink-0 ${onToggle ? "cursor-pointer hover:border-amber-400/50" : ""}`}
           />
           <span>{unchecked[1]}</span>
@@ -181,15 +192,20 @@ function renderPreview(text: string, onToggle?: (lineIdx: number) => void) {
     const checked = CHECKED.exec(line);
     if (checked) {
       return (
-        <div key={i} className="flex items-start gap-1.5">
+        <div key={originalIdx} className="flex items-start gap-1.5">
           <span
-            onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(i); } : undefined}
-            className={`mt-0.5 w-3 h-3 rounded-[3px] bg-emerald-500/40 border border-emerald-500/50 shrink-0 flex items-center justify-center text-[7px] text-emerald-300 ${onToggle ? "cursor-pointer hover:bg-emerald-500/60" : ""}`}
-          >✓</span>
+            role="checkbox"
+            aria-checked="true"
+            aria-label={checked[1]}
+            onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(originalIdx); } : undefined}
+            className={`mt-0.5 w-3 h-3 rounded-[3px] bg-emerald-500/40 border border-emerald-500/50 shrink-0 flex items-center justify-center ${onToggle ? "cursor-pointer hover:bg-emerald-500/60" : ""}`}
+          >
+            <Check size={7} className="text-emerald-300" />
+          </span>
           <span className="line-through text-slate-600">{checked[1]}</span>
         </div>
       );
     }
-    return <div key={i}>{line}</div>;
+    return <div key={originalIdx}>{line}</div>;
   });
 }

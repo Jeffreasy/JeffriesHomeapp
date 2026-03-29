@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  StickyNote, Plus, Search, Archive, Tag,
+  StickyNote, Plus, Search, Archive, Tag, X,
   Eye, EyeOff, Filter, ArrowDownAZ, ArrowUpDown, Clock,
 } from "lucide-react";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
@@ -40,7 +40,8 @@ export default function NotitiesPage() {
 
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
-        handleNew();
+        setEditNote(null);
+        setEditorOpen(true);
       }
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
@@ -176,7 +177,7 @@ export default function NotitiesPage() {
         </div>
       </header>
 
-      <main className="px-6 py-5 max-w-4xl mx-auto space-y-4">
+      <main className="px-6 py-5 pb-24 max-w-4xl mx-auto space-y-4">
         {/* ─── Search + Sort + View ────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Search */}
@@ -194,8 +195,9 @@ export default function NotitiesPage() {
               <button
                 onClick={() => setSearch("")}
                 className="text-slate-600 hover:text-slate-400 cursor-pointer"
+                aria-label="Zoekterm wissen"
               >
-                <span className="text-xs">✕</span>
+                <X size={12} />
               </button>
             )}
           </div>
@@ -203,6 +205,7 @@ export default function NotitiesPage() {
           {/* Sort */}
           <button
             onClick={cycleSortMode}
+            aria-label={`Sorteer op ${sortLabel}`}
             className="flex items-center gap-1.5 px-3 py-2 glass rounded-xl border border-white/5 text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
           >
             {sortMode === "title" ? <ArrowDownAZ size={13} /> : sortMode === "oldest" ? <Clock size={13} /> : <ArrowUpDown size={13} />}

@@ -162,6 +162,8 @@ export const archive = mutation({
 export const remove = mutation({
   args: { id: v.id("notes") },
   handler: async (ctx, { id }) => {
+    const note = await ctx.db.get(id);
+    if (!note) throw new Error("Notitie niet gevonden");
     await ctx.db.delete(id);
   },
 });
@@ -192,11 +194,15 @@ export const createInternal = internalMutation({
 });
 
 export const togglePinInternal = internalMutation({
-  args: { id: v.id("notes") },
+  args: { id: v.string() },
   handler: async (ctx, { id }) => {
-    const note = await ctx.db.get(id);
+    // Look up by querying to safely handle string IDs from Grok tools
+    const note = await ctx.db
+      .query("notes")
+      .filter((q) => q.eq(q.field("_id"), id))
+      .first();
     if (!note) throw new Error("Notitie niet gevonden");
-    await ctx.db.patch(id, {
+    await ctx.db.patch(note._id, {
       isPinned: !note.isPinned,
       gewijzigd: new Date().toISOString(),
     });

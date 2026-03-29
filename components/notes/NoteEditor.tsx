@@ -26,18 +26,24 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
 
   const textRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-focus + auto-resize on mount
-  useEffect(() => {
-    textRef.current?.focus();
-    autoResize();
-  }, []);
-
   // Auto-resize textarea
   const autoResize = useCallback(() => {
     const el = textRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.max(120, Math.min(el.scrollHeight, 360))}px`;
+  }, []);
+
+  // Auto-focus + auto-resize on mount
+  useEffect(() => {
+    textRef.current?.focus();
+    autoResize();
+  }, [autoResize]);
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
   }, []);
 
   const handleContentChange = (val: string) => {
