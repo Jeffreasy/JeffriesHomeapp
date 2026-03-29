@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Lightbulb, Calendar, CalendarDays, Landmark, Zap, ChevronRight,
-  TrendingUp, Power, Circle, Plus,
+  TrendingUp, Power, Circle, Plus, Eye, EyeOff,
 } from "lucide-react";
 import Link from "next/link";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
@@ -15,6 +15,7 @@ import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
+import { usePrivacy } from "@/hooks/usePrivacy";
 import { CUSTOM_SCENES } from "@/lib/scenes";
 
 // ─── Stat Card ───────────────────────────────────────────────────────────────
@@ -91,6 +92,7 @@ export default function DashboardPage() {
   const { huidig: salarisHuidig } = useSalary();
   const loonstroken = useLoonstroken();
   const { upcoming: upcomingEvents, eventsByDate, conflictMap } = usePersonalEvents({ diensten: thisWeek });
+  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy();
 
   // Werkelijk salaris (loonstrook) of berekend (prognose)
   const nu = new Date();
@@ -155,6 +157,20 @@ export default function DashboardPage() {
             <Power size={13} />
             <span className="hidden sm:inline">{allOn ? "Uit" : "Aan"}</span>
           </motion.button>
+
+          {/* Privacy toggle */}
+          <motion.button
+            whileTap={{ scale: 0.93 }}
+            onClick={togglePrivacy}
+            title={privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-xs font-medium border transition-all ${
+              privacyOn
+                ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/30"
+                : "bg-white/5 text-slate-500 border-white/10 hover:text-slate-300"
+            }`}
+          >
+            {privacyOn ? <EyeOff size={13} /> : <Eye size={13} />}
+          </motion.button>
         </div>
       </header>
 
@@ -181,11 +197,11 @@ export default function DashboardPage() {
           <StatCard
             icon={Landmark}
             label={nettoLabel}
-            value={
+            value={mask(
               nettoValue
                 ? `€ ${nettoValue.toLocaleString("nl-NL", { maximumFractionDigits: 0 })}`
                 : "—"
-            }
+            )}
             sub={nettoSub}
             accent="#34d399"
             href="/rooster"

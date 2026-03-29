@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useTransactions }  from "@/hooks/useTransactions";
 import { useLoonstroken }   from "@/hooks/useLoonstroken";
+import { usePrivacy }       from "@/hooks/usePrivacy";
 import { CsvUploader }      from "@/components/finance/CsvUploader";
 import { TransactionList }  from "@/components/finance/TransactionList";
 import { FilterPanel }      from "@/components/finance/FilterPanel";
@@ -22,7 +23,7 @@ import {
   RefreshCw, CreditCard, Download, Filter, RotateCcw,
   PieChart as PieChartIcon, BarChart3, Hash,
   ArrowUpRight, ArrowDownRight, Receipt, ShoppingBag,
-  CalendarDays, Wallet,
+  CalendarDays, Wallet, Eye, EyeOff,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -62,6 +63,7 @@ export default function FinancePage() {
   const [chartView,   setChartView]   = useState<"saldo" | "inuit">("saldo");
   const [jaarFilter,  setJaarFilter]  = useState<string>("2026");
   const loonstroken = useLoonstroken();
+  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy();
   const [filters, setFilters] = useState({
     excludeIntern: true,
     onlyStorneringen: false,
@@ -159,7 +161,20 @@ export default function FinancePage() {
             </p>
           </div>
         </div>
-        <div className="finance-import"><CsvUploader /></div>
+        <div className="finance-import" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <button
+            onClick={togglePrivacy}
+            title={privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${
+              privacyOn
+                ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/30"
+                : "bg-white/5 text-slate-500 border-white/10 hover:text-slate-300"
+            }`}
+          >
+            {privacyOn ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+          <CsvUploader />
+        </div>
       </div>
 
       {/* ─── Jaar Tabs ────────────────────────────────────────────────── */}
@@ -217,32 +232,32 @@ export default function FinancePage() {
         <div className="finance-stats-grid">
           <StatCard
             label="Saldo"
-            value={eur(stats.huidigSaldo)}
+            value={mask(eur(stats.huidigSaldo))}
             sub={ibanFilter ? ibanLabel(ibanFilter) : "Alle rekeningen"}
             icon={Landmark}
             accent={stats.huidigSaldo > 0}
           />
           <StatCard
             label="Totaal inkomsten"
-            value={eur(stats.totaalIn)}
+            value={mask(eur(stats.totaalIn))}
             sub={momDelta
               ? `${momDelta.inkomstenDelta >= 0 ? "+" : ""}${momDelta.inkomstenDelta}% vs vorige mnd`
-              : `gem. ${eur(stats.gemiddeldIn)} /mnd`}
+              : `gem. ${mask(eur(stats.gemiddeldIn))} /mnd`}
             icon={TrendingUp}
             accent
           />
           <StatCard
             label="Totaal uitgaven"
-            value={eur(stats.totaalUit)}
+            value={mask(eur(stats.totaalUit))}
             sub={momDelta
               ? `${momDelta.uitgavenDelta >= 0 ? "+" : ""}${momDelta.uitgavenDelta}% vs vorige mnd`
-              : `gem. ${eur(stats.gemiddeldUit)} /mnd`}
+              : `gem. ${mask(eur(stats.gemiddeldUit))} /mnd`}
             icon={TrendingDown}
             warning={momDelta ? momDelta.uitgavenDelta > 10 : false}
           />
           <StatCard
             label="Netto stroom"
-            value={eur(stats.nettoStroom)}
+            value={mask(eur(stats.nettoStroom))}
             sub={stats.nettoStroom >= 0 ? "In de plus" : "In de min"}
             icon={stats.nettoStroom >= 0 ? ArrowUpRight : ArrowDownRight}
             accent={stats.nettoStroom >= 0}
@@ -264,10 +279,10 @@ export default function FinancePage() {
           {salarisStat && (
             <StatCard
               label="Netto Salaris"
-              value={eur(salarisStat.latest.netto)}
+              value={mask(eur(salarisStat.latest.netto))}
               sub={salarisStat.delta !== 0
-                ? `${salarisStat.delta >= 0 ? "+" : ""}${eur(salarisStat.delta)} vs vorige mnd`
-                : `gem. ${eur(salarisStat.gemNetto)} /mnd`}
+                ? `${salarisStat.delta >= 0 ? "+" : ""}${mask(eur(salarisStat.delta))} vs vorige mnd`
+                : `gem. ${mask(eur(salarisStat.gemNetto))} /mnd`}
               icon={Wallet}
               accent
             />
