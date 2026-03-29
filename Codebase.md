@@ -398,17 +398,18 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `Sidebar` | ~150 | Desktop nav met route links, active indicator, Clerk UserButton |
 | `BottomNav` | ~100 | Mobile bottom navigation met animated indicator |
 
-### 9.2 Schedule (8)
+### 9.2 Schedule (9)
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
 | **StatsView** | 368 | Jaar/maand statistieken met interactieve kaarten, ShiftBar (horizontaal gestapeld), TeamSplit badges, MonthDetail (week breakdown) |
-| **SalarisView** | 260 | PrognoseCard (bruto/netto + ORT detail), JaarSectie met custom bar chart, MaandRij met breakdown, TotaalCard grid |
+| **SalarisView** | 325 | PrognoseCard, JaarSectie bar chart, MaandRij breakdown, TotaalCard grid, LoonstrookUploader integratie, VergelijkingSectie (berekend vs werkelijk) |
 | **CreateEventModal** | 318 | Full CRUD modal (create + edit) met 9 categorieën, hele-dag toggle, animated visibility, `[categorie:xxx]` tag in beschrijving |
 | **NextShiftCard** | 223 | Volgende dienst kaart met conflict warnings, countdown timer, DRY conflictMap |
 | **AfsprakenView** | ~240 | Afspraken CRUD lijst met edit/delete, conflict indicators |
 | **PersonalEventItem** | ~230 | Event kaart met categorie badge, conflict chip, edit/delete buttons |
 | **DienstItem** | ~120 | Dienst kaart met shift type badge, team indicator, status icon |
+| **LoonstrookUploader** | 207 | PDF drag-drop uploader (multi-file), preview tabel, Convex bulk import, pdfjs-dist parsing |
 | **RoosterPanel** | ~120 | Wrapper panel voor rooster pagina |
 
 ### 9.3 Finance (8)
@@ -458,7 +459,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `sync-schedule-daily` | 06:00 UTC | `syncSchedule.syncFromCalendar` | SDB Calendar → schedule tabel |
 | `sync-personal-events-interval` | Elk uur | `syncPersonalEvents.syncFromCalendar` | Primary Calendar → personalEvents |
 | `sync-todoist-daily` | 07:00 UTC | `syncTodoist.syncTodoist` | Schedule → Todoist taken |
-| `process-pending-calendar` | Elk uur | `processPendingCalendar.processPending` | PendingCreate/Delete → Google Calendar |
+| `process-pending-calendar` | Elk uur | `processPendingCalendar.processPending` | PendingCreate → Google Calendar (PendingDelete = legacy, instant delete is primair) |
 | `sync-gmail` | Elke 5 min | `syncGmail.syncFromGmail` | Gmail incremental sync (History API) |
 | `purge-deleted-emails` | 03:00 UTC | `emails.purgeDeletedInternal` | Verwijder >7 dagen trash |
 
@@ -523,6 +524,7 @@ convex/
 ├── emails.ts                          # 438 regels
 ├── schedule.ts                        # 145 regels
 ├── personalEvents.ts                  # 403 regels
+├── loonstroken.ts                     # 120 regels
 ├── automations.ts                     # 93 regels
 ├── actions/
 │   ├── syncSchedule.ts                # 178 regels
@@ -566,7 +568,7 @@ convex/
     └── api.ts                         # 142 regels
 ```
 
-### Frontend (45 bestanden)
+### Frontend (48 bestanden)
 ```
 app/
 ├── page.tsx                           # 334 regels (Dashboard)
@@ -586,6 +588,7 @@ lib/
 ├── api.ts                             # 106 regels
 ├── finance-constants.ts               # 75 regels
 ├── utils.ts                           # ~35 regels
+├── loonstrook-pdf.ts                  # 384 regels
 └── automations.ts                     # ~225 regels
 
 hooks/
@@ -599,6 +602,7 @@ hooks/
 ├── useAutomations.ts                  # ~110 regels
 ├── useGlobalShortcuts.ts              # ~30 regels
 ├── useDebounce.ts                     # ~35 regels
+├── useLoonstroken.ts                  # 75 regels
 └── useSwipe.ts                        # ~30 regels
 
 components/
@@ -608,12 +612,13 @@ components/
 │   └── BottomNav.tsx                  # ~100 regels
 ├── schedule/
 │   ├── StatsView.tsx                  # 368 regels
-│   ├── SalarisView.tsx                # 260 regels
+│   ├── SalarisView.tsx                # 325 regels
 │   ├── CreateEventModal.tsx           # 318 regels
 │   ├── NextShiftCard.tsx              # 223 regels
 │   ├── AfsprakenView.tsx              # ~240 regels
 │   ├── PersonalEventItem.tsx          # ~230 regels
 │   ├── DienstItem.tsx                 # ~120 regels
+│   ├── LoonstrookUploader.tsx         # 207 regels
 │   └── RoosterPanel.tsx              # ~120 regels
 ├── finance/
 │   ├── CsvUploader.tsx                # 195 regels
@@ -643,16 +648,16 @@ components/
 | **Totaal bestanden gelezen** | ~81 |
 | **Totaal regels gelezen** | ~12.000+ |
 | **Coverage** | **100%** |
-| **Convex data modules** | 6 |
+| **Convex data modules** | 7 |
 | **Server actions** | 9 (met 15+ exports in sendGmail) |
 | **AI tools** | 22 |
 | **Agent context getters** | 6 |
 | **Frontend pages** | 6 |
-| **React hooks** | 11 |
-| **UI components** | 25 |
-| **Lib modules** | 14 (9 frontend + 5 backend) |
+| **React hooks** | 12 |
+| **UI components** | 26 |
+| **Lib modules** | 15 (10 frontend + 5 backend) |
 | **Cron jobs** | 6 |
 | **Auto-categorisatie regels** | 24 regex patterns |
 | **Scene presets** | 17 (6 custom + 10 WiZ + 1 uit) |
 | **Finance categorieën** | 26 |
-| **Database tabellen** | 12 |
+| **Database tabellen** | 13 |

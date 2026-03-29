@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import { TrendingUp, Euro, Landmark, Briefcase } from "lucide-react";
+import { TrendingUp, Euro, Landmark, Briefcase, FileUp } from "lucide-react";
 import { useSalary, type SalarisRecord } from "@/hooks/useSalary";
+import { useLoonstroken, type LoonstrookRecord } from "@/hooks/useLoonstroken";
+import { LoonstrookUploader } from "./LoonstrookUploader";
 import { cn } from "@/lib/utils";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -191,6 +193,7 @@ function MaandRij({ record: r }: { record: SalarisRecord }) {
 
 export function SalarisView() {
   const { records, huidig, perJaar, totaalBruto, totaalNetto, isLoading } = useSalary();
+  const loonstroken = useLoonstroken();
 
   const jaren = Object.keys(perJaar)
     .map(Number)
@@ -220,25 +223,39 @@ export function SalarisView() {
   return (
     <div className="space-y-6">
 
-      {/* ── Totalen banner ────────────────────────────────────────────────── */}
+      {/* Totalen banner */}
       <div className="grid grid-cols-3 gap-3">
         <TotaalCard icon={Briefcase} label="Totaal Bruto" value={fmt(totaalBruto)} accent="#f59e0b" />
         <TotaalCard icon={Landmark}  label="Pensioen PFZW" value={fmt(records.reduce((s, r) => s + r.pensioenpremie, 0))} accent="#ef4444" />
-        <TotaalCard icon={TrendingUp} label="≈ Totaal Netto" value={fmt(totaalNetto)} accent="#34d399" />
+        <TotaalCard icon={TrendingUp} label={"\u2248 Totaal Netto"} value={fmt(totaalNetto)} accent="#34d399" />
       </div>
 
-      {/* ── Huidige maand prognose ────────────────────────────────────────── */}
+      {/* Huidige maand prognose */}
       {huidig && <PrognoseCard record={huidig} />}
 
-      {/* ── Per jaar ─────────────────────────────────────────────────────── */}
+      {/* Per jaar */}
       {jaren.map((jaar) => (
         <JaarSectie key={jaar} jaar={jaar} records={perJaar[jaar]} />
       ))}
 
-      {/* ── Disclaimer ────────────────────────────────────────────────────── */}
+      {/* Loonstroken Upload */}
+      <div className="glass rounded-2xl p-5 border border-white/5">
+        <div className="flex items-center gap-2 mb-4">
+          <FileUp size={14} className="text-indigo-400" />
+          <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-bold">Loonstroken uploaden</p>
+        </div>
+        <LoonstrookUploader />
+      </div>
+
+      {/* Werkelijk vs Berekend vergelijking */}
+      {loonstroken.count > 0 && (
+        <VergelijkingSectie berekend={records} werkelijkByPeriode={loonstroken.byPeriode} />
+      )}
+
+      {/* Disclaimer */}
       <p className="text-[10px] text-slate-700 text-center leading-relaxed">
-        ≈ Netto prognose is een schatting op basis van de 2026-loonheffingstabel.
-        De exacte verrekening door 's Heeren Loo kan afwijken door tijdvakfactor en heffingskortingen.
+        {"\u2248"} Netto prognose is een schatting op basis van de 2026-loonheffingstabel.
+        De exacte verrekening door {"'"}s Heeren Loo kan afwijken door tijdvakfactor en heffingskortingen.
       </p>
     </div>
   );
@@ -257,3 +274,68 @@ function TotaalCard({ icon: Icon, label, value, accent }: {
     </div>
   );
 }
+
+// ─── Vergelijking: Berekend vs Werkelijk ──────────────────────────────────────
+
+function VergelijkingSectie({
+  berekend,
+  werkelijkByPeriode,
+}: {
+  berekend: SalarisRecord[];
+  werkelijkByPeriode: Map<string, LoonstrookRecord>;
+}) {
+  const rows = berekend
+    .filter((r) => werkelijkByPeriode.has(r.periode))
+    .map((r) => {
+      const w = werkelijkByPeriode.get(r.periode)!;
+      const deltaNetto = w.netto - r.nettoPrognose;
+      const deltaOrt = w.ortTotaal - r.ortTotaal;
+      return { periode: r.periode, maand: r.maand, jaar: r.jaar, berekend: r, werkelijk: w, deltaNetto, deltaOrt };
+    })
+    .sort((a, b) => a.jaar - b.jaar || a.maand - b.maand);
+
+  if (rows.length === 0) return null;
+
+  const DeltaBadge = ({ delta }: { delta: number }) => {
+    const pos = delta >= 0;
+    return (
+      <span className={cn(
+        "text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded",
+        pos ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
+      )}>
+        {pos ? "+" : ""}{fmt(delta)}
+      </span>
+    );
+  };
+
+  return (
+    <div className="glass rounded-2xl p-5 border border-white/5">
+      <p className="text-[10px] text-teal-400/70 uppercase tracking-wider font-bold mb-3">
+        Berekend vs Werkelijk
+      </p>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", fontSize: "0.75rem", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-muted, #64748b)" }}>Periode</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", color: "#f59e0b" }}>Berekend</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", color: "#34d399" }}>Werkelijk</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--text-muted, #64748b)" }}>Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.periode} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                <td style={{ padding: "6px 8px", fontWeight: 600 }}>{MAANDEN[r.maand - 1]} {r.jaar}</td>
+                <td style={{ padding: "6px 8px", textAlign: "right", color: "#f59e0b" }}>{fmt(r.berekend.nettoPrognose)}</td>
+                <td style={{ padding: "6px 8px", textAlign: "right", color: "#34d399" }}>{fmt(r.werkelijk.netto)}</td>
+                <td style={{ padding: "6px 8px", textAlign: "right" }}><DeltaBadge delta={r.deltaNetto} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+

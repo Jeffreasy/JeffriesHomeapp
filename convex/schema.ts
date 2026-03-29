@@ -262,4 +262,47 @@ export default defineSchema({
     lastFullSync: v.string(),                   // ISO timestamp
     totalSynced:  v.number(),
   }).index("by_user", ["userId"]),
+
+  // ─── Loonstroken (geüploade PDF payslips) ─────────────────────────────────
+  loonstroken: defineTable({
+    userId:            v.string(),
+    jaar:              v.number(),
+    periode:           v.number(),          // 1-12
+    periodeLabel:      v.string(),          // "2026-03"
+    type:              v.string(),          // "loonstrook" | "jaaropgave"
+
+    // Kernbedragen
+    netto:             v.number(),
+    brutoBetaling:     v.number(),
+    brutoInhouding:    v.number(),
+    salarisBasis:      v.number(),
+
+    // ORT
+    ortTotaal:         v.number(),
+    ortDetail:         v.string(),          // JSON: [{pct, uren, bedrag}]
+
+    // Componenten
+    amtZeerintensief:  v.optional(v.number()),
+    pensioenpremie:    v.optional(v.number()),
+    loonheffing:       v.optional(v.number()),
+    reiskosten:        v.optional(v.number()),
+    vakantietoeslag:   v.optional(v.number()),
+    ejuBedrag:         v.optional(v.number()),
+    toeslagBalansvlf:  v.optional(v.number()),
+    extraUrenBedrag:   v.optional(v.number()),
+
+    // Meta
+    schaalnummer:      v.string(),
+    trede:             v.string(),
+    parttimeFactor:    v.number(),
+    uurloon:           v.optional(v.number()),
+
+    // Raw data
+    componenten:       v.string(),          // JSON array alle looncomponenten
+    cumulatieven:      v.optional(v.string()),
+
+    geimporteerdOp:    v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_periode", ["userId", "jaar", "periode"]),
 });
