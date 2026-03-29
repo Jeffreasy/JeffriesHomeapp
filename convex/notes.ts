@@ -67,6 +67,9 @@ export const listForAgent = internalQuery({
         inhoud: n.inhoud.length > 200 ? n.inhoud.slice(0, 200) + "…" : n.inhoud,
         tags: n.tags ?? [],
         isPinned: n.isPinned,
+        deadline: n.deadline ?? null,
+        linkedEventId: n.linkedEventId ?? null,
+        prioriteit: n.prioriteit ?? "normaal",
         aangemaakt: n.aangemaakt,
         gewijzigd: n.gewijzigd,
       })),
@@ -90,45 +93,57 @@ export const searchInternal = internalQuery({
 
 export const create = mutation({
   args: {
-    userId:  v.string(),
-    titel:   v.optional(v.string()),
-    inhoud:  v.string(),
-    tags:    v.optional(v.array(v.string())),
-    kleur:   v.optional(v.string()),
+    userId:        v.string(),
+    titel:         v.optional(v.string()),
+    inhoud:        v.string(),
+    tags:          v.optional(v.array(v.string())),
+    kleur:         v.optional(v.string()),
+    deadline:      v.optional(v.string()),
+    linkedEventId: v.optional(v.string()),
+    prioriteit:    v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = new Date().toISOString();
     return ctx.db.insert("notes", {
-      userId:     args.userId,
-      titel:      args.titel,
-      inhoud:     args.inhoud,
-      tags:       args.tags,
-      kleur:      args.kleur,
-      isPinned:   false,
-      isArchived: false,
-      aangemaakt: now,
-      gewijzigd:  now,
+      userId:        args.userId,
+      titel:         args.titel,
+      inhoud:        args.inhoud,
+      tags:          args.tags,
+      kleur:         args.kleur,
+      deadline:      args.deadline,
+      linkedEventId: args.linkedEventId,
+      prioriteit:    args.prioriteit,
+      isPinned:      false,
+      isArchived:    false,
+      aangemaakt:    now,
+      gewijzigd:     now,
     });
   },
 });
 
 export const update = mutation({
   args: {
-    id:      v.id("notes"),
-    titel:   v.optional(v.string()),
-    inhoud:  v.optional(v.string()),
-    tags:    v.optional(v.array(v.string())),
-    kleur:   v.optional(v.string()),
+    id:            v.id("notes"),
+    titel:         v.optional(v.string()),
+    inhoud:        v.optional(v.string()),
+    tags:          v.optional(v.array(v.string())),
+    kleur:         v.optional(v.string()),
+    deadline:      v.optional(v.string()),
+    linkedEventId: v.optional(v.string()),
+    prioriteit:    v.optional(v.string()),
   },
   handler: async (ctx, { id, ...fields }) => {
     const existing = await ctx.db.get(id);
     if (!existing) throw new Error("Notitie niet gevonden");
 
     const patch: Record<string, unknown> = { gewijzigd: new Date().toISOString() };
-    if (fields.titel !== undefined)  patch.titel  = fields.titel;
-    if (fields.inhoud !== undefined) patch.inhoud  = fields.inhoud;
-    if (fields.tags !== undefined)   patch.tags    = fields.tags;
-    if (fields.kleur !== undefined)  patch.kleur   = fields.kleur;
+    if (fields.titel !== undefined)         patch.titel         = fields.titel;
+    if (fields.inhoud !== undefined)        patch.inhoud         = fields.inhoud;
+    if (fields.tags !== undefined)          patch.tags           = fields.tags;
+    if (fields.kleur !== undefined)         patch.kleur          = fields.kleur;
+    if (fields.deadline !== undefined)      patch.deadline       = fields.deadline;
+    if (fields.linkedEventId !== undefined) patch.linkedEventId  = fields.linkedEventId;
+    if (fields.prioriteit !== undefined)    patch.prioriteit     = fields.prioriteit;
 
     await ctx.db.patch(id, patch);
   },
@@ -172,23 +187,74 @@ export const remove = mutation({
 
 export const createInternal = internalMutation({
   args: {
-    userId:     v.string(),
-    inhoud:     v.string(),
-    titel:      v.optional(v.string()),
-    tags:       v.optional(v.array(v.string())),
-    aangemaakt: v.string(),
-    gewijzigd:  v.string(),
+    userId:        v.string(),
+    inhoud:        v.string(),
+    titel:         v.optional(v.string()),
+    tags:          v.optional(v.array(v.string())),
+    deadline:      v.optional(v.string()),
+    linkedEventId: v.optional(v.string()),
+    prioriteit:    v.optional(v.string()),
+    aangemaakt:    v.string(),
+    gewijzigd:     v.string(),
   },
   handler: async (ctx, args) => {
     return ctx.db.insert("notes", {
-      userId:     args.userId,
-      titel:      args.titel,
-      inhoud:     args.inhoud,
-      tags:       args.tags,
-      isPinned:   false,
-      isArchived: false,
-      aangemaakt: args.aangemaakt,
-      gewijzigd:  args.gewijzigd,
+      userId:        args.userId,
+      titel:         args.titel,
+      inhoud:        args.inhoud,
+      tags:          args.tags,
+      deadline:      args.deadline,
+      linkedEventId: args.linkedEventId,
+      prioriteit:    args.prioriteit,
+      isPinned:      false,
+      isArchived:    false,
+      aangemaakt:    args.aangemaakt,
+      gewijzigd:     args.gewijzigd,
+    });
+  },
+});
+
+export const updateInternal = internalMutation({
+  args: {
+    id:            v.string(),
+    inhoud:        v.optional(v.string()),
+    titel:         v.optional(v.string()),
+    tags:          v.optional(v.array(v.string())),
+    deadline:      v.optional(v.string()),
+    linkedEventId: v.optional(v.string()),
+    prioriteit:    v.optional(v.string()),
+  },
+  handler: async (ctx, { id, ...fields }) => {
+    const note = await ctx.db
+      .query("notes")
+      .filter((q) => q.eq(q.field("_id"), id))
+      .first();
+    if (!note) throw new Error("Notitie niet gevonden");
+
+    const patch: Record<string, unknown> = { gewijzigd: new Date().toISOString() };
+    if (fields.inhoud !== undefined)        patch.inhoud         = fields.inhoud;
+    if (fields.titel !== undefined)         patch.titel          = fields.titel;
+    if (fields.tags !== undefined)          patch.tags           = fields.tags;
+    if (fields.deadline !== undefined)      patch.deadline       = fields.deadline;
+    if (fields.linkedEventId !== undefined) patch.linkedEventId  = fields.linkedEventId;
+    if (fields.prioriteit !== undefined)    patch.prioriteit     = fields.prioriteit;
+
+    await ctx.db.patch(note._id, patch);
+  },
+});
+
+export const archiveInternal = internalMutation({
+  args: { id: v.string() },
+  handler: async (ctx, { id }) => {
+    const note = await ctx.db
+      .query("notes")
+      .filter((q) => q.eq(q.field("_id"), id))
+      .first();
+    if (!note) throw new Error("Notitie niet gevonden");
+    await ctx.db.patch(note._id, {
+      isArchived: true,
+      isPinned: false,
+      gewijzigd: new Date().toISOString(),
     });
   },
 });
@@ -196,7 +262,6 @@ export const createInternal = internalMutation({
 export const togglePinInternal = internalMutation({
   args: { id: v.string() },
   handler: async (ctx, { id }) => {
-    // Look up by querying to safely handle string IDs from Grok tools
     const note = await ctx.db
       .query("notes")
       .filter((q) => q.eq(q.field("_id"), id))
@@ -208,4 +273,3 @@ export const togglePinInternal = internalMutation({
     });
   },
 });
-

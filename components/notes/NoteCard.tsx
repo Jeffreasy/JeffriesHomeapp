@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Pin, Archive, Trash2, Tag, ListChecks, Check } from "lucide-react";
+import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle } from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
 
 interface NoteCardProps {
@@ -16,13 +16,20 @@ interface NoteCardProps {
 
 const KLEUR_OPACITY = "25";
 
+const PRIORITEIT_STYLES: Record<string, { dot: string; label: string }> = {
+  hoog:    { dot: "bg-red-500",    label: "Hoog" },
+  normaal: { dot: "bg-slate-500",  label: "Normaal" },
+  laag:    { dot: "bg-blue-400",   label: "Laag" },
+};
+
 export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpdateContent, masked }: NoteCardProps) {
   const displayTitle = note.titel || note.inhoud.slice(0, 50);
   const age = formatAge(note.gewijzigd);
   const checklistInfo = getChecklistInfo(note.inhoud);
   const allLines = note.inhoud.split("\n");
+  const deadlineInfo = note.deadline ? getDeadlineInfo(note.deadline) : null;
+  const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
 
-  // Toggle a specific checkbox line in the ORIGINAL content by original line index
   const toggleCheckbox = (originalLineIndex: number) => {
     if (!onUpdateContent) return;
     const lines = [...allLines];
@@ -50,6 +57,11 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
       }}
       onClick={() => onEdit(note)}
     >
+      {/* Priority indicator — left strip */}
+      {note.prioriteit === "hoog" && (
+        <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-red-500" />
+      )}
+
       {/* Pin indicator */}
       {note.isPinned && (
         <div className="absolute top-2 right-2">
@@ -58,17 +70,44 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
       )}
 
       <div className="p-4">
-        {/* Title */}
-        <h3 className="text-sm font-semibold text-slate-200 mb-1 line-clamp-1">
-          {masked ? "••••••" : displayTitle}
-        </h3>
+        {/* Title row with priority dot */}
+        <div className="flex items-center gap-1.5 mb-1">
+          {note.prioriteit && note.prioriteit !== "normaal" && (
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${prio.dot}`}
+              title={`Prioriteit: ${prio.label}`}
+            />
+          )}
+          <h3 className="text-sm font-semibold text-slate-200 line-clamp-1">
+            {masked ? "••••••" : displayTitle}
+          </h3>
+        </div>
 
-        {/* Content preview — with checklist support */}
+        {/* Deadline badge */}
+        {!masked && deadlineInfo && (
+          <div className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md mb-2 ${deadlineInfo.style}`}>
+            {deadlineInfo.overdue
+              ? <AlertTriangle size={9} aria-hidden="true" />
+              : <Clock size={9} aria-hidden="true" />
+            }
+            <span>{deadlineInfo.label}</span>
+          </div>
+        )}
+
+        {/* Linked event chip */}
+        {!masked && note.linkedEventId && (
+          <div className="inline-flex items-center gap-1 text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-md mb-2 ml-1">
+            <CalendarDays size={9} aria-hidden="true" />
+            <span>Gekoppeld</span>
+          </div>
+        )}
+
+        {/* Content preview with checklist support */}
         <div className="text-xs text-slate-500 line-clamp-4 mb-2 leading-relaxed">
           {masked ? "•••• •••• ••••" : renderPreview(allLines, onUpdateContent ? toggleCheckbox : undefined)}
         </div>
 
-        {/* Checklist progress (if applicable) */}
+        {/* Checklist progress */}
         {!masked && checklistInfo.total > 0 && (
           <div className="flex items-center gap-2 mb-2">
             <ListChecks size={10} className="text-slate-600 shrink-0" aria-hidden="true" />
@@ -154,6 +193,21 @@ function formatAge(iso: string): string {
   return new Date(iso).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
 }
 
+function getDeadlineInfo(deadline: string): { label: string; style: string; overdue: boolean } {
+  const diff = new Date(deadline).getTime() - Date.now();
+  const days = Math.ceil(diff / 86400000);
+
+  if (days < 0) return { label: "Verlopen!", style: "text-red-400 bg-red-500/15", overdue: true };
+  if (days === 0) return { label: "Vandaag", style: "text-amber-400 bg-amber-500/15", overdue: false };
+  if (days === 1) return { label: "Morgen", style: "text-amber-400 bg-amber-500/15", overdue: false };
+  if (days <= 7) return { label: `Over ${days}d`, style: "text-sky-400 bg-sky-500/10", overdue: false };
+  return {
+    label: new Date(deadline).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }),
+    style: "text-slate-400 bg-white/5",
+    overdue: false,
+  };
+}
+
 const UNCHECKED = /^- \[ \] (.+)$/;
 const CHECKED   = /^- \[x\] (.+)$/i;
 
@@ -164,14 +218,9 @@ function getChecklistInfo(text: string) {
   return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
-/**
- * Renders first 4 lines of content with checkbox support.
- * Uses ORIGINAL line indices for toggleCheckbox so the correct line is mutated.
- */
 function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void) {
   const previewLines = allLines.slice(0, 4);
   return previewLines.map((line, previewIdx) => {
-    // The preview index IS the original index since we slice from the start
     const originalIdx = previewIdx;
 
     const unchecked = UNCHECKED.exec(line);

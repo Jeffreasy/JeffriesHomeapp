@@ -13,7 +13,7 @@ import { NoteEditor } from "@/components/notes/NoteEditor";
 import type { Id } from "@/convex/_generated/dataModel";
 
 type ViewMode = "active" | "archived";
-type SortMode = "recent" | "oldest" | "title";
+type SortMode = "recent" | "oldest" | "title" | "deadline";
 
 export default function NotitiesPage() {
   const {
@@ -74,9 +74,18 @@ export default function NotitiesPage() {
     list.sort((a, b) => {
       if (viewMode === "active" && a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       switch (sortMode) {
-        case "oldest": return a.gewijzigd.localeCompare(b.gewijzigd);
-        case "title":  return (a.titel ?? a.inhoud).localeCompare(b.titel ?? b.inhoud, "nl");
-        default:       return b.gewijzigd.localeCompare(a.gewijzigd);
+        case "oldest":   return a.gewijzigd.localeCompare(b.gewijzigd);
+        case "title":    return (a.titel ?? a.inhoud).localeCompare(b.titel ?? b.inhoud, "nl");
+        case "deadline": {
+          // Notes with deadline first, sorted ascending (earliest first)
+          const aDl = a.deadline ?? "";
+          const bDl = b.deadline ?? "";
+          if (aDl && !bDl) return -1;
+          if (!aDl && bDl) return 1;
+          if (aDl && bDl) return aDl.localeCompare(bDl);
+          return b.gewijzigd.localeCompare(a.gewijzigd);
+        }
+        default:         return b.gewijzigd.localeCompare(a.gewijzigd);
       }
     });
 
@@ -105,7 +114,7 @@ export default function NotitiesPage() {
     setEditorOpen(true);
   };
 
-  const handleSave = async (data: { titel?: string; inhoud: string; tags?: string[]; kleur?: string }) => {
+  const handleSave = async (data: { titel?: string; inhoud: string; tags?: string[]; kleur?: string; deadline?: string; prioriteit?: string }) => {
     if (editNote) {
       await update(editNote._id, data);
     } else {
@@ -125,12 +134,12 @@ export default function NotitiesPage() {
   };
 
   const cycleSortMode = () => {
-    const modes: SortMode[] = ["recent", "oldest", "title"];
+    const modes: SortMode[] = ["recent", "oldest", "title", "deadline"];
     const idx = modes.indexOf(sortMode);
     setSortMode(modes[(idx + 1) % modes.length]);
   };
 
-  const sortLabel = { recent: "Nieuwst", oldest: "Oudst", title: "A→Z" }[sortMode];
+  const sortLabel = { recent: "Nieuwst", oldest: "Oudst", title: "A→Z", deadline: "Deadline" }[sortMode];
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: "#0a0a0f" }}>

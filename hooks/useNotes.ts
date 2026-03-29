@@ -9,18 +9,41 @@ import type { Id } from "@/convex/_generated/dataModel";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface NoteRecord {
-  _id:         Id<"notes">;
-  _creationTime: number;
-  userId:      string;
-  titel?:      string;
-  inhoud:      string;
-  tags?:       string[];
-  kleur?:      string;
-  isPinned:    boolean;
-  isArchived:  boolean;
-  aangemaakt:  string;
-  gewijzigd:   string;
+  _id:            Id<"notes">;
+  _creationTime:  number;
+  userId:         string;
+  titel?:         string;
+  inhoud:         string;
+  tags?:          string[];
+  kleur?:         string;
+  isPinned:       boolean;
+  isArchived:     boolean;
+  deadline?:      string;        // ISO timestamp
+  linkedEventId?: string;        // personalEvents eventId
+  prioriteit?:    string;        // "hoog" | "normaal" | "laag"
+  aangemaakt:     string;
+  gewijzigd:      string;
 }
+
+export type NoteCreateData = {
+  titel?: string;
+  inhoud: string;
+  tags?: string[];
+  kleur?: string;
+  deadline?: string;
+  linkedEventId?: string;
+  prioriteit?: string;
+};
+
+export type NoteUpdateData = {
+  titel?: string;
+  inhoud?: string;
+  tags?: string[];
+  kleur?: string;
+  deadline?: string;
+  linkedEventId?: string;
+  prioriteit?: string;
+};
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -77,9 +100,9 @@ export function useNotes() {
     isLoading: raw === undefined,
     count: active.length,
 
-    create: (data: { titel?: string; inhoud: string; tags?: string[]; kleur?: string }) =>
+    create: (data: NoteCreateData) =>
       createNote({ userId, ...data }),
-    update: (id: Id<"notes">, data: { titel?: string; inhoud?: string; tags?: string[]; kleur?: string }) =>
+    update: (id: Id<"notes">, data: NoteUpdateData) =>
       updateNote({ id, ...data }),
     togglePin: (id: Id<"notes">) => togglePin({ id }),
     archive:   (id: Id<"notes">) => archiveNote({ id }),

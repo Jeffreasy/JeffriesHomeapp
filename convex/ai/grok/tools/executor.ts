@@ -23,6 +23,7 @@ import {
 } from "./calendar";
 import {
   handleNotitieMaken, handleNotitiesZoeken, handleNotitiePinnen,
+  handleNotitieBewerken, handleNotitieArchiveren, handleNotitiesOverzicht,
 } from "./notes";
 
 // ─── Tool name → handler mapping ─────────────────────────────────────────────
@@ -69,6 +70,9 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   notitieMaken:        handleNotitieMaken,
   notitiesZoeken:      handleNotitiesZoeken,
   notitiePinnen:       handleNotitiePinnen,
+  notitieBewerken:     handleNotitieBewerken,
+  notitieArchiveren:   handleNotitieArchiveren,
+  notitiesOverzicht:   handleNotitiesOverzicht,
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

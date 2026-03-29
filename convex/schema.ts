@@ -308,20 +308,25 @@ export default defineSchema({
 
   // ─── Notes (persoonlijke notities) ──────────────────────────────────────────
   notes: defineTable({
-    userId:      v.string(),
-    titel:       v.optional(v.string()),
-    inhoud:      v.string(),
-    tags:        v.optional(v.array(v.string())),
-    kleur:       v.optional(v.string()),       // hex kleur
-    isPinned:    v.boolean(),
-    isArchived:  v.boolean(),
-    aangemaakt:  v.string(),                   // ISO timestamp
-    gewijzigd:   v.string(),                   // ISO timestamp
+    userId:        v.string(),
+    titel:         v.optional(v.string()),
+    inhoud:        v.string(),
+    tags:          v.optional(v.array(v.string())),
+    kleur:         v.optional(v.string()),       // hex kleur
+    isPinned:      v.boolean(),
+    isArchived:    v.boolean(),
+    deadline:      v.optional(v.string()),       // ISO timestamp — "doe dit voor..."
+    linkedEventId: v.optional(v.string()),       // personalEvents eventId koppeling
+    prioriteit:    v.optional(v.string()),       // "hoog" | "normaal" | "laag"
+    aangemaakt:    v.string(),                   // ISO timestamp
+    gewijzigd:     v.string(),                   // ISO timestamp
   })
     .index("by_user", ["userId"])
     .index("by_user_pinned", ["userId", "isPinned"])
+    .index("by_user_deadline", ["userId", "deadline"])
     .searchIndex("search_notes", {
       searchField: "inhoud",
       filterFields: ["userId", "isArchived"],
     }),
 });
+

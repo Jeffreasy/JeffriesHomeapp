@@ -427,9 +427,12 @@ BELANGRIJK — Professioneel Template Protocol:
       parameters: {
         type: "object",
         properties: {
-          inhoud:  { type: "string", description: "De tekst van de notitie. Gebruik '- [ ] item' syntax voor checklist items." },
-          titel:   { type: "string", description: "Optionele korte titel voor de notitie" },
-          tags:    { type: "array", items: { type: "string" }, description: "Optionele tags (bijv. ['boodschappen', 'werk'])" },
+          inhoud:        { type: "string", description: "De tekst van de notitie. Gebruik '- [ ] item' syntax voor checklist items." },
+          titel:         { type: "string", description: "Optionele korte titel voor de notitie" },
+          tags:          { type: "array", items: { type: "string" }, description: "Optionele tags (bijv. ['boodschappen', 'werk'])" },
+          deadline:      { type: "string", description: "ISO timestamp deadline (bijv. '2026-04-05T17:00:00'). Gebruik bij 'doe dit voor vrijdag', 'deadline morgen'." },
+          linkedEventId: { type: "string", description: "eventId van een personalEvent om aan te koppelen. Gebruik bij 'koppel aan mijn afspraak'." },
+          prioriteit:    { type: "string", enum: ["hoog", "normaal", "laag"], description: "Prioriteit. Gebruik 'hoog' bij 'urgent', 'belangrijk'. Default: 'normaal'." },
         },
         required: ["inhoud"],
       },
@@ -463,4 +466,53 @@ BELANGRIJK — Professioneel Template Protocol:
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "notitieBewerken",
+      description: "Bewerk een bestaande notitie. Gebruik bij 'bewerk notitie', 'voeg toe aan notitie', 'wijzig deadline', 'koppel aan afspraak'. Zoek eerst met notitiesZoeken als je het ID niet hebt.",
+      parameters: {
+        type: "object",
+        properties: {
+          noteId:        { type: "string", description: "Het ID van de notitie" },
+          inhoud:        { type: "string", description: "Nieuwe inhoud (vervangt volledig)" },
+          titel:         { type: "string", description: "Nieuwe titel" },
+          tags:          { type: "array", items: { type: "string" }, description: "Nieuwe tags" },
+          deadline:      { type: "string", description: "Nieuwe deadline (ISO timestamp)" },
+          linkedEventId: { type: "string", description: "Event ID om aan te koppelen" },
+          prioriteit:    { type: "string", enum: ["hoog", "normaal", "laag"], description: "Nieuwe prioriteit" },
+        },
+        required: ["noteId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "notitieArchiveren",
+      description: "Archiveer een notitie zodat deze niet meer in het overzicht staat. Gebruik bij 'klaar met notitie', 'archiveer', 'verwijder notitie' (we archiveren soft).",
+      parameters: {
+        type: "object",
+        properties: {
+          noteId: { type: "string", description: "Het ID van de notitie" },
+        },
+        required: ["noteId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "notitiesOverzicht",
+      description: "Toon een overzicht van alle notities met optioneel filter. Gebruik bij 'mijn notities', 'welke deadlines heb ik', 'toon vastgezette notities', 'belangrijke notities'.",
+      parameters: {
+        type: "object",
+        properties: {
+          filter: { type: "string", enum: ["recent", "pinned", "deadline", "hoog"], description: "Filter: recent (default), pinned (vastgezet), deadline (met deadline), hoog (hoge prioriteit)" },
+        },
+        required: [],
+      },
+    },
+  },
 ];
+
