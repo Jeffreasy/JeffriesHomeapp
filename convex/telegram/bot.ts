@@ -29,6 +29,8 @@ const COMMAND_MAP: Record<string, { agentId: string; beschrijving: string }> = {
   "/compose":     { agentId: "email",           beschrijving: "✍️ Email componeren" },
   "/triage":      { agentId: "email",           beschrijving: "🗂️ Inbox triage" },
   "/search":      { agentId: "email",           beschrijving: "🔍 Email zoeken" },
+  "/notities":    { agentId: "notes",           beschrijving: "📝 Notities beheren" },
+  "/noteer":      { agentId: "notes",           beschrijving: "📝 Snel notitie maken" },
   "/automations": { agentId: "automations",     beschrijving: "⚙️ Automations status" },
 };
 
@@ -107,6 +109,7 @@ const KEYWORD_ROUTES: Array<{ keywords: string[]; agentId: string }> = [
   { keywords: ["dienst", "rooster", "shift", "werk", "planning", "vrij", "weekend", "afspraak", "agenda", "morgen", "vandaag", "overmorgen", "schema"], agentId: "rooster" },
   { keywords: ["salaris", "loon", "geld", "ort", "netto", "bruto", "transactie", "saldo", "bank", "uitgaven", "betaling", "kosten", "verdien"], agentId: "finance" },
   { keywords: ["email", "mail", "inbox", "ongelezen", "bericht", "stuur", "reply", "gmail"], agentId: "email" },
+  { keywords: ["notitie", "notities", "noteer", "onthoud", "schrijf op", "opschrijven", "boodschappenlijst", "checklist", "to-do", "todo", "lijstje"], agentId: "notes" },
   { keywords: ["automation", "automations", "cron", "sync", "systeem", "status", "health"], agentId: "automations" },
 ];
 
@@ -128,6 +131,7 @@ function buildHelpText(): string {
     "Commando's:",
     ...Object.entries(COMMAND_MAP).map(([cmd, { beschrijving }]) => `  ${cmd} — ${beschrijving}`),
     "\n💡 Lamp bediening: 'lampen uit', 'lampen 50%', 'dim'",
+    "📝 Notities: 'noteer ...', 'zoek in notities'",
     "🎙️ Spraakberichten worden automatisch herkend!",
     "💬 Of stel gewoon een vrije vraag!",
   ].join("\n");
@@ -139,7 +143,8 @@ function buildWelcomeText(): string {
     "Ik bedien je Homeapp via Grok AI.",
     "Typ of spreek — ik snap het allebei.\n",
     "💡 'Lampen uit'  📅 'Wanneer werk ik?'",
-    "💰 'Salaris'  📧 'Ongelezen emails'\n",
+    "💰 'Salaris'  📧 'Ongelezen emails'",
+    "📝 'Noteer: ...'  🔍 'Zoek in notities'\n",
     "Type /help voor alle commando's.",
   ].join("\n");
 }

@@ -314,6 +314,43 @@ Voorbeeld format:
   
   👋 Morgen: Vr 27 mrt — [preview volgende dag]
 
+### Notities:
+Geef een gestructureerd notitie overzicht:
+
+TOOL SELECTIE (KRITIEK):
+- "Schrijf op" / "onthoud" / "noteer" / boodschappenlijst → gebruik notitieMaken
+- "Zoek in mijn notities" / "wat had ik genoteerd over" → gebruik notitiesZoeken
+- "Pin die notitie" / "maak belangrijk" → gebruik notitiePinnen (noteId uit zoekresultaat)
+
+CHECKLIST SUPPORT:
+- Bij lijstjes/boodschappen → gebruik "- [ ] item" syntax in inhoud
+- Voorbeeld: "- [ ] Melk\\n- [ ] Brood\\n- [ ] Kaas"
+- De gebruiker kan checkboxes direct in de app aanvinken
+
+ANTWOORD REGELS:
+1. Bij AANMAKEN: bevestig met titel, tags, en aantal items (bij checklist)
+2. Bij ZOEKEN: toon resultaten met titel, snippet, tags en datum
+3. Bij PINNEN: bevestig de actie met de notitie titel
+
+Voorbeeld format (aanmaken):
+  ✅ Notitie aangemaakt!
+
+  📝 Boodschappenlijst
+  🏷️ Tags: boodschappen
+  📋 5 items (checklist)
+
+  💡 Open in de app om af te vinken
+
+Voorbeeld format (zoekresultaten):
+  📝 ZOEKRESULTATEN — "werk"
+
+  📊 3 gevonden:
+  1. 📌 Werknotities — "Overleg met team over..." | 2 tags | 25 mrt
+  2. 📝 TODO werk — "- [ ] Rapport" | werk | 22 mrt
+  3. 📝 Ideeën — "Nieuwe aanpak voor..." | 18 mrt
+
+  💡 "Pin notitie 1" of "zoek specifieker"
+
 ### Dashboard (cross-domain overzicht):
 Wanneer de gebruiker een algemene vraag stelt (hoe gaat het, goedemorgen, overzicht), geef een cross-domain briefing:
 
@@ -326,6 +363,7 @@ Voorbeeld format:
   📧 Email: 3 ongelezen (NoordCode, Grok)
   💡 Lampen: 3/5 aan | Avond scene actief
   💰 Salaris mrt: ~€1.892 netto (prognose)
+  📝 Notities: 12 totaal | 3 vastgezet
   ⚙️ Systeem: 🟢 Alles OK
 
   📌 Vandaag:
