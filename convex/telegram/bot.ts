@@ -181,8 +181,13 @@ async function processText(ctx: any, chatId: number, text: string): Promise<void
 
   if (mapping) {
     await sendTyping(chatId);
+    // /noteer smart routing: stuur tekst direct als notitie-instructie
+    let vraag = customVraag || "Geef een beknopt overzicht";
+    if (cmd === "/noteer" && customVraag) {
+      vraag = `Maak een notitie aan met de volgende inhoud: ${customVraag}`;
+    }
     const result = await ctx.runAction(api.ai.grok.chat.chat, {
-      userId: OWNER_USER_ID, vraag: customVraag || "Geef een beknopt overzicht",
+      userId: OWNER_USER_ID, vraag,
       agentId: mapping.agentId, history: grokHistory,
     }) as { ok: boolean; antwoord?: string; error?: string };
     await saveAndReply(ctx, chatId, result, mapping.agentId);
@@ -206,6 +211,14 @@ export const handleUpdate = internalAction({
     const message = update?.message;
     if (!message?.chat?.id) return;
     const chatId = message.chat.id as number;
+
+    // ── Security: chatId whitelist ───────────────────────────────────────
+    const ownerChatId = process.env.TELEGRAM_OWNER_CHAT_ID;
+    if (ownerChatId && String(chatId) !== ownerChatId) {
+      console.warn(`[Telegram] ❌ Onbekend chatId: ${chatId}`);
+      await sendMessage(chatId, "⛔ Je bent niet geautoriseerd om deze bot te gebruiken.", { parseMode: undefined as any });
+      return;
+    }
 
     // ── Spraakbericht → Groq Whisper transcriptie ─────────────────────────
     const voice = message.voice ?? message.audio;

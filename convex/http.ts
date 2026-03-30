@@ -533,6 +533,16 @@ http.route({
   path: "/telegram/webhook",
   method: "POST",
   handler: httpAction(async (ctx, req) => {
+    // ── Security: valideer Telegram webhook secret ────────────────────────
+    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (secret) {
+      const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
+      if (headerSecret !== secret) {
+        console.warn("[Webhook] ❌ Ongeautoriseerd: ongeldige secret token");
+        return new Response("Unauthorized", { status: 401 });
+      }
+    }
+
     try {
       const update = await req.json();
       // Fire-and-forget — Telegram vereist snelle 200 response
