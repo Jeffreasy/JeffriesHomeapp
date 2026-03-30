@@ -93,7 +93,7 @@ graph TB
 | **emails** | Gmail metadata + snippet | gmailId, threadId, from, subject, snippet, searchText, isGelezen, isSter, isVerwijderd, categorie | `by_user`, `by_user_datum`, `by_user_thread`, `by_user_gmailId`, `search_emails` (FTS) |
 | **emailSyncMeta** | Gmail sync cursor (incremental) | historyId, lastFullSync, totalSynced | `by_user` |
 | **loonstroken** | Uploaded loonstrook data | userId, jaar, periode, brutoloon, nettoloon, uren | `by_user`, `by_user_periode` |
-| **notes** | Persoonlijke notities | userId, titel?, inhoud, tags?, kleur?, isPinned, isArchived, aangemaakt, gewijzigd | `by_user`, `by_user_pinned`, `search_notes` (FTS) |
+| **notes** | Persoonlijke notities | userId, titel?, inhoud, tags?, kleur?, isPinned, isArchived, deadline?, linkedEventId?, prioriteit?, aangemaakt, gewijzigd | `by_user`, `by_user_pinned`, `by_user_deadline`, `search_notes` (FTS) |
 
 ---
 
@@ -231,7 +231,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **finance** | salaris huidig (bruto/netto/ort) + periode | Salary history (6 maanden) + 30-dagen categorie verdeling + top 10 uitgaven + in/uit balans |
 | **email** | totaal/ongelezen/prullenbak | Stats (inbox/ongelezen/ster/verzonden) + top 10 afzenders + categorie verdeling + triage suggesties + 15 recente emails |
 | **automations** | totaal/actief | Alle regels met triggers + 5 cron jobs info + sync health (rooster/gmail/todoist/calendar) |
-| **notes** | totaal/pin count + recente titels | Alle notities (id/titel/inhoud/tags/isPinned/aangemaakt/gewijzigd) + pin count |
+| **notes** | totaal/pin count + recente titels | Alle notities (id/titel/inhoud/tags/isPinned/deadline/linkedEventId/prioriteit/aangemaakt/gewijzigd) + pin count |
 
 **Key pattern:** Dashboard agent roept alle andere agents aan met `{ lite: true }` — voorkomt enorme context window bij de briefing.
 
@@ -261,13 +261,15 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `/triage` | email | Inbox triage |
 | `/search` | email | Email zoeken |
 | `/automations` | automations | Automations status |
+| `/notities` | notes | Notitie overzicht |
+| `/noteer` | notes | Snelle notitie aanmaken |
 | `/help` | - | Alle commando's tonen |
 
 - **Smart keyword routing** (`detectAgent()`): 5 keyword sets → agent score matching
 - **Lamp command detectie** (`detectLampCommand()`): Direct aan/uit/dim/scene zonder AI
 - **Voice support:** Groq Whisper STT → transcriptie → processText()
 
-**22 Grok Tools + 3 Notes Tools = 25 totaal** ([definitions.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/ai/grok/tools/definitions.ts), 467 regels):
+**28 Grok Tools** ([definitions.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/ai/grok/tools/definitions.ts), ~520 regels):
 
 | Domein | Tools | Handler |
 |--------|-------|---------|
@@ -276,7 +278,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | Schedule | dienstenOpvragen, salarisOpvragen | `schedule.ts` |
 | Calendar | afspraakMaken, afspraakBewerken, afspraakVerwijderen, afsprakenOpvragen | `calendar.ts` |
 | Finance | saldoOpvragen, transactiesZoeken, uitgavenOverzicht, maandVergelijken, vasteLastenAnalyse, categorieWijzigen, bulkCategoriseren, ongelabeldAnalyse | `finance.ts` |
-| Notes | notitieMaken, notitiesZoeken, notitiePinnen | `notes.ts` |
+| Notes | notitieMaken, notitiesZoeken, notitiePinnen, notitieBewerken, notitieArchiveren, notitiesOverzicht | `notes.ts` |
 
 **Calendar tools detail:**
 - `afspraakMaken` → `personalEvents.create()` (PendingCreate → cron push met Google Calendar kleuren)
@@ -390,7 +392,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `useGlobalShortcuts` | Native `useEffect` + keydown | Spatiebalk = master toggle lampen |
 | `useDebounce` / `useDebouncedCallback` | Custom | Debounced values en callbacks (voor sliders) |
 | `useSwipe` | Touch events | Swipe gesture detectie voor BottomSheet |
-| `useNotes` | Convex `useQuery` | Notes CRUD + split (active/archived/pinned) + allTags + `NoteRecord` type export |
+| `useNotes` | Convex `useQuery` | Notes CRUD + split (active/archived/pinned) + allTags + `NoteRecord`, `NoteCreateData`, `NoteUpdateData` type exports |
 | `usePrivacy` | Zustand persist | Privacy toggle (mask sensitive data) |
 
 ---
@@ -423,8 +425,8 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
-| **NoteCard** | 210 | Kaart met kleur-tint, pin/archief/delete hover-acties, inline checkbox toggling (klik checkbox → direct DB update), tag overflow (+N), 3-kleur progress bar, ARIA checkbox roles |
-| **NoteEditor** | 292 | Modal editor met auto-resize textarea, Ctrl+Enter save, Esc close, ListChecks insert, auto-continue checklist op Enter, woord/teken teller, kleur picker, tag input, body scroll lock |
+| **NoteCard** | ~250 | Kaart met kleur-tint, pin/archief/delete hover-acties, inline checkbox toggling, tag overflow (+N), 3-kleur progress bar, ARIA roles, **deadline badge** (countdown: Verlopen!/Vandaag/Morgen/Over Xd), **prioriteit strip+dot** (rood/normaal/blauw), **linked event chip** (📅 Gekoppeld) |
+| **NoteEditor** | ~340 | Modal editor met auto-resize textarea, Ctrl+Enter save, Esc close, ListChecks insert, auto-continue checklist op Enter, woord/teken teller, kleur picker, tag input, body scroll lock, **collapsible meta panel** (datetime-local deadline picker + prioriteit dropdown hoog/normaal/laag) |
 | **QuickNote** | 174 | Dashboard widget: inline quick-capture met #tag auto-extractie en live preview, recente notities met checklist progress, compact datum formatting |
 
 ### 9.4 Finance (8)
@@ -531,7 +533,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 ### Convex Backend (35 bestanden)
 ```
 convex/
-├── schema.ts                          # 266 regels — 12 tabellen
+├── schema.ts                          # ~330 regels — 14 tabellen
 ├── http.ts                            # 549 regels — HTTP router
 ├── crons.ts                           # Cron job definities
 ├── devices.ts                         # 142 regels
@@ -541,6 +543,7 @@ convex/
 ├── personalEvents.ts                  # 403 regels
 ├── loonstroken.ts                     # 120 regels
 ├── automations.ts                     # 93 regels
+├── notes.ts                           # ~240 regels (incl. internal mutations)
 ├── actions/
 │   ├── syncSchedule.ts                # 178 regels
 │   ├── syncPersonalEvents.ts          # 124 regels
@@ -564,22 +567,24 @@ convex/
 │   │   ├── prompt.ts                  # 337 regels
 │   │   ├── types.ts                   # 88 regels
 │   │   └── tools/
-│   │       ├── definitions.ts         # 422 regels (22 tools)
-│   │       ├── executor.ts            # 80 regels
+│   │       ├── definitions.ts         # ~520 regels (28 tools)
+│   │       ├── executor.ts            # ~92 regels
 │   │       ├── email.ts               # 194 regels
 │   │       ├── finance.ts             # 427 regels
 │   │       ├── schedule.ts            # 135 regels
 │   │       ├── calendar.ts            # 206 regels
-│   │       └── smarthome.ts           # 68 regels
+│   │       ├── smarthome.ts           # 68 regels
+│   │       └── notes.ts              # ~190 regels (6 handlers)
 │   └── agents/
 │       ├── dashboard.ts               # 83 regels
 │       ├── lampen.ts                  # 126 regels
 │       ├── rooster.ts                 # 152 regels
 │       ├── finance.ts                 # 137 regels
 │       ├── email.ts                   # 111 regels
-│       └── automations.ts             # 118 regels
+│       ├── automations.ts             # 118 regels
+│       └── notes.ts                   # ~100 regels (8 capabilities)
 └── telegram/
-    ├── bot.ts                         # 277 regels
+    ├── bot.ts                         # ~300 regels (15 commando's)
     └── api.ts                         # 142 regels
 ```
 
@@ -591,6 +596,7 @@ app/
 ├── rooster/page.tsx                   # 404 regels
 ├── finance/page.tsx                   # 458 regels
 ├── automations/page.tsx               # 171 regels
+├── notities/page.tsx                  # ~346 regels
 ├── settings/page.tsx                  # 129 regels
 └── globals.css                        # 1641 regels
 
@@ -618,6 +624,7 @@ hooks/
 ├── useGlobalShortcuts.ts              # ~30 regels
 ├── useDebounce.ts                     # ~35 regels
 ├── useLoonstroken.ts                  # 87 regels
+├── useNotes.ts                        # ~110 regels — NoteRecord, NoteCreateData, NoteUpdateData
 ├── usePrivacy.ts                      # 38 regels — privacy toggle (localStorage)
 └── useSwipe.ts                        # ~30 regels
 
@@ -653,6 +660,10 @@ components/
     ├── AutomationCard.tsx             # ~115 regels
     ├── AutomationForm.tsx             # ~230 regels
     └── DienstWekkerSection.tsx        # ~70 regels
+├── notes/
+│   ├── NoteCard.tsx                   # ~250 regels
+│   ├── NoteEditor.tsx                 # ~340 regels
+│   └── QuickNote.tsx                  # 174 regels
 ```
 
 ---
@@ -666,14 +677,14 @@ components/
 | **Coverage** | **100%** |
 | **Convex data modules** | 7 |
 | **Server actions** | 9 (met 15+ exports in sendGmail) |
-| **AI tools** | 22 |
-| **Agent context getters** | 6 |
-| **Frontend pages** | 6 |
-| **React hooks** | 12 |
-| **UI components** | 26 |
+| **AI tools** | 28 |
+| **Agent context getters** | 7 |
+| **Frontend pages** | 7 |
+| **React hooks** | 13 |
+| **UI components** | 31 |
 | **Lib modules** | 15 (10 frontend + 5 backend) |
 | **Cron jobs** | 6 |
 | **Auto-categorisatie regels** | 24 regex patterns |
 | **Scene presets** | 17 (6 custom + 10 WiZ + 1 uit) |
 | **Finance categorieën** | 26 |
-| **Database tabellen** | 13 |
+| **Database tabellen** | 14 |

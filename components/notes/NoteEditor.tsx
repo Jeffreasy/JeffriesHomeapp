@@ -260,7 +260,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                   type="datetime-local"
                   value={deadline ? deadline.slice(0, 16) : ""}
                   onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value).toISOString() : "")}
-                  className="bg-transparent text-xs text-slate-300 outline-none border border-white/10 rounded-lg px-2 py-1.5 flex-1 [color-scheme:dark]"
+                  className="bg-transparent text-xs text-slate-300 outline-none border border-white/10 rounded-lg px-2 py-1.5 flex-1 scheme-dark"
                 />
                 {deadline && (
                   <button
@@ -280,7 +280,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                   <select
                     value={prioriteit}
                     onChange={(e) => setPrioriteit(e.target.value)}
-                    className="appearance-none bg-transparent text-xs text-slate-300 outline-none border border-white/10 rounded-lg pl-2 pr-6 py-1.5 cursor-pointer [color-scheme:dark]"
+                    className="appearance-none bg-transparent text-xs text-slate-300 outline-none border border-white/10 rounded-lg pl-2 pr-6 py-1.5 cursor-pointer scheme-dark"
                   >
                     {PRIORITEITEN.map((p) => (
                       <option key={p.value} value={p.value}>{p.label}</option>
