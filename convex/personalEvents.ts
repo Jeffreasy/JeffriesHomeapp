@@ -155,12 +155,32 @@ export const bulkUpsertFromCalendar = internalMutation({
     }
 
     const existingMap = new Map(existing.map((e) => [e.eventId, e]));
+
+    // Pending-dedup: prevent duplicate inserts when a promoted Google event
+    // arrives via sync while a pending version (::pending::) still exists locally.
+    // Key = "titel::startDatum" → the pending record to replace.
+    const pendingMap = new Map(
+      existing
+        .filter(e => e.eventId.includes("::pending::") && e.status !== "VERWIJDERD")
+        .map(e => [`${e.titel}::${e.startDatum}`, e])
+    );
+
     for (const afspraak of afspraken) {
       const ex = existingMap.get(afspraak.eventId);
       if (ex) {
+        // Known event → patch in place
         await ctx.db.patch(ex._id, afspraak);
       } else {
-        await ctx.db.insert("personalEvents", afspraak);
+        // Unknown eventId — check if this is a promoted version of a pending event
+        const pendingKey = `${afspraak.titel}::${afspraak.startDatum}`;
+        const pendingMatch = pendingMap.get(pendingKey);
+        if (pendingMatch) {
+          // Promote: replace the pending record with the real Google event data
+          await ctx.db.patch(pendingMatch._id, afspraak);
+          pendingMap.delete(pendingKey); // prevent double-match
+        } else {
+          await ctx.db.insert("personalEvents", afspraak);
+        }
       }
       upserted++;
     }
