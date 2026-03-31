@@ -669,6 +669,17 @@ export const logIncident = mutation({
     const datum = todayStr();
     const bron = args.bron ?? "web";
 
+    // Voorkom duplicate incident op dezelfde dag
+    const existing = await ctx.db
+      .query("habitLogs")
+      .withIndex("by_habit_datum", (q) => q.eq("habitId", args.habitId).eq("datum", datum))
+      .first();
+    if (existing?.isIncident) {
+      return { action: "already_logged", streakReset: false };
+    }
+    // Verwijder eventueel bestaande completion log voor vandaag
+    if (existing) await ctx.db.delete(existing._id);
+
     await ctx.db.insert("habitLogs", {
       userId:     args.userId,
       habitId:    args.habitId,
@@ -812,8 +823,20 @@ export const logIncidentInternal = internalMutation({
     const habit = await ctx.db.get(habitId);
     if (!habit) throw new Error("Habit niet gevonden");
 
+    const datum = todayStr();
+
+    // Voorkom duplicate incident op dezelfde dag
+    const existing = await ctx.db
+      .query("habitLogs")
+      .withIndex("by_habit_datum", (q) => q.eq("habitId", habitId).eq("datum", datum))
+      .first();
+    if (existing?.isIncident) {
+      return { action: "already_logged", streakReset: false };
+    }
+    if (existing) await ctx.db.delete(existing._id);
+
     await ctx.db.insert("habitLogs", {
-      userId: args.userId, habitId, datum: todayStr(), voltooid: false,
+      userId: args.userId, habitId, datum, voltooid: false,
       isIncident: true, notitie: args.notitie, bron: "grok", xpVerdiend: 0,
       aangemaakt: new Date().toISOString(),
     });

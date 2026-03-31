@@ -38,7 +38,11 @@ export function HabitCard({ habit, onToggle, onIncident, onPause, onArchive, onR
   }, [showMenu]);
   const isCompleted = habit.log?.voltooid === true;
   const isNegative = habit.type === "negatief";
+  const hasIncident = habit.log?.isIncident === true;
   const color = habit.kleur ?? "#f97316";
+
+  // Negatieve habits: succes = geen incident (auto-streak)
+  const isSuccess = isNegative ? !hasIncident : isCompleted;
 
   return (
     <motion.div
@@ -46,30 +50,50 @@ export function HabitCard({ habit, onToggle, onIncident, onPause, onArchive, onR
       layout
       className="relative rounded-2xl overflow-hidden transition-all"
       style={{
-        background: isCompleted
+        background: isSuccess
           ? `linear-gradient(135deg, ${color}08, ${color}04)`
-          : "rgba(255,255,255,0.02)",
-        border: isCompleted
+          : hasIncident
+            ? "rgba(239,68,68,0.04)"
+            : "rgba(255,255,255,0.02)",
+        border: isSuccess
           ? `1px solid ${color}20`
-          : "1px solid rgba(255,255,255,0.05)",
+          : hasIncident
+            ? "1px solid rgba(239,68,68,0.12)"
+            : "1px solid rgba(255,255,255,0.05)",
       }}
     >
       <div className="flex items-center p-3.5 gap-3">
-        {/* Check button — large touch target */}
-        <button
-          onClick={isNegative && !isCompleted ? () => onToggle() : onToggle}
-          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer"
-          style={{
-            background: isCompleted ? color : "rgba(255,255,255,0.03)",
-            border: isCompleted ? "none" : `2px solid ${color}30`,
-          }}
-        >
-          {isCompleted ? (
-            <Check size={20} className="text-white" />
-          ) : (
-            <span className="text-xl">{habit.emoji}</span>
-          )}
-        </button>
+        {/* Check button (positief) / Status indicator (negatief) */}
+        {isNegative ? (
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              background: hasIncident ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.10)",
+              border: hasIncident ? "1px solid rgba(239,68,68,0.20)" : `1px solid rgba(34,197,94,0.20)`,
+            }}
+          >
+            {hasIncident ? (
+              <AlertTriangle size={18} className="text-red-400" />
+            ) : (
+              <Check size={18} className="text-green-400" />
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={onToggle}
+            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer"
+            style={{
+              background: isCompleted ? color : "rgba(255,255,255,0.03)",
+              border: isCompleted ? "none" : `2px solid ${color}30`,
+            }}
+          >
+            {isCompleted ? (
+              <Check size={20} className="text-white" />
+            ) : (
+              <span className="text-xl">{habit.emoji}</span>
+            )}
+          </button>
+        )}
 
         {/* Content */}
         <div className="flex-1 min-w-0">
@@ -77,8 +101,8 @@ export function HabitCard({ habit, onToggle, onIncident, onPause, onArchive, onR
             <span
               className="text-sm font-semibold truncate"
               style={{
-                color: isCompleted ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.9)",
-                textDecoration: isCompleted ? "line-through" : "none",
+                color: isSuccess ? "rgba(255,255,255,0.4)" : hasIncident ? "#f87171" : "rgba(255,255,255,0.9)",
+                textDecoration: isSuccess && !isNegative ? "line-through" : "none",
               }}
             >
               {habit.naam}
@@ -134,7 +158,7 @@ export function HabitCard({ habit, onToggle, onIncident, onPause, onArchive, onR
         </div>
 
         {/* Incident button (negatieve habits) */}
-        {isNegative && !isCompleted && (
+        {isNegative && !hasIncident && (
           <button
             onClick={() => onIncident()}
             className="w-10 h-10 rounded-xl bg-red-500/8 border border-red-500/12 flex items-center justify-center shrink-0 active:scale-90 transition-transform"
