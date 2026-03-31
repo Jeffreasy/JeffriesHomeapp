@@ -94,7 +94,7 @@ graph TB
 | **emails** | Gmail metadata + snippet | gmailId, threadId, from, subject, snippet, searchText, isGelezen, isSter, isVerwijderd, categorie | `by_user`, `by_user_datum`, `by_user_thread`, `by_user_gmailId`, `search_emails` (FTS) |
 | **emailSyncMeta** | Gmail sync cursor (incremental) | historyId, lastFullSync, totalSynced | `by_user` |
 | **loonstroken** | Uploaded loonstrook data | userId, jaar, periode, brutoloon, nettoloon, uren | `by_user`, `by_user_periode` |
-| **notes** | Persoonlijke notities | userId, titel?, inhoud, tags?, kleur?, isPinned, isArchived, deadline?, linkedEventId?, prioriteit?, aangemaakt, gewijzigd | `by_user`, `by_user_pinned`, `by_user_deadline`, `search_notes` (FTS) |
+| **notes** | Persoonlijke notities | userId, titel?, inhoud, tags?, kleur?, isPinned, isArchived, deadline?, linkedEventId?, prioriteit?, triageFlag? (cron-set archiveringskandidaat), aangemaakt, gewijzigd | `by_user`, `by_user_pinned`, `by_user_deadline`, `search_notes` (FTS) |
 | **habits** | Gewoontes met gamification | userId, naam, emoji, type (positief/negatief), frequentie (6 opties), moeilijkheid, kleur, roosterFilter?, isKwantitatief, doelWaarde?, eenheid?, doelTijd?, doelAantal?, xpPerVoltooiing, huidigeStreak, langsteStreak, totaalVoltooid, totaalXP, volgorde, isActief, isPauze, aangemaakt, gewijzigd | `by_user`, `by_user_actief` |
 | **habitLogs** | Voltooiings-registratie | userId, habitId, datum (YYYY-MM-DD), voltooid, waarde?, isIncident, trigger?, notitie?, bron, xpVerdiend, aangemaakt | `by_user`, `by_habit`, `by_habit_datum`, `by_user_datum` |
 | **habitBadges** | Behaalde achievements | userId, badgeId, habitId?, naam, emoji, beschrijving, xpBonus, behaaldOp | `by_user`, `by_user_badge` |
@@ -253,7 +253,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **finance** | salaris huidig (bruto/netto/ort) + periode | Salary history (6 maanden) + 30-dagen categorie verdeling + top 10 uitgaven + in/uit balans |
 | **email** | totaal/ongelezen/prullenbak | Stats (inbox/ongelezen/ster/verzonden) + top 10 afzenders + categorie verdeling + triage suggesties + 15 recente emails |
 | **automations** | totaal/actief | Alle regels met triggers + 5 cron jobs info + sync health (rooster/gmail/todoist/calendar) |
-| **notes** | totaal/pin count + recente titels | Alle notities (id/titel/inhoud/tags/isPinned/deadline/linkedEventId/prioriteit/aangemaakt/gewijzigd) + pin count |
+| **notes** | totaal/pin count + recente titels + triageSuggesties count | Alle notities (id/titel/inhoud/tags/isPinned/deadline/linkedEventId/prioriteit/aangemaakt/gewijzigd) + pin count + **triageSuggesties** (verstrekenDeadlines/afgevinkt/stale — via `getTriageCandidates`) |
 | **habits** | totaalHabits/actief/streak overview + vandaag voortgang | Alle habits met huidige status + daglog + streaks + XP/level + badges + **weekRapport** (voltooiingen/incidenten/xpVerdiend via `getWeeklyReport`) + rooster-integratie + **coaching instructie** voor AI correlatie-analyse |
 
 **Key pattern:** Dashboard agent roept alle andere agents aan met `{ lite: true }` — voorkomt enorme context window bij de briefing.
@@ -293,9 +293,9 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 - **Smart keyword routing** (`detectAgent()`): 6 keyword sets → agent score matching (incl. habit/streak/badge/xp)
 - **Lamp command detectie** (`detectLampCommand()`): Direct aan/uit/dim/scene zonder AI
-- **Voice support:** Groq Whisper STT → transcriptie → processText()
+- **Voice support:** Groq Whisper STT → transcriptie → processText() + **Voice-to-Structure protocol** (Grok structureert chaotische voice dumps automatisch naar titel + bulletpoints + checklist + tags + deadline)
 
-**36 Grok Tools** ([definitions.ts](file:///c:/Users/jeffrey/Desktop/Projecten/JeffriesHomeapp/convex/ai/grok/tools/definitions.ts), ~650 regels):
+**37 Grok Tools** ([definitions.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/ai/grok/tools/definitions.ts), ~665 regels):
 
 | Domein | Tools | Handler |
 |--------|-------|---------|
@@ -304,7 +304,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | Schedule | dienstenOpvragen, salarisOpvragen | `schedule.ts` |
 | Calendar | afspraakMaken, afspraakBewerken, afspraakVerwijderen, afsprakenOpvragen | `calendar.ts` |
 | Finance | saldoOpvragen, transactiesZoeken, uitgavenOverzicht, maandVergelijken, vasteLastenAnalyse, categorieWijzigen, bulkCategoriseren, ongelabeldAnalyse | `finance.ts` |
-| Notes | notitieMaken, notitiesZoeken, notitiePinnen, notitieBewerken, notitieArchiveren, notitiesOverzicht | `notes.ts` |
+| Notes | notitieMaken, notitiesZoeken, notitiePinnen, notitieBewerken, notitieArchiveren, notitiesOverzicht, **bulkArchiveerNotities** (batch archivering na triage) | `notes.ts` |
 | Habits | habitAanmaken, habitVoltooien, habitIncident (met `trigger` enum: 6 categorieën), habitNotitie, habitsOverzicht, habitStreaks, habitBadges, habitRapport | `habits.ts` |
 
 **Calendar tools detail:**
@@ -514,7 +514,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 ---
 
-## 10. Cron Jobs (7 stuks)
+## 10. Cron Jobs (8 stuks)
 
 | Naam | Frequentie | Action | Doel |
 |------|-----------|--------|------|
@@ -525,6 +525,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `sync-gmail` | Elke 5 min | `syncGmail.syncFromGmail` | Gmail incremental sync (History API) |
 | `purge-deleted-emails` | 03:00 UTC | `emails.purgeDeletedInternal` | Verwijder >7 dagen trash |
 | `decay-habit-streaks` | 01:00 UTC | `habits.decayStreaks` | Streak decay (positief) + auto-groei (negatief) + badge toekenning + **progressive overload** (notitie-suggestie bij streak 30/60/100 om moeilijkheid te verlagen) |
+| `triage-notes-weekly` | Ma 06:00 UTC | `notes.triageNotesInternal` | Wekelijkse schoonmaak: detecteert verstreken deadlines, volledig afgevinkte checklists, stale notities (>30 dagen) → flagged met `triageFlag=true` zodat AI archivering kan voorstellen |
 
 ---
 
@@ -602,7 +603,7 @@ convex/
 ├── personalEvents.ts                  # 403 regels
 ├── loonstroken.ts                     # 120 regels
 ├── automations.ts                     # 93 regels
-├── notes.ts                           # ~240 regels (incl. internal mutations)
+├── notes.ts                           # ~400 regels (incl. internal mutations + triage system + bulk archive)
 ├── habits.ts                          # ~1095 regels (streak engine + CRUD + gamification + incrementWaarde + incident triggers + progressive overload + level-up rewards + cron decay + AI tools)
 ├── actions/
 │   ├── syncSchedule.ts                # 178 regels
@@ -626,17 +627,17 @@ convex/
 │   ├── router.ts                      # 82 regels — agent discovery queries
 │   ├── grok/
 │   │   ├── chat.ts                    # 155 regels
-│   │   ├── prompt.ts                  # 337 regels
+│   │   ├── prompt.ts                  # ~395 regels (incl. Voice-to-Structure + Triage protocol)
 │   │   ├── types.ts                   # 88 regels
 │   │   └── tools/
-│   │       ├── definitions.ts         # ~650 regels (36 tools)
-│   │       ├── executor.ts            # ~92 regels
+│   │       ├── definitions.ts         # ~665 regels (37 tools)
+│   │       ├── executor.ts            # ~105 regels
 │   │       ├── email.ts               # 194 regels
 │   │       ├── finance.ts             # 427 regels
 │   │       ├── schedule.ts            # 135 regels
 │   │       ├── calendar.ts            # 206 regels
 │   │       ├── smarthome.ts           # 68 regels
-│   │       ├── notes.ts              # ~190 regels (6 handlers)
+│   │       ├── notes.ts              # ~211 regels (7 handlers incl. bulk archiveer)
 │   │       └── habits.ts             # ~280 regels (8 handlers + fuzzy match)
 │   └── agents/
 │       ├── dashboard.ts               # 83 regels
@@ -645,7 +646,7 @@ convex/
 │       ├── finance.ts                 # 137 regels
 │       ├── email.ts                   # 111 regels
 │       ├── automations.ts             # 118 regels
-│       ├── notes.ts                   # ~100 regels (8 capabilities)
+│       ├── notes.ts                   # ~118 regels (9 capabilities, 7 tools, triage-enriched context)
 │       └── habits.ts                  # ~130 regels (8 tools, lite/full context + weekRapport + coaching)
 └── telegram/
     ├── bot.ts                         # ~320 regels (18 commando's)
@@ -751,13 +752,13 @@ components/
 | **Coverage** | **100%** |
 | **Convex data modules** | 8 |
 | **Server actions** | 9 (met 15+ exports in sendGmail) |
-| **AI tools** | 36 |
+| **AI tools** | 37 |
 | **Agent context getters** | 8 |
 | **Frontend pages** | 8 |
 | **React hooks** | 15 |
 | **UI components** | 37 |
 | **Lib modules** | 17 (11 frontend + 6 backend) |
-| **Cron jobs** | 7 |
+| **Cron jobs** | 8 |
 | **Auto-categorisatie regels** | 24 regex patterns |
 | **Scene presets** | 17 (6 custom + 10 WiZ + 1 uit) |
 | **Finance categorieën** | 26 |
