@@ -44,8 +44,12 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
   }, []);
 
   useEffect(() => {
-    textRef.current?.focus();
-    autoResize();
+    // Small delay so mobile keyboard has time to appear
+    const t = setTimeout(() => {
+      textRef.current?.focus();
+      autoResize();
+    }, 100);
+    return () => clearTimeout(t);
   }, [autoResize]);
 
   useEffect(() => {
@@ -113,25 +117,31 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:px-4"
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 10, scale: 0.97 }}
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 40 }}
+        transition={{ type: "spring", damping: 28, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg rounded-2xl border border-white/10 overflow-hidden"
+        className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-white/10 overflow-hidden max-h-[92dvh] flex flex-col"
         style={{
           background: kleur
             ? `linear-gradient(135deg, ${kleur}15 0%, #0f0f14 40%)`
             : "#0f0f14",
         }}
       >
+        {/* Drag handle (mobile) */}
+        <div className="flex justify-center pt-2 pb-0 sm:hidden">
+          <div className="w-8 h-1 rounded-full bg-white/20" />
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/8">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/8 shrink-0">
           <h3 className="text-sm font-semibold text-slate-200">
             {note ? "Notitie bewerken" : "Nieuwe notitie"}
           </h3>
@@ -139,21 +149,21 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
             <span className="text-[10px] text-slate-600 mr-2 hidden sm:block">
               Ctrl+Enter = opslaan · Esc = sluiten
             </span>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
-              <X size={16} className="text-slate-400" />
+            <button onClick={onClose} className="p-2 -mr-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <X size={18} className="text-slate-400" />
             </button>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+        {/* Body — scrollable */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-3">
           {/* Title */}
           <input
             type="text"
             placeholder="Titel (optioneel)"
             value={titel}
             onChange={(e) => setTitel(e.target.value)}
-            className="w-full bg-transparent text-base font-semibold text-slate-200 placeholder:text-slate-600 outline-none"
+            className="w-full bg-transparent text-base font-semibold text-slate-200 placeholder:text-slate-600 outline-none min-h-[44px]"
           />
 
           {/* Content */}
@@ -190,40 +200,40 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
           />
 
           {/* Toolbar row */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <button
               onClick={insertChecklist}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-2.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               title="Checklist toevoegen"
             >
-              <ListChecks size={14} className="text-slate-500" />
+              <ListChecks size={16} className="text-slate-500" />
             </button>
 
             <button
               onClick={() => setShowColors(!showColors)}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-2.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               title="Kleur kiezen"
             >
-              <Palette size={14} className="text-slate-500" />
+              <Palette size={16} className={showColors ? "text-amber-400" : "text-slate-500"} />
             </button>
 
             <button
               onClick={() => setShowMeta(!showMeta)}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-2.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               title="Deadline & prioriteit"
             >
-              <CalendarDays size={14} className={showMeta ? "text-amber-400" : "text-slate-500"} />
+              <CalendarDays size={16} className={showMeta ? "text-amber-400" : "text-slate-500"} />
             </button>
 
             {showColors && (
               <motion.div
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1.5 ml-1"
               >
                 <button
                   onClick={() => setKleur("")}
-                  className={`w-5 h-5 rounded-full border-2 transition-all cursor-pointer ${
+                  className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
                     !kleur ? "border-white/40 bg-slate-700" : "border-transparent bg-slate-800 hover:border-white/20"
                   }`}
                 />
@@ -231,7 +241,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                   <button
                     key={c}
                     onClick={() => setKleur(c)}
-                    className={`w-5 h-5 rounded-full border-2 transition-all cursor-pointer ${
+                    className={`w-7 h-7 rounded-full border-2 transition-all cursor-pointer ${
                       kleur === c ? "border-white/60 scale-110" : "border-transparent hover:scale-105"
                     }`}
                     style={{ background: c }}
@@ -242,7 +252,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
 
             <div className="ml-auto flex items-center gap-2 text-[10px] text-slate-600">
               <Clock size={10} />
-              {wordCount} woorden · {charCount} tekens
+              {wordCount}w · {charCount}c
             </div>
           </div>
 
@@ -251,42 +261,42 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-xl bg-white/3 border border-white/5"
+              className="flex flex-col gap-3 p-3 rounded-xl bg-white/3 border border-white/5"
             >
               {/* Deadline picker */}
-              <div className="flex items-center gap-2 flex-1">
-                <Clock size={13} className="text-slate-500 shrink-0" />
+              <div className="flex items-center gap-2">
+                <Clock size={14} className="text-slate-500 shrink-0" />
                 <input
                   type="datetime-local"
                   value={deadline ? deadline.slice(0, 16) : ""}
                   onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value).toISOString() : "")}
-                  className="bg-transparent text-xs text-slate-300 outline-none border border-white/10 rounded-lg px-2 py-1.5 flex-1 scheme-dark"
+                  className="bg-transparent text-sm text-slate-300 outline-none border border-white/10 rounded-xl px-3 py-2.5 flex-1 min-h-[44px] scheme-dark"
                 />
                 {deadline && (
                   <button
                     onClick={() => setDeadline("")}
-                    className="p-0.5 hover:bg-white/10 rounded cursor-pointer"
+                    className="p-2 hover:bg-white/10 rounded-lg cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                     aria-label="Deadline verwijderen"
                   >
-                    <X size={11} className="text-slate-500" />
+                    <X size={14} className="text-slate-500" />
                   </button>
                 )}
               </div>
 
               {/* Priority selector */}
               <div className="flex items-center gap-2">
-                <AlertTriangle size={13} className="text-slate-500 shrink-0" />
-                <div className="relative">
+                <AlertTriangle size={14} className="text-slate-500 shrink-0" />
+                <div className="relative flex-1">
                   <select
                     value={prioriteit}
                     onChange={(e) => setPrioriteit(e.target.value)}
-                    className="appearance-none bg-transparent text-xs text-slate-300 outline-none border border-white/10 rounded-lg pl-2 pr-6 py-1.5 cursor-pointer scheme-dark"
+                    className="w-full appearance-none bg-transparent text-sm text-slate-300 outline-none border border-white/10 rounded-xl pl-3 pr-8 py-2.5 cursor-pointer min-h-[44px] scheme-dark"
                   >
                     {PRIORITEITEN.map((p) => (
                       <option key={p.value} value={p.value}>{p.label}</option>
                     ))}
                   </select>
-                  <ChevronDown size={11} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                 </div>
               </div>
             </motion.div>
@@ -297,10 +307,10 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 text-[11px] text-slate-300 bg-white/8 px-2 py-0.5 rounded-md cursor-pointer hover:bg-red-500/20 transition-colors"
+                className="inline-flex items-center gap-1 text-xs text-slate-300 bg-white/8 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/20 transition-colors min-h-[36px]"
                 onClick={() => removeTag(tag)}
               >
-                <Tag size={9} /> {tag} <X size={9} />
+                <Tag size={10} /> {tag} <X size={10} />
               </span>
             ))}
             <input
@@ -314,23 +324,23 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                   addTag();
                 }
               }}
-              className="bg-transparent text-[11px] text-slate-400 placeholder:text-slate-600 outline-none w-16"
+              className="bg-transparent text-xs text-slate-400 placeholder:text-slate-600 outline-none w-20 min-h-[36px]"
             />
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-white/8">
+        {/* Footer — fixed at bottom */}
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-white/8 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           <button
             onClick={onClose}
-            className="px-4 py-1.5 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer min-h-[44px] rounded-xl"
           >
             Annuleren
           </button>
           <button
             onClick={handleSave}
             disabled={!inhoud.trim()}
-            className="px-4 py-1.5 text-xs font-semibold text-white bg-amber-500/90 hover:bg-amber-500 rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+            className="px-5 py-2.5 text-sm font-semibold text-white bg-amber-500/90 hover:bg-amber-500 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
           >
             {note ? "Opslaan" : "Aanmaken"}
           </button>

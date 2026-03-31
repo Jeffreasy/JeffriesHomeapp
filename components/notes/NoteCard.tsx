@@ -148,28 +148,28 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
             <span className="text-[10px] text-slate-600">{age}</span>
           </div>
 
-          {/* Action buttons — visible on hover */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Action buttons — always visible on mobile, hover on desktop */}
+          <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => { e.stopPropagation(); onTogglePin(note._id); }}
-              className="p-1 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label={note.isPinned ? "Losmaken" : "Vastpinnen"}
             >
-              <Pin size={12} className={note.isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
+              <Pin size={14} className={note.isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onArchive(note._id); }}
-              className="p-1 rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label="Archiveren"
             >
-              <Archive size={12} className="text-slate-500" />
+              <Archive size={14} className="text-slate-500" />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onDelete(note._id); }}
-              className="p-1 rounded-md hover:bg-red-500/20 transition-colors cursor-pointer"
+              className="p-2 rounded-lg hover:bg-red-500/20 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label="Verwijderen"
             >
-              <Trash2 size={12} className="text-slate-500 hover:text-red-400" />
+              <Trash2 size={14} className="text-slate-500 hover:text-red-400" />
             </button>
           </div>
         </div>
