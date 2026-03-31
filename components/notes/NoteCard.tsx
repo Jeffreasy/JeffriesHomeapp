@@ -1,7 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle } from "lucide-react";
+import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import type { NoteRecord } from "@/hooks/useNotes";
 
 interface NoteCardProps {
@@ -11,6 +13,7 @@ interface NoteCardProps {
   onArchive:   (id: NoteRecord["_id"]) => void;
   onDelete:    (id: NoteRecord["_id"]) => void;
   onUpdateContent?: (id: NoteRecord["_id"], inhoud: string) => void;
+  onNavigateToNote?: (title: string) => void;
   masked?:     boolean;
 }
 
@@ -22,13 +25,14 @@ const PRIORITEIT_STYLES: Record<string, { dot: string; label: string }> = {
   laag:    { dot: "bg-blue-400",   label: "Laag" },
 };
 
-export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpdateContent, masked }: NoteCardProps) {
+export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpdateContent, onNavigateToNote, masked }: NoteCardProps) {
   const displayTitle = note.titel || note.inhoud.slice(0, 50);
   const age = formatAge(note.gewijzigd);
   const checklistInfo = getChecklistInfo(note.inhoud);
   const allLines = note.inhoud.split("\n");
   const deadlineInfo = note.deadline ? getDeadlineInfo(note.deadline) : null;
   const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
+  const backlinks = useQuery(api.notes.getBacklinks, { noteId: note._id });
 
   const toggleCheckbox = (originalLineIndex: number) => {
     if (!onUpdateContent) return;
@@ -102,9 +106,9 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
           </div>
         )}
 
-        {/* Content preview with checklist support */}
+        {/* Content preview with checklist + wiki-link support */}
         <div className="text-xs text-slate-500 line-clamp-4 mb-2 leading-relaxed">
-          {masked ? "•••• •••• ••••" : renderPreview(allLines, onUpdateContent ? toggleCheckbox : undefined)}
+          {masked ? "•••• •••• ••••" : renderPreview(allLines, onUpdateContent ? toggleCheckbox : undefined, onNavigateToNote)}
         </div>
 
         {/* Checklist progress */}
@@ -173,6 +177,25 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
             </button>
           </div>
         </div>
+
+        {/* Backlinks (Zettelkasten) */}
+        {!masked && backlinks && backlinks.length > 0 && (
+          <div className="flex items-center gap-1.5 px-4 pb-2 -mt-1 flex-wrap">
+            <Link2 size={10} className="text-amber-400/60 shrink-0" />
+            {backlinks.slice(0, 3).map((bl) => (
+              <span
+                key={bl.id}
+                onClick={(e) => { e.stopPropagation(); onNavigateToNote?.(bl.titel); }}
+                className="text-[10px] text-amber-400/70 bg-amber-400/8 px-1.5 py-0.5 rounded-md cursor-pointer hover:bg-amber-400/15 transition-colors"
+              >
+                {bl.titel}
+              </span>
+            ))}
+            {backlinks.length > 3 && (
+              <span className="text-[10px] text-slate-600">+{backlinks.length - 3}</span>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -218,7 +241,7 @@ function getChecklistInfo(text: string) {
   return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
-function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void) {
+function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void, onNavigateToNote?: (title: string) => void) {
   const previewLines = allLines.slice(0, 4);
   return previewLines.map((line, previewIdx) => {
     const originalIdx = previewIdx;
@@ -234,7 +257,7 @@ function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) 
             onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(originalIdx); } : undefined}
             className={`mt-0.5 w-3 h-3 rounded-[3px] border border-white/20 shrink-0 ${onToggle ? "cursor-pointer hover:border-amber-400/50" : ""}`}
           />
-          <span>{unchecked[1]}</span>
+          <span>{renderLineWithLinks(unchecked[1], onNavigateToNote)}</span>
         </div>
       );
     }
@@ -251,10 +274,33 @@ function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) 
           >
             <Check size={7} className="text-emerald-300" />
           </span>
-          <span className="line-through text-slate-600">{checked[1]}</span>
+          <span className="line-through text-slate-600">{renderLineWithLinks(checked[1], onNavigateToNote)}</span>
         </div>
       );
     }
-    return <div key={originalIdx}>{line}</div>;
+    return <div key={originalIdx}>{renderLineWithLinks(line, onNavigateToNote)}</div>;
+  });
+}
+
+/** Render [[title]] patterns as clickable amber chips within a line */
+function renderLineWithLinks(text: string, onNavigateToNote?: (title: string) => void) {
+  const parts = text.split(/(\[\[[^\]]+\]\])/g);
+  if (parts.length === 1) return text;
+
+  return parts.map((part, i) => {
+    const linkMatch = /^\[\[([^\]]+)\]\]$/.exec(part);
+    if (linkMatch) {
+      return (
+        <span
+          key={i}
+          onClick={onNavigateToNote ? (e) => { e.stopPropagation(); onNavigateToNote(linkMatch[1]); } : undefined}
+          className="inline-flex items-center gap-0.5 text-amber-400/80 bg-amber-400/10 px-1 py-0.5 rounded text-[10px] cursor-pointer hover:bg-amber-400/20 transition-colors"
+        >
+          <Link2 size={8} />
+          {linkMatch[1]}
+        </span>
+      );
+    }
+    return <span key={i}>{part}</span>;
   });
 }

@@ -330,6 +330,17 @@ export default defineSchema({
       filterFields: ["userId", "isArchived"],
     }),
 
+  // ─── Note Links (Zettelkasten bi-directionele links) ────────────────────────
+  noteLinks: defineTable({
+    userId:     v.string(),
+    sourceId:   v.id("notes"),               // notitie die de [[link]] bevat
+    targetId:   v.id("notes"),               // notitie waarnaar gelinkt wordt
+    aangemaakt: v.string(),                  // ISO timestamp
+  })
+    .index("by_source", ["sourceId"])
+    .index("by_target", ["targetId"])
+    .index("by_user",   ["userId"]),
+
   // ─── Habits (gewoonte-definities) ───────────────────────────────────────────
   habits: defineTable({
     userId:           v.string(),

@@ -345,11 +345,21 @@ Als de notities context "triageSuggesties" bevat met kandidaten:
 - Bied aan: "Zal ik deze archiveren?" → gebruik bulkArchiveerNotities bij bevestiging
 - Bij /briefing: meld als compact onderdeel van de daily brief
 
+PROACTIEVE CONTEXT PROTOCOL:
+Als de notities context "relevanteNotities" bevat:
+- Meld proactief in de briefing: "📝 Relevante notitie(s) voor vandaag/morgen:"
+- Per notitie: titel + reden (deadline/gekoppeld-event/tag-match)
+- Bij "deadline" reden: "⏰ Deadline vandaag: [titel]"
+- Bij "gekoppeld-event" reden: "📅 Gekoppeld aan je afspraak: [titel]"
+- Bij "tag-match" reden: "🏷️ Werk-gerelateerd: [titel]"
+- Houd het compact (max 3 items in briefing, verwijs naar /notities voor meer)
+
 ANTWOORD REGELS:
 1. Bij AANMAKEN: bevestig met titel, tags, en aantal items (bij checklist)
 2. Bij ZOEKEN: toon resultaten met titel, snippet, tags en datum
 3. Bij PINNEN: bevestig de actie met de notitie titel
 4. Bij TRIAGE: toon per categorie hoeveel en bied bulk-archivering aan
+5. Bij PROACTIEVE CONTEXT: meld relevante notities bij dienst/afspraak-gerelateerde vragen
 
 Voorbeeld format (aanmaken):
   ✅ Notitie aangemaakt!

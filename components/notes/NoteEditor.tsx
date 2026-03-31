@@ -1,8 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
-import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, ChevronDown, Link2 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { useUser } from "@clerk/nextjs";
+import { api } from "@/convex/_generated/api";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 
 const KLEUREN = [
@@ -23,6 +26,9 @@ interface NoteEditorProps {
 }
 
 export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
+  const { user } = useUser();
+  const userId = user?.id ?? "";
+
   const [titel, setTitel]           = useState(note?.titel ?? "");
   const [inhoud, setInhoud]         = useState(note?.inhoud ?? "");
   const [tags, setTags]             = useState<string[]>(note?.tags ?? []);
@@ -32,6 +38,18 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
   const [deadline, setDeadline]     = useState(note?.deadline ?? "");
   const [prioriteit, setPrioriteit] = useState(note?.prioriteit ?? "normaal");
   const [showMeta, setShowMeta]     = useState(!!(note?.deadline || (note?.prioriteit && note.prioriteit !== "normaal")));
+
+  // ── Zettelkasten [[link]] autocomplete ──────────────────────────────
+  const [linkSearch, setLinkSearch]     = useState("");
+  const [linkActive, setLinkActive]     = useState(false);
+  const [linkCursorPos, setLinkCursorPos] = useState(0);
+
+  const linkResults = useQuery(
+    api.notes.searchTitles,
+    linkActive && linkSearch.length > 0 && userId
+      ? { userId, term: linkSearch }
+      : "skip"
+  );
 
   const textRef = useRef<HTMLTextAreaElement>(null);
 
@@ -60,7 +78,48 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
   const handleContentChange = (val: string) => {
     setInhoud(val);
     autoResize();
+
+    // Detect [[ autocomplete trigger
+    const el = textRef.current;
+    if (el) {
+      const pos = el.selectionStart;
+      const textBefore = val.slice(0, pos);
+      const lastOpen = textBefore.lastIndexOf("[[");
+      const lastClose = textBefore.lastIndexOf("]]");
+
+      if (lastOpen > lastClose) {
+        const searchTerm = textBefore.slice(lastOpen + 2);
+        if (!searchTerm.includes("\n")) {
+          setLinkActive(true);
+          setLinkSearch(searchTerm);
+          setLinkCursorPos(pos);
+          return;
+        }
+      }
+    }
+    setLinkActive(false);
+    setLinkSearch("");
   };
+
+  const insertLink = useCallback((title: string) => {
+    const el = textRef.current;
+    if (!el) return;
+
+    // Find the [[ position and replace with [[title]]
+    const before = inhoud.slice(0, linkCursorPos);
+    const lastOpen = before.lastIndexOf("[[");
+    const newText = inhoud.slice(0, lastOpen) + `[[${title}]]` + inhoud.slice(linkCursorPos);
+    setInhoud(newText);
+    setLinkActive(false);
+    setLinkSearch("");
+
+    requestAnimationFrame(() => {
+      const newPos = lastOpen + title.length + 4; // [[ + title + ]]
+      el.setSelectionRange(newPos, newPos);
+      el.focus();
+      autoResize();
+    });
+  }, [inhoud, linkCursorPos, autoResize]);
 
   const handleSave = useCallback(() => {
     if (!inhoud.trim()) return;
@@ -198,6 +257,30 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
             className="w-full bg-transparent text-sm text-slate-300 placeholder:text-slate-600 outline-none resize-none leading-relaxed"
             style={{ minHeight: 120 }}
           />
+
+          {/* [[wiki-link]] autocomplete dropdown */}
+          <AnimatePresence>
+            {linkActive && linkResults && linkResults.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className="rounded-xl border border-white/10 bg-[#1a1a22] overflow-hidden max-h-[200px] overflow-y-auto"
+              >
+                {linkResults.map((result) => (
+                  <button
+                    key={result.id}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); insertLink(result.titel); }}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-white/8 transition-colors cursor-pointer min-h-[40px]"
+                  >
+                    <Link2 size={14} className="text-amber-400/70 shrink-0" />
+                    <span className="truncate">{result.titel}</span>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Toolbar row */}
           <div className="flex items-center gap-1">

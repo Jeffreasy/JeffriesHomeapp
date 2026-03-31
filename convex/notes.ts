@@ -105,7 +105,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const now = new Date().toISOString();
-    return ctx.db.insert("notes", {
+    const noteId = await ctx.db.insert("notes", {
       userId:        args.userId,
       titel:         args.titel,
       inhoud:        args.inhoud,
@@ -119,6 +119,8 @@ export const create = mutation({
       aangemaakt:    now,
       gewijzigd:     now,
     });
+    await syncNoteLinksHelper(ctx, noteId, args.userId, args.inhoud);
+    return noteId;
   },
 });
 
@@ -147,6 +149,8 @@ export const update = mutation({
     if (fields.prioriteit !== undefined)    patch.prioriteit     = fields.prioriteit;
 
     await ctx.db.patch(id, patch);
+    const finalContent = fields.inhoud ?? existing.inhoud;
+    await syncNoteLinksHelper(ctx, id, existing.userId, finalContent);
   },
 });
 
@@ -199,7 +203,7 @@ export const createInternal = internalMutation({
     gewijzigd:     v.string(),
   },
   handler: async (ctx, args) => {
-    return ctx.db.insert("notes", {
+    const noteId = await ctx.db.insert("notes", {
       userId:        args.userId,
       titel:         args.titel,
       inhoud:        args.inhoud,
@@ -212,6 +216,8 @@ export const createInternal = internalMutation({
       aangemaakt:    args.aangemaakt,
       gewijzigd:     args.gewijzigd,
     });
+    await syncNoteLinksHelper(ctx, noteId, args.userId, args.inhoud);
+    return noteId;
   },
 });
 
@@ -241,6 +247,8 @@ export const updateInternal = internalMutation({
     if (fields.prioriteit !== undefined)    patch.prioriteit     = fields.prioriteit;
 
     await ctx.db.patch(note._id, patch);
+    const finalContent = fields.inhoud ?? note.inhoud;
+    await syncNoteLinksHelper(ctx, note._id, note.userId, finalContent);
   },
 });
 
@@ -397,3 +405,106 @@ export const bulkArchiveInternal = internalMutation({
     return { gearchiveerd: count };
   },
 });
+
+// ─── Zettelkasten (bi-directionele [[nota]] links) ────────────────────────────
+
+/** Autocomplete voor [[ syntax — doorzoekt titels */
+export const searchTitles = query({
+  args: { userId: v.string(), term: v.string() },
+  handler: async (ctx, { userId, term }) => {
+    const all = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("isArchived"), false))
+      .collect();
+
+    const lower = term.toLowerCase();
+    return all
+      .filter((n) => {
+        const title = (n.titel ?? n.inhoud.slice(0, 40)).toLowerCase();
+        return title.includes(lower);
+      })
+      .slice(0, 10)
+      .map((n) => ({ id: n._id, titel: n.titel || n.inhoud.slice(0, 40) }));
+  },
+});
+
+/** Haal alle notities op die naar deze notitie linken */
+export const getBacklinks = query({
+  args: { noteId: v.id("notes") },
+  handler: async (ctx, { noteId }) => {
+    const links = await ctx.db
+      .query("noteLinks")
+      .withIndex("by_target", (q) => q.eq("targetId", noteId))
+      .collect();
+
+    const results = [];
+    for (const link of links) {
+      const source = await ctx.db.get(link.sourceId);
+      if (source && !source.isArchived) {
+        results.push({ id: source._id, titel: source.titel || source.inhoud.slice(0, 40) });
+      }
+    }
+    return results;
+  },
+});
+
+/** Parse [[titel]] uit inhoud en synchroniseer noteLinks tabel */
+async function syncNoteLinksHelper(
+  ctx: any,
+  noteId: any,
+  userId: string,
+  inhoud: string,
+) {
+  // Extract alle [[titel]] matches
+  const linkRegex = /\[\[([^\]]+)\]\]/g;
+  const linkedTitles: string[] = [];
+  let match;
+  while ((match = linkRegex.exec(inhoud)) !== null) {
+    linkedTitles.push(match[1]);
+  }
+
+  // Resolve titels naar IDs
+  const allNotes = await ctx.db
+    .query("notes")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .filter((q: any) => q.eq(q.field("isArchived"), false))
+    .collect();
+
+  const targetIds: Set<string> = new Set();
+  for (const title of linkedTitles) {
+    const lower = title.toLowerCase();
+    const target = allNotes.find((n: any) =>
+      (n.titel ?? "").toLowerCase() === lower && n._id !== noteId
+    );
+    if (target) targetIds.add(target._id);
+  }
+
+  // Haal bestaande links op
+  const existing = await ctx.db
+    .query("noteLinks")
+    .withIndex("by_source", (q: any) => q.eq("sourceId", noteId))
+    .collect();
+
+  const existingTargetIds = new Set(existing.map((l: any) => l.targetId));
+
+  // Verwijder links die niet meer in de inhoud staan
+  for (const link of existing) {
+    if (!targetIds.has(link.targetId)) {
+      await ctx.db.delete(link._id);
+    }
+  }
+
+  // Maak nieuwe links aan
+  const now = new Date().toISOString();
+  for (const targetId of targetIds) {
+    if (!existingTargetIds.has(targetId)) {
+      await ctx.db.insert("noteLinks", {
+        userId,
+        sourceId: noteId,
+        targetId: targetId as any,
+        aangemaakt: now,
+      });
+    }
+  }
+}
