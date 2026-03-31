@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Lightbulb, Power, AlertTriangle } from "lucide-react";
+import {
+  Lightbulb, Power, AlertTriangle, Search, X,
+  Wifi, Sun, Zap,
+} from "lucide-react";
 import Link from "next/link";
 import { useDevices, useRooms, useLampCommand } from "@/hooks/useHomeapp";
 import { RoomSection } from "@/components/room/RoomSection";
@@ -12,41 +15,84 @@ import { SceneBar } from "@/components/scenes/SceneBar";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
 import { type Device } from "@/lib/api";
 
+// ─── Stat card (matches Rooster pattern) ──────────────────────────────────────
+
+function StatCard({ label, value, sub, accent }: {
+  label: string; value: string | number; sub?: string; accent?: string;
+}) {
+  return (
+    <div
+      className="glass rounded-xl px-4 py-3 flex-1 min-w-0 border border-white/5"
+      style={accent ? { borderColor: accent + "25" } : undefined}
+    >
+      <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-xl font-bold leading-none" style={{ color: accent ?? "#e2e8f0" }}>{value}</p>
+      {sub && <p className="text-[10px] text-slate-600 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Stagger animation config ─────────────────────────────────────────────────
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.04, duration: 0.25, ease: [0.25, 0.1, 0.25, 1] as const },
+  }),
+};
+
 export default function LampenPage() {
   const { data: devices = [], isLoading: loadingDevices, error } = useDevices();
   const { data: rooms = [], isLoading: loadingRooms } = useRooms();
   const { mutate: sendCommand } = useLampCommand();
 
-  // Selected device for desktop slide panel
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [search, setSearch] = useState("");
 
   const handleSelect = (device: Device) => {
     setSelectedDevice((prev) => (prev?.id === device.id ? null : device));
   };
 
+  // ─── Derived stats ──────────────────────────────────────────────────────────
+
   const onlineDevices = devices.filter((d) => d.status === "online");
   const onDevices = devices.filter((d) => d.current_state?.on);
   const allOn = onDevices.length === devices.length && devices.length > 0;
+
+  const avgBrightness = onDevices.length > 0
+    ? Math.round(onDevices.reduce((sum, d) => sum + (d.current_state?.brightness ?? 0), 0) / onDevices.length)
+    : 0;
 
   const toggleAll = () =>
     devices.forEach((d) => sendCommand({ id: d.id, cmd: { on: !allOn } }));
 
   useGlobalShortcuts({ devices, allOn, sendCommand });
 
+  // ─── Search filter ──────────────────────────────────────────────────────────
+
+  const filteredDevices = useMemo(() => {
+    if (!search.trim()) return devices;
+    const q = search.toLowerCase();
+    return devices.filter((d) => d.name.toLowerCase().includes(q));
+  }, [devices, search]);
+
+  // ─── Group by room (with search applied) ────────────────────────────────────
+
   const devicesByRoom = rooms.map((room) => ({
     room,
-    devices: devices.filter((d) => d.room_id === room.id),
+    devices: filteredDevices.filter((d) => d.room_id === room.id),
   }));
-  const unassigned = devices.filter((d) => !d.room_id);
+  const unassigned = filteredDevices.filter((d) => !d.room_id);
 
   return (
-    // Outer flex: grid + slide panel side by side
-    <div className="flex min-h-screen" style={{ background: "#0a0a0f" }}>
+    <div className="flex min-h-screen bg-background">
       {/* Main scrollable area */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* ─── Header ──────────────────────────────────────────────────────── */}
-        <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 py-4 flex-shrink-0">
-          <div className="flex items-center justify-between gap-2">
+        <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 py-4 shrink-0">
+          <div className="flex items-center justify-between gap-2 max-w-5xl mx-auto">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center">
                 <Lightbulb size={18} className="text-amber-400" />
@@ -59,13 +105,13 @@ export default function LampenPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               {/* Master toggle */}
               <motion.button
                 whileTap={{ scale: 0.93 }}
                 onClick={toggleAll}
                 title="Alle lampen aan/uit (Spatiebalk)"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer ${
                   allOn
                     ? "bg-slate-500/15 text-slate-300 border-slate-500/30 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30"
                     : "bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
@@ -73,23 +119,83 @@ export default function LampenPage() {
               >
                 <Power size={13} />
                 <span className="hidden sm:inline">{allOn ? "Zet uit" : "Zet aan"}</span>
+                <kbd className="hidden sm:inline text-[9px] text-current/40 bg-white/5 px-1 rounded">⎵</kbd>
               </motion.button>
             </div>
           </div>
         </header>
 
-        {/* ─── Scene bar ───────────────────────────────────────────────────── */}
-        <div className="px-6 pt-4 pb-0 flex-shrink-0">
-          <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Scènes</p>
-          <SceneBar />
-        </div>
+        {/* ─── Main content ─────────────────────────────────────────────────── */}
+        <main className="flex-1 overflow-y-auto px-6 py-5 pb-32 max-w-5xl mx-auto w-full">
 
-        {/* ─── Main content (scrollable) ────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto px-6 py-5 pb-32 space-y-8 max-w-5xl">
+          {/* ─── Stat strip (matches Rooster) ──────────────────────────────── */}
+          {!loadingDevices && devices.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+              <StatCard
+                label="Totaal"
+                value={devices.length}
+                sub={`${rooms.length} kamer${rooms.length !== 1 ? "s" : ""}`}
+                accent="#94a3b8"
+              />
+              <StatCard
+                label="Online"
+                value={onlineDevices.length}
+                sub={devices.length > 0 ? `${Math.round((onlineDevices.length / devices.length) * 100)}%` : undefined}
+                accent="#34d399"
+              />
+              <StatCard
+                label="Aan"
+                value={onDevices.length}
+                sub={onDevices.length > 0 ? `van ${onlineDevices.length} online` : "geen"}
+                accent="#fbbf24"
+              />
+              <StatCard
+                label="Gem. helderheid"
+                value={onDevices.length > 0 ? `${avgBrightness}%` : "—"}
+                sub={onDevices.length > 0 ? `${onDevices.length} lamp${onDevices.length !== 1 ? "en" : ""}` : undefined}
+                accent="#f59e0b"
+              />
+            </div>
+          )}
+
+          {/* ─── Scene bar ───────────────────────────────────────────────────── */}
+          <div className="mb-5">
+            <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Scènes</p>
+            <SceneBar />
+          </div>
+
+          {/* ─── Search + Filter toolbar (matches Notities) ──────────────────── */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 flex items-center gap-2 px-3 py-2 glass rounded-xl border border-white/5">
+              <Search size={14} className="text-slate-500 shrink-0" />
+              <input
+                type="text"
+                placeholder="Zoek lamp op naam..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-600 outline-none"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="text-slate-600 hover:text-slate-400 cursor-pointer"
+                  aria-label="Zoekterm wissen"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            {search && (
+              <span className="text-xs text-slate-500 shrink-0">
+                {filteredDevices.length} resultaat{filteredDevices.length !== 1 ? "en" : ""}
+              </span>
+            )}
+          </div>
+
           {/* Error */}
           {error && (
-            <div className="glass rounded-2xl border border-red-500/20 p-4 flex items-start gap-3">
-              <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="glass rounded-2xl border border-red-500/20 p-4 flex items-start gap-3 mb-5">
+              <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-red-300">Verbinding mislukt</p>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -102,23 +208,25 @@ export default function LampenPage() {
           {loadingDevices || loadingRooms ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2 items-start">
               {[...Array(6)].map((_, i) => (
-                <div
+                <motion.div
                   key={i}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.06 }}
                   className="glass rounded-2xl h-20 animate-pulse"
-                  style={{ animationDelay: `${i * 80}ms` }}
                 />
               ))}
             </div>
           ) : (
-            <>
+            <div className="space-y-8">
               {/* Rooms with devices */}
               {devicesByRoom
                 .filter(({ devices }) => devices.length > 0)
-                .map(({ room, devices }) => (
+                .map(({ room, devices: roomDevices }) => (
                   <RoomSection
                     key={room.id}
                     room={room}
-                    devices={devices}
+                    devices={roomDevices}
                     onSelect={handleSelect}
                   />
                 ))}
@@ -133,14 +241,39 @@ export default function LampenPage() {
                     </h2>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
-                    {unassigned.map((d) => (
-                      <LampCard key={d.id} device={d} onSelect={handleSelect} />
+                    {unassigned.map((d, i) => (
+                      <motion.div
+                        key={d.id}
+                        custom={i}
+                        initial="hidden"
+                        animate="visible"
+                        variants={cardVariants}
+                      >
+                        <LampCard device={d} onSelect={handleSelect} />
+                      </motion.div>
                     ))}
                   </div>
                 </section>
               )}
 
-              {/* Empty state */}
+              {/* No results from search */}
+              {search && filteredDevices.length === 0 && devices.length > 0 && (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Search size={28} className="text-slate-600 mb-3" />
+                  <h3 className="text-sm font-semibold text-slate-400">Geen lampen gevonden</h3>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Geen lamp met &quot;{search}&quot; in de naam.
+                  </p>
+                  <button
+                    onClick={() => setSearch("")}
+                    className="mt-3 text-xs text-amber-400 hover:text-amber-300 cursor-pointer"
+                  >
+                    Zoekterm wissen
+                  </button>
+                </div>
+              )}
+
+              {/* Empty state (no devices at all) */}
               {devices.length === 0 && !error && (
                 <div className="flex flex-col items-center justify-center py-24 text-center">
                   <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-4">
@@ -156,7 +289,7 @@ export default function LampenPage() {
                   </p>
                 </div>
               )}
-            </>
+            </div>
           )}
         </main>
       </div>

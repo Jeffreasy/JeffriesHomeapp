@@ -49,14 +49,14 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
         <div className="flex items-center gap-2 min-w-0">
           <h2 className="text-sm font-semibold text-slate-200 truncate">{room.name}</h2>
           <span
-            className="text-xs text-slate-600 flex-shrink-0"
+            className="text-xs text-slate-600 shrink-0"
             aria-label={`${onlineCount} van ${devices.length} online, ${onCount} aan`}
           >
             {onlineCount}/{devices.length} · {onCount} aan
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => setShowScenes((v) => !v)}
             aria-expanded={showScenes}
@@ -131,10 +131,17 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
         )}
       </AnimatePresence>
 
-      {/* Lamp grid — items-start prevents card stretching when one expands */}
+      {/* Lamp grid — stagger animation */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
-        {devices.map((device) => (
-          <LampCard key={device.id} device={device} onSelect={onSelect} />
+        {devices.map((device, i) => (
+          <motion.div
+            key={device.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.04, duration: 0.22, ease: "easeOut" }}
+          >
+            <LampCard device={device} onSelect={onSelect} />
+          </motion.div>
         ))}
       </div>
     </section>
