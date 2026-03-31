@@ -67,4 +67,14 @@ crons.daily(
   { userId: JEFFREY_USER_ID }
 );
 
+/**
+ * Dagelijkse streak validatie — 01:00 UTC (03:00 Amsterdam)
+ * Herberekent alle actieve streaks en reset gebroken streaks.
+ */
+crons.daily(
+  "decay-habit-streaks",
+  { hourUTC: 1, minuteUTC: 0 },
+  internal.habits.decayStreaks,
+);
+
 export default crons;
