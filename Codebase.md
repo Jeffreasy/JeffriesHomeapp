@@ -456,9 +456,9 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
-| **NoteCard** | ~250 | Kaart met kleur-tint, pin/archief/delete hover-acties, inline checkbox toggling, tag overflow (+N), 3-kleur progress bar, ARIA roles, **deadline badge** (countdown: Verlopen!/Vandaag/Morgen/Over Xd), **prioriteit strip+dot** (rood/normaal/blauw), **linked event chip** (📅 Gekoppeld) |
-| **NoteEditor** | ~340 | Modal editor met auto-resize textarea, Ctrl+Enter save, Esc close, ListChecks insert, auto-continue checklist op Enter, woord/teken teller, kleur picker, tag input, body scroll lock, **collapsible meta panel** (datetime-local deadline picker + prioriteit dropdown hoog/normaal/laag) |
-| **QuickNote** | 174 | Dashboard widget: inline quick-capture met #tag auto-extractie en live preview, recente notities met checklist progress, compact datum formatting |
+| **NoteCard** | ~261 | Kaart met kleur-tint, pin/archief/delete acties (altijd zichtbaar op mobiel, hover op desktop, 40px touch targets), inline checkbox toggling, tag overflow (+N), 3-kleur progress bar, ARIA roles, **deadline badge** (Verlopen!/Vandaag/Morgen/Over Xd), **prioriteit strip+dot**, **linked event chip** |
+| **NoteEditor** | ~290 | Bottom-sheet op mobiel (slide-up) / centered modal op desktop. 44px touch targets, drag handle, safe-area footer, auto-resize textarea, Ctrl+Enter save, checklist auto-continue, woord/teken teller, kleur picker (28px swatches), tag input, **collapsible meta panel** (datetime-local deadline + prioriteit dropdown, 44px inputs) |
+| **QuickNote** | 174 | Dashboard widget: inline quick-capture met #tag auto-extractie en live preview, recente notities met checklist progress |
 
 ### 9.4 Finance (8)
 
@@ -493,8 +493,8 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
-| **HabitCard** | ~210 | Positief: check button toggle. Negatief: shield/check status indicator (geen toggle, auto-streak) + incident button. Kwantitatieve progress bar, streak counter (Flame), "Vermijden" badge, click-outside dropdown menu (edit/pause/archive/delete) |
-| **HabitForm** | ~451 | Bottom-sheet creation/edit modal, emoji picker (30 presets), type toggle (Doen/Vermijden), frequentie selector, rooster koppeling (5 opties), meetbaar doel toggle (doelwaarde + eenheid presets), doeltijd (HH:mm), kleur picker (12 kleuren), isSubmitting guard |
+| **HabitCard** | ~216 | Positief: check button toggle. Negatief: shield/check status indicator (auto-streak) + incident button. Kwantitatieve progress bar, streak counter (Flame), "Vermijden" badge, click-outside dropdown menu (52px knoppen, 15px iconen, cursor-pointer) |
+| **HabitForm** | ~451 | Bottom-sheet (mobile) / centered modal (desktop). Emoji picker (30 presets, 44px targets), type toggle (Doen/Vermijden), frequentie selector, rooster koppeling (5 opties), meetbaar doel, doeltijd (met wis-knop 40px), kleur picker (40px swatches), 96px scroll padding, safe-area footer, Tailwind v4 classes |
 | **HabitStats** | ~152 | XP progress bar, level display, 4 stat kaarten, streak leaderboard met "Auto" badge bij negatieve habits |
 | **HabitHeatmap** | ~131 | GitHub-style 365-dagen contribution grid, 5-level orange intensity, horizontaal scrollbaar (mobile) |
 | **BadgeShowcase** | ~113 | Badge grid met locked/unlocked states, single-pulse glow op recente badges, emoji + titel per badge |
