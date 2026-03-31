@@ -40,7 +40,7 @@ graph TB
     end
 
     subgraph ConvexBackend["Convex Backend"]
-        Schema["Schema (15 tabellen)"]
+        Schema["Schema (17 tabellen)"]
         HTTP["HTTP Router"]
         DataModules["Data Modules (8)"]
         Actions["9 Server Actions"]
@@ -78,7 +78,7 @@ graph TB
 
 ---
 
-## 3. Database Schema (15 tabellen)
+## 3. Database Schema (17 tabellen)
 
 | Tabel | Beschrijving | Key Fields | Indices |
 |-------|-------------|------------|---------|
@@ -95,7 +95,9 @@ graph TB
 | **emailSyncMeta** | Gmail sync cursor (incremental) | historyId, lastFullSync, totalSynced | `by_user` |
 | **loonstroken** | Uploaded loonstrook data | userId, jaar, periode, brutoloon, nettoloon, uren | `by_user`, `by_user_periode` |
 | **notes** | Persoonlijke notities | userId, titel?, inhoud, tags?, kleur?, isPinned, isArchived, deadline?, linkedEventId?, prioriteit?, aangemaakt, gewijzigd | `by_user`, `by_user_pinned`, `by_user_deadline`, `search_notes` (FTS) |
-| **habits** | Gewoontes met gamification | userId, naam, emoji, type (positief/negatief), frequentie (dagelijks/weekdagen/weekenddagen/aangepast/x_per_week/x_per_maand), moeilijkheid, kleur, roosterFilter?, isKwantitatief, doelWaarde?, eenheid?, doelTijd?, doelAantal?, status (actief/gepauzeerd/gearchiveerd), huidigeStreak, langsteStreak, totaalVoltooid, totaalIncidenten, xp, badges[], logboek[] (datum/voltooid/isIncident/notitie/waarde) | `by_user`, `by_user_status` |
+| **habits** | Gewoontes met gamification | userId, naam, emoji, type (positief/negatief), frequentie (6 opties), moeilijkheid, kleur, roosterFilter?, isKwantitatief, doelWaarde?, eenheid?, doelTijd?, doelAantal?, xpPerVoltooiing, huidigeStreak, langsteStreak, totaalVoltooid, totaalXP, volgorde, isActief, isPauze, aangemaakt, gewijzigd | `by_user`, `by_user_actief` |
+| **habitLogs** | Voltooiings-registratie | userId, habitId, datum (YYYY-MM-DD), voltooid, waarde?, isIncident, notitie?, bron, xpVerdiend, aangemaakt | `by_user`, `by_habit`, `by_habit_datum`, `by_user_datum` |
+| **habitBadges** | Behaalde achievements | userId, badgeId, habitId?, naam, emoji, beschrijving, xpBonus, behaaldOp | `by_user`, `by_user_badge` |
 
 ---
 
@@ -206,13 +208,15 @@ graph TB
 - **Single constant:** `JEFFREY_USER_ID` (Clerk User ID)
 - Gebruikt door alle cron jobs voor de hardcoded single-user
 
-### 5.6 [habitConstants.ts](file:///c:/Users/jeffrey/Desktop/Projecten/JeffriesHomeapp/convex/lib/habitConstants.ts) (~150 regels)
-- **Gamification engine:** Exponentieel XP-model (12 levels: Beginner → Legende)
-- **XP per moeilijkheid:** makkelijk=5, normaal=10, moeilijk=20
-- **13 badges:** Gebaseerd op streaks (7d, 30d, 100d, 365d) en totaal voltooiingen (10, 50, 100, 500, 1000)
-- **Emoji presets:** `HABIT_EMOJIS` (30 emoji's, 5 categorieën: Gezondheid, Sport, Studie, Voeding, Lifestyle)
-- **Rooster filter opties:** alle/vroege_dienst/late_dienst/vrije_dag/werkdag
-- **`calculateLevel(xp)`**, **`checkBadges(streak, total)`** — pure functies
+### 5.6 [habitConstants.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/lib/habitConstants.ts) (160 regels)
+- **Gamification engine:** Exponentieel XP-model (12 levels: Beginner → Grandmaster)
+- **`computeXP(moeilijkheid, streakBonus)`:** Base XP × moeilijkheid multiplier + streak bonus (capped +10)
+- **XP multipliers:** makkelijk=0.5×, normaal=1×, moeilijk=2× (BASE_XP=10)
+- **17 badges:** 7 streak milestones (3d→365d) + 5 total completion (10→1000) + 1 first habit
+- **`getLevel(totalXP)`** → `LevelInfo` met level, progress 0-1, nextXP, titel
+- **`getNewBadges(streak, total, behaald)`** → nieuwe badges na completion
+- **Emoji presets:** `HABIT_EMOJIS` (30 emoji's)
+- **Rooster filter opties:** alle/werkdagen/vrijeDagen/vroegeDienst/lateDienst
 
 ---
 
@@ -395,9 +399,9 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 - Automation form helpers
 - Scene/action type mappings
 
-### 7.10 [habit-constants.ts](file:///c:/Users/jeffrey/Desktop/Projecten/JeffriesHomeapp/lib/habit-constants.ts) (~83 regels)
+### 7.10 [habit-constants.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/lib/habit-constants.ts) (83 regels)
 - **12 preset kleuren** (`HABIT_COLORS`) — Orange, Red, Pink, Violet, Blue, Cyan, Teal, Green, Lime, Yellow, Stone, Slate
-- **Labels:** Moeilijkheid (3), Frequentie (6), Dag (7), Type (2 + emoji)
+- **Labels:** Moeilijkheid (3), Frequentie (6), Dag (7), Type (2: positief/negatief)
 - **Formatters:** `formatStreak()`, `formatXP()`, `formatLevel()`
 - **Heatmap:** 5-level orange intensity colours + `getHeatmapLevel()` (0-25-50-75-100%)
 
@@ -420,7 +424,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `useSwipe` | Touch events | Swipe gesture detectie voor BottomSheet |
 | `useNotes` | Convex `useQuery` | Notes CRUD + split (active/archived/pinned) + allTags + `NoteRecord`, `NoteCreateData`, `NoteUpdateData` type exports |
 | `usePrivacy` | Zustand persist | Privacy toggle (mask sensitive data) |
-| `useHabits` | Convex `useQuery` + `useMutation` | Habits CRUD + `HabitWithLog` type (habit + vandaag-log merge), toggle/incident/pause/archive/remove, stats (totalCompleted, currentStreak, longestStreak, xp, level, badges), rooster-aware filtering |
+| `useHabits` | Convex `useQuery` + `useMutation` | Habits CRUD + datum-parameter (date navigation) + `HabitWithLog` type, toggle/incident/pause/archive/remove, todaySummary (negatief-aware: geen incident = voltooid), level via `getLevel()`, rooster-aware filtering |
 
 ---
 
@@ -489,12 +493,12 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
-| **HabitCard** | ~192 | Habit kaart met check button (positief) / incident button (negatief), kwantitatieve progress bar, streak counter (Flame icon), click-outside dropdown menu (pause/archive/edit/delete) |
+| **HabitCard** | ~210 | Positief: check button toggle. Negatief: shield/check status indicator (geen toggle, auto-streak) + incident button. Kwantitatieve progress bar, streak counter (Flame), "Vermijden" badge, click-outside dropdown menu (edit/pause/archive/delete) |
 | **HabitForm** | ~451 | Bottom-sheet creation/edit modal, emoji picker (30 presets), type toggle (Doen/Vermijden), frequentie selector, rooster koppeling (5 opties), meetbaar doel toggle (doelwaarde + eenheid presets), doeltijd (HH:mm), kleur picker (12 kleuren), isSubmitting guard |
-| **HabitStats** | ~149 | XP progress bar (11px labels), level display, 4 stat kaarten (Totaal/Voltooid/Langste Streak/Badges), streak leaderboard |
-| **HabitHeatmap** | ~130 | GitHub-style 365-dagen contribution grid, 5-level orange intensity, Lucide Activity icon header, horizontaal scrollbaar (mobile), scrollbar-none |
+| **HabitStats** | ~152 | XP progress bar, level display, 4 stat kaarten, streak leaderboard met "Auto" badge bij negatieve habits |
+| **HabitHeatmap** | ~131 | GitHub-style 365-dagen contribution grid, 5-level orange intensity, horizontaal scrollbaar (mobile) |
 | **BadgeShowcase** | ~113 | Badge grid met locked/unlocked states, single-pulse glow op recente badges, emoji + titel per badge |
-| **DailyChecklist** | ~170 | Dashboard widget: dagelijkse habit lijst met progress bar, Flame streak icons, inline toggle, empty state CTA ("Habits instellen"), level display |
+| **DailyChecklist** | ~175 | Dashboard widget: dagelijkse habit lijst, negatieve habits tonen shield/check (geen toggle), progress bar, Flame streak icons |
 
 ### 9.8 Overige directories
 
@@ -507,16 +511,17 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 ---
 
-## 10. Cron Jobs (6 stuks)
+## 10. Cron Jobs (7 stuks)
 
 | Naam | Frequentie | Action | Doel |
 |------|-----------|--------|------|
 | `sync-schedule-daily` | 06:00 UTC | `syncSchedule.syncFromCalendar` | SDB Calendar → schedule tabel |
 | `sync-personal-events-interval` | Elk uur | `syncPersonalEvents.syncFromCalendar` | Primary Calendar → personalEvents |
 | `sync-todoist-daily` | 07:00 UTC | `syncTodoist.syncTodoist` | Schedule → Todoist taken |
-| `process-pending-calendar` | Elk uur | `processPendingCalendar.processPending` | PendingCreate → Google Calendar (PendingDelete = legacy, instant delete is primair) |
+| `process-pending-calendar` | Elk uur | `processPendingCalendar.processPending` | PendingCreate → Google Calendar |
 | `sync-gmail` | Elke 5 min | `syncGmail.syncFromGmail` | Gmail incremental sync (History API) |
 | `purge-deleted-emails` | 03:00 UTC | `emails.purgeDeletedInternal` | Verwijder >7 dagen trash |
+| `decay-habit-streaks` | 01:00 UTC | `habits.decayStreaks` | Streak decay (positief) + auto-groei (negatief) + badge toekenning |
 
 ---
 
@@ -566,12 +571,16 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 - **Conflict detection:** 3-level system (hard/soft/info) met ergste-wint aggregatie
 
 ### Habits/Gamification Patterns
-- **Exponentieel XP model:** 12 levels (100→15000 XP), XP per moeilijkheid (5/10/20)
-- **Badge engine:** 13 badges gebaseerd op streaks en totaal voltooiingen, `checkBadges()` pure functie
-- **Kwantitatieve tracking:** `isKwantitatief` + `doelWaarde` + `eenheid` door hele stack (schema → form → card → AI)
-- **Rooster-integratie:** `roosterFilter` field (5 opties) → habit alleen zichtbaar op matching diensttype
-- **Negatief habit patroon:** "Vermijden" type met incident logging (streak reset bij incident)
-- **Dual AI paths:** `addNoteInternal` (geen streak reset) vs `logIncidentInternal` (streak reset)
+- **Streak engine:** `computeStreakFrom()` (positief: achterwaarts due-dag verificatie) + `computeNegativeStreakFrom()` (negatief: auto-groei zonder incident, begrensd door aanmaakdatum)
+- **Lazy + Proactive:** Streak berekening bij toggle (lazy) + dagelijkse cron decay/groei (proactief, 01:00 UTC)
+- **DRY mutations:** `coreToggle()` gedeeld door public `toggleCompletion` en internal `toggleCompletionInternal`
+- **Badge engine:** 17 badges, check bij toggle + cron (met duplicate preventie via DB query)
+- **XP model:** 12 levels (Beginner→Grandmaster), exponentiële thresholds, streak bonus (+1 XP per 5 streak, capped +10)
+- **Kwantitatieve tracking:** `isKwantitatief` + `doelWaarde` + `eenheid` door hele stack
+- **Rooster-integratie:** `roosterFilter` (5 opties) + dienst-aware filtering in `getForDate`
+- **Negatief habit patroon:** Auto-streak groei (cron), incident logging met duplicate preventie, shield/check UI indicator
+- **Heatmap:** 365 dagen, rate berekend op basis van due habits per dag (frequentie-aware)
+- **Datum-navigatie:** `getForDate(datum)` → invullen voor verleden dagen (toggle stuurt datum mee)
 
 ---
 
@@ -591,7 +600,7 @@ convex/
 ├── loonstroken.ts                     # 120 regels
 ├── automations.ts                     # 93 regels
 ├── notes.ts                           # ~240 regels (incl. internal mutations)
-├── habits.ts                          # ~350 regels (CRUD + gamification + logboek)
+├── habits.ts                          # ~940 regels (streak engine + CRUD + gamification + cron decay + AI tools)
 ├── actions/
 │   ├── syncSchedule.ts                # 178 regels
 │   ├── syncPersonalEvents.ts          # 124 regels
@@ -649,7 +658,7 @@ app/
 ├── finance/page.tsx                   # 509 regels
 ├── automations/page.tsx               # 171 regels
 ├── notities/page.tsx                  # ~346 regels
-├── habits/page.tsx                    # ~227 regels
+├── habits/page.tsx                    # ~340 regels (datum-navigatie, delete modal, overzicht grouping)
 ├── settings/page.tsx                  # 129 regels
 └── globals.css                        # 1648 regels
 
@@ -681,7 +690,7 @@ hooks/
 ├── useNotes.ts                        # ~110 regels — NoteRecord, NoteCreateData, NoteUpdateData
 ├── usePrivacy.ts                      # 38 regels — privacy toggle (localStorage)
 ├── useSwipe.ts                        # ~30 regels
-└── useHabits.ts                       # ~180 regels — HabitWithLog type, CRUD, stats, rooster filter
+└── useHabits.ts                       # ~167 regels — HabitWithLog type, datum-aware CRUD, negatief-aware summary
 
 components/
 ├── layout/
@@ -745,11 +754,11 @@ components/
 | **React hooks** | 15 |
 | **UI components** | 37 |
 | **Lib modules** | 17 (11 frontend + 6 backend) |
-| **Cron jobs** | 6 |
+| **Cron jobs** | 7 |
 | **Auto-categorisatie regels** | 24 regex patterns |
 | **Scene presets** | 17 (6 custom + 10 WiZ + 1 uit) |
 | **Finance categorieën** | 26 |
-| **Database tabellen** | 15 |
+| **Database tabellen** | 17 |
 | **Habit gamification levels** | 12 |
-| **Habit badges** | 13 |
+| **Habit badges** | 17 |
 | **Telegram commando's** | 18 |
