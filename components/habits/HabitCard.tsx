@@ -2,15 +2,26 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, AlertTriangle, Pause, MoreVertical, Trash2, Archive, Edit3, Plus, Minus } from "lucide-react";
-import { formatStreak, MOEILIJKHEID_LABELS } from "@/lib/habit-constants";
+import { Check, AlertTriangle, Pause, MoreVertical, Trash2, Archive, Edit3, Plus, Minus, ChevronDown, Trophy, Calendar, Target, Zap, TrendingUp } from "lucide-react";
+import { formatStreak, formatXP, MOEILIJKHEID_LABELS, FREQUENTIE_LABELS } from "@/lib/habit-constants";
+import { getLevel } from "@/convex/lib/habitConstants";
 import { DEFAULT_STAP, INCIDENT_TRIGGERS } from "@/convex/lib/habitConstants";
 import type { HabitWithLog } from "@/hooks/useHabits";
 
 /**
  * HabitCard — Habit kaart met checkbox/stepper, streak, XP, incident triggers.
  * Mobile-first: touch targets >= 44px, stepper gescheiden van incident button.
+ * Tappable content area: expand/collapse detail panel.
  */
+
+const ROOSTER_LABELS: Record<string, string> = {
+  altijd:        "Altijd",
+  werkdagen:     "Alleen werkdagen",
+  vrije_dagen:   "Alleen vrije dagen",
+  vroege_dienst: "Vroege diensten",
+  late_dienst:   "Late diensten",
+};
+
 interface HabitCardProps {
   habit: HabitWithLog;
   onToggle: () => void;
@@ -24,6 +35,7 @@ interface HabitCardProps {
 
 export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, onArchive, onRemove, onEdit }: HabitCardProps) {
   const [showMenu, setShowMenu] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [showTriggerModal, setShowTriggerModal] = useState(false);
   const [selectedTrigger, setSelectedTrigger] = useState<string | undefined>();
   const [triggerNotitie, setTriggerNotitie] = useState("");
@@ -124,8 +136,11 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
           </button>
         )}
 
-        {/* Content */}
-        <div className="flex-1 min-w-0">
+        {/* Content — tap to expand details */}
+        <div
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={() => setShowDetail(!showDetail)}
+        >
           <div className="flex items-center gap-2">
             <span
               className="text-sm font-semibold truncate"
@@ -141,6 +156,11 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                 Vermijden
               </span>
             )}
+            <ChevronDown
+              size={14}
+              className="text-slate-600 shrink-0 transition-transform duration-200"
+              style={{ transform: showDetail ? "rotate(180deg)" : "rotate(0deg)" }}
+            />
           </div>
 
           <div className="flex items-center gap-2 mt-1">
@@ -233,6 +253,98 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
           </div>
         </div>
       )}
+
+      {/* ─── Expandable Detail Panel ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {showDetail && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div className="px-3.5 pb-3 border-t border-white/5 pt-3">
+              {/* Beschrijving */}
+              {habit.beschrijving && (
+                <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+                  {habit.beschrijving}
+                </p>
+              )}
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <DetailStat
+                  icon={<Calendar size={12} />}
+                  label="Frequentie"
+                  value={FREQUENTIE_LABELS[habit.frequentie] ?? habit.frequentie}
+                  color="#3b82f6"
+                />
+                <DetailStat
+                  icon={<Trophy size={12} />}
+                  label="Langste streak"
+                  value={`${habit.langsteStreak}d`}
+                  color="#f59e0b"
+                />
+                <DetailStat
+                  icon={<Target size={12} />}
+                  label="Totaal voltooid"
+                  value={`${habit.totaalVoltooid}x`}
+                  color="#22c55e"
+                />
+              </div>
+
+              {/* XP + Level progress */}
+              {(() => {
+                const levelInfo = getLevel(habit.totaalXP);
+                return (
+                  <div className="rounded-xl p-2.5" style={{ background: `${color}06`, border: `1px solid ${color}10` }}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Zap size={12} style={{ color }} />
+                        <span className="text-[11px] font-bold" style={{ color }}>
+                          Lv.{levelInfo.level} {levelInfo.titel}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500">
+                        {formatXP(habit.totaalXP)}
+                        {levelInfo.nextXP > 0 && (
+                          <span className="text-slate-600"> · nog {levelInfo.nextXP}</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: color }}
+                        animate={{ width: `${levelInfo.progress * 100}%` }}
+                        transition={{ type: "spring", damping: 20, stiffness: 200 }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Rooster koppeling badge */}
+              {habit.roosterFilter && habit.roosterFilter !== "altijd" && (
+                <div className="flex items-center gap-1.5 mt-2.5">
+                  <TrendingUp size={11} className="text-cyan-400/60" />
+                  <span className="text-[10px] text-cyan-400/70">
+                    Rooster: {ROOSTER_LABELS[habit.roosterFilter] ?? habit.roosterFilter}
+                  </span>
+                </div>
+              )}
+
+              {/* Aangemaakt datum */}
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="text-[10px] text-slate-600">
+                  Aangemaakt {new Date(habit.aangemaakt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ─── Incident Trigger Modal ───────────────────────────────────────── */}
       <AnimatePresence>
@@ -329,5 +441,17 @@ function MenuBtn({ icon, label, onClick, danger }: {
       {icon}
       <span className="text-[10px] font-medium">{label}</span>
     </button>
+  );
+}
+
+function DetailStat({ icon, label, value, color }: {
+  icon: React.ReactNode; label: string; value: string; color: string;
+}) {
+  return (
+    <div className="rounded-lg p-2 text-center" style={{ background: `${color}08`, border: `1px solid ${color}12` }}>
+      <div className="flex justify-center mb-1" style={{ color }}>{icon}</div>
+      <div className="text-[11px] font-bold text-slate-200">{value}</div>
+      <div className="text-[9px] text-slate-500 mt-0.5">{label}</div>
+    </div>
   );
 }
