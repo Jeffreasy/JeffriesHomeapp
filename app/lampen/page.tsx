@@ -41,20 +41,22 @@ export default function LampenPage() {
 
   return (
     // Outer flex: grid + slide panel side by side
-    <div className="flex h-screen overflow-hidden" style={{ background: "#0a0a0f" }}>
+    <div className="flex min-h-screen" style={{ background: "#0a0a0f" }}>
       {/* Main scrollable area */}
-      <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col">
         {/* ─── Header ──────────────────────────────────────────────────────── */}
         <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between gap-2">
-            <div>
-              <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                <Lightbulb size={20} className="text-amber-400" />
-                Verlichting
-              </h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {onlineDevices.length}/{devices.length} online · {onDevices.length} aan
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center">
+                <Lightbulb size={18} className="text-amber-400" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-white">Verlichting</h1>
+                <p className="text-xs text-slate-500">
+                  {onlineDevices.length}/{devices.length} online · {onDevices.length} aan
+                </p>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -83,7 +85,7 @@ export default function LampenPage() {
         </div>
 
         {/* ─── Main content (scrollable) ────────────────────────────────────── */}
-        <main className="flex-1 overflow-y-auto px-6 py-5 space-y-8 max-w-5xl">
+        <main className="flex-1 overflow-y-auto px-6 py-5 pb-32 space-y-8 max-w-5xl">
           {/* Error */}
           {error && (
             <div className="glass rounded-2xl border border-red-500/20 p-4 flex items-start gap-3">

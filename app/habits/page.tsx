@@ -88,61 +88,64 @@ export default function HabitsPage() {
   };
 
   return (
-    <div className="min-h-dvh pb-32 md:pb-8 px-4 md:px-0">
-      {/* Header */}
-      <div className="pt-6 pb-4 md:pt-8 md:pb-6">
-        <div className="flex items-center justify-between mb-1">
+    <div className="min-h-screen overflow-x-hidden" style={{ background: "#0a0a0f" }}>
+      {/* ─── Header ──────────────────────────────────────────────────── */}
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 py-4">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/20 flex items-center justify-center">
-              <Target size={20} className="text-orange-400" />
+            <div className="w-9 h-9 rounded-xl bg-orange-500/15 border border-orange-500/20 flex items-center justify-center">
+              <Target size={18} className="text-orange-400" />
             </div>
             <div>
-              <h1 className="text-xl font-extrabold text-white tracking-tight">Habits</h1>
-              <p className="text-[11px] text-slate-500">
+              <h1 className="text-lg font-bold text-white">Habits</h1>
+              <p className="text-xs text-slate-500">
                 {formatLevel(level.level, level.titel)} · {formatXP(stats?.totaalXP ?? 0)}
               </p>
             </div>
           </div>
 
-          {todayDienst && (
-            <div className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/15">
-              <span className="text-[10px] text-blue-400 font-medium">
-                {todayDienst.shiftType} dienst
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {todayDienst && (
+              <div className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/15">
+                <span className="text-[10px] text-blue-400 font-medium">
+                  {todayDienst.shiftType} dienst
+                </span>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Tab bar */}
-      <div className="sticky top-0 z-30 -mx-4 px-4 py-2" style={{ background: "rgba(10,10,15,0.92)", backdropFilter: "blur(16px)" }}>
-        <div className="flex gap-1 p-1 bg-white/3 rounded-xl">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className="flex-1 relative py-2.5 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium transition-all min-h-[44px]"
-              style={{ color: activeTab === id ? "#f97316" : "#64748b" }}
-            >
-              {activeTab === id && (
-                <motion.div
-                  layoutId="activeTab"
-                  className="absolute inset-0 rounded-lg"
-                  style={{
-                    background: "rgba(249,115,22,0.08)",
-                    border: "1px solid rgba(249,115,22,0.12)",
-                  }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                <Icon size={14} />
-                {label}
-              </span>
-            </button>
-          ))}
+      <main className="px-6 py-5 pb-32 max-w-4xl mx-auto">
+        {/* Tab bar */}
+        <div className="sticky top-[65px] z-20 -mx-6 px-6 py-2" style={{ background: "rgba(10,10,15,0.92)", backdropFilter: "blur(16px)" }}>
+          <div className="flex gap-1 p-1 bg-white/3 rounded-xl">
+            {TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id)}
+                className="flex-1 relative py-2.5 rounded-lg flex items-center justify-center gap-1.5 text-xs font-medium transition-all min-h-[44px]"
+                style={{ color: activeTab === id ? "#f97316" : "#64748b" }}
+              >
+                {activeTab === id && (
+                  <motion.div
+                    layoutId="activeTab"
+                    className="absolute inset-0 rounded-lg"
+                    style={{
+                      background: "rgba(249,115,22,0.08)",
+                      border: "1px solid rgba(249,115,22,0.12)",
+                    }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-1.5">
+                  <Icon size={14} />
+                  {label}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
       {/* Tab content */}
       <div className="mt-4">
@@ -367,6 +370,7 @@ export default function HabitsPage() {
           )}
         </AnimatePresence>
       </div>
+      </main>
 
       {/* FAB */}
       <motion.button
