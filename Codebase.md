@@ -96,7 +96,7 @@ graph TB
 | **loonstroken** | Uploaded loonstrook data | userId, jaar, periode, brutoloon, nettoloon, uren | `by_user`, `by_user_periode` |
 | **notes** | Persoonlijke notities | userId, titel?, inhoud, tags?, kleur?, isPinned, isArchived, deadline?, linkedEventId?, prioriteit?, aangemaakt, gewijzigd | `by_user`, `by_user_pinned`, `by_user_deadline`, `search_notes` (FTS) |
 | **habits** | Gewoontes met gamification | userId, naam, emoji, type (positief/negatief), frequentie (6 opties), moeilijkheid, kleur, roosterFilter?, isKwantitatief, doelWaarde?, eenheid?, doelTijd?, doelAantal?, xpPerVoltooiing, huidigeStreak, langsteStreak, totaalVoltooid, totaalXP, volgorde, isActief, isPauze, aangemaakt, gewijzigd | `by_user`, `by_user_actief` |
-| **habitLogs** | Voltooiings-registratie | userId, habitId, datum (YYYY-MM-DD), voltooid, waarde?, isIncident, notitie?, bron, xpVerdiend, aangemaakt | `by_user`, `by_habit`, `by_habit_datum`, `by_user_datum` |
+| **habitLogs** | Voltooiings-registratie | userId, habitId, datum (YYYY-MM-DD), voltooid, waarde?, isIncident, trigger?, notitie?, bron, xpVerdiend, aangemaakt | `by_user`, `by_habit`, `by_habit_datum`, `by_user_datum` |
 | **habitBadges** | Behaalde achievements | userId, badgeId, habitId?, naam, emoji, beschrijving, xpBonus, behaaldOp | `by_user`, `by_user_badge` |
 
 ---
@@ -208,7 +208,7 @@ graph TB
 - **Single constant:** `JEFFREY_USER_ID` (Clerk User ID)
 - Gebruikt door alle cron jobs voor de hardcoded single-user
 
-### 5.6 [habitConstants.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/lib/habitConstants.ts) (160 regels)
+### 5.6 [habitConstants.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/lib/habitConstants.ts) (~190 regels)
 - **Gamification engine:** Exponentieel XP-model (12 levels: Beginner → Grandmaster)
 - **`computeXP(moeilijkheid, streakBonus)`:** Base XP × moeilijkheid multiplier + streak bonus (capped +10)
 - **XP multipliers:** makkelijk=0.5×, normaal=1×, moeilijk=2× (BASE_XP=10)
@@ -217,6 +217,9 @@ graph TB
 - **`getNewBadges(streak, total, behaald)`** → nieuwe badges na completion
 - **Emoji presets:** `HABIT_EMOJIS` (30 emoji's)
 - **Rooster filter opties:** alle/werkdagen/vrijeDagen/vroegeDienst/lateDienst
+- **`INCIDENT_TRIGGERS`:** 6 psychologisch onderbouwde categorieën (mentale_overprikkeling, fysieke_vermoeidheid, stress_emotie, vermijdingsgedrag, sociale_druk, anders) — elk met emoji + label
+- **`DEFAULT_STAP`:** Kwantitatieve stappen per eenheid (ml=250, min=15, km=1, pg=5, x=1)
+- **`OVERLOAD_THRESHOLDS`:** [30, 60, 100] dagen — triggers voor progressive overload notities
 
 ---
 
@@ -251,7 +254,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **email** | totaal/ongelezen/prullenbak | Stats (inbox/ongelezen/ster/verzonden) + top 10 afzenders + categorie verdeling + triage suggesties + 15 recente emails |
 | **automations** | totaal/actief | Alle regels met triggers + 5 cron jobs info + sync health (rooster/gmail/todoist/calendar) |
 | **notes** | totaal/pin count + recente titels | Alle notities (id/titel/inhoud/tags/isPinned/deadline/linkedEventId/prioriteit/aangemaakt/gewijzigd) + pin count |
-| **habits** | totaalHabits/actief/streak overview + vandaag voortgang | Alle habits met huidige status + daglog + streaks + XP/level + badges + weekstatistieken + rooster-integratie |
+| **habits** | totaalHabits/actief/streak overview + vandaag voortgang | Alle habits met huidige status + daglog + streaks + XP/level + badges + **weekRapport** (voltooiingen/incidenten/xpVerdiend via `getWeeklyReport`) + rooster-integratie + **coaching instructie** voor AI correlatie-analyse |
 
 **Key pattern:** Dashboard agent roept alle andere agents aan met `{ lite: true }` — voorkomt enorme context window bij de briefing.
 
@@ -302,7 +305,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | Calendar | afspraakMaken, afspraakBewerken, afspraakVerwijderen, afsprakenOpvragen | `calendar.ts` |
 | Finance | saldoOpvragen, transactiesZoeken, uitgavenOverzicht, maandVergelijken, vasteLastenAnalyse, categorieWijzigen, bulkCategoriseren, ongelabeldAnalyse | `finance.ts` |
 | Notes | notitieMaken, notitiesZoeken, notitiePinnen, notitieBewerken, notitieArchiveren, notitiesOverzicht | `notes.ts` |
-| Habits | habitAanmaken, habitVoltooien, habitIncident, habitNotitie, habitsOpvragen, habitRapportage, habitPauzeren, habitVerwijderen | `habits.ts` |
+| Habits | habitAanmaken, habitVoltooien, habitIncident (met `trigger` enum: 6 categorieën), habitNotitie, habitsOverzicht, habitStreaks, habitBadges, habitRapport | `habits.ts` |
 
 **Calendar tools detail:**
 - `afspraakMaken` → `personalEvents.create()` (PendingCreate → cron push met Google Calendar kleuren)
@@ -424,7 +427,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `useSwipe` | Touch events | Swipe gesture detectie voor BottomSheet |
 | `useNotes` | Convex `useQuery` | Notes CRUD + split (active/archived/pinned) + allTags + `NoteRecord`, `NoteCreateData`, `NoteUpdateData` type exports |
 | `usePrivacy` | Zustand persist | Privacy toggle (mask sensitive data) |
-| `useHabits` | Convex `useQuery` + `useMutation` | Habits CRUD + datum-parameter (date navigation) + `HabitWithLog` type, toggle/incident/pause/archive/remove, todaySummary (negatief-aware: geen incident = voltooid), level via `getLevel()`, rooster-aware filtering |
+| `useHabits` | Convex `useQuery` + `useMutation` | Habits CRUD + datum-parameter (date navigation) + `HabitWithLog` type, toggle/**increment**/incident (met trigger)/pause/archive/remove, todaySummary (negatief-aware: geen incident = voltooid), level via `getLevel()`, rooster-aware filtering |
 
 ---
 
@@ -493,7 +496,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
-| **HabitCard** | ~216 | Positief: check button toggle. Negatief: shield/check status indicator (auto-streak) + incident button. Kwantitatieve progress bar, streak counter (Flame), "Vermijden" badge, click-outside dropdown menu (52px knoppen, 15px iconen, cursor-pointer) |
+| **HabitCard** | ~334 | Positief: check button toggle. Negatief: shield/check status indicator (auto-streak) + incident button. **Kwantitatieve stepper:** +/− knoppen (44px) in eigen rij onder habit-info, animated progress bar (spring transition), current/doel waarde display. **Incident trigger modal:** inline AnimatePresence met 6 trigger-categorieën (2-kolom grid, 44px), verplichte notitie bij "anders", annuleer/bevestig knoppen. Streak counter (Flame), "Vermijden" badge, click-outside dropdown menu (52px knoppen, 15px iconen, cursor-pointer) |
 | **HabitForm** | ~451 | Bottom-sheet (mobile) / centered modal (desktop). Emoji picker (30 presets, 44px targets), type toggle (Doen/Vermijden), frequentie selector, rooster koppeling (5 opties), meetbaar doel, doeltijd (met wis-knop 40px), kleur picker (40px swatches), 96px scroll padding, safe-area footer, Tailwind v4 classes |
 | **HabitStats** | ~152 | XP progress bar, level display, 4 stat kaarten, streak leaderboard met "Auto" badge bij negatieve habits |
 | **HabitHeatmap** | ~131 | GitHub-style 365-dagen contribution grid, 5-level orange intensity, horizontaal scrollbaar (mobile) |
@@ -521,7 +524,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `process-pending-calendar` | Elk uur | `processPendingCalendar.processPending` | PendingCreate → Google Calendar |
 | `sync-gmail` | Elke 5 min | `syncGmail.syncFromGmail` | Gmail incremental sync (History API) |
 | `purge-deleted-emails` | 03:00 UTC | `emails.purgeDeletedInternal` | Verwijder >7 dagen trash |
-| `decay-habit-streaks` | 01:00 UTC | `habits.decayStreaks` | Streak decay (positief) + auto-groei (negatief) + badge toekenning |
+| `decay-habit-streaks` | 01:00 UTC | `habits.decayStreaks` | Streak decay (positief) + auto-groei (negatief) + badge toekenning + **progressive overload** (notitie-suggestie bij streak 30/60/100 om moeilijkheid te verlagen) |
 
 ---
 
@@ -600,7 +603,7 @@ convex/
 ├── loonstroken.ts                     # 120 regels
 ├── automations.ts                     # 93 regels
 ├── notes.ts                           # ~240 regels (incl. internal mutations)
-├── habits.ts                          # ~940 regels (streak engine + CRUD + gamification + cron decay + AI tools)
+├── habits.ts                          # ~1095 regels (streak engine + CRUD + gamification + incrementWaarde + incident triggers + progressive overload + level-up rewards + cron decay + AI tools)
 ├── actions/
 │   ├── syncSchedule.ts                # 178 regels
 │   ├── syncPersonalEvents.ts          # 124 regels
@@ -617,7 +620,7 @@ convex/
 │   ├── salaryCalc.ts                  # 283 regels
 │   ├── fields.ts                      # 48 regels
 │   ├── config.ts                      # 10 regels
-│   └── habitConstants.ts              # ~150 regels (XP/levels/badges/emojis)
+│   └── habitConstants.ts              # ~190 regels (XP/levels/badges/emojis/triggers/stappen/overload)
 ├── ai/
 │   ├── registry.ts                    # 94 regels
 │   ├── router.ts                      # 82 regels — agent discovery queries
@@ -643,7 +646,7 @@ convex/
 │       ├── email.ts                   # 111 regels
 │       ├── automations.ts             # 118 regels
 │       ├── notes.ts                   # ~100 regels (8 capabilities)
-│       └── habits.ts                  # ~120 regels (8 tools, lite/full context)
+│       └── habits.ts                  # ~130 regels (8 tools, lite/full context + weekRapport + coaching)
 └── telegram/
     ├── bot.ts                         # ~320 regels (18 commando's)
     └── api.ts                         # 142 regels
@@ -658,7 +661,7 @@ app/
 ├── finance/page.tsx                   # 509 regels
 ├── automations/page.tsx               # 171 regels
 ├── notities/page.tsx                  # ~346 regels
-├── habits/page.tsx                    # ~340 regels (datum-navigatie, delete modal, overzicht grouping)
+├── habits/page.tsx                    # ~455 regels (datum-navigatie, delete modal, overzicht grouping, stepper+trigger integratie)
 ├── settings/page.tsx                  # 129 regels
 └── globals.css                        # 1648 regels
 
@@ -729,7 +732,7 @@ components/
 │   ├── NoteEditor.tsx                 # ~340 regels
 │   └── QuickNote.tsx                  # 174 regels
 ├── habits/
-│   ├── HabitCard.tsx                  # ~192 regels
+│   ├── HabitCard.tsx                  # ~334 regels (stepper + trigger modal + animated progress)
 │   ├── HabitForm.tsx                  # ~451 regels
 │   ├── HabitStats.tsx                 # ~149 regels
 │   ├── HabitHeatmap.tsx               # ~130 regels
