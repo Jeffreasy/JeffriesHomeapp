@@ -107,36 +107,52 @@ export function DailyChecklist() {
 function HabitCheckItem({ habit, onToggle }: { habit: HabitWithLog; onToggle: () => void }) {
   const isCompleted = habit.log?.voltooid === true;
   const isNegative = habit.type === "negatief";
+  const hasIncident = habit.log?.isIncident === true;
   const streakStr = habit.huidigeStreak > 0 ? habit.huidigeStreak : 0;
+
+  // Negatieve habits: auto-streak, geen toggle nodig
+  // Positieve habits: toggle aan/uit
+  const isSuccess = isNegative ? !hasIncident : isCompleted;
 
   return (
     <motion.button
       layout
-      onClick={onToggle}
+      onClick={isNegative ? undefined : onToggle}
       className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all min-h-[56px] active:scale-[0.97]"
       style={{
-        background: isCompleted
+        background: isSuccess
           ? "rgba(34, 197, 94, 0.06)"
-          : "rgba(255,255,255,0.02)",
-        border: isCompleted
+          : hasIncident
+            ? "rgba(239, 68, 68, 0.06)"
+            : "rgba(255,255,255,0.02)",
+        border: isSuccess
           ? "1px solid rgba(34, 197, 94, 0.12)"
-          : "1px solid transparent",
+          : hasIncident
+            ? "1px solid rgba(239, 68, 68, 0.12)"
+            : "1px solid transparent",
+        cursor: isNegative ? "default" : "pointer",
       }}
-      whileTap={{ scale: 0.97 }}
+      whileTap={isNegative ? {} : { scale: 0.97 }}
     >
-      {/* Check circle */}
+      {/* Check circle / Shield icon */}
       <div
         className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all duration-200"
         style={{
-          background: isCompleted
-            ? habit.kleur ?? "#22c55e"
-            : "rgba(255,255,255,0.05)",
-          border: isCompleted
+          background: isNegative
+            ? (hasIncident ? "#ef4444" : "rgba(34, 197, 94, 0.15)")
+            : (isCompleted ? habit.kleur ?? "#22c55e" : "rgba(255,255,255,0.05)"),
+          border: isNegative
             ? "none"
-            : `2px solid ${habit.kleur ?? "rgba(255,255,255,0.12)"}`,
+            : (isCompleted ? "none" : `2px solid ${habit.kleur ?? "rgba(255,255,255,0.12)"}`),
         }}
       >
-        {isCompleted && <Check size={14} className="text-white" />}
+        {isNegative ? (
+          hasIncident
+            ? <AlertTriangle size={12} className="text-white" />
+            : <Check size={14} className="text-green-400" />
+        ) : (
+          isCompleted && <Check size={14} className="text-white" />
+        )}
       </div>
 
       {/* Emoji + name */}
@@ -145,8 +161,8 @@ function HabitCheckItem({ habit, onToggle }: { habit: HabitWithLog; onToggle: ()
         <span
           className="text-sm font-medium truncate transition-all"
           style={{
-            color: isCompleted ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.85)",
-            textDecoration: isCompleted ? "line-through" : "none",
+            color: isSuccess ? "rgba(255,255,255,0.4)" : hasIncident ? "#f87171" : "rgba(255,255,255,0.85)",
+            textDecoration: isSuccess && !isNegative ? "line-through" : "none",
           }}
         >
           {habit.naam}
@@ -155,9 +171,6 @@ function HabitCheckItem({ habit, onToggle }: { habit: HabitWithLog; onToggle: ()
 
       {/* Streak badge + type indicator */}
       <div className="flex items-center gap-1.5 shrink-0">
-        {isNegative && !habit.log?.isIncident && (
-          <AlertTriangle size={12} className="text-amber-400/60" />
-        )}
         {streakStr > 0 && (
           <span className="text-[10px] text-orange-400/80 font-medium flex items-center gap-0.5">
             <Flame size={10} className="text-orange-400" />{streakStr}

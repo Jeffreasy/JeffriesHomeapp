@@ -389,7 +389,7 @@ export const getStats = query({
       .filter((h) => h.huidigeStreak > 0)
       .sort((a, b) => b.huidigeStreak - a.huidigeStreak)
       .slice(0, 5)
-      .map((h) => ({ naam: h.naam, emoji: h.emoji, streak: h.huidigeStreak }));
+      .map((h) => ({ naam: h.naam, emoji: h.emoji, streak: h.huidigeStreak, type: h.type }));
 
     return {
       totaalXP,
@@ -501,7 +501,8 @@ export const listForAgent = internalQuery({
       .withIndex("by_user_datum", (q) => q.eq("userId", userId).eq("datum", today))
       .collect();
 
-    const logSet = new Set(logs.filter((l) => l.voltooid).map((l) => l.habitId.toString()));
+    const completedSet = new Set(logs.filter((l) => l.voltooid).map((l) => l.habitId.toString()));
+    const incidentSet = new Set(logs.filter((l) => l.isIncident).map((l) => l.habitId.toString()));
 
     const badges = await ctx.db
       .query("habitBadges")
@@ -511,9 +512,15 @@ export const listForAgent = internalQuery({
     const totaalXP = habits.reduce((s, h) => s + h.totaalXP, 0)
       + badges.reduce((s, b) => s + b.xpBonus, 0);
 
+    // Negatieve habits zonder incident vandaag = "klaar" (auto-streak)
+    const isKlaar = (h: typeof habits[0]) => {
+      if (h.type === "negatief") return !incidentSet.has(h._id.toString());
+      return completedSet.has(h._id.toString());
+    };
+
     return {
       totaal: habits.length,
-      vandaagVoltooid: logSet.size,
+      vandaagVoltooid: habits.filter(isKlaar).length,
       totaalXP,
       badgeCount: badges.length,
       habits: habits
@@ -526,7 +533,7 @@ export const listForAgent = internalQuery({
           streak: h.huidigeStreak,
           langsteStreak: h.langsteStreak,
           totaal: h.totaalVoltooid,
-          vandaagKlaar: logSet.has(h._id.toString()),
+          vandaagKlaar: isKlaar(h),
           moeilijkheid: h.moeilijkheid,
         })),
     };
@@ -869,6 +876,8 @@ export const decayStreaks = internalMutation({
       .collect();
 
     let updated = 0;
+    let badgesAwarded = 0;
+
     for (const habit of allHabits) {
       const newStreak = await computeCurrentStreak(
         ctx, habit._id, habit.frequentie, habit.aangepasteDagen,
@@ -882,9 +891,37 @@ export const decayStreaks = internalMutation({
           gewijzigd:     new Date().toISOString(),
         });
         updated++;
+
+        // Badge check bij streak-groei (belangrijk voor negatieve habits met auto-streak)
+        if (newStreak > habit.huidigeStreak) {
+          const existingBadges = await ctx.db
+            .query("habitBadges")
+            .withIndex("by_user", (q) => q.eq("userId", habit.userId))
+            .collect();
+          const behaald = new Set<string>(existingBadges.map((b) => b.badgeId));
+          const newBadges = getNewBadges(newStreak, habit.totaalVoltooid, behaald);
+
+          for (const badge of newBadges) {
+            // Dubbele-badge preventie: check of deze specifieke badge al bestaat
+            const exists = existingBadges.some((b) => b.badgeId === badge.id);
+            if (exists) continue;
+
+            await ctx.db.insert("habitBadges", {
+              userId:       habit.userId,
+              badgeId:      badge.id,
+              habitId:      habit._id,
+              naam:         badge.naam,
+              emoji:        badge.emoji,
+              beschrijving: badge.beschrijving,
+              xpBonus:      badge.xpBonus,
+              behaaldOp:    new Date().toISOString(),
+            });
+            badgesAwarded++;
+          }
+        }
       }
     }
 
-    return { checked: allHabits.length, updated };
+    return { checked: allHabits.length, updated, badgesAwarded };
   },
 });

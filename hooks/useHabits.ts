@@ -130,7 +130,10 @@ export function useHabits(datum?: string) {
   const todaySummary = useMemo(() => {
     if (!forDate) return { due: 0, completed: 0, rate: 0 };
     const due = forDate.habits.length;
-    const completed = forDate.habits.filter((h) => h.log?.voltooid).length;
+    // Negatieve habits zonder incident vandaag = "voltooid" (auto-streak)
+    const completed = forDate.habits.filter((h) =>
+      h.log?.voltooid || (h.type === "negatief" && !h.log?.isIncident)
+    ).length;
     return { due, completed, rate: due > 0 ? completed / due : 0 };
   }, [forDate]);
 
