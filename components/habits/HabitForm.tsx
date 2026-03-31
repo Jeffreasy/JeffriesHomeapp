@@ -115,8 +115,8 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
             </div>
 
             {/* Scrollable content */}
-            <div className="overflow-y-auto max-h-[85vh] md:max-h-[75vh] px-5 pb-8 pt-2"
-              style={{ paddingBottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}>
+            <div className="overflow-y-auto max-h-[85dvh] md:max-h-[75vh] px-5 pb-8 pt-2 overscroll-contain"
+              style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}>
 
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
@@ -125,9 +125,9 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 </h2>
                 <button
                   onClick={onClose}
-                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+                  className="w-11 h-11 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-90"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
 
@@ -365,14 +365,14 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                   type="time"
                   value={doelTijd}
                   onChange={(e) => setDoelTijd(e.target.value)}
-                  className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-orange-500/30 min-h-[48px] [color-scheme:dark]"
+                  className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-orange-500/30 min-h-[48px] scheme-dark"
                 />
                 {doelTijd && (
                   <button
                     onClick={() => setDoelTijd("")}
-                    className="mt-1 text-[10px] text-slate-500 hover:text-slate-400 transition-colors"
+                    className="mt-1.5 px-3 py-2 text-xs text-red-400/70 bg-red-500/8 border border-red-500/10 rounded-lg hover:bg-red-500/15 transition-colors cursor-pointer min-h-[40px]"
                   >
-                    Tijdstip verwijderen
+                    Tijdstip wissen
                   </button>
                 )}
               </div>
@@ -407,12 +407,12 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
               {/* Kleur */}
               <div className="mb-6">
                 <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block mb-2">Kleur</label>
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2.5 flex-wrap">
                   {HABIT_COLORS.map((c) => (
                     <button
                       key={c}
                       onClick={() => setKleur(c)}
-                      className="w-8 h-8 rounded-full transition-all active:scale-90"
+                      className="w-10 h-10 rounded-full transition-all active:scale-90 cursor-pointer"
                       style={{
                         background: c,
                         border: kleur === c ? "3px solid white" : "2px solid rgba(255,255,255,0.1)",
@@ -426,7 +426,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
 
             {/* Fixed submit button — respects safe area */}
             <div
-              className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[rgba(15,15,20,1)] via-[rgba(15,15,20,0.95)] to-transparent"
+              className="absolute bottom-0 inset-x-0 p-4 bg-linear-to-t from-[rgba(15,15,20,1)] via-[rgba(15,15,20,0.95)] to-transparent"
               style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))" }}
             >
               <button

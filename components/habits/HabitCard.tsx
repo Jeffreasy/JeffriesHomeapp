@@ -184,11 +184,11 @@ export function HabitCard({ habit, onToggle, onIncident, onPause, onArchive, onR
           animate={{ height: "auto", opacity: 1 }}
           className="border-t border-white/5 overflow-hidden"
         >
-          <div className="p-2 flex gap-1.5">
-            <MenuBtn icon={<Edit3 size={13} />} label="Bewerken" onClick={() => { onEdit(); setShowMenu(false); }} />
-            <MenuBtn icon={<Pause size={13} />} label={habit.isPauze ? "Hervatten" : "Pauzeren"} onClick={() => { onPause(); setShowMenu(false); }} />
-            <MenuBtn icon={<Archive size={13} />} label="Archiveer" onClick={() => { onArchive(); setShowMenu(false); }} />
-            <MenuBtn icon={<Trash2 size={13} />} label="Verwijder" onClick={() => { onRemove(); setShowMenu(false); }} danger />
+          <div className="p-2.5 flex gap-2">
+            <MenuBtn icon={<Edit3 size={15} />} label="Bewerken" onClick={() => { onEdit(); setShowMenu(false); }} />
+            <MenuBtn icon={<Pause size={15} />} label={habit.isPauze ? "Hervatten" : "Pauzeren"} onClick={() => { onPause(); setShowMenu(false); }} />
+            <MenuBtn icon={<Archive size={15} />} label="Archiveer" onClick={() => { onArchive(); setShowMenu(false); }} />
+            <MenuBtn icon={<Trash2 size={15} />} label="Verwijder" onClick={() => { onRemove(); setShowMenu(false); }} danger />
           </div>
         </motion.div>
       )}
@@ -202,14 +202,14 @@ function MenuBtn({ icon, label, onClick, danger }: {
   return (
     <button
       onClick={onClick}
-      className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg transition-all active:scale-95 min-h-[44px]"
+      className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl transition-all active:scale-95 min-h-[52px] cursor-pointer"
       style={{
         background: danger ? "rgba(239,68,68,0.06)" : "rgba(255,255,255,0.03)",
         color: danger ? "#f87171" : "#94a3b8",
       }}
     >
       {icon}
-      <span className="text-[9px] font-medium">{label}</span>
+      <span className="text-[10px] font-medium">{label}</span>
     </button>
   );
 }
