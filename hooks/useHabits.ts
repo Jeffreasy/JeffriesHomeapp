@@ -154,7 +154,7 @@ export function useHabits(datum?: string) {
     update: (id: Id<"habits">, data: Partial<HabitCreateData>) =>
       updateHabit({ id, ...data }),
     toggle: (habitId: Id<"habits">, waarde?: number, notitie?: string) =>
-      toggleCompletion({ userId, habitId, waarde, notitie }),
+      toggleCompletion({ userId, habitId, datum, waarde, notitie }),
     incident: (habitId: Id<"habits">, notitie?: string) =>
       logIncident({ userId, habitId, notitie }),
     reorder: (items: Array<{ id: Id<"habits">; volgorde: number }>) =>
