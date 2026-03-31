@@ -6,7 +6,6 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-// @ts-expect-error — pdfjs-dist ships its own types but tsconfig can't always resolve them
 import * as pdfjsLib from "pdfjs-dist";
 
 // Worker setup voor Next.js
