@@ -553,11 +553,12 @@ BELANGRIJK — Professioneel Template Protocol:
     type: "function" as const,
     function: {
       name: "habitIncident",
-      description: "Log een incident voor een negatieve habit (streak reset). Gebruik bij 'ik heb gerookt', 'toch fastfood gehad', 'terugval'.",
+      description: "Log een incident voor een negatieve habit (streak reset). Gebruik bij 'ik heb gerookt', 'toch fastfood gehad', 'terugval'. VRAAG ALTIJD naar de trigger/oorzaak.",
       parameters: {
         type: "object",
         properties: {
           habitNaam: { type: "string", description: "Naam van de negatieve habit" },
+          trigger:   { type: "string", enum: ["mentale_overprikkeling", "fysieke_vermoeidheid", "stress_emotie", "vermijdingsgedrag", "sociale_druk", "anders"], description: "Oorzaak/trigger van het incident. Probeer ALTIJD te classificeren. Vraag de gebruiker als onduidelijk." },
           notitie:   { type: "string", description: "Optionele context/notitie bij het incident" },
         },
         required: ["habitNaam"],

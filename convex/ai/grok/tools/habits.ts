@@ -80,6 +80,7 @@ async function handleHabitVoltooien(ctx: Ctx, args: Record<string, unknown>, use
 
 async function handleHabitIncident(ctx: Ctx, args: Record<string, unknown>, userId: string): Promise<string> {
   const habitNaam = args.habitNaam as string;
+  const trigger = args.trigger as string | undefined;
   const notitie = args.notitie as string | undefined;
   const match = await findHabit(ctx, userId, habitNaam);
 
@@ -92,12 +93,13 @@ async function handleHabitIncident(ctx: Ctx, args: Record<string, unknown>, user
   }
 
   await ctx.runMutation(internal.habits.logIncidentInternal, {
-    userId, habitId: match.id, notitie,
+    userId, habitId: match.id, trigger, notitie,
   });
 
+  const triggerLabel = trigger ? ` (trigger: ${trigger})` : "";
   return JSON.stringify({
     ok: true,
-    bericht: `${match.emoji} Incident gelogd voor "${match.naam}". Streak gereset naar 0. Morgen begin je opnieuw! 💪`,
+    bericht: `${match.emoji} Incident gelogd voor "${match.naam}"${triggerLabel}. Streak gereset naar 0. Morgen begin je opnieuw! 💪`,
   });
 }
 
