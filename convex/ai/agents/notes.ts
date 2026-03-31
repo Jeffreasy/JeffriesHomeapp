@@ -21,6 +21,7 @@ export const notesAgent: AgentDefinition = {
     "Notities pinnen/unpinnen",
     "Notities bewerken (inhoud, titel, tags, deadline, prioriteit)",
     "Notities archiveren",
+    "Bulk archivering na triage-suggesties (verstreken deadlines, afgevinkte checklists, stale)",
     "Overzicht met filters (recent, pinned, deadline, hoog)",
     "Koppelen aan persoonlijke agenda-afspraken",
     "Checklist progress tracking",
@@ -76,6 +77,13 @@ export const notesAgent: AgentDefinition = {
       beschrijving: "Overzicht met filter",
       parameters: [
         { naam: "filter", type: "string", beschrijving: "recent/pinned/deadline/hoog", verplicht: false },
+      ],
+    },
+    {
+      naam: "bulkArchiveerNotities", type: "mutation",
+      beschrijving: "Archiveer meerdere notities tegelijk na triage-bevestiging",
+      parameters: [
+        { naam: "noteIds", type: "array", beschrijving: "Array van notitie IDs", verplicht: true },
       ],
     },
   ],

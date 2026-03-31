@@ -190,6 +190,7 @@ export async function handleNotitiesOverzicht(
 export async function handleBulkArchiveer(
   ctx: any,
   args: Record<string, unknown>,
+  _userId: string,
 ): Promise<string> {
   const noteIds = args.noteIds as string[];
   if (!noteIds || noteIds.length === 0) {
