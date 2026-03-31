@@ -7,6 +7,7 @@
  */
 
 import * as pdfjsLib from "pdfjs-dist";
+import type { TextItem } from "pdfjs-dist/types/src/display/api";
 
 // Worker setup voor Next.js
 if (typeof window !== "undefined") {
@@ -16,74 +17,74 @@ if (typeof window !== "undefined") {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface OrtItem {
-  pct:    string;   // "22%", "38%", "52%", "60%", "bij vakantie"
-  uren:   number;
+  pct: string;   // "22%", "38%", "52%", "60%", "bij vakantie"
+  uren: number;
   bedrag: number;
 }
 
 export interface LoonComponent {
   omschrijving: string;
-  aantal:       number | null;
-  eenheid:      string;       // "%", "Uren", "K", ""
-  betaling:     number | null;
-  berekOver:    number | null;
+  aantal: number | null;
+  eenheid: string;       // "%", "Uren", "K", ""
+  betaling: number | null;
+  berekOver: number | null;
 }
 
 export interface ParsedLoonstrook {
-  jaar:             number;
-  periode:          number;
-  periodeLabel:     string;    // "2026-03"
-  type:             "loonstrook" | "jaaropgave";
+  jaar: number;
+  periode: number;
+  periodeLabel: string;    // "2026-03"
+  type: "loonstrook" | "jaaropgave";
 
   // Kernbedragen
-  netto:            number;
-  brutoBetaling:    number;
-  brutoInhouding:   number;
-  salarisBasis:     number;
+  netto: number;
+  brutoBetaling: number;
+  brutoInhouding: number;
+  salarisBasis: number;
 
   // ORT
-  ortTotaal:        number;
-  ortDetail:        OrtItem[];
+  ortTotaal: number;
+  ortDetail: OrtItem[];
 
   // Componenten
   amtZeerintensief: number | null;
-  pensioenpremie:   number | null;
-  loonheffing:      number | null;
-  reiskosten:       number | null;
-  vakantietoeslag:  number | null;
-  ejuBedrag:        number | null;
+  pensioenpremie: number | null;
+  loonheffing: number | null;
+  reiskosten: number | null;
+  vakantietoeslag: number | null;
+  ejuBedrag: number | null;
   toeslagBalansvlf: number | null;
-  extraUrenBedrag:  number | null;
+  extraUrenBedrag: number | null;
 
   // Meta
-  schaalnummer:     string;
-  trede:            string;
-  parttimeFactor:   number;
-  uurloon:          number | null;
+  schaalnummer: string;
+  trede: string;
+  parttimeFactor: number;
+  uurloon: number | null;
 
   // Raw
-  componenten:      LoonComponent[];
-  cumulatieven:     Record<string, string>;
+  componenten: LoonComponent[];
+  cumulatieven: Record<string, string>;
 }
 
 export interface ParseResult {
-  items:    ParsedLoonstrook[];
-  errors:   string[];
-  skipped:  string[];    // jaaropgaven etc.
+  items: ParsedLoonstrook[];
+  errors: string[];
+  skipped: string[];    // jaaropgaven etc.
 }
 
 // Spatial text item extracted from PDF
 interface SpatialTextItem {
   text: string;
-  x:    number;
-  y:    number;
+  x: number;
+  y: number;
 }
 
 // Line reconstructed from grouped spatial items
 interface TextLine {
   text: string;
-  y:    number;
-  x:    number;
+  y: number;
+  x: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,17 +131,17 @@ function groupByY(items: SpatialTextItem[]): TextLine[] {
 // ─── Component Categorizer ────────────────────────────────────────────────────
 
 interface CategorizedComponents {
-  ortItems:         OrtItem[];
+  ortItems: OrtItem[];
   amtZeerintensief: number | null;
-  pensioenpremie:   number | null;
-  loonheffing:      number | null;
-  reiskosten:       number | null;
-  vakantietoeslag:  number | null;
-  ejuBedrag:        number | null;
+  pensioenpremie: number | null;
+  loonheffing: number | null;
+  reiskosten: number | null;
+  vakantietoeslag: number | null;
+  ejuBedrag: number | null;
   toeslagBalansvlf: number | null;
-  extraUrenBedrag:  number | null;
-  brutoBetaling:    number;
-  brutoInhouding:   number;
+  extraUrenBedrag: number | null;
+  brutoBetaling: number;
+  brutoInhouding: number;
 }
 
 function categorizeComponents(components: LoonComponent[]): CategorizedComponents {
@@ -221,11 +222,9 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
   const content = await page.getTextContent();
 
   // Extract text items with spatial positions
-  const textItems: SpatialTextItem[] = content.items
-    .filter((item: Record<string, unknown>): item is Record<string, unknown> & { str: string; transform: number[] } =>
-      "str" in item && "transform" in item
-    )
-    .map((item: { str: string; transform: number[] }): SpatialTextItem => ({
+  const textItems: SpatialTextItem[] = (content.items as TextItem[])
+    .filter((item: TextItem) => "str" in item && "transform" in item)
+    .map((item: TextItem): SpatialTextItem => ({
       text: item.str,
       x: item.transform[4],
       y: item.transform[5],
@@ -248,8 +247,8 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
 
   // ── Group text items by spatial regions (columns) ──
   // Left column (x < 280): labels  |  Middle (280-480): amounts  |  Right (≥480): meta
-  const leftItems  = textItems.filter((t: SpatialTextItem) => t.x < 280);
-  const midItems   = textItems.filter((t: SpatialTextItem) => t.x >= 280 && t.x < 480);
+  const leftItems = textItems.filter((t: SpatialTextItem) => t.x < 280);
+  const midItems = textItems.filter((t: SpatialTextItem) => t.x >= 280 && t.x < 480);
   const rightItems = textItems.filter((t: SpatialTextItem) => t.x >= 480);
 
   // ── Parse labels + amounts by matching Y positions ──
