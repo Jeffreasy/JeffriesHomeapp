@@ -514,5 +514,102 @@ BELANGRIJK — Professioneel Template Protocol:
       },
     },
   },
+  // ──────────────── Habits tools ────────────────────────────────────────────
+  {
+    type: "function" as const,
+    function: {
+      name: "habitAanmaken",
+      description: "Maak een nieuwe habit/gewoonte aan. Gebruik dit als de gebruiker zegt 'ik wil dagelijks X doen', 'nieuwe habit', 'gewoonte toevoegen'. Stel slimme defaults in (emoji, moeilijkheid, frequentie).",
+      parameters: {
+        type: "object",
+        properties: {
+          naam:          { type: "string", description: "Naam van de habit (bijv. 'Gym', 'Water drinken', 'Geen fastfood')" },
+          emoji:         { type: "string", description: "Passende emoji (bijv. '🏋️', '💧', '🚫')" },
+          type:          { type: "string", enum: ["positief", "negatief"], description: "Positief (doen) of negatief (vermijden)" },
+          frequentie:    { type: "string", enum: ["dagelijks", "weekdagen", "weekenddagen", "aangepast", "x_per_week", "x_per_maand"], description: "Hoe vaak" },
+          moeilijkheid:  { type: "string", enum: ["makkelijk", "normaal", "moeilijk"], description: "XP multiplier: makkelijk=5, normaal=10, moeilijk=20" },
+          beschrijving:  { type: "string", description: "Optionele beschrijving/doel" },
+          roosterFilter: { type: "string", enum: ["alle", "werkdagen", "vrijeDagen", "vroegeDienst", "lateDienst"], description: "Koppel aan werkrooster (optioneel)" },
+        },
+        required: ["naam", "emoji", "type", "frequentie"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "habitVoltooien",
+      description: "Markeer een habit als voltooid voor vandaag. Gebruik bij 'ik heb getraind', 'gym gedaan', 'water gedronken', 'check habit X'. Verdient XP en bouwt streak op.",
+      parameters: {
+        type: "object",
+        properties: {
+          habitNaam: { type: "string", description: "Naam (of deel van naam) van de habit om af te tikken (bijv. 'gym', 'water')" },
+        },
+        required: ["habitNaam"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "habitIncident",
+      description: "Log een incident voor een negatieve habit (streak reset). Gebruik bij 'ik heb gerookt', 'toch fastfood gehad', 'terugval'.",
+      parameters: {
+        type: "object",
+        properties: {
+          habitNaam: { type: "string", description: "Naam van de negatieve habit" },
+          notitie:   { type: "string", description: "Optionele context/notitie bij het incident" },
+        },
+        required: ["habitNaam"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "habitsOverzicht",
+      description: "Toon alle habits met streaks, XP en dagelijkse status. Gebruik bij 'mijn habits', 'welke habits heb ik', 'habit overzicht'.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "habitStreaks",
+      description: "Toon streak overzicht van alle habits. Gebruik bij 'mijn streaks', 'hoe lang al', 'streak status'.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "habitBadges",
+      description: "Toon behaalde badges/achievements en level info. Gebruik bij 'mijn badges', 'welk level ben ik', 'achievements'.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "habitRapport",
+      description: "Genereer een samenvattend habit rapport. Gebruik bij 'habit rapport', 'hoe gaat het met mijn habits', 'weekoverzicht habits'.",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "habitNotitie",
+      description: "Voeg een notitie toe aan een habit. Gebruik bij 'noteer bij gym: ...', 'habit notitie'.",
+      parameters: {
+        type: "object",
+        properties: {
+          habitNaam: { type: "string", description: "Naam van de habit" },
+          notitie:   { type: "string", description: "Notitie tekst" },
+        },
+        required: ["habitNaam", "notitie"],
+      },
+    },
+  },
 ];
 

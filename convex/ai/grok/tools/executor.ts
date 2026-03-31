@@ -25,6 +25,7 @@ import {
   handleNotitieMaken, handleNotitiesZoeken, handleNotitiePinnen,
   handleNotitieBewerken, handleNotitieArchiveren, handleNotitiesOverzicht,
 } from "./notes";
+import { handleHabitTool } from "./habits";
 
 // ─── Tool name → handler mapping ─────────────────────────────────────────────
 
@@ -73,6 +74,16 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   notitieBewerken:     handleNotitieBewerken,
   notitieArchiveren:   handleNotitieArchiveren,
   notitiesOverzicht:   handleNotitiesOverzicht,
+
+  // Habits
+  habitAanmaken:       (ctx, args, userId) => handleHabitTool(ctx, "habitAanmaken", args, userId),
+  habitVoltooien:      (ctx, args, userId) => handleHabitTool(ctx, "habitVoltooien", args, userId),
+  habitIncident:       (ctx, args, userId) => handleHabitTool(ctx, "habitIncident", args, userId),
+  habitsOverzicht:     (ctx, args, userId) => handleHabitTool(ctx, "habitsOverzicht", args, userId),
+  habitStreaks:        (ctx, args, userId) => handleHabitTool(ctx, "habitStreaks", args, userId),
+  habitBadges:         (ctx, args, userId) => handleHabitTool(ctx, "habitBadges", args, userId),
+  habitRapport:        (ctx, args, userId) => handleHabitTool(ctx, "habitRapport", args, userId),
+  habitNotitie:        (ctx, args, userId) => handleHabitTool(ctx, "habitNotitie", args, userId),
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

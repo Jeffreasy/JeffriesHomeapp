@@ -32,6 +32,9 @@ const COMMAND_MAP: Record<string, { agentId: string; beschrijving: string }> = {
   "/notities":    { agentId: "notes",           beschrijving: "📝 Notities beheren" },
   "/noteer":      { agentId: "notes",           beschrijving: "📝 Snel notitie maken" },
   "/automations": { agentId: "automations",     beschrijving: "⚙️ Automations status" },
+  "/habits":      { agentId: "habits",          beschrijving: "🎯 Habits overzicht" },
+  "/streak":      { agentId: "habits",          beschrijving: "🔥 Streak status" },
+  "/check":       { agentId: "habits",          beschrijving: "✅ Habit aftikken" },
 };
 
 // ─── Lamp Command Detection ──────────────────────────────────────────────────
@@ -110,6 +113,7 @@ const KEYWORD_ROUTES: Array<{ keywords: string[]; agentId: string }> = [
   { keywords: ["salaris", "loon", "geld", "ort", "netto", "bruto", "transactie", "saldo", "bank", "uitgaven", "betaling", "kosten", "verdien"], agentId: "finance" },
   { keywords: ["email", "mail", "inbox", "ongelezen", "bericht", "stuur", "reply", "gmail"], agentId: "email" },
   { keywords: ["notitie", "notities", "noteer", "onthoud", "schrijf op", "opschrijven", "boodschappenlijst", "checklist", "to-do", "todo", "lijstje"], agentId: "notes" },
+  { keywords: ["habit", "habits", "gewoonte", "streak", "badge", "xp", "level", "gym", "meditatie", "water drinken", "checklist habit", "voltooid"], agentId: "habits" },
   { keywords: ["automation", "automations", "cron", "sync", "systeem", "status", "health"], agentId: "automations" },
 ];
 

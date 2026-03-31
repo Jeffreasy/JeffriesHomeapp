@@ -198,9 +198,9 @@ export default defineSchema({
     heledag:           v.boolean(),
     locatie:           v.optional(v.string()),
     beschrijving:      v.optional(v.string()),
+    conflictMetDienst: v.optional(v.string()),  // dienst-conflict detectie
     status:            v.string(),           // "Aankomend" | "Voorbij" | "VERWIJDERD"
     kalender:          v.string(),           // "Main"
-    conflictMetDienst: v.optional(v.string()),
   })
     .index("by_user",         ["userId"])
     .index("by_user_date",    ["userId", "startDatum"])
@@ -328,5 +328,97 @@ export default defineSchema({
       searchField: "inhoud",
       filterFields: ["userId", "isArchived"],
     }),
+
+  // ─── Habits (gewoonte-definities) ───────────────────────────────────────────
+  habits: defineTable({
+    userId:           v.string(),
+    naam:             v.string(),
+    emoji:            v.string(),
+    type:             v.union(v.literal("positief"), v.literal("negatief")),
+    beschrijving:     v.optional(v.string()),
+
+    // Frequentie
+    frequentie:       v.union(
+      v.literal("dagelijks"),
+      v.literal("weekdagen"),
+      v.literal("weekenddagen"),
+      v.literal("aangepast"),
+      v.literal("x_per_week"),
+      v.literal("x_per_maand"),
+    ),
+    aangepasteDagen:  v.optional(v.array(v.number())),   // [0=zo,1=ma,...6=za]
+    doelAantal:       v.optional(v.number()),            // bij x_per_week/maand
+
+    // Rooster integratie
+    roosterFilter:    v.optional(v.union(
+      v.literal("alle"),
+      v.literal("werkdagen"),
+      v.literal("vrijeDagen"),
+      v.literal("vroegeDienst"),
+      v.literal("lateDienst"),
+    )),
+
+    // Kwantitatief & Tijd
+    isKwantitatief:   v.boolean(),
+    doelWaarde:       v.optional(v.number()),            // bv. 2000 (ml water), 30 (min)
+    eenheid:          v.optional(v.string()),            // "ml", "min", "pagina's", "stappen"
+    doelTijd:         v.optional(v.string()),            // "07:00" — doeltijdstip (HH:mm)
+
+    // Gamification
+    xpPerVoltooiing:  v.number(),
+    moeilijkheid:     v.union(v.literal("makkelijk"), v.literal("normaal"), v.literal("moeilijk")),
+
+    // Finance koppeling
+    financieCategorie: v.optional(v.string()),
+
+    // Streak tracking (denormalized)
+    huidigeStreak:    v.number(),
+    langsteStreak:    v.number(),
+    totaalVoltooid:   v.number(),
+    totaalXP:         v.number(),
+
+    // Meta
+    kleur:            v.optional(v.string()),
+    volgorde:         v.number(),
+    isActief:         v.boolean(),
+    isPauze:          v.boolean(),
+    gepauzeerOm:      v.optional(v.string()),
+    aangemaakt:       v.string(),
+    gewijzigd:        v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_actief", ["userId", "isActief"]),
+
+  // ─── Habit Logs (voltooiings-registratie) ──────────────────────────────────
+  habitLogs: defineTable({
+    userId:     v.string(),
+    habitId:    v.id("habits"),
+    datum:      v.string(),                              // "YYYY-MM-DD"
+    voltooid:   v.boolean(),
+    waarde:     v.optional(v.number()),                  // kwantitatief: actuele waarde
+    isIncident: v.boolean(),                             // negatieve habit incident
+    notitie:    v.optional(v.string()),
+    bron:       v.string(),                              // "web" | "telegram" | "grok"
+    xpVerdiend: v.number(),
+    aangemaakt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_habit", ["habitId"])
+    .index("by_habit_datum", ["habitId", "datum"])
+    .index("by_user_datum", ["userId", "datum"]),
+
+  // ─── Habit Badges (behaalde achievements) ──────────────────────────────────
+  habitBadges: defineTable({
+    userId:       v.string(),
+    badgeId:      v.string(),
+    habitId:      v.optional(v.id("habits")),
+    naam:         v.string(),
+    emoji:        v.string(),
+    beschrijving: v.string(),
+    xpBonus:      v.number(),
+    behaaldOp:    v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_badge", ["userId", "badgeId"]),
 });
 

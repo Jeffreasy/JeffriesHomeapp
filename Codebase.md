@@ -1,6 +1,6 @@
 # JeffriesHomeapp — 100% Volledige Codebase Analyse
 
-> **Doel:** Persoonlijke smart home dashboard voor Jeffrey — combineert lampsturing, werkrooster, financiën, agenda, email en AI-gestuurde automatisering in één app.
+> **Doel:** Persoonlijke smart home dashboard voor Jeffrey — combineert lampsturing, werkrooster, financiën, agenda, email, habits/gamification en AI-gestuurde automatisering in één app.
 
 ---
 
@@ -34,24 +34,25 @@ graph TB
         Rooster["/rooster"]
         Finance["/finance"]
         Notities["/notities"]
+        Habits["/habits"]
         Automations["/automations"]
         Settings["/settings"]
     end
 
     subgraph ConvexBackend["Convex Backend"]
-        Schema["Schema (14 tabellen)"]
+        Schema["Schema (15 tabellen)"]
         HTTP["HTTP Router"]
-        DataModules["Data Modules (7)"]
+        DataModules["Data Modules (8)"]
         Actions["9 Server Actions"]
-        AgentCtx["7 Agent Context Getters"]
+        AgentCtx["8 Agent Context Getters"]
         Crons["6 Cron Jobs"]
         AI["Grok AI Engine"]
     end
 
     subgraph FrontendLib["Frontend Libraries"]
-        Hooks["12 Hooks"]
-        Libs["9 Lib Modules"]
-        Components["31 UI Components"]
+        Hooks["15 Hooks"]
+        Libs["11 Lib Modules"]
+        Components["37 UI Components"]
     end
 
     subgraph External["Externe Services"]
@@ -77,7 +78,7 @@ graph TB
 
 ---
 
-## 3. Database Schema (14 tabellen)
+## 3. Database Schema (15 tabellen)
 
 | Tabel | Beschrijving | Key Fields | Indices |
 |-------|-------------|------------|---------|
@@ -94,6 +95,7 @@ graph TB
 | **emailSyncMeta** | Gmail sync cursor (incremental) | historyId, lastFullSync, totalSynced | `by_user` |
 | **loonstroken** | Uploaded loonstrook data | userId, jaar, periode, brutoloon, nettoloon, uren | `by_user`, `by_user_periode` |
 | **notes** | Persoonlijke notities | userId, titel?, inhoud, tags?, kleur?, isPinned, isArchived, deadline?, linkedEventId?, prioriteit?, aangemaakt, gewijzigd | `by_user`, `by_user_pinned`, `by_user_deadline`, `search_notes` (FTS) |
+| **habits** | Gewoontes met gamification | userId, naam, emoji, type (positief/negatief), frequentie (dagelijks/weekdagen/weekenddagen/aangepast/x_per_week/x_per_maand), moeilijkheid, kleur, roosterFilter?, isKwantitatief, doelWaarde?, eenheid?, doelTijd?, doelAantal?, status (actief/gepauzeerd/gearchiveerd), huidigeStreak, langsteStreak, totaalVoltooid, totaalIncidenten, xp, badges[], logboek[] (datum/voltooid/isIncident/notitie/waarde) | `by_user`, `by_user_status` |
 
 ---
 
@@ -177,7 +179,7 @@ graph TB
 
 ---
 
-## 5. Convex Lib Modules (5 bestanden)
+## 5. Convex Lib Modules (6 bestanden)
 
 ### 5.1 [googleAuth.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/lib/googleAuth.ts) (31 regels)
 - **Factory:** `createOAuthClient()` → `google.auth.OAuth2` met refresh token
@@ -196,7 +198,7 @@ graph TB
 - PFZW pensioenberekening (12.95%)
 - `computeSalary()` als hoofd-export
 
-### 5.4 [fields.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/lib/fields.ts) (49 regels)
+### 5.4 [fields.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/lib/fields.ts) (48 regels)
 - **Gedeelde Convex validators:** `dienstFields` en `eventFields`
 - Voorkomt duplicatie tussen mutations en queries
 
@@ -204,11 +206,24 @@ graph TB
 - **Single constant:** `JEFFREY_USER_ID` (Clerk User ID)
 - Gebruikt door alle cron jobs voor de hardcoded single-user
 
+### 5.6 [habitConstants.ts](file:///c:/Users/jeffrey/Desktop/Projecten/JeffriesHomeapp/convex/lib/habitConstants.ts) (~150 regels)
+- **Gamification engine:** Exponentieel XP-model (12 levels: Beginner → Legende)
+- **XP per moeilijkheid:** makkelijk=5, normaal=10, moeilijk=20
+- **13 badges:** Gebaseerd op streaks (7d, 30d, 100d, 365d) en totaal voltooiingen (10, 50, 100, 500, 1000)
+- **Emoji presets:** `HABIT_EMOJIS` (30 emoji's, 5 categorieën: Gezondheid, Sport, Studie, Voeding, Lifestyle)
+- **Rooster filter opties:** alle/vroege_dienst/late_dienst/vrije_dag/werkdag
+- **`calculateLevel(xp)`**, **`checkBadges(streak, total)`** — pure functies
+
 ---
 
 ## 6. AI Agent Agency — Volledige Analyse
 
 ### 6.1 [registry.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/ai/registry.ts) (94 regels)
+
+### 6.1b [router.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/ai/router.ts) (82 regels)
+- **Agent Agency Router** — Convex queries voor agent discovery en context
+- **3 queries:** `listAgents` (discovery), `getAgentContext` (volledige context ophalen), `getBriefing` (dashboard shortcut)
+- **1 internal query:** `internalGetAgentContext` (callable vanuit actions/grok.ts)
 
 **Type systeem:**
 - `AgentDefinition` — id, naam, emoji, beschrijving, domein[], capabilities[], tools[], `getContext(ctx, userId, opts?)`
@@ -217,7 +232,7 @@ graph TB
 - `ToolParameter` — naam, type, beschrijving, verplicht, enum?, default?
 - `toMeta()` — Strip `getContext` voor API responses
 
-**Registry:** Array van 7 `AgentDefinition` objecten, opzoekbaar via `getAgent(id)`
+**Registry:** Array van 8 `AgentDefinition` objecten, opzoekbaar via `getAgent(id)`
 
 ### 6.2 Agent Context Getters
 
@@ -232,6 +247,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **email** | totaal/ongelezen/prullenbak | Stats (inbox/ongelezen/ster/verzonden) + top 10 afzenders + categorie verdeling + triage suggesties + 15 recente emails |
 | **automations** | totaal/actief | Alle regels met triggers + 5 cron jobs info + sync health (rooster/gmail/todoist/calendar) |
 | **notes** | totaal/pin count + recente titels | Alle notities (id/titel/inhoud/tags/isPinned/deadline/linkedEventId/prioriteit/aangemaakt/gewijzigd) + pin count |
+| **habits** | totaalHabits/actief/streak overview + vandaag voortgang | Alle habits met huidige status + daglog + streaks + XP/level + badges + weekstatistieken + rooster-integratie |
 
 **Key pattern:** Dashboard agent roept alle andere agents aan met `{ lite: true }` — voorkomt enorme context window bij de briefing.
 
@@ -245,7 +261,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 5. Return: antwoord + agent meta + token usage
 
 **Telegram Bot** ([bot.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/telegram/bot.ts), 277 regels):
-- **13 slash commando's:**
+- **16 slash commando's:**
 
 | Commando | Agent | Functie |
 |----------|-------|---------|
@@ -263,13 +279,16 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `/automations` | automations | Automations status |
 | `/notities` | notes | Notitie overzicht |
 | `/noteer` | notes | Snelle notitie aanmaken |
+| `/habits` | habits | Habit overzicht + streaks |
+| `/streak` | habits | Huidige streak status |
+| `/check` | habits | Habit afvinken |
 | `/help` | - | Alle commando's tonen |
 
-- **Smart keyword routing** (`detectAgent()`): 5 keyword sets → agent score matching
+- **Smart keyword routing** (`detectAgent()`): 6 keyword sets → agent score matching (incl. habit/streak/badge/xp)
 - **Lamp command detectie** (`detectLampCommand()`): Direct aan/uit/dim/scene zonder AI
 - **Voice support:** Groq Whisper STT → transcriptie → processText()
 
-**28 Grok Tools** ([definitions.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/ai/grok/tools/definitions.ts), ~520 regels):
+**36 Grok Tools** ([definitions.ts](file:///c:/Users/jeffrey/Desktop/Projecten/JeffriesHomeapp/convex/ai/grok/tools/definitions.ts), ~650 regels):
 
 | Domein | Tools | Handler |
 |--------|-------|---------|
@@ -279,6 +298,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | Calendar | afspraakMaken, afspraakBewerken, afspraakVerwijderen, afsprakenOpvragen | `calendar.ts` |
 | Finance | saldoOpvragen, transactiesZoeken, uitgavenOverzicht, maandVergelijken, vasteLastenAnalyse, categorieWijzigen, bulkCategoriseren, ongelabeldAnalyse | `finance.ts` |
 | Notes | notitieMaken, notitiesZoeken, notitiePinnen, notitieBewerken, notitieArchiveren, notitiesOverzicht | `notes.ts` |
+| Habits | habitAanmaken, habitVoltooien, habitIncident, habitNotitie, habitsOpvragen, habitRapportage, habitPauzeren, habitVerwijderen | `habits.ts` |
 
 **Calendar tools detail:**
 - `afspraakMaken` → `personalEvents.create()` (PendingCreate → cron push met Google Calendar kleuren)
@@ -288,7 +308,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 ---
 
-## 7. Frontend Libraries (9 bestanden)
+## 7. Frontend Libraries (11 bestanden)
 
 ### 7.1 [schedule.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/lib/schedule.ts) (365 regels — **grootste lib**)
 
@@ -375,9 +395,15 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 - Automation form helpers
 - Scene/action type mappings
 
+### 7.10 [habit-constants.ts](file:///c:/Users/jeffrey/Desktop/Projecten/JeffriesHomeapp/lib/habit-constants.ts) (~83 regels)
+- **12 preset kleuren** (`HABIT_COLORS`) — Orange, Red, Pink, Violet, Blue, Cyan, Teal, Green, Lime, Yellow, Stone, Slate
+- **Labels:** Moeilijkheid (3), Frequentie (6), Dag (7), Type (2 + emoji)
+- **Formatters:** `formatStreak()`, `formatXP()`, `formatLevel()`
+- **Heatmap:** 5-level orange intensity colours + `getHeatmapLevel()` (0-25-50-75-100%)
+
 ---
 
-## 8. React Hooks (11 bestanden)
+## 8. React Hooks (15 bestanden)
 
 | Hook | Bron | Doel |
 |------|------|------|
@@ -394,10 +420,11 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `useSwipe` | Touch events | Swipe gesture detectie voor BottomSheet |
 | `useNotes` | Convex `useQuery` | Notes CRUD + split (active/archived/pinned) + allTags + `NoteRecord`, `NoteCreateData`, `NoteUpdateData` type exports |
 | `usePrivacy` | Zustand persist | Privacy toggle (mask sensitive data) |
+| `useHabits` | Convex `useQuery` + `useMutation` | Habits CRUD + `HabitWithLog` type (habit + vandaag-log merge), toggle/incident/pause/archive/remove, stats (totalCompleted, currentStreak, longestStreak, xp, level, badges), rooster-aware filtering |
 
 ---
 
-## 9. UI Components — Volledige Analyse (31 components)
+## 9. UI Components — Volledige Analyse (37 components)
 
 ### 9.1 Layout (3)
 
@@ -458,7 +485,18 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **AutomationForm** | ~230 | Multi-step form: naam, trigger (tijd/dagen/diensttype), actie (scene/brightness/color/toggle), device selectie |
 | **DienstWekkerSection** | ~70 | Pre-built automation packs (Vroeg/Laat/Dienst) met kleurcodering, one-click install/remove |
 
-### 9.7 Overige directories
+### 9.7 Habits (6)
+
+| Component | Regels | Functie |
+|-----------|--------|---------|
+| **HabitCard** | ~192 | Habit kaart met check button (positief) / incident button (negatief), kwantitatieve progress bar, streak counter (Flame icon), click-outside dropdown menu (pause/archive/edit/delete) |
+| **HabitForm** | ~451 | Bottom-sheet creation/edit modal, emoji picker (30 presets), type toggle (Doen/Vermijden), frequentie selector, rooster koppeling (5 opties), meetbaar doel toggle (doelwaarde + eenheid presets), doeltijd (HH:mm), kleur picker (12 kleuren), isSubmitting guard |
+| **HabitStats** | ~149 | XP progress bar (11px labels), level display, 4 stat kaarten (Totaal/Voltooid/Langste Streak/Badges), streak leaderboard |
+| **HabitHeatmap** | ~130 | GitHub-style 365-dagen contribution grid, 5-level orange intensity, Lucide Activity icon header, horizontaal scrollbaar (mobile), scrollbar-none |
+| **BadgeShowcase** | ~113 | Badge grid met locked/unlocked states, single-pulse glow op recente badges, emoji + titel per badge |
+| **DailyChecklist** | ~170 | Dashboard widget: dagelijkse habit lijst met progress bar, Flame streak icons, inline toggle, empty state CTA ("Habits instellen"), level display |
+
+### 9.8 Overige directories
 
 | Directory | Contents |
 |-----------|----------|
@@ -488,7 +526,8 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 |------|-----------|
 | **Frontend auth** | Clerk middleware (`proxy.ts`) |
 | **API auth** | Bearer token + X-API-Key header |
-| **Vercel headers** | X-Frame-Options DENY, X-Content-Type-Options nosniff, strict CSP |
+| **Vercel headers** | X-Frame-Options DENY, X-Content-Type-Options nosniff, X-XSS-Protection, Referrer-Policy, Permissions-Policy |
+| **CSP header** | `Content-Security-Policy` — default-src 'self', connect-src Convex/Clerk/xAI/Groq, frame-src Clerk |
 | **Single user** | `JEFFREY_USER_ID` in `config.ts` |
 | **Telegram** | Secret token bij webhook registratie |
 | **Convex queries** | `ctx.auth.getUserIdentity()` check |
@@ -508,7 +547,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 ### AI Conflict Detectie
 - **On-the-fly:** Rooster agent `getContext()` berekent conflicten real-time via `detectConflict()` helper (event × dienst op dezelfde datum)
 - **Client-side:** `conflictDetection.ts` in `usePersonalEvents()` hook (3-level: hard/soft/info)
-- **Schema veld:** `conflictMetDienst` in personalEvents schema is deprecated (nooit actief geschreven)
+- **Schema:** `conflictMetDienst` veld bestaat als `v.optional(v.string())` op `personalEvents` voor backward compatibility
 
 ### Query Patterns
 - **Dual pagination:** Transacties: daterange → `collect()` (pad A) vs full → `paginate()` (pad B)
@@ -526,15 +565,23 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 - **Scene detection:** 70% threshold matching voor active scene indicator
 - **Conflict detection:** 3-level system (hard/soft/info) met ergste-wint aggregatie
 
+### Habits/Gamification Patterns
+- **Exponentieel XP model:** 12 levels (100→15000 XP), XP per moeilijkheid (5/10/20)
+- **Badge engine:** 13 badges gebaseerd op streaks en totaal voltooiingen, `checkBadges()` pure functie
+- **Kwantitatieve tracking:** `isKwantitatief` + `doelWaarde` + `eenheid` door hele stack (schema → form → card → AI)
+- **Rooster-integratie:** `roosterFilter` field (5 opties) → habit alleen zichtbaar op matching diensttype
+- **Negatief habit patroon:** "Vermijden" type met incident logging (streak reset bij incident)
+- **Dual AI paths:** `addNoteInternal` (geen streak reset) vs `logIncidentInternal` (streak reset)
+
 ---
 
 ## 13. Volledige Bestandslijst (alle gelezen bestanden)
 
-### Convex Backend (35 bestanden)
+### Convex Backend (40 bestanden)
 ```
 convex/
-├── schema.ts                          # ~330 regels — 14 tabellen
-├── http.ts                            # 549 regels — HTTP router
+├── schema.ts                          # ~430 regels — 15 tabellen
+├── http.ts                            # 562 regels — HTTP router
 ├── crons.ts                           # Cron job definities
 ├── devices.ts                         # 142 regels
 ├── transactions.ts                    # 437 regels
@@ -544,6 +591,7 @@ convex/
 ├── loonstroken.ts                     # 120 regels
 ├── automations.ts                     # 93 regels
 ├── notes.ts                           # ~240 regels (incl. internal mutations)
+├── habits.ts                          # ~350 regels (CRUD + gamification + logboek)
 ├── actions/
 │   ├── syncSchedule.ts                # 178 regels
 │   ├── syncPersonalEvents.ts          # 124 regels
@@ -558,23 +606,26 @@ convex/
 │   ├── googleAuth.ts                  # 31 regels
 │   ├── autoCategorie.ts               # 76 regels (24 regex rules)
 │   ├── salaryCalc.ts                  # 283 regels
-│   ├── fields.ts                      # 49 regels
-│   └── config.ts                      # 10 regels
+│   ├── fields.ts                      # 48 regels
+│   ├── config.ts                      # 10 regels
+│   └── habitConstants.ts              # ~150 regels (XP/levels/badges/emojis)
 ├── ai/
 │   ├── registry.ts                    # 94 regels
+│   ├── router.ts                      # 82 regels — agent discovery queries
 │   ├── grok/
 │   │   ├── chat.ts                    # 155 regels
 │   │   ├── prompt.ts                  # 337 regels
 │   │   ├── types.ts                   # 88 regels
 │   │   └── tools/
-│   │       ├── definitions.ts         # ~520 regels (28 tools)
+│   │       ├── definitions.ts         # ~650 regels (36 tools)
 │   │       ├── executor.ts            # ~92 regels
 │   │       ├── email.ts               # 194 regels
 │   │       ├── finance.ts             # 427 regels
 │   │       ├── schedule.ts            # 135 regels
 │   │       ├── calendar.ts            # 206 regels
 │   │       ├── smarthome.ts           # 68 regels
-│   │       └── notes.ts              # ~190 regels (6 handlers)
+│   │       ├── notes.ts              # ~190 regels (6 handlers)
+│   │       └── habits.ts             # ~280 regels (8 handlers + fuzzy match)
 │   └── agents/
 │       ├── dashboard.ts               # 83 regels
 │       ├── lampen.ts                  # 126 regels
@@ -582,23 +633,25 @@ convex/
 │       ├── finance.ts                 # 137 regels
 │       ├── email.ts                   # 111 regels
 │       ├── automations.ts             # 118 regels
-│       └── notes.ts                   # ~100 regels (8 capabilities)
+│       ├── notes.ts                   # ~100 regels (8 capabilities)
+│       └── habits.ts                  # ~120 regels (8 tools, lite/full context)
 └── telegram/
-    ├── bot.ts                         # ~300 regels (15 commando's)
+    ├── bot.ts                         # ~320 regels (18 commando's)
     └── api.ts                         # 142 regels
 ```
 
-### Frontend (48 bestanden)
+### Frontend (56 bestanden)
 ```
 app/
 ├── page.tsx                           # 334 regels (Dashboard)
 ├── lampen/page.tsx                    # 172 regels
 ├── rooster/page.tsx                   # 404 regels
-├── finance/page.tsx                   # 458 regels
+├── finance/page.tsx                   # 509 regels
 ├── automations/page.tsx               # 171 regels
 ├── notities/page.tsx                  # ~346 regels
+├── habits/page.tsx                    # ~227 regels
 ├── settings/page.tsx                  # 129 regels
-└── globals.css                        # 1641 regels
+└── globals.css                        # 1648 regels
 
 lib/
 ├── schedule.ts                        # 365 regels
@@ -609,8 +662,9 @@ lib/
 ├── api.ts                             # 106 regels
 ├── finance-constants.ts               # 75 regels
 ├── utils.ts                           # ~35 regels
-├── loonstrook-pdf.ts                  # 384 regels
-└── automations.ts                     # ~225 regels
+├── loonstrook-pdf.ts                  # 318 regels (refactored)
+├── automations.ts                     # ~225 regels
+└── habit-constants.ts                 # ~83 regels (kleuren/labels/formatters/heatmap)
 
 hooks/
 ├── useDevices.ts                      # ~100 regels
@@ -626,7 +680,8 @@ hooks/
 ├── useLoonstroken.ts                  # 87 regels
 ├── useNotes.ts                        # ~110 regels — NoteRecord, NoteCreateData, NoteUpdateData
 ├── usePrivacy.ts                      # 38 regels — privacy toggle (localStorage)
-└── useSwipe.ts                        # ~30 regels
+├── useSwipe.ts                        # ~30 regels
+└── useHabits.ts                       # ~180 regels — HabitWithLog type, CRUD, stats, rooster filter
 
 components/
 ├── layout/
@@ -664,6 +719,13 @@ components/
 │   ├── NoteCard.tsx                   # ~250 regels
 │   ├── NoteEditor.tsx                 # ~340 regels
 │   └── QuickNote.tsx                  # 174 regels
+├── habits/
+│   ├── HabitCard.tsx                  # ~192 regels
+│   ├── HabitForm.tsx                  # ~451 regels
+│   ├── HabitStats.tsx                 # ~149 regels
+│   ├── HabitHeatmap.tsx               # ~130 regels
+│   ├── BadgeShowcase.tsx              # ~113 regels
+│   └── DailyChecklist.tsx             # ~170 regels
 ```
 
 ---
@@ -672,19 +734,22 @@ components/
 
 | Metric | Waarde |
 |--------|--------|
-| **Totaal bestanden gelezen** | ~81 |
-| **Totaal regels gelezen** | ~12.000+ |
+| **Totaal bestanden gelezen** | ~96 |
+| **Totaal regels gelezen** | ~15.000+ |
 | **Coverage** | **100%** |
-| **Convex data modules** | 7 |
+| **Convex data modules** | 8 |
 | **Server actions** | 9 (met 15+ exports in sendGmail) |
-| **AI tools** | 28 |
-| **Agent context getters** | 7 |
-| **Frontend pages** | 7 |
-| **React hooks** | 13 |
-| **UI components** | 31 |
-| **Lib modules** | 15 (10 frontend + 5 backend) |
+| **AI tools** | 36 |
+| **Agent context getters** | 8 |
+| **Frontend pages** | 8 |
+| **React hooks** | 15 |
+| **UI components** | 37 |
+| **Lib modules** | 17 (11 frontend + 6 backend) |
 | **Cron jobs** | 6 |
 | **Auto-categorisatie regels** | 24 regex patterns |
 | **Scene presets** | 17 (6 custom + 10 WiZ + 1 uit) |
 | **Finance categorieën** | 26 |
-| **Database tabellen** | 14 |
+| **Database tabellen** | 15 |
+| **Habit gamification levels** | 12 |
+| **Habit badges** | 13 |
+| **Telegram commando's** | 18 |

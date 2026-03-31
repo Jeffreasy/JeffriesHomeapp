@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Lightbulb, Calendar, CalendarDays, Landmark, Zap, ChevronRight,
-  TrendingUp, Power, Circle, Plus, Eye, EyeOff,
+  TrendingUp, Power, Circle, Plus, Eye, EyeOff, Target,
 } from "lucide-react";
 import Link from "next/link";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
@@ -18,6 +18,7 @@ import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { CUSTOM_SCENES } from "@/lib/scenes";
 import { QuickNote } from "@/components/notes/QuickNote";
+import { DailyChecklist } from "@/components/habits/DailyChecklist";
 
 // ─── Stat Card ───────────────────────────────────────────────────────────────
 
@@ -316,6 +317,9 @@ export default function DashboardPage() {
           )}
         </section>
 
+        {/* ─── Habits Daily Checklist ──────────────────────────────────────── */}
+        <DailyChecklist />
+
         {/* ─── Quick Notes ─────────────────────────────────────────────── */}
         <QuickNote />
 
@@ -327,6 +331,7 @@ export default function DashboardPage() {
               { href: "/lampen",     icon: Lightbulb, label: "Verlichting",  sub: `${devices.length} lampen`,  accent: "#f59e0b" },
               { href: "/rooster",    icon: Calendar,  label: "Rooster",      sub: "Diensten & agenda",          accent: "#60a5fa" },
               { href: "/finance",    icon: Landmark,  label: "Finance",      sub: "Salaris & transacties",      accent: "#34d399" },
+              { href: "/habits",     icon: Target,    label: "Habits",       sub: "Streaks & badges",           accent: "#f97316" },
               { href: "/automations",icon: Zap,       label: "Automations",  sub: "Schema & triggers",          accent: "#a78bfa" },
             ].map(({ href, icon: Icon, label, sub, accent }) => (
               <Link key={href} href={href}>

@@ -169,12 +169,14 @@ http.route({
 
       } else {
         // General update: name, room, ip
-        await ctx.runMutation(api.devices.update, { id: deviceId as any, ...body });
         const device = await ctx.runQuery(api.devices.getByStringId, { id: deviceId });
+        if (!device) return json({ ok: false, error: "Ongeldig device ID" }, 400);
+        await ctx.runMutation(api.devices.update, { id: device._id, ...body });
         return json({ ok: true, device });
       }
-    } catch (e: any) {
-      return json({ ok: false, error: e.message ?? "DB fout" }, 500);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "DB fout";
+      return json({ ok: false, error: msg }, 500);
     }
   }),
 });
@@ -190,10 +192,13 @@ http.route({
     const deviceId = url.pathname.replace(/^\/devices\//, "").split("/")[0];
     if (!deviceId) return json({ ok: false, error: "ID ontbreekt" }, 400);
     try {
-      await ctx.runMutation(api.devices.remove, { id: deviceId as any });
+      const device = await ctx.runQuery(api.devices.getByStringId, { id: deviceId });
+      if (!device) return json({ ok: false, error: "Ongeldig device ID" }, 400);
+      await ctx.runMutation(api.devices.remove, { id: device._id });
       return json({ ok: true });
-    } catch (e: any) {
-      return json({ ok: false, error: e.message ?? "DB fout" }, 500);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "DB fout";
+      return json({ ok: false, error: msg }, 500);
     }
   }),
 });
@@ -432,7 +437,7 @@ http.route({
             "userId", "eventId (Titel::startISO)", "titel", "startDatum (YYYY-MM-DD)",
             "startTijd? (HH:MM)", "eindDatum", "eindTijd?", "heledag", "locatie?",
             "beschrijving?", "status (Aankomend|Voorbij|PendingCreate|VERWIJDERD)",
-            "kalender (Main)", "conflictMetDienst?",
+            "kalender (Main)",
           ],
           indices: [
             "by_user [userId]", "by_user_date [userId, startDatum]",

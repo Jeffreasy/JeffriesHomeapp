@@ -12,6 +12,7 @@ import { financeAgent }     from "./finance";
 import { emailAgent }       from "./email";
 import { automationsAgent } from "./automations";
 import { notesAgent }       from "./notes";
+import { habitsAgent }      from "./habits";
 
 export const dashboardAgent: AgentDefinition = {
   id:           "dashboard",
@@ -19,7 +20,7 @@ export const dashboardAgent: AgentDefinition = {
   emoji:        "📊",
   beschrijving: "Cross-domain overzicht specialist. Delegeert naar sub-agents voor " +
                 "compacte samenvattingen en bouwt één unified daily briefing.",
-  domein:       ["schedule", "personalEvents", "devices", "emails", "salary", "automations", "notes"],
+  domein:       ["schedule", "personalEvents", "devices", "emails", "salary", "automations", "notes", "habits"],
   capabilities: [
     "Dagelijkse briefing genereren (cross-domain)",
     "Volgende dienst + type tonen",
@@ -42,7 +43,7 @@ export const dashboardAgent: AgentDefinition = {
       beschrijving: "Context ophalen van een specifieke sub-agent",
       endpoint: "GET /ai/agent/:id",
       parameters: [
-        { naam: "agentId", type: "string", beschrijving: "Agent ID", verplicht: true, enum: ["lampen", "rooster", "finance", "email", "automations", "notes"] },
+        { naam: "agentId", type: "string", beschrijving: "Agent ID", verplicht: true, enum: ["lampen", "rooster", "finance", "email", "automations", "notes", "habits"] },
         { naam: "userId", type: "string", beschrijving: "Gebruiker ID", verplicht: true },
       ],
     },
@@ -57,13 +58,14 @@ export const dashboardAgent: AgentDefinition = {
 
     // ── Inter-agent delegation: lite mode ─────────────────────────────────
     // Elke sub-agent geeft een compacte samenvatting terug.
-    const [lampen, rooster, finance, email, automations, notes] = await Promise.all([
+    const [lampen, rooster, finance, email, automations, notes, habits] = await Promise.all([
       lampenAgent.getContext(ctx, userId, { lite: true }),
       roosterAgent.getContext(ctx, userId, { lite: true }),
       financeAgent.getContext(ctx, userId, { lite: true }),
       emailAgent.getContext(ctx, userId, { lite: true }),
       automationsAgent.getContext(ctx, userId, { lite: true }),
       notesAgent.getContext(ctx, userId, { lite: true }),
+      habitsAgent.getContext(ctx, userId, { lite: true }),
     ]);
 
     return {
@@ -77,6 +79,7 @@ export const dashboardAgent: AgentDefinition = {
       email,
       automations,
       notities: notes,
+      habits,
 
       instructie: "Dit is een compact overzicht van alle domeinen. " +
                   "Gebruik getAgentContext met het specifieke agentId voor gedetailleerde informatie.",

@@ -140,7 +140,7 @@ export default function FinancePage() {
   // Merge loonstroken netto into inUitPerMaand for chart overlay
   const inUitMetSalaris = useMemo(() => {
     if (!stats) return [];
-    return stats.inUitPerMaand.map((m: any) => {
+    return stats.inUitPerMaand.map((m: { maand: string; inkomsten: number; uitgaven: number }) => {
       const ls = loonstroken.byPeriode.get(m.maand);
       return { ...m, salaris: ls?.netto ?? null };
     });

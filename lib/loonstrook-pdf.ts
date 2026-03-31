@@ -6,6 +6,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+// @ts-expect-error — pdfjs-dist ships its own types but tsconfig can't always resolve them
 import * as pdfjsLib from "pdfjs-dist";
 
 // Worker setup voor Next.js
@@ -72,6 +73,20 @@ export interface ParseResult {
   skipped:  string[];    // jaaropgaven etc.
 }
 
+// Spatial text item extracted from PDF
+interface SpatialTextItem {
+  text: string;
+  x:    number;
+  y:    number;
+}
+
+// Line reconstructed from grouped spatial items
+interface TextLine {
+  text: string;
+  y:    number;
+  x:    number;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseNL(s: string): number {
@@ -86,42 +101,113 @@ function tryParseNL(s: string | undefined): number | null {
   return n === 0 && !s.includes("0") ? null : n;
 }
 
-// ─── Text Block Parsers ───────────────────────────────────────────────────────
-
-function parseLabelsBlock(text: string): string[] {
-  // Find the labels section between "Omschrijving" and the amounts
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-  const labels: string[] = [];
-
-  for (const line of lines) {
-    // Match patterns: "44,440 % Salaris", "6,000 Uren ORT 22%", "Loonheffing", "600,000 K Reisk. woon-werk"
-    if (/^\d+[,.]?\d*\s*(K|%|Uren)\s+/.test(line) ||
-        /^(Salaris|Loonheffing|Totaal|Netto)/.test(line) ||
-        /ORT|Amt|Premie|Reisk|Vakantie|Toeslag|EJU|Sal\.\s*extra/i.test(line)) {
-      labels.push(line);
-    }
-  }
-
-  return labels;
-}
-
-function parseAmountsBlock(text: string): string[] {
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-  const amounts: string[] = [];
-
-  for (const line of lines) {
-    // Lines with NL numbers: "3.481,00 1.546,96" or just "1.788,35"
-    if (/^\d+[\d.,]*\s+\d+[\d.,]*$/.test(line) || /^\d+[\d.,]+$/.test(line)) {
-      amounts.push(line);
-    }
-  }
-
-  return amounts;
-}
-
 function extractField(text: string, pattern: RegExp): string {
   const m = text.match(pattern);
   return m ? m[1].trim() : "";
+}
+
+// ── Helper: group text items into lines by Y proximity ──
+
+function groupByY(items: SpatialTextItem[]): TextLine[] {
+  if (items.length === 0) return [];
+
+  const sorted = [...items].sort((a: SpatialTextItem, b: SpatialTextItem) => b.y - a.y || a.x - b.x);
+  const lines: TextLine[] = [];
+  let currentLine: TextLine = { text: sorted[0].text, y: sorted[0].y, x: sorted[0].x };
+
+  for (let idx = 1; idx < sorted.length; idx++) {
+    if (Math.abs(sorted[idx].y - currentLine.y) < 3) {
+      currentLine.text += " " + sorted[idx].text;
+    } else {
+      lines.push(currentLine);
+      currentLine = { text: sorted[idx].text, y: sorted[idx].y, x: sorted[idx].x };
+    }
+  }
+  lines.push(currentLine);
+
+  return lines;
+}
+
+// ─── Component Categorizer ────────────────────────────────────────────────────
+
+interface CategorizedComponents {
+  ortItems:         OrtItem[];
+  amtZeerintensief: number | null;
+  pensioenpremie:   number | null;
+  loonheffing:      number | null;
+  reiskosten:       number | null;
+  vakantietoeslag:  number | null;
+  ejuBedrag:        number | null;
+  toeslagBalansvlf: number | null;
+  extraUrenBedrag:  number | null;
+  brutoBetaling:    number;
+  brutoInhouding:   number;
+}
+
+function categorizeComponents(components: LoonComponent[]): CategorizedComponents {
+  const result: CategorizedComponents = {
+    ortItems: [],
+    amtZeerintensief: null,
+    pensioenpremie: null,
+    loonheffing: null,
+    reiskosten: null,
+    vakantietoeslag: null,
+    ejuBedrag: null,
+    toeslagBalansvlf: null,
+    extraUrenBedrag: null,
+    brutoBetaling: 0,
+    brutoInhouding: 0,
+  };
+
+  for (const c of components) {
+    const o = c.omschrijving;
+    const b = c.betaling || 0;
+
+    if (/ORT/.test(o)) {
+      const pctMatch = o.match(/(\d+%|bij vakantie)/);
+      result.ortItems.push({
+        pct: pctMatch ? pctMatch[1] : o,
+        uren: c.aantal || 0,
+        bedrag: b,
+      });
+    } else if (/Amt\s*zeerintensief/i.test(o)) {
+      result.amtZeerintensief = b;
+    } else if (/Premie\s*pensioen/i.test(o)) {
+      result.pensioenpremie = b;
+    } else if (/^Loonheffing$/i.test(o.trim())) {
+      result.loonheffing = b;
+    } else if (/Reisk/i.test(o)) {
+      result.reiskosten = b;
+    } else if (/Vakantietoeslag/i.test(o)) {
+      result.vakantietoeslag = b;
+    } else if (/EJU/i.test(o)) {
+      result.ejuBedrag = b;
+    } else if (/Balansvl/i.test(o)) {
+      result.toeslagBalansvlf = b;
+    } else if (/extra\s*uren/i.test(o)) {
+      result.extraUrenBedrag = b;
+    } else if (o === "Totaal") {
+      result.brutoBetaling = c.betaling || 0;
+      result.brutoInhouding = c.berekOver || 0;
+    }
+  }
+
+  return result;
+}
+
+// ─── Netto Extraction ─────────────────────────────────────────────────────────
+
+function extractNetto(components: LoonComponent[], fullText: string): number {
+  // Primary: find "Netto" in components
+  for (const c of components) {
+    if (c.omschrijving === "Netto" || c.omschrijving.includes("Netto")) {
+      return c.betaling || 0;
+    }
+  }
+
+  // Fallback: regex from full text
+  const match = fullText.match(/(?:Netto|IBAN)[^0-9]*(\d[\d.,]+)/);
+  return match ? parseNL(match[1]) : 0;
 }
 
 // ─── Main Parser ──────────────────────────────────────────────────────────────
@@ -134,15 +220,22 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
 
   const page = await pdf.getPage(1);
   const content = await page.getTextContent();
-  const textItems = content.items
-    .filter((item): item is import("pdfjs-dist/types/src/display/api").TextItem => "str" in item)
-    .map(item => ({ text: item.str, x: item.transform[4], y: item.transform[5] }));
+
+  // Extract text items with spatial positions
+  const textItems: SpatialTextItem[] = content.items
+    .filter((item: Record<string, unknown>): item is Record<string, unknown> & { str: string; transform: number[] } =>
+      "str" in item && "transform" in item
+    )
+    .map((item: { str: string; transform: number[] }): SpatialTextItem => ({
+      text: item.str,
+      x: item.transform[4],
+      y: item.transform[5],
+    }));
 
   // Sort by Y (top to bottom) then X (left to right)
-  textItems.sort((a, b) => b.y - a.y || a.x - b.x);
+  textItems.sort((a: SpatialTextItem, b: SpatialTextItem) => b.y - a.y || a.x - b.x);
 
-  // Reconstruct full text
-  const fullText = textItems.map(i => i.text).join(" ");
+  const fullText = textItems.map((t: SpatialTextItem) => t.text).join(" ");
 
   // ── Periode + Jaar ──
   const periodeMatch = fullText.match(/Periode\s+(\d+)/);
@@ -155,24 +248,18 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
   const periodeLabel = `${jaar}-${String(periode).padStart(2, "0")}`;
 
   // ── Group text items by spatial regions (columns) ──
-  // Left column (x < 300): labels  |  Middle (300-500): amounts  |  Right (>500): meta
-  const leftItems = textItems.filter(i => i.x < 280);
-  const midItems = textItems.filter(i => i.x >= 280 && i.x < 480);
-  const rightItems = textItems.filter(i => i.x >= 480);
+  // Left column (x < 280): labels  |  Middle (280-480): amounts  |  Right (≥480): meta
+  const leftItems  = textItems.filter((t: SpatialTextItem) => t.x < 280);
+  const midItems   = textItems.filter((t: SpatialTextItem) => t.x >= 280 && t.x < 480);
+  const rightItems = textItems.filter((t: SpatialTextItem) => t.x >= 480);
 
   // ── Parse labels + amounts by matching Y positions ──
-  // Strategy: pair up label lines with amount lines on similar Y
   const components: LoonComponent[] = [];
-  const labelLines: string[] = [];
-  const amountPairs: { berekOver: number | null; betaling: number | null }[] = [];
-
-  // Group left items into lines by Y proximity
   const leftLines = groupByY(leftItems);
   const midLines = groupByY(midItems);
 
-  // Match recognized label patterns
-  for (let i = 0; i < leftLines.length; i++) {
-    const line = leftLines[i].text;
+  for (let idx = 0; idx < leftLines.length; idx++) {
+    const line = leftLines[idx].text;
 
     // Parse label: "44,440 % Salaris" or "6,000 Uren ORT 22%" or "Loonheffing"
     const labelMatch = line.match(/^([\d.,]+)\s*(K|%|Uren)?\s*(.+)$/);
@@ -192,8 +279,8 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
     if (!omschrijving || /^(Perc|Totaal|Netto|Berekening)/.test(omschrijving)) continue;
 
     // Find matching amount line at similar Y
-    const y = leftLines[i].y;
-    const matchedMid = midLines.find(m => Math.abs(m.y - y) < 5);
+    const y = leftLines[idx].y;
+    const matchedMid = midLines.find((m: TextLine) => Math.abs(m.y - y) < 5);
 
     let betaling: number | null = null;
     let berekOver: number | null = null;
@@ -209,11 +296,10 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
     }
 
     components.push({ omschrijving, aantal, eenheid, betaling, berekOver });
-    labelLines.push(omschrijving);
   }
 
   // ── Extract meta fields from right column ──
-  const rightText = rightItems.map(i => i.text).join(" ");
+  const rightText = rightItems.map((t: SpatialTextItem) => t.text).join(" ");
 
   const salaris = tryParseNL(extractField(rightText, /Salaris\s+([\d.,]+)/));
   const schaalnummer = extractField(rightText, /Schaalnummer\s+(\d+)/);
@@ -221,76 +307,11 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
   const ptFactor = tryParseNL(extractField(rightText, /Parttime\s+factor\s+([\d.,]+)/));
   const uurloon = tryParseNL(extractField(rightText, /Uurln\s+vorige\s+mnd\s+([\d.,]+)/));
 
-  // ── Netto from full text ──
-  // The netto amount is in "Uitbetaling: ... IBAN ... [amount]" section
-  const nettoMatch = fullText.match(/Uitbetaling[\s\S]*?(\d[\d.,]+)\s/);
-  let netto = 0;
-
-  // Look for the netto at the bottom of components
-  for (const c of components) {
-    if (c.omschrijving === "Netto" || c.omschrijving.includes("Netto")) {
-      netto = c.betaling || 0;
-      break;
-    }
-  }
-
-  // Fallback: find in specific text area
-  if (netto === 0) {
-    const nettoTextMatch = fullText.match(/(?:Netto|IBAN)[^0-9]*(\d[\d.,]+)/);
-    if (nettoTextMatch) netto = parseNL(nettoTextMatch[1]);
-  }
+  // ── Netto ──
+  const netto = extractNetto(components, fullText);
 
   // ── Categorize components ──
-  const ortItems: OrtItem[] = [];
-  let amtZeerintensief: number | null = null;
-  let pensioenpremie: number | null = null;
-  let loonheffing: number | null = null;
-  let reiskosten: number | null = null;
-  let vakantietoeslag: number | null = null;
-  let ejuBedrag: number | null = null;
-  let toeslagBalansvlf: number | null = null;
-  let extraUrenBedrag: number | null = null;
-  let brutoBetaling = 0;
-  let brutoInhouding = 0;
-
-  for (const c of components) {
-    const o = c.omschrijving;
-    const b = c.betaling || 0;
-
-    if (/ORT/.test(o)) {
-      const pctMatch = o.match(/(\d+%|bij vakantie)/);
-      ortItems.push({
-        pct: pctMatch ? pctMatch[1] : o,
-        uren: c.aantal || 0,
-        bedrag: b,
-      });
-    } else if (/Amt\s*zeerintensief/i.test(o)) {
-      amtZeerintensief = b;
-    } else if (/Premie\s*pensioen/i.test(o)) {
-      pensioenpremie = b;
-    } else if (/^Loonheffing$/i.test(o) || /^Loonheffing$/i.test(o.trim())) {
-      loonheffing = b;
-    } else if (/Reisk/i.test(o)) {
-      reiskosten = b;
-    } else if (/Vakantietoeslag/i.test(o)) {
-      vakantietoeslag = b;
-    } else if (/EJU/i.test(o)) {
-      ejuBedrag = b;
-    } else if (/Balansvl/i.test(o)) {
-      toeslagBalansvlf = b;
-    } else if (/extra\s*uren/i.test(o)) {
-      extraUrenBedrag = b;
-    }
-  }
-
-  // totals
-  const totaalComp = components.find(c => c.omschrijving === "Totaal");
-  if (totaalComp) {
-    brutoBetaling = totaalComp.betaling || 0;
-    brutoInhouding = totaalComp.berekOver || 0;
-  }
-
-  const ortTotaal = ortItems.reduce((s, o) => s + o.bedrag, 0);
+  const cat = categorizeComponents(components);
 
   // ── Cumulatieven ──
   const cumulatieven: Record<string, string> = {};
@@ -311,49 +332,26 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
     periodeLabel,
     type: "loonstrook",
     netto,
-    brutoBetaling,
-    brutoInhouding,
+    brutoBetaling: cat.brutoBetaling,
+    brutoInhouding: cat.brutoInhouding,
     salarisBasis: salaris || 0,
-    ortTotaal,
-    ortDetail: ortItems,
-    amtZeerintensief,
-    pensioenpremie,
-    loonheffing,
-    reiskosten,
-    vakantietoeslag,
-    ejuBedrag,
-    toeslagBalansvlf,
-    extraUrenBedrag,
+    ortTotaal: cat.ortItems.reduce((s: number, o: OrtItem) => s + o.bedrag, 0),
+    ortDetail: cat.ortItems,
+    amtZeerintensief: cat.amtZeerintensief,
+    pensioenpremie: cat.pensioenpremie,
+    loonheffing: cat.loonheffing,
+    reiskosten: cat.reiskosten,
+    vakantietoeslag: cat.vakantietoeslag,
+    ejuBedrag: cat.ejuBedrag,
+    toeslagBalansvlf: cat.toeslagBalansvlf,
+    extraUrenBedrag: cat.extraUrenBedrag,
     schaalnummer: schaalnummer || "?",
     trede: trede || "?",
     parttimeFactor: ptFactor || 0,
     uurloon,
-    componenten: components.filter(c => c.omschrijving !== "Totaal" && c.omschrijving !== "Netto"),
+    componenten: components.filter((c: LoonComponent) => c.omschrijving !== "Totaal" && c.omschrijving !== "Netto"),
     cumulatieven,
   };
-}
-
-// ── Helper: group text items into lines by Y proximity ──
-interface TextLine { text: string; y: number; x: number }
-
-function groupByY(items: { text: string; x: number; y: number }[]): TextLine[] {
-  if (items.length === 0) return [];
-
-  const sorted = [...items].sort((a, b) => b.y - a.y || a.x - b.x);
-  const lines: TextLine[] = [];
-  let currentLine = { text: sorted[0].text, y: sorted[0].y, x: sorted[0].x };
-
-  for (let i = 1; i < sorted.length; i++) {
-    if (Math.abs(sorted[i].y - currentLine.y) < 3) {
-      currentLine.text += " " + sorted[i].text;
-    } else {
-      lines.push(currentLine);
-      currentLine = { text: sorted[i].text, y: sorted[i].y, x: sorted[i].x };
-    }
-  }
-  lines.push(currentLine);
-
-  return lines;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -371,13 +369,13 @@ export async function parseLoonstrookPDFs(files: File[]): Promise<ParseResult> {
       } else {
         skipped.push(file.name);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       errors.push(`${file.name}: ${err instanceof Error ? err.message : "Onbekende fout"}`);
     }
   }
 
   // Sort by periode
-  items.sort((a, b) => a.jaar - b.jaar || a.periode - b.periode);
+  items.sort((a: ParsedLoonstrook, b: ParsedLoonstrook) => a.jaar - b.jaar || a.periode - b.periode);
 
   return { items, errors, skipped };
 }
