@@ -78,7 +78,7 @@ graph TB
 
 ---
 
-## 3. Database Schema (17 tabellen)
+## 3. Database Schema (18 tabellen)
 
 | Tabel | Beschrijving | Key Fields | Indices |
 |-------|-------------|------------|---------|
@@ -98,6 +98,7 @@ graph TB
 | **habits** | Gewoontes met gamification | userId, naam, emoji, type (positief/negatief), frequentie (6 opties), moeilijkheid, kleur, roosterFilter?, isKwantitatief, doelWaarde?, eenheid?, doelTijd?, doelAantal?, xpPerVoltooiing, huidigeStreak, langsteStreak, totaalVoltooid, totaalXP, volgorde, isActief, isPauze, aangemaakt, gewijzigd | `by_user`, `by_user_actief` |
 | **habitLogs** | Voltooiings-registratie | userId, habitId, datum (YYYY-MM-DD), voltooid, waarde?, isIncident, trigger?, notitie?, bron, xpVerdiend, aangemaakt | `by_user`, `by_habit`, `by_habit_datum`, `by_user_datum` |
 | **habitBadges** | Behaalde achievements | userId, badgeId, habitId?, naam, emoji, beschrijving, xpBonus, behaaldOp | `by_user`, `by_user_badge` |
+| **noteLinks** | Zettelkasten bi-directionele links | userId, sourceId (notes), targetId (notes), aangemaakt | `by_source`, `by_target`, `by_user` |
 
 ---
 
@@ -253,7 +254,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | **finance** | salaris huidig (bruto/netto/ort) + periode | Salary history (6 maanden) + 30-dagen categorie verdeling + top 10 uitgaven + in/uit balans |
 | **email** | totaal/ongelezen/prullenbak | Stats (inbox/ongelezen/ster/verzonden) + top 10 afzenders + categorie verdeling + triage suggesties + 15 recente emails |
 | **automations** | totaal/actief | Alle regels met triggers + 5 cron jobs info + sync health (rooster/gmail/todoist/calendar) |
-| **notes** | totaal/pin count + recente titels + triageSuggesties count | Alle notities (id/titel/inhoud/tags/isPinned/deadline/linkedEventId/prioriteit/aangemaakt/gewijzigd) + pin count + **triageSuggesties** (verstrekenDeadlines/afgevinkt/stale — via `getTriageCandidates`) |
+| **notes** | totaal/pin count + recente titels + triageSuggesties count + **relevanteNotities** | Alle notities + pin count + **triageSuggesties** + **relevanteNotities** (cross-domain match: deadline proximity + linkedEventId + tag match + titel overlap tegen schedule/personalEvents vandaag/morgen, max 5 met reden) |
 | **habits** | totaalHabits/actief/streak overview + vandaag voortgang | Alle habits met huidige status + daglog + streaks + XP/level + badges + **weekRapport** (voltooiingen/incidenten/xpVerdiend via `getWeeklyReport`) + rooster-integratie + **coaching instructie** voor AI correlatie-analyse |
 
 **Key pattern:** Dashboard agent roept alle andere agents aan met `{ lite: true }` — voorkomt enorme context window bij de briefing.
@@ -459,8 +460,8 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 | Component | Regels | Functie |
 |-----------|--------|---------|
-| **NoteCard** | ~261 | Kaart met kleur-tint, pin/archief/delete acties (altijd zichtbaar op mobiel, hover op desktop, 40px touch targets), inline checkbox toggling, tag overflow (+N), 3-kleur progress bar, ARIA roles, **deadline badge** (Verlopen!/Vandaag/Morgen/Over Xd), **prioriteit strip+dot**, **linked event chip** |
-| **NoteEditor** | ~290 | Bottom-sheet op mobiel (slide-up) / centered modal op desktop. 44px touch targets, drag handle, safe-area footer, auto-resize textarea, Ctrl+Enter save, checklist auto-continue, woord/teken teller, kleur picker (28px swatches), tag input, **collapsible meta panel** (datetime-local deadline + prioriteit dropdown, 44px inputs) |
+| **NoteCard** | ~307 | Kaart met kleur-tint, pin/archief/delete acties (altijd zichtbaar op mobiel, hover op desktop, 40px touch targets), inline checkbox toggling, tag overflow (+N), 3-kleur progress bar, ARIA roles, **deadline badge** (Verlopen!/Vandaag/Morgen/Over Xd), **prioriteit strip+dot**, **linked event chip**, **Zettelkasten:** `[[titel]]` rendered als amber chips met Link2 icon + backlinks sectie onderaan (max 3 chips via `getBacklinks` query) |
+| **NoteEditor** | ~440 | Bottom-sheet op mobiel (slide-up) / centered modal op desktop. 44px touch targets, drag handle, safe-area footer, auto-resize textarea, Ctrl+Enter save, checklist auto-continue, woord/teken teller, kleur picker (28px swatches), tag input, **collapsible meta panel** (datetime-local deadline + prioriteit dropdown, 44px inputs), **Zettelkasten `[[` autocomplete:** detecteert `[[` in textarea → floating dropdown met `searchTitles` Convex query → insert `[[titel]]` bij selectie |
 | **QuickNote** | 174 | Dashboard widget: inline quick-capture met #tag auto-extractie en live preview, recente notities met checklist progress |
 
 ### 9.4 Finance (8)
@@ -586,6 +587,13 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 - **Heatmap:** 365 dagen, rate berekend op basis van due habits per dag (frequentie-aware)
 - **Datum-navigatie:** `getForDate(datum)` → invullen voor verleden dagen (toggle stuurt datum mee)
 
+### Notes/Zettelkasten Patterns
+- **Proactieve context:** Notes agent cross-queries `schedule` + `personalEvents` tabellen voor tag/deadline/linkedEvent matching (vandaag + morgen)
+- **Zettelkasten links:** `[[titel]]` syntax in notitie-inhoud → `syncNoteLinksHelper()` parsed en synchroniseert `noteLinks` tabel bij elke create/update
+- **Link resolution:** Titel-based matching (case-insensitive), auto-cleanup van verwijderde links bij bewerking
+- **Backlinks:** `getBacklinks(noteId)` query haalt alle inbound links op voor een notitie
+- **Autocomplete:** `searchTitles(term)` query voor real-time dropdown bij `[[` in NoteEditor
+
 ---
 
 ## 13. Volledige Bestandslijst (alle gelezen bestanden)
@@ -603,7 +611,7 @@ convex/
 ├── personalEvents.ts                  # 403 regels
 ├── loonstroken.ts                     # 120 regels
 ├── automations.ts                     # 93 regels
-├── notes.ts                           # ~400 regels (incl. internal mutations + triage system + bulk archive)
+├── notes.ts                           # ~510 regels (incl. internal mutations + triage + bulk archive + Zettelkasten: searchTitles/getBacklinks/syncNoteLinksHelper)
 ├── habits.ts                          # ~1095 regels (streak engine + CRUD + gamification + incrementWaarde + incident triggers + progressive overload + level-up rewards + cron decay + AI tools)
 ├── actions/
 │   ├── syncSchedule.ts                # 178 regels
@@ -646,7 +654,7 @@ convex/
 │       ├── finance.ts                 # 137 regels
 │       ├── email.ts                   # 111 regels
 │       ├── automations.ts             # 118 regels
-│       ├── notes.ts                   # ~118 regels (9 capabilities, 7 tools, triage-enriched context)
+│       ├── notes.ts                   # ~170 regels (9 capabilities, 7 tools, triage + proactieve context: cross-domain schedule/events matching)
 │       └── habits.ts                  # ~130 regels (8 tools, lite/full context + weekRapport + coaching)
 └── telegram/
     ├── bot.ts                         # ~320 regels (18 commando's)
@@ -762,7 +770,7 @@ components/
 | **Auto-categorisatie regels** | 24 regex patterns |
 | **Scene presets** | 17 (6 custom + 10 WiZ + 1 uit) |
 | **Finance categorieën** | 26 |
-| **Database tabellen** | 17 |
+| **Database tabellen** | 18 |
 | **Habit gamification levels** | 12 |
 | **Habit badges** | 17 |
 | **Telegram commando's** | 18 |
