@@ -24,6 +24,7 @@ import {
 import {
   handleNotitieMaken, handleNotitiesZoeken, handleNotitiePinnen,
   handleNotitieBewerken, handleNotitieArchiveren, handleNotitiesOverzicht,
+  handleBulkArchiveer,
 } from "./notes";
 import { handleHabitTool } from "./habits";
 
@@ -72,8 +73,9 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   notitiesZoeken:      handleNotitiesZoeken,
   notitiePinnen:       handleNotitiePinnen,
   notitieBewerken:     handleNotitieBewerken,
-  notitieArchiveren:   handleNotitieArchiveren,
-  notitiesOverzicht:   handleNotitiesOverzicht,
+  notitieArchiveren:     handleNotitieArchiveren,
+  notitiesOverzicht:     handleNotitiesOverzicht,
+  bulkArchiveerNotities: handleBulkArchiveer,
 
   // Habits
   habitAanmaken:       (ctx, args, userId) => handleHabitTool(ctx, "habitAanmaken", args, userId),

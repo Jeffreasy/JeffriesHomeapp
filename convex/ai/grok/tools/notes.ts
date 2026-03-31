@@ -186,3 +186,24 @@ export async function handleNotitiesOverzicht(
     })),
   });
 }
+
+export async function handleBulkArchiveer(
+  ctx: any,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const noteIds = args.noteIds as string[];
+  if (!noteIds || noteIds.length === 0) {
+    return JSON.stringify({ error: "Geen notitie IDs opgegeven." });
+  }
+
+  try {
+    const result = await ctx.runMutation(internal.notes.bulkArchiveInternal, { ids: noteIds });
+    return JSON.stringify({
+      ok: true,
+      message: `${result.gearchiveerd} notitie(s) gearchiveerd.`,
+      gearchiveerd: result.gearchiveerd,
+    });
+  } catch {
+    return JSON.stringify({ error: "Bulk archivering mislukt." });
+  }
+}

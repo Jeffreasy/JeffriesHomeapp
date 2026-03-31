@@ -514,6 +514,20 @@ BELANGRIJK — Professioneel Template Protocol:
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "bulkArchiveerNotities",
+      description: "Archiveer meerdere notities tegelijk. Gebruik na triage-bevestiging wanneer de gebruiker zegt 'ja archiveer ze', 'ruim die notities op', of bevestigt na een triage-suggestie.",
+      parameters: {
+        type: "object",
+        properties: {
+          noteIds: { type: "array", items: { type: "string" }, description: "Array van notitie IDs om te archiveren" },
+        },
+        required: ["noteIds"],
+      },
+    },
+  },
   // ──────────────── Habits tools ────────────────────────────────────────────
   {
     type: "function" as const,

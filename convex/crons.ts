@@ -77,4 +77,15 @@ crons.daily(
   internal.habits.decayStreaks,
 );
 
+/**
+ * Wekelijkse notitie-triage — maandag 06:00 UTC (08:00 Amsterdam)
+ * Detecteert verstreken deadlines, volledig afgevinkte checklists, en stale notities.
+ * Flagged ze met triageFlag=true zodat de AI ze kan voorstellen voor archivering.
+ */
+crons.weekly(
+  "triage-notes-weekly",
+  { dayOfWeek: "monday", hourUTC: 6, minuteUTC: 0 },
+  internal.notes.triageNotesInternal,
+);
+
 export default crons;

@@ -82,12 +82,14 @@ export const notesAgent: AgentDefinition = {
 
   getContext: async (ctx, userId, opts?: ContextOptions) => {
     const data = await ctx.runQuery(internal.notes.listForAgent, { userId });
+    const triage = await ctx.runQuery(internal.notes.getTriageCandidates, { userId });
 
     if (opts?.lite) {
       const deadlineCount = data.notities.filter((n) => n.deadline).length;
       return {
         notities: `${data.totaal} notities (${data.pinned} vastgezet, ${deadlineCount} met deadline)`,
         recenteTitels: data.notities.slice(0, 3).map((n) => n.titel),
+        ...(triage.totaal > 0 ? { triageSuggesties: `${triage.totaal} notities klaar voor archivering` } : {}),
       };
     }
 
@@ -95,6 +97,14 @@ export const notesAgent: AgentDefinition = {
       totaal: data.totaal,
       pinned: data.pinned,
       notities: data.notities,
+      ...(triage.totaal > 0 ? {
+        triageSuggesties: {
+          totaal: triage.totaal,
+          verstrekenDeadlines: triage.verstrekenDeadlines,
+          afgevinkt: triage.afgevinkt,
+          stale: triage.stale,
+        },
+      } : {}),
     };
   },
 };

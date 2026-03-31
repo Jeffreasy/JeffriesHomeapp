@@ -318,6 +318,7 @@ export default defineSchema({
     deadline:      v.optional(v.string()),       // ISO timestamp — "doe dit voor..."
     linkedEventId: v.optional(v.string()),       // personalEvents eventId koppeling
     prioriteit:    v.optional(v.string()),       // "hoog" | "normaal" | "laag"
+    triageFlag:    v.optional(v.boolean()),      // true = kandidaat voor archivering (cron)
     aangemaakt:    v.string(),                   // ISO timestamp
     gewijzigd:     v.string(),                   // ISO timestamp
   })

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
@@ -271,5 +272,128 @@ export const togglePinInternal = internalMutation({
       isPinned: !note.isPinned,
       gewijzigd: new Date().toISOString(),
     });
+  },
+});
+
+// ─── Triage System (AI-assisted cleanup) ──────────────────────────────────────
+
+/** Detecteer notities die kandidaat zijn voor archivering */
+export const getTriageCandidates = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const all = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .filter((q) => q.eq(q.field("isArchived"), false))
+      .collect();
+
+    const now = new Date().toISOString();
+    const staleThreshold = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const verstrekenDeadlines: typeof all = [];
+    const afgevinkt: typeof all = [];
+    const stale: typeof all = [];
+
+    for (const n of all) {
+      // 1. Verstreken deadline
+      if (n.deadline && n.deadline < now) {
+        verstrekenDeadlines.push(n);
+        continue;
+      }
+
+      // 2. Volledig afgevinkte checklists
+      const unchecked = (n.inhoud.match(/- \[ \]/g) ?? []).length;
+      const checked = (n.inhoud.match(/- \[x\]/gi) ?? []).length;
+      if (checked > 0 && unchecked === 0) {
+        afgevinkt.push(n);
+        continue;
+      }
+
+      // 3. Stale: >30 dagen niet gewijzigd, niet gepind
+      if (!n.isPinned && n.gewijzigd < staleThreshold) {
+        stale.push(n);
+      }
+    }
+
+    const format = (n: typeof all[0]) => ({
+      id: n._id,
+      titel: n.titel || n.inhoud.slice(0, 40),
+      deadline: n.deadline ?? null,
+      gewijzigd: n.gewijzigd,
+    });
+
+    return {
+      verstrekenDeadlines: verstrekenDeadlines.map(format),
+      afgevinkt: afgevinkt.map(format),
+      stale: stale.map(format),
+      totaal: verstrekenDeadlines.length + afgevinkt.length + stale.length,
+    };
+  },
+});
+
+/** Wekelijkse cron: flag triage-kandidaten */
+export const triageNotesInternal = internalMutation({
+  handler: async (ctx): Promise<{ flagged: number }> => {
+    const { JEFFREY_USER_ID } = await import("./lib/config");
+
+    const all = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", JEFFREY_USER_ID))
+      .filter((q) => q.eq(q.field("isArchived"), false))
+      .collect();
+
+    const now = new Date().toISOString();
+    const staleThreshold = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const candidateIds: string[] = [];
+    for (const n of all) {
+      if (n.deadline && n.deadline < now) { candidateIds.push(n._id); continue; }
+      const unchecked = (n.inhoud.match(/- \[ \]/g) ?? []).length;
+      const checked = (n.inhoud.match(/- \[x\]/gi) ?? []).length;
+      if (checked > 0 && unchecked === 0) { candidateIds.push(n._id); continue; }
+      if (!n.isPinned && n.gewijzigd < staleThreshold) { candidateIds.push(n._id); }
+    }
+
+    // Reset old flags
+    const flagged = await ctx.db
+      .query("notes")
+      .filter((q) => q.eq(q.field("triageFlag"), true))
+      .collect();
+    for (const n of flagged) {
+      await ctx.db.patch(n._id, { triageFlag: undefined });
+    }
+
+    // Set new flags
+    for (const id of candidateIds) {
+      const note = await ctx.db.get(id as any);
+      if (note) await ctx.db.patch(note._id, { triageFlag: true });
+    }
+
+    return { flagged: candidateIds.length };
+  },
+});
+
+/** Bulk archiveer notities (AI triage bevestiging) */
+export const bulkArchiveInternal = internalMutation({
+  args: { ids: v.array(v.string()) },
+  handler: async (ctx, { ids }) => {
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const id of ids) {
+      const note = await ctx.db
+        .query("notes")
+        .filter((q) => q.eq(q.field("_id"), id))
+        .first();
+      if (note && !note.isArchived) {
+        await ctx.db.patch(note._id, {
+          isArchived: true,
+          isPinned: false,
+          triageFlag: undefined,
+          gewijzigd: now,
+        });
+        count++;
+      }
+    }
+    return { gearchiveerd: count };
   },
 });
