@@ -50,7 +50,7 @@ export default function HabitsPage() {
   const {
     todayHabits, todaySummary, todayDienst,
     habits, stats, level,
-    create, update, toggle, incident, pause, archive, remove,
+    create, update, toggle, increment, incident, pause, archive, remove,
     isLoading,
   } = useHabits(selectedDate);
 
@@ -88,7 +88,7 @@ export default function HabitsPage() {
   };
 
   return (
-    <div className="min-h-[100dvh] pb-32 md:pb-8 px-4 md:px-0">
+    <div className="min-h-dvh pb-32 md:pb-8 px-4 md:px-0">
       {/* Header */}
       <div className="pt-6 pb-4 md:pt-8 md:pb-6">
         <div className="flex items-center justify-between mb-1">
@@ -116,7 +116,7 @@ export default function HabitsPage() {
 
       {/* Tab bar */}
       <div className="sticky top-0 z-30 -mx-4 px-4 py-2" style={{ background: "rgba(10,10,15,0.92)", backdropFilter: "blur(16px)" }}>
-        <div className="flex gap-1 p-1 bg-white/[0.03] rounded-xl">
+        <div className="flex gap-1 p-1 bg-white/3 rounded-xl">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -246,7 +246,8 @@ export default function HabitsPage() {
                       key={habit._id}
                       habit={habit}
                       onToggle={() => toggle(habit._id)}
-                      onIncident={(notitie) => incident(habit._id, notitie)}
+                      onIncrement={(stap) => increment(habit._id, stap)}
+                      onIncident={(trigger, notitie) => incident(habit._id, trigger, notitie)}
                       onPause={() => pause(habit._id)}
                       onArchive={() => archive(habit._id)}
                       onRemove={() => setConfirmDelete(habit._id)}
@@ -310,7 +311,8 @@ export default function HabitsPage() {
                             key={habit._id}
                             habit={{ ...habit, log: null }}
                             onToggle={() => toggle(habit._id)}
-                            onIncident={(notitie) => incident(habit._id, notitie)}
+                            onIncrement={(stap) => increment(habit._id, stap)}
+                            onIncident={(trigger, notitie) => incident(habit._id, trigger, notitie)}
                             onPause={() => pause(habit._id)}
                             onArchive={() => archive(habit._id)}
                             onRemove={() => setConfirmDelete(habit._id)}
@@ -333,6 +335,7 @@ export default function HabitsPage() {
                             key={habit._id}
                             habit={{ ...habit, log: null }}
                             onToggle={() => {}}
+                            onIncrement={() => {}}
                             onIncident={() => {}}
                             onPause={() => pause(habit._id)}
                             onArchive={() => archive(habit._id)}

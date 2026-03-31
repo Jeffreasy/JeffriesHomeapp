@@ -7,6 +7,7 @@
 
 import type { AgentDefinition, ContextOptions } from "../registry";
 import { internal } from "../../_generated/api";
+import { api } from "../../_generated/api";
 import { getLevel } from "../../lib/habitConstants";
 
 export const habitsAgent: AgentDefinition = {
@@ -52,6 +53,7 @@ export const habitsAgent: AgentDefinition = {
       beschrijving: "Log een negatieve habit incident (streak reset)",
       parameters: [
         { naam: "habitNaam", type: "string", beschrijving: "Naam van de negatieve habit", verplicht: true },
+        { naam: "trigger",   type: "string", beschrijving: "Trigger categorie: mentale_overprikkeling|fysieke_vermoeidheid|stress_emotie|vermijdingsgedrag|sociale_druk|anders", verplicht: false },
         { naam: "notitie",   type: "string", beschrijving: "Optionele notitie",          verplicht: false },
       ],
     },
@@ -100,6 +102,10 @@ export const habitsAgent: AgentDefinition = {
     }
 
     const level = getLevel(data.totaalXP);
+
+    // Haal recente incidenten op voor correlatie-analyse
+    const recentLogs = await ctx.runQuery(api.habits.getWeeklyReport, { userId });
+
     return {
       level: {
         nummer: level.level,
@@ -111,7 +117,13 @@ export const habitsAgent: AgentDefinition = {
       vandaagVoltooid: data.vandaagVoltooid,
       totaal: data.totaal,
       badgeCount: data.badgeCount,
+      weekRapport: {
+        voltooiingen: recentLogs.completions,
+        incidenten: recentLogs.incidents,
+        xpVerdiend: recentLogs.xpEarned,
+      },
       habits: data.habits,
+      instructie: "Analyseer patronen: als incidenten correleren met bepaalde triggers of diensttypen, benoem dit proactief als coach. Stel concrete acties voor.",
     };
   },
 };

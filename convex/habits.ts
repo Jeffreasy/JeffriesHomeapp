@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { computeXP, getNewBadges, type Moeilijkheid } from "./lib/habitConstants";
+import { computeXP, getNewBadges, getLevel, OVERLOAD_THRESHOLDS, type Moeilijkheid } from "./lib/habitConstants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -171,7 +171,7 @@ async function coreToggle(
   bron: string,
   waarde?: number,
   notitie?: string,
-): Promise<{ action: string; xp: number; streak: number; newBadges: Array<{ naam: string; emoji: string }> }> {
+): Promise<{ action: string; xp: number; streak: number; levelUp?: number; newBadges: Array<{ naam: string; emoji: string }> }> {
   const habit = await ctx.db.get(habitId);
   if (!habit) throw new Error("Habit niet gevonden");
 
@@ -249,6 +249,10 @@ async function coreToggle(
     });
   }
 
+  // Check level-up → genereer notitie
+  const oldLevel = getLevel(habit.totaalXP).level;
+  const newLevel = getLevel(habit.totaalXP + xp + bonusXP).level;
+
   // Eén enkele patch met alle updates (fixes race condition)
   await ctx.db.patch(habitId, {
     huidigeStreak:  newStreak,
@@ -258,10 +262,27 @@ async function coreToggle(
     gewijzigd:      new Date().toISOString(),
   });
 
+  // Feature 5: Level-up → automatische notitie als beloning
+  if (newLevel > oldLevel) {
+    const levelInfo = getLevel(habit.totaalXP + xp + bonusXP);
+    try {
+      await ctx.db.insert("notes", {
+        userId,
+        inhoud: `- [ ] Level ${levelInfo.level} (${levelInfo.titel}) bereikt! Budget suggestie: €20 voor Vrije Tijd 🎮`,
+        tags: ["level-up", "beloning"],
+        isPinned: true,
+        isArchived: false,
+        aangemaakt: new Date().toISOString(),
+        gewijzigd: new Date().toISOString(),
+      });
+    } catch { /* notes tabel niet beschikbaar in test */ }
+  }
+
   return {
     action: "checked",
     xp,
     streak: newStreak,
+    levelUp: newLevel > oldLevel ? newLevel : undefined,
     newBadges: newBadges.map((b) => ({ naam: b.naam, emoji: b.emoji })),
   };
 }
@@ -358,6 +379,7 @@ export const getForDate = query({
             voltooid: log.voltooid,
             waarde: log.waarde,
             isIncident: log.isIncident,
+            trigger: log.trigger,
             notitie: log.notitie,
             xpVerdiend: log.xpVerdiend,
           } : null,
@@ -658,6 +680,7 @@ export const logIncident = mutation({
   args: {
     userId:  v.string(),
     habitId: v.id("habits"),
+    trigger: v.optional(v.string()),
     notitie: v.optional(v.string()),
     bron:    v.optional(v.string()),
   },
@@ -677,7 +700,6 @@ export const logIncident = mutation({
     if (existing?.isIncident) {
       return { action: "already_logged", streakReset: false };
     }
-    // Verwijder eventueel bestaande completion log voor vandaag
     if (existing) await ctx.db.delete(existing._id);
 
     await ctx.db.insert("habitLogs", {
@@ -686,6 +708,7 @@ export const logIncident = mutation({
       datum,
       voltooid:   false,
       isIncident: true,
+      trigger:    args.trigger,
       notitie:    args.notitie,
       bron,
       xpVerdiend: 0,
@@ -699,6 +722,109 @@ export const logIncident = mutation({
     });
 
     return { action: "incident", streakReset: true };
+  },
+});
+
+/** Kwantitatief: increment waarde (auto-complete bij doel) */
+export const incrementWaarde = mutation({
+  args: {
+    userId:  v.string(),
+    habitId: v.id("habits"),
+    stap:    v.number(),
+    datum:   v.optional(v.string()),
+    bron:    v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const habit = await ctx.db.get(args.habitId);
+    if (!habit) throw new Error("Habit niet gevonden");
+    if (!habit.isKwantitatief) throw new Error("Niet kwantitatief");
+
+    const datum = args.datum ?? todayStr();
+    const bron = args.bron ?? "web";
+
+    const existingLog = await ctx.db
+      .query("habitLogs")
+      .withIndex("by_habit_datum", (q) => q.eq("habitId", args.habitId).eq("datum", datum))
+      .first();
+
+    const oldWaarde = existingLog?.waarde ?? 0;
+    const newWaarde = Math.max(0, oldWaarde + args.stap);
+    const doelBereikt = habit.doelWaarde ? newWaarde >= habit.doelWaarde : false;
+    const wasVoltooid = existingLog?.voltooid ?? false;
+
+    if (existingLog) {
+      // Update bestaande log
+      await ctx.db.patch(existingLog._id, {
+        waarde: newWaarde,
+        voltooid: doelBereikt,
+      });
+
+      // Doel net bereikt → XP + streak update
+      if (doelBereikt && !wasVoltooid) {
+        const xp = computeXP(habit.moeilijkheid as Moeilijkheid, habit.huidigeStreak);
+        await ctx.db.patch(existingLog._id, { xpVerdiend: xp });
+
+        const newStreak = await computeCurrentStreak(
+          ctx, args.habitId, habit.frequentie, habit.aangepasteDagen,
+          habit.type, habit.aangemaakt,
+        );
+        const newTotal = habit.totaalVoltooid + 1;
+
+        // Badge check
+        const existingBadges = await ctx.db
+          .query("habitBadges")
+          .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+          .collect();
+        const behaald = new Set<string>(existingBadges.map((b: any) => b.badgeId as string));
+        const newBadges = getNewBadges(newStreak, newTotal, behaald);
+        let bonusXP = 0;
+        for (const badge of newBadges) {
+          bonusXP += badge.xpBonus;
+          await ctx.db.insert("habitBadges", {
+            userId: args.userId, badgeId: badge.id, habitId: args.habitId,
+            naam: badge.naam, emoji: badge.emoji, beschrijving: badge.beschrijving,
+            xpBonus: badge.xpBonus, behaaldOp: new Date().toISOString(),
+          });
+        }
+
+        await ctx.db.patch(args.habitId, {
+          huidigeStreak: newStreak,
+          langsteStreak: Math.max(habit.langsteStreak, newStreak),
+          totaalVoltooid: newTotal,
+          totaalXP: habit.totaalXP + xp + bonusXP,
+          gewijzigd: new Date().toISOString(),
+        });
+
+        return { waarde: newWaarde, voltooid: true, xp, action: "goal_reached" };
+      }
+
+      // Doel weer onder grens → undo completion
+      if (!doelBereikt && wasVoltooid) {
+        await ctx.db.patch(existingLog._id, { xpVerdiend: 0 });
+        const newStreak = await computeCurrentStreak(
+          ctx, args.habitId, habit.frequentie, habit.aangepasteDagen,
+          habit.type, habit.aangemaakt,
+        );
+        await ctx.db.patch(args.habitId, {
+          huidigeStreak: newStreak,
+          totaalVoltooid: Math.max(0, habit.totaalVoltooid - 1),
+          totaalXP: Math.max(0, habit.totaalXP - (existingLog.xpVerdiend ?? 0)),
+          gewijzigd: new Date().toISOString(),
+        });
+      }
+
+      return { waarde: newWaarde, voltooid: doelBereikt, xp: 0, action: "incremented" };
+    }
+
+    // Nieuw log
+    await ctx.db.insert("habitLogs", {
+      userId: args.userId, habitId: args.habitId, datum,
+      voltooid: doelBereikt, waarde: newWaarde,
+      isIncident: false, bron,
+      xpVerdiend: 0, aangemaakt: new Date().toISOString(),
+    });
+
+    return { waarde: newWaarde, voltooid: doelBereikt, xp: 0, action: "started" };
   },
 });
 
@@ -817,7 +943,7 @@ export const toggleCompletionInternal = internalMutation({
 });
 
 export const logIncidentInternal = internalMutation({
-  args: { userId: v.string(), habitId: v.string(), notitie: v.optional(v.string()) },
+  args: { userId: v.string(), habitId: v.string(), trigger: v.optional(v.string()), notitie: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const habitId = args.habitId as Id<"habits">;
     const habit = await ctx.db.get(habitId);
@@ -825,7 +951,6 @@ export const logIncidentInternal = internalMutation({
 
     const datum = todayStr();
 
-    // Voorkom duplicate incident op dezelfde dag
     const existing = await ctx.db
       .query("habitLogs")
       .withIndex("by_habit_datum", (q) => q.eq("habitId", habitId).eq("datum", datum))
@@ -837,7 +962,7 @@ export const logIncidentInternal = internalMutation({
 
     await ctx.db.insert("habitLogs", {
       userId: args.userId, habitId, datum, voltooid: false,
-      isIncident: true, notitie: args.notitie, bron: "grok", xpVerdiend: 0,
+      isIncident: true, trigger: args.trigger, notitie: args.notitie, bron: "grok", xpVerdiend: 0,
       aangemaakt: new Date().toISOString(),
     });
 
@@ -900,6 +1025,7 @@ export const decayStreaks = internalMutation({
 
     let updated = 0;
     let badgesAwarded = 0;
+    let overloadSuggestions = 0;
 
     for (const habit of allHabits) {
       const newStreak = await computeCurrentStreak(
@@ -915,7 +1041,7 @@ export const decayStreaks = internalMutation({
         });
         updated++;
 
-        // Badge check bij streak-groei (belangrijk voor negatieve habits met auto-streak)
+        // Badge check bij streak-groei
         if (newStreak > habit.huidigeStreak) {
           const existingBadges = await ctx.db
             .query("habitBadges")
@@ -925,7 +1051,6 @@ export const decayStreaks = internalMutation({
           const newBadges = getNewBadges(newStreak, habit.totaalVoltooid, behaald);
 
           for (const badge of newBadges) {
-            // Dubbele-badge preventie: check of deze specifieke badge al bestaat
             const exists = existingBadges.some((b) => b.badgeId === badge.id);
             if (exists) continue;
 
@@ -943,8 +1068,27 @@ export const decayStreaks = internalMutation({
           }
         }
       }
+
+      // Feature 3: Progressive Overload — stel moeilijkheidsverlaging voor
+      if (
+        habit.moeilijkheid !== "makkelijk" &&
+        OVERLOAD_THRESHOLDS.some((t) => newStreak === t)
+      ) {
+        try {
+          await ctx.db.insert("notes", {
+            userId: habit.userId,
+            inhoud: `${habit.emoji} **${habit.naam}** heeft een streak van ${newStreak} dagen!\n\nDeze gewoonte zit verankerd in je systeem. Overweeg de moeilijkheid te verlagen van "${habit.moeilijkheid}" naar "${habit.moeilijkheid === "moeilijk" ? "normaal" : "makkelijk"}" om XP-inflatie te voorkomen.\n\n- [ ] Moeilijkheid aanpassen in Habits`,
+            tags: ["overload", "habits"],
+            isPinned: false,
+            isArchived: false,
+            aangemaakt: new Date().toISOString(),
+            gewijzigd: new Date().toISOString(),
+          });
+          overloadSuggestions++;
+        } catch { /* notes tabel fallback */ }
+      }
     }
 
-    return { checked: allHabits.length, updated, badgesAwarded };
+    return { checked: allHabits.length, updated, badgesAwarded, overloadSuggestions };
   },
 });

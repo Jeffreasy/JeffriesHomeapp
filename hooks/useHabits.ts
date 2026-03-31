@@ -46,6 +46,7 @@ export interface HabitLogEntry {
   voltooid:   boolean;
   waarde?:    number;
   isIncident: boolean;
+  trigger?:   string;
   notitie?:   string;
   xpVerdiend: number;
 }
@@ -115,6 +116,7 @@ export function useHabits(datum?: string) {
   const updateHabit       = useMutation(api.habits.update);
   const toggleCompletion  = useMutation(api.habits.toggleCompletion);
   const logIncident       = useMutation(api.habits.logIncident);
+  const incrementWaarde   = useMutation(api.habits.incrementWaarde);
   const reorderHabits     = useMutation(api.habits.reorder);
   const togglePause       = useMutation(api.habits.togglePause);
   const archiveHabit      = useMutation(api.habits.archive);
@@ -155,8 +157,10 @@ export function useHabits(datum?: string) {
       updateHabit({ id, ...data }),
     toggle: (habitId: Id<"habits">, waarde?: number, notitie?: string) =>
       toggleCompletion({ userId, habitId, datum, waarde, notitie }),
-    incident: (habitId: Id<"habits">, notitie?: string) =>
-      logIncident({ userId, habitId, notitie }),
+    increment: (habitId: Id<"habits">, stap: number) =>
+      incrementWaarde({ userId, habitId, stap, datum }),
+    incident: (habitId: Id<"habits">, trigger?: string, notitie?: string) =>
+      logIncident({ userId, habitId, trigger, notitie }),
     reorder: (items: Array<{ id: Id<"habits">; volgorde: number }>) =>
       reorderHabits({ items }),
     pause:   (id: Id<"habits">) => togglePause({ id }),

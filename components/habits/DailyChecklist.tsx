@@ -29,7 +29,7 @@ export function DailyChecklist() {
   if (todayHabits.length === 0) {
     return (
       <Link href="/habits">
-        <div className="glass rounded-2xl p-5 hover:bg-white/[0.03] transition-colors">
+        <div className="glass rounded-2xl p-5 hover:bg-white/3 transition-colors">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/20 flex items-center justify-center">
               <Target size={18} className="text-orange-400" />

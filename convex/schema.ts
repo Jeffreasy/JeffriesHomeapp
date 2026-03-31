@@ -397,6 +397,7 @@ export default defineSchema({
     voltooid:   v.boolean(),
     waarde:     v.optional(v.number()),                  // kwantitatief: actuele waarde
     isIncident: v.boolean(),                             // negatieve habit incident
+    trigger:    v.optional(v.string()),                  // incident trigger categorie
     notitie:    v.optional(v.string()),
     bron:       v.string(),                              // "web" | "telegram" | "grok"
     xpVerdiend: v.number(),

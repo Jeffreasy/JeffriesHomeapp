@@ -157,3 +157,32 @@ export const ROOSTER_FILTER_OPTIONS = [
   { value: "vroegeDienst", label: "Alleen bij Vroege dienst" },
   { value: "lateDienst",   label: "Alleen bij Late dienst" },
 ] as const;
+
+// ─── Incident Triggers (psychologisch onderbouwd) ────────────────────────────
+
+export const INCIDENT_TRIGGERS = [
+  { value: "mentale_overprikkeling", label: "Mentale overprikkeling", emoji: "🧠" },
+  { value: "fysieke_vermoeidheid",   label: "Fysieke vermoeidheid",   emoji: "😴" },
+  { value: "stress_emotie",          label: "Stress / Emotionele reactie", emoji: "😤" },
+  { value: "vermijdingsgedrag",      label: "Vermijdingsgedrag / Uitstel", emoji: "🙈" },
+  { value: "sociale_druk",           label: "Sociale druk / Gezelligheid", emoji: "👥" },
+  { value: "anders",                 label: "Anders",                  emoji: "📝" },
+] as const;
+
+export type IncidentTrigger = typeof INCIDENT_TRIGGERS[number]["value"];
+
+// ─── Kwantitatief: Default Stap per Eenheid ──────────────────────────────────
+
+export const DEFAULT_STAP: Record<string, number> = {
+  ml:  250,
+  min: 15,
+  km:  1,
+  pg:  5,
+  x:   1,
+};
+
+// ─── Progressive Overload Thresholds ─────────────────────────────────────────
+
+/** Streak milestones waar moeilijkheidsverlaging wordt voorgesteld */
+export const OVERLOAD_THRESHOLDS = [30, 60, 100] as const;
+
