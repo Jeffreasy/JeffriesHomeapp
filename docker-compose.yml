@@ -1,0 +1,42 @@
+services:
+  web:
+    build:
+      context: .
+    command: npm run dev -- --hostname 0.0.0.0
+    env_file:
+      - .env.local
+    environment:
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    restart: unless-stopped
+
+  telegram:
+    build:
+      context: .
+    command: npm run telegram
+    env_file:
+      - .env.local
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  command-bridge:
+    build:
+      context: .
+    command: npm run bridge
+    env_file:
+      - .env.local
+    environment:
+      NEXT_PUBLIC_API_URL: ${DOCKER_API_URL:-http://host.docker.internal:8000/api/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped

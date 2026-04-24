@@ -2,12 +2,15 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "telegram": "node scripts/telegramPoller.mjs",
     "bridge": "node scripts/commandBridge.mjs",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
     "lint": "eslint"
   },
   "dependencies": {

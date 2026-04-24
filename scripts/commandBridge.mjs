@@ -44,6 +44,7 @@ if (!BRIDGE_SECRET) {
 }
 
 const convex = new ConvexHttpClient(CONVEX_URL);
+let isPolling = false;
 
 // ─── Local WiZ API helpers ───────────────────────────────────────────────────
 
@@ -84,6 +85,8 @@ async function sendCommand(deviceId, command) {
 // ─── Main Loop ───────────────────────────────────────────────────────────────
 
 async function pollAndExecute() {
+  if (isPolling) return;
+  isPolling = true;
   try {
     const pending = await convex.query(api.deviceCommands.listPending, {
       bridgeSecret: BRIDGE_SECRET,
@@ -117,6 +120,8 @@ async function pollAndExecute() {
     }
   } catch (err) {
     console.error(`⚠️ ${err.message}`);
+  } finally {
+    isPolling = false;
   }
 }
 
