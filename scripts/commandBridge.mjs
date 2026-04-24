@@ -36,7 +36,12 @@ const CONVEX_URL    = process.env.NEXT_PUBLIC_CONVEX_URL
   || "https://adorable-mink-458.eu-west-1.convex.cloud";
 const API_BASE      = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 const API_KEY       = process.env.NEXT_PUBLIC_API_KEY || "";
+const BRIDGE_SECRET = process.env.TELEGRAM_BRIDGE_SECRET || "";
 const POLL_INTERVAL = 2000;
+
+if (!BRIDGE_SECRET) {
+  throw new Error("TELEGRAM_BRIDGE_SECRET ontbreekt in .env.local");
+}
 
 const convex = new ConvexHttpClient(CONVEX_URL);
 
@@ -80,7 +85,9 @@ async function sendCommand(deviceId, command) {
 
 async function pollAndExecute() {
   try {
-    const pending = await convex.query(api.deviceCommands.listPending);
+    const pending = await convex.query(api.deviceCommands.listPending, {
+      bridgeSecret: BRIDGE_SECRET,
+    });
     if (!pending || pending.length === 0) return;
 
     console.log(`⚡ ${pending.length} pending command(s)`);
@@ -98,11 +105,13 @@ async function pollAndExecute() {
           console.log(`  ✅ ALL (${devices.length}) → ${JSON.stringify(cmd.command)}`);
         }
 
-        await convex.mutation(api.deviceCommands.markDone, { id: cmd._id, status: "done" });
+        await convex.mutation(api.deviceCommands.markDone, {
+          id: cmd._id, status: "done", bridgeSecret: BRIDGE_SECRET,
+        });
       } catch (err) {
         console.error(`  ❌ ${err.message}`);
         await convex.mutation(api.deviceCommands.markDone, {
-          id: cmd._id, status: "failed", error: err.message,
+          id: cmd._id, status: "failed", error: err.message, bridgeSecret: BRIDGE_SECRET,
         });
       }
     }
@@ -115,6 +124,7 @@ console.log("🌉 Command Bridge gestart");
 console.log(`   Convex: ${CONVEX_URL}`);
 console.log(`   WiZ API: ${API_BASE}`);
 console.log(`   API Key: ${API_KEY ? "✅ geladen" : "❌ ONTBREEKT"}`);
+console.log(`   Bridge Secret: ${BRIDGE_SECRET ? "✅ geladen" : "❌ ONTBREEKT"}`);
 console.log(`   Poll: ${POLL_INTERVAL}ms\n`);
 
 setInterval(pollAndExecute, POLL_INTERVAL);

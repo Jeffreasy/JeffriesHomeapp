@@ -8,7 +8,7 @@
  */
 
 import { action, internalAction, type ActionCtx } from "../_generated/server";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
 import {
   sendMessage,
@@ -24,6 +24,26 @@ import {
 import { JEFFREY_USER_ID } from "../lib/config";
 
 const OWNER_USER_ID = JEFFREY_USER_ID;
+
+function requireBridgeSecret(provided: string) {
+  const expected = process.env.TELEGRAM_BRIDGE_SECRET;
+  if (!expected) throw new Error("TELEGRAM_BRIDGE_SECRET niet geconfigureerd");
+  if (provided !== expected) throw new Error("Unauthorized");
+}
+
+function getOwnerChatId(): string {
+  const ownerChatId = process.env.TELEGRAM_OWNER_CHAT_ID;
+  if (!ownerChatId) throw new Error("TELEGRAM_OWNER_CHAT_ID niet geconfigureerd");
+  return ownerChatId;
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function sendPlainText(chatId: number, text: string): Promise<void> {
+  await sendMessage(chatId, escapeHtml(text));
+}
 
 // ─── Commando → Agent mapping ────────────────────────────────────────────────
 
@@ -202,12 +222,12 @@ async function processText(ctx: ActionCtx, chatId: number, text: string): Promis
   // Lamp commando → direct uitvoeren
   const lampCmd = detectLampCommand(text);
   if (lampCmd) {
-    await ctx.runMutation(api.deviceCommands.queueCommand, {
+    await ctx.runMutation(internal.deviceCommands.queueCommand, {
       userId: OWNER_USER_ID, command: lampCmd.command, bron: "telegram",
     });
     const reply = `💡 ${lampCmd.beschrijving} — commando verstuurd!`;
     await ctx.runMutation(api.chatMessages.save, { chatId, role: "assistant", content: reply, agentId: "lampen" });
-    await sendMessage(chatId, reply);
+    await sendPlainText(chatId, reply);
     return;
   }
 
@@ -248,83 +268,103 @@ async function processText(ctx: ActionCtx, chatId: number, text: string): Promis
 
 async function processUpdate(ctx: ActionCtx, update: TelegramUpdate): Promise<void> {
   const message = update.message;
-    if (!message?.chat?.id) return;
-    const chatId = message.chat.id as number;
+  if (!message?.chat?.id) return;
+  const chatId = message.chat.id as number;
 
-    // ── Security: chatId whitelist ───────────────────────────────────────
-    const ownerChatId = process.env.TELEGRAM_OWNER_CHAT_ID;
-    if (ownerChatId && String(chatId) !== ownerChatId) {
-      console.warn(`[Telegram] ❌ Onbekend chatId: ${chatId}`);
-      await sendMessage(chatId, "⛔ Je bent niet geautoriseerd om deze bot te gebruiken.");
-      return;
-    }
+  // ── Security: chatId whitelist ───────────────────────────────────────
+  let ownerChatId: string;
+  try {
+    ownerChatId = getOwnerChatId();
+  } catch (err) {
+    console.error(`[Telegram] Configuratie ontbreekt: ${(err as Error).message}`);
+    return;
+  }
+  if (String(chatId) !== ownerChatId) {
+    console.warn(`[Telegram] ❌ Onbekend chatId: ${chatId}`);
+    await sendPlainText(chatId, "Je bent niet geautoriseerd om deze bot te gebruiken.");
+    return;
+  }
 
-    // ── Spraakbericht → Groq Whisper transcriptie ─────────────────────────
-    const voice = message.voice ?? message.audio;
-    if (voice && !message.text) {
-      try {
-        await sendTyping(chatId);
-        const fileInfo = await getFile(voice.file_id);
-        const audioBuffer = await downloadFile(fileInfo.file_path);
-        const transcription = await transcribeVoice(audioBuffer, "voice.ogg");
-
-        if (!transcription.trim()) {
-          await sendMessage(chatId, "🎙️ Kon geen spraak herkennen.");
-          return;
-        }
-
-        await sendMessage(chatId, `🎙️ "${transcription}"`);
-        await processText(ctx, chatId, transcription);
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err);
-        await sendMessage(chatId, `🎙️ Fout: ${errMsg.slice(0, 100)}`);
-      }
-      return;
-    }
-
-    // ── Tekst bericht ─────────────────────────────────────────────────────
-    if (!message.text) return;
+  // ── Spraakbericht → Groq Whisper transcriptie ─────────────────────────
+  const voice = message.voice ?? message.audio;
+  if (voice && !message.text) {
     try {
-      await processText(ctx, chatId, (message.text as string).trim());
+      await sendTyping(chatId);
+      const fileInfo = await getFile(voice.file_id);
+      const audioBuffer = await downloadFile(fileInfo.file_path);
+      const transcription = await transcribeVoice(audioBuffer, "voice.ogg");
+
+      if (!transcription.trim()) {
+        await sendPlainText(chatId, "Kon geen spraak herkennen.");
+        return;
+      }
+
+      await sendPlainText(chatId, `"${transcription}"`);
+      await processText(ctx, chatId, transcription);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error("[Telegram Bot] processText crashed:", errMsg);
-      await sendMessage(chatId, `❌ Er ging iets mis: ${errMsg.slice(0, 200)}`);
+      await sendPlainText(chatId, `Fout: ${errMsg.slice(0, 100)}`);
     }
+    return;
+  }
+
+  // ── Tekst bericht ─────────────────────────────────────────────────────
+  if (!message.text) return;
+  try {
+    await processText(ctx, chatId, message.text.trim());
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[Telegram Bot] processText crashed:", errMsg);
+    await sendPlainText(chatId, `Er ging iets mis: ${errMsg.slice(0, 200)}`);
+  }
+}
+
+async function processUpdateSafe(ctx: ActionCtx, update: TelegramUpdate): Promise<void> {
+  try {
+    await processUpdate(ctx, update);
+  } catch (err) {
+    console.error(`[Telegram] Update verwerken mislukt: ${(err as Error).message}`);
+  }
 }
 
 export const handleUpdate = internalAction({
   args: { update: v.any() },
   handler: async (ctx, { update }) => {
-    await processUpdate(ctx, update as TelegramUpdate);
+    await processUpdateSafe(ctx, update as TelegramUpdate);
   },
 });
 
 export const handleUpdatePublic = action({
-  args: { update: v.any() },
-  handler: async (ctx, { update }) => {
-    await processUpdate(ctx, update as TelegramUpdate);
+  args: { update: v.any(), bridgeSecret: v.string() },
+  handler: async (ctx, { update, bridgeSecret }) => {
+    requireBridgeSecret(bridgeSecret);
+    await processUpdateSafe(ctx, update as TelegramUpdate);
   },
 });
 
 export const pollUpdates = action({
   args: {
+    bridgeSecret: v.string(),
     offset: v.optional(v.number()),
     timeoutSeconds: v.optional(v.number()),
+    disableWebhook: v.optional(v.boolean()),
   },
-  handler: async (ctx, { offset, timeoutSeconds }) => {
-    await disableWebhookForPolling();
+  handler: async (ctx, { bridgeSecret, offset, timeoutSeconds, disableWebhook }) => {
+    requireBridgeSecret(bridgeSecret);
+    if (disableWebhook) await disableWebhookForPolling();
     const updates = await getUpdates(offset, timeoutSeconds ?? 25) as TelegramUpdate[];
     let nextOffset = offset;
+    let processed = 0;
 
     for (const update of updates) {
-      await processUpdate(ctx, update);
+      await processUpdateSafe(ctx, update);
+      processed += 1;
       if (typeof update.update_id === "number") {
         nextOffset = update.update_id + 1;
       }
     }
 
-    return { ok: true, count: updates.length, nextOffset };
+    return { ok: true, count: updates.length, processed, nextOffset };
   },
 });
 
@@ -334,15 +374,12 @@ async function saveAndReply(
   agentId?: string,
 ) {
   if (result.ok && result.antwoord) {
-    // Escape HTML entities zodat <email@addr> en dergelijke niet als tags worden geparsed
-    let antwoord = result.antwoord
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    let antwoord = escapeHtml(result.antwoord);
     if (antwoord.length > 4000) antwoord = antwoord.slice(0, 3997) + "...";
     await ctx.runMutation(api.chatMessages.save, { chatId, role: "assistant" as const, content: result.antwoord, agentId });
     await sendMessage(chatId, antwoord);
   } else {
-    const escaped = (result.error ?? "Kon geen antwoord genereren")
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const escaped = escapeHtml(result.error ?? "Kon geen antwoord genereren");
     await sendMessage(chatId, `❌ ${escaped}`);
   }
 }
@@ -350,12 +387,14 @@ async function saveAndReply(
 // ─── Webhook Setup ───────────────────────────────────────────────────────────
 
 export const registerWebhook = action({
-  args: { webhookUrl: v.string() },
-  handler: async (_ctx, { webhookUrl }) => {
-    const secret = "homebot_" + Date.now().toString(36);
+  args: { webhookUrl: v.string(), bridgeSecret: v.string() },
+  handler: async (_ctx, { webhookUrl, bridgeSecret }) => {
+    requireBridgeSecret(bridgeSecret);
+    const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (!secret) throw new Error("TELEGRAM_WEBHOOK_SECRET niet geconfigureerd");
     const result = await tgSetWebhook(webhookUrl, secret);
     const me = await getMe() as { username: string };
-    return { ok: true, result, bot: me.username, secret };
+    return { ok: true, result, bot: me.username };
   },
 });
 

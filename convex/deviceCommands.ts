@@ -22,8 +22,14 @@ const commandShape = {
   scene_id:         v.optional(v.number()),
 };
 
-/** Zet een nieuw commando in de queue. */
-export const queueCommand = mutation({
+function requireBridgeSecret(provided: string) {
+  const expected = process.env.TELEGRAM_BRIDGE_SECRET;
+  if (!expected) throw new Error("TELEGRAM_BRIDGE_SECRET niet geconfigureerd");
+  if (provided !== expected) throw new Error("Unauthorized");
+}
+
+/** Zet een nieuw commando in de queue vanuit trusted Convex code. */
+export const queueCommand = internalMutation({
   args: {
     userId:   v.string(),
     deviceId: v.optional(v.string()),    // undefined = alle devices
@@ -64,8 +70,9 @@ export const queueForUser = mutation({
 
 /** Haal pending commands op (voor lokale bridge polling). */
 export const listPending = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { bridgeSecret: v.string() },
+  handler: async (ctx, { bridgeSecret }) => {
+    requireBridgeSecret(bridgeSecret);
     return ctx.db
       .query("deviceCommands")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
@@ -79,8 +86,10 @@ export const markDone = mutation({
     id:     v.id("deviceCommands"),
     status: v.union(v.literal("done"), v.literal("failed")),
     error:  v.optional(v.string()),
+    bridgeSecret: v.string(),
   },
-  handler: async (ctx, { id, status, error }) => {
+  handler: async (ctx, { id, status, error, bridgeSecret }) => {
+    requireBridgeSecret(bridgeSecret);
     await ctx.db.patch(id, {
       status,
       doneAt: new Date().toISOString(),

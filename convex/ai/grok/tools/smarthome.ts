@@ -5,7 +5,9 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { api } from "../../../_generated/api";
+import { api, internal } from "../../../_generated/api";
+import type { ActionCtx } from "../../../_generated/server";
+import type { Doc } from "../../../_generated/dataModel";
 
 const SCENE_NAMES: Record<number, string> = {
   1:"Ocean",2:"Romance",3:"Sunset",4:"Party",5:"Fireplace",6:"Cozy",
@@ -16,7 +18,7 @@ const SCENE_NAMES: Record<number, string> = {
   27:"Christmas",28:"Halloween",29:"Candlelight",30:"Golden White",31:"Pulse",32:"Steampunk",
 };
 
-export async function handleLampBedien(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
+export async function handleLampBedien(ctx: ActionCtx, args: Record<string, unknown>, userId: string): Promise<string> {
   const actie = args.actie as string;
   const cmd: Record<string, unknown> = {};
 
@@ -41,15 +43,15 @@ export async function handleLampBedien(ctx: any, args: Record<string, unknown>, 
   let deviceId: string | undefined;
 
   if (lampNaam) {
-    const devices = await ctx.runQuery(api.devices.list, { userId });
-    const match = devices.find((d: any) =>
+    const devices = await ctx.runQuery(api.devices.list, { userId }) as Doc<"devices">[];
+    const match = devices.find((d) =>
       d.name?.toLowerCase().includes(lampNaam.toLowerCase())
     );
     if (match) deviceId = match._id;
   }
 
   try {
-    await ctx.runMutation(api.deviceCommands.queueCommand, {
+    await ctx.runMutation(internal.deviceCommands.queueCommand, {
       userId, command: cmd, bron: "grok",
       ...(deviceId ? { deviceId } : {}),
     });

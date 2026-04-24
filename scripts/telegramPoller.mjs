@@ -31,11 +31,15 @@ function loadEnv() {
 loadEnv();
 
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
+const BRIDGE_SECRET = process.env.TELEGRAM_BRIDGE_SECRET;
 const POLL_TIMEOUT_SECONDS = Number(process.env.TELEGRAM_POLL_TIMEOUT_SECONDS ?? 25);
 const OFFSET_FILE = ".telegram-offset.json";
 
 if (!CONVEX_URL) {
   throw new Error("NEXT_PUBLIC_CONVEX_URL ontbreekt in .env.local");
+}
+if (!BRIDGE_SECRET) {
+  throw new Error("TELEGRAM_BRIDGE_SECRET ontbreekt in .env.local");
 }
 
 const convex = new ConvexHttpClient(CONVEX_URL);
@@ -56,6 +60,7 @@ function saveOffset(offset) {
 
 async function pollLoop() {
   let offset = loadOffset();
+  let disableWebhook = true;
   console.log("Telegram poller gestart");
   console.log(`Convex: ${CONVEX_URL}`);
   console.log(`Offset: ${offset ?? "nieuw"}\n`);
@@ -63,9 +68,12 @@ async function pollLoop() {
   while (true) {
     try {
       const result = await convex.action(api.telegram.bot.pollUpdates, {
+        bridgeSecret: BRIDGE_SECRET,
         offset,
         timeoutSeconds: POLL_TIMEOUT_SECONDS,
+        disableWebhook,
       });
+      disableWebhook = false;
 
       if (typeof result.nextOffset === "number") {
         offset = result.nextOffset;
