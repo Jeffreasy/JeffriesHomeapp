@@ -7,10 +7,20 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { action, internalAction } from "../_generated/server";
+import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
-import { sendMessage, sendTyping, setWebhook as tgSetWebhook, getMe, getFile, downloadFile, transcribeVoice } from "./api";
+import {
+  sendMessage,
+  sendTyping,
+  setWebhook as tgSetWebhook,
+  getMe,
+  getFile,
+  downloadFile,
+  transcribeVoice,
+  disableWebhookForPolling,
+  getUpdates,
+} from "./api";
 import { JEFFREY_USER_ID } from "../lib/config";
 
 const OWNER_USER_ID = JEFFREY_USER_ID;
@@ -155,9 +165,36 @@ function buildWelcomeText(): string {
 
 // ─── Text Processing (shared by text + voice) ───────────────────────────────
 
-async function processText(ctx: any, chatId: number, text: string): Promise<void> {
-  if (text === "/start") { await sendMessage(chatId, buildWelcomeText(), { parseMode: undefined as any }); return; }
-  if (text === "/help")  { await sendMessage(chatId, buildHelpText(), { parseMode: undefined as any }); return; }
+type TelegramVoice = {
+  file_id: string;
+};
+
+type TelegramMessage = {
+  chat?: { id?: number };
+  text?: string;
+  voice?: TelegramVoice;
+  audio?: TelegramVoice;
+};
+
+type TelegramUpdate = {
+  update_id?: number;
+  message?: TelegramMessage;
+};
+
+type ChatHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type GrokChatResult = {
+  ok: boolean;
+  antwoord?: string;
+  error?: string;
+};
+
+async function processText(ctx: ActionCtx, chatId: number, text: string): Promise<void> {
+  if (text === "/start") { await sendMessage(chatId, buildWelcomeText()); return; }
+  if (text === "/help")  { await sendMessage(chatId, buildHelpText()); return; }
 
   // Sla user bericht op
   await ctx.runMutation(api.chatMessages.save, { chatId, role: "user", content: text });
@@ -170,13 +207,13 @@ async function processText(ctx: any, chatId: number, text: string): Promise<void
     });
     const reply = `💡 ${lampCmd.beschrijving} — commando verstuurd!`;
     await ctx.runMutation(api.chatMessages.save, { chatId, role: "assistant", content: reply, agentId: "lampen" });
-    await sendMessage(chatId, reply, { parseMode: undefined as any });
+    await sendMessage(chatId, reply);
     return;
   }
 
   // Chat history laden
-  const history = await ctx.runQuery(api.chatMessages.getHistory, { chatId, limit: 10 }) as Array<{ role: "user" | "assistant"; content: string }>;
-  const grokHistory = history.slice(0, -1).map((m: any) => ({ role: m.role, content: m.content }));
+  const history = await ctx.runQuery(api.chatMessages.getHistory, { chatId, limit: 10 }) as ChatHistoryMessage[];
+  const grokHistory = history.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
 
   // Slash commando routing
   const cmd = text.split(" ")[0].toLowerCase().replace(/@\w+/, "");
@@ -193,7 +230,7 @@ async function processText(ctx: any, chatId: number, text: string): Promise<void
     const result = await ctx.runAction(api.ai.grok.chat.chat, {
       userId: OWNER_USER_ID, vraag,
       agentId: mapping.agentId, history: grokHistory,
-    }) as { ok: boolean; antwoord?: string; error?: string };
+    }) as GrokChatResult;
     await saveAndReply(ctx, chatId, result, mapping.agentId);
     return;
   }
@@ -203,16 +240,14 @@ async function processText(ctx: any, chatId: number, text: string): Promise<void
   const detectedAgent = detectAgent(text);
   const result = await ctx.runAction(api.ai.grok.chat.chat, {
     userId: OWNER_USER_ID, vraag: text, agentId: detectedAgent, history: grokHistory,
-  }) as { ok: boolean; antwoord?: string; error?: string };
+  }) as GrokChatResult;
   await saveAndReply(ctx, chatId, result, detectedAgent);
 }
 
 // ─── Webhook Handler ─────────────────────────────────────────────────────────
 
-export const handleUpdate = internalAction({
-  args: { update: v.any() },
-  handler: async (ctx, { update }) => {
-    const message = update?.message;
+async function processUpdate(ctx: ActionCtx, update: TelegramUpdate): Promise<void> {
+  const message = update.message;
     if (!message?.chat?.id) return;
     const chatId = message.chat.id as number;
 
@@ -220,7 +255,7 @@ export const handleUpdate = internalAction({
     const ownerChatId = process.env.TELEGRAM_OWNER_CHAT_ID;
     if (ownerChatId && String(chatId) !== ownerChatId) {
       console.warn(`[Telegram] ❌ Onbekend chatId: ${chatId}`);
-      await sendMessage(chatId, "⛔ Je bent niet geautoriseerd om deze bot te gebruiken.", { parseMode: undefined as any });
+      await sendMessage(chatId, "⛔ Je bent niet geautoriseerd om deze bot te gebruiken.");
       return;
     }
 
@@ -234,15 +269,15 @@ export const handleUpdate = internalAction({
         const transcription = await transcribeVoice(audioBuffer, "voice.ogg");
 
         if (!transcription.trim()) {
-          await sendMessage(chatId, "🎙️ Kon geen spraak herkennen.", { parseMode: undefined as any });
+          await sendMessage(chatId, "🎙️ Kon geen spraak herkennen.");
           return;
         }
 
-        await sendMessage(chatId, `🎙️ "${transcription}"`, { parseMode: undefined as any });
+        await sendMessage(chatId, `🎙️ "${transcription}"`);
         await processText(ctx, chatId, transcription);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        await sendMessage(chatId, `🎙️ Fout: ${errMsg.slice(0, 100)}`, { parseMode: undefined as any });
+        await sendMessage(chatId, `🎙️ Fout: ${errMsg.slice(0, 100)}`);
       }
       return;
     }
@@ -254,14 +289,48 @@ export const handleUpdate = internalAction({
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error("[Telegram Bot] processText crashed:", errMsg);
-      await sendMessage(chatId, `❌ Er ging iets mis: ${errMsg.slice(0, 200)}`, { parseMode: undefined as any });
+      await sendMessage(chatId, `❌ Er ging iets mis: ${errMsg.slice(0, 200)}`);
     }
+}
+
+export const handleUpdate = internalAction({
+  args: { update: v.any() },
+  handler: async (ctx, { update }) => {
+    await processUpdate(ctx, update as TelegramUpdate);
+  },
+});
+
+export const handleUpdatePublic = action({
+  args: { update: v.any() },
+  handler: async (ctx, { update }) => {
+    await processUpdate(ctx, update as TelegramUpdate);
+  },
+});
+
+export const pollUpdates = action({
+  args: {
+    offset: v.optional(v.number()),
+    timeoutSeconds: v.optional(v.number()),
+  },
+  handler: async (ctx, { offset, timeoutSeconds }) => {
+    await disableWebhookForPolling();
+    const updates = await getUpdates(offset, timeoutSeconds ?? 25) as TelegramUpdate[];
+    let nextOffset = offset;
+
+    for (const update of updates) {
+      await processUpdate(ctx, update);
+      if (typeof update.update_id === "number") {
+        nextOffset = update.update_id + 1;
+      }
+    }
+
+    return { ok: true, count: updates.length, nextOffset };
   },
 });
 
 async function saveAndReply(
-  ctx: any, chatId: number,
-  result: { ok: boolean; antwoord?: string; error?: string },
+  ctx: ActionCtx, chatId: number,
+  result: GrokChatResult,
   agentId?: string,
 ) {
   if (result.ok && result.antwoord) {

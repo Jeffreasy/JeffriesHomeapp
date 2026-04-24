@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "telegram": "node scripts/telegramPoller.mjs",
+    "bridge": "node scripts/commandBridge.mjs",
     "lint": "eslint"
   },
   "dependencies": {

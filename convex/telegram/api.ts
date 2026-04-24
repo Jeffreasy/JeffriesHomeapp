@@ -59,6 +59,20 @@ export async function deleteWebhook(): Promise<unknown> {
   return tgFetch("deleteWebhook", { drop_pending_updates: true });
 }
 
+/** Verwijder webhook zonder pending updates weg te gooien. */
+export async function disableWebhookForPolling(): Promise<unknown> {
+  return tgFetch("deleteWebhook", { drop_pending_updates: false });
+}
+
+/** Haal updates op via long polling. */
+export async function getUpdates(offset?: number, timeout = 25): Promise<Array<Record<string, unknown>>> {
+  return tgFetch("getUpdates", {
+    offset,
+    timeout,
+    allowed_updates: ["message"],
+  }) as Promise<Array<Record<string, unknown>>>;
+}
+
 /** Haal bot info op. */
 export async function getMe(): Promise<unknown> {
   return tgFetch("getMe", {});
