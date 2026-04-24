@@ -61,15 +61,9 @@ export function clearSchedule(): void {
 
 // ─── XLSX → DienstRow ─────────────────────────────────────────────────────────
 
-const EXPECTED_HEADERS = [
-  "Event ID", "Titel", "Start Datum", "Start Tijd", "Eind Datum", "Eind Tijd",
-  "Werktijd", "Locatie", "Team Prefix", "Shift Type", "Prioriteit", "Duur (uur)",
-  "Weeknr", "Dag", "Status", "Beschrijving", "Hele Dag",
-];
-
 /** Parse raw row from xlsx getValues() to DienstRow */
-export function parseXlsxRow(row: any[], headers: string[]): DienstRow | null {
-  const get = (col: string): any => {
+export function parseXlsxRow(row: unknown[], headers: string[]): DienstRow | null {
+  const get = (col: string): unknown => {
     const idx = headers.indexOf(col);
     return idx >= 0 ? row[idx] : undefined;
   };
@@ -112,7 +106,7 @@ export function parseXlsxRow(row: any[], headers: string[]): DienstRow | null {
   };
 }
 
-function _toDateString(val: any): string {
+function _toDateString(val: unknown): string {
   if (!val) return "";
   if (typeof val === "string") {
     // Already "YYYY-MM-DD" or "DD-MM-YYYY"
@@ -134,7 +128,7 @@ function _toDateString(val: any): string {
   return String(val).slice(0, 10);
 }
 
-function _toTimeString(val: any): string {
+function _toTimeString(val: unknown): string {
   if (!val && val !== 0) return "";
   if (typeof val === "string") {
     if (/^\d{1,2}:\d{2}/.test(val)) return val.slice(0, 5);
@@ -152,31 +146,104 @@ function _toTimeString(val: any): string {
 
 // ─── Query helpers ────────────────────────────────────────────────────────────
 
+const APP_TIMEZONE = "Europe/Amsterdam";
+
+function getAmsterdamParts(date = new Date()): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat("nl-NL", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+
+  return {
+    date: `${get("year")}-${get("month")}-${get("day")}`,
+    time: `${get("hour")}:${get("minute")}`,
+  };
+}
+
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function normalizeTime(time: string | undefined, fallback: string): string {
+  if (!time) return fallback;
+  const match = time.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return fallback;
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+}
+
+function getStartKey(dienst: DienstRow): string {
+  return `${dienst.startDatum} ${normalizeTime(dienst.startTijd, "00:00")}`;
+}
+
+function getEndKey(dienst: DienstRow): string {
+  let endDate = dienst.eindDatum || dienst.startDatum;
+  const startKey = getStartKey(dienst);
+  let endKey = `${endDate} ${normalizeTime(dienst.eindTijd, "23:59")}`;
+
+  // Night shifts sometimes arrive with equal start/end dates. Treat an end
+  // time before the start time as crossing midnight in Amsterdam.
+  if (endKey <= startKey) {
+    endDate = addDaysIso(dienst.startDatum, 1);
+    endKey = `${endDate} ${normalizeTime(dienst.eindTijd, "23:59")}`;
+  }
+
+  return endKey;
+}
+
+function getNowKey(date = new Date()): string {
+  const now = getAmsterdamParts(date);
+  return `${now.date} ${now.time}`;
+}
+
+function getLimitKey(days: number, date = new Date()): string {
+  const now = getAmsterdamParts(date);
+  return `${addDaysIso(now.date, days)} 23:59`;
+}
+
+function getRuntimeStatus(dienst: DienstRow, nowKey = getNowKey()): DienstRow["status"] {
+  if (dienst.status === "VERWIJDERD") return dienst.status;
+
+  const startKey = getStartKey(dienst);
+  const endKey = getEndKey(dienst);
+
+  if (startKey <= nowKey && nowKey <= endKey) return "Bezig";
+  if (endKey < nowKey) return "Gedraaid";
+  if (dienst.status === "Bezig" || dienst.status === "Gedraaid") return "Opkomend";
+
+  return dienst.status;
+}
+
+function withRuntimeStatus(dienst: DienstRow, nowKey = getNowKey()): DienstRow {
+  const status = getRuntimeStatus(dienst, nowKey);
+  return status === dienst.status ? dienst : { ...dienst, status };
+}
+
 export function getUpcoming(diensten: DienstRow[], days = 30): DienstRow[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const limit = new Date(today);
-  limit.setDate(limit.getDate() + days);
+  const nowKey = getNowKey();
+  const limitKey = getLimitKey(days);
 
   return diensten
     .filter(d => {
-      if (d.status === "Gedraaid" || d.status === "VERWIJDERD") return false;
-      const start = new Date(d.startDatum);
-      return start >= today && start <= limit;
+      if (d.status === "VERWIJDERD") return false;
+      return getEndKey(d) >= nowKey && getStartKey(d) <= limitKey;
     })
-    .sort((a, b) => a.startDatum.localeCompare(b.startDatum));
+    .sort((a, b) => getStartKey(a).localeCompare(getStartKey(b)))
+    .map(d => withRuntimeStatus(d, nowKey));
 }
 
 export function getNextDienst(diensten: DienstRow[]): DienstRow | null {
-  const now  = new Date();
-  const today = now.toISOString().slice(0, 10);
-
-  // Check if one is currently "Bezig"
-  const bezig = diensten.find(d => d.status === "Bezig");
-  if (bezig) return bezig;
-
-  // Return first upcoming
-  return getUpcoming(diensten)[0] ?? null;
+  const upcoming = getUpcoming(diensten);
+  return upcoming.find(d => d.status === "Bezig") ?? upcoming[0] ?? null;
 }
 
 export function getThisWeek(diensten: DienstRow[]): DienstRow[] {

@@ -103,14 +103,14 @@ export function useSchedule() {
       const ws = wb.Sheets[sheetName];
       if (!ws) throw new Error(`Sheet "${sheetName}" niet gevonden`);
 
-      const rawData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
+      const rawData = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: "" });
       if (rawData.length < 2) throw new Error("Geen data gevonden");
 
-      const headers: string[] = rawData[0].map((h: any) => String(h).trim());
+      const headers: string[] = rawData[0].map((h) => String(h).trim());
       const rows: DienstRow[] = [];
       for (let i = 1; i < rawData.length; i++) {
         const row = rawData[i];
-        if (!row || row.every((c: any) => !c)) continue;
+        if (!row || row.every((c) => c === "" || c === null || c === undefined)) continue;
         const parsed = parseXlsxRow(row, headers);
         if (parsed) rows.push(parsed);
       }
@@ -127,8 +127,9 @@ export function useSchedule() {
       });
 
       return { ok: true, count: rows.length };
-    } catch (e: any) {
-      return { ok: false, count: 0, error: e.message ?? "Onbekende fout" };
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Onbekende fout";
+      return { ok: false, count: 0, error: message };
     }
   }, [userId, bulkImportMutation]);
 
