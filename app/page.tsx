@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Lightbulb, Calendar, CalendarDays, Landmark, Zap, ChevronRight,
-  TrendingUp, Power, Circle, Plus, Eye, EyeOff, Target,
+  Power, Circle, Plus, Eye, EyeOff, Target,
 } from "lucide-react";
 import Link from "next/link";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
@@ -87,6 +87,37 @@ function QuickScene({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+type DashboardDateInfo = {
+  greeting: string;
+  todayLabel: string;
+  todayIso: string;
+  period: string;
+};
+
+function getDashboardDateInfo(): DashboardDateInfo {
+  const now = new Date();
+  const todayIso = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+  const hour = Number(
+    new Intl.DateTimeFormat("nl-NL", {
+      timeZone: "Europe/Amsterdam",
+      hour: "2-digit",
+      hourCycle: "h23",
+    }).format(now)
+  );
+
+  return {
+    greeting: hour < 6 ? "Goedenacht" : hour < 12 ? "Goedemorgen" : hour < 18 ? "Goedemiddag" : "Goedenavond",
+    todayLabel: now.toLocaleDateString("nl-NL", {
+      timeZone: "Europe/Amsterdam",
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    }),
+    todayIso,
+    period: todayIso.slice(0, 7),
+  };
+}
+
 export default function DashboardPage() {
   const { data: devices = [] } = useDevices();
   const { mutate: sendCommand } = useLampCommand();
@@ -95,11 +126,20 @@ export default function DashboardPage() {
   const loonstroken = useLoonstroken();
   const { upcoming: upcomingEvents, eventsByDate, conflictMap } = usePersonalEvents({ diensten: thisWeek });
   const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy();
+  const [dateInfo, setDateInfo] = useState<DashboardDateInfo | null>(null);
+
+  useEffect(() => {
+    const updateDateInfo = () => setDateInfo(getDashboardDateInfo());
+    const timeout = window.setTimeout(updateDateInfo, 0);
+    const interval = window.setInterval(updateDateInfo, 60_000);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
+  }, []);
 
   // Werkelijk salaris (loonstrook) of berekend (prognose)
-  const nu = new Date();
-  const huidigePeriode = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, "0")}`;
-  const werkelijkNetto = loonstroken.byPeriode.get(huidigePeriode)?.netto;
+  const werkelijkNetto = dateInfo ? loonstroken.byPeriode.get(dateInfo.period)?.netto : undefined;
   const nettoLabel = werkelijkNetto ? "Netto salaris" : "Netto prognose";
   const nettoValue = werkelijkNetto ?? salarisHuidig?.nettoPrognose;
   const nettoSub = werkelijkNetto ? "loonstrook" : "berekend";
@@ -126,14 +166,9 @@ export default function DashboardPage() {
     );
   };
 
-  // Greeting
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 6 ? "Goedenacht" : hour < 12 ? "Goedemorgen" : hour < 18 ? "Goedemiddag" : "Goedenavond";
-
-  const today = new Date().toLocaleDateString("nl-NL", {
-    weekday: "long", day: "numeric", month: "long",
-  });
+  const greeting = dateInfo?.greeting ?? "Welkom";
+  const today = dateInfo?.todayLabel ?? "vandaag";
+  const todayIso = dateInfo?.todayIso;
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: "#0a0a0f" }}>
@@ -287,7 +322,7 @@ export default function DashboardPage() {
                   <div key={evt.eventId} className="px-3 py-0.5">
                     <PersonalEventItem
                       event={evt}
-                      isToday={evt.startDatum === new Date().toISOString().slice(0, 10)}
+                      isToday={todayIso ? evt.startDatum === todayIso : false}
                       onEdit={handleEditEvent}
                       conflictInfo={conflictMap.get(evt.eventId)}
                     />
