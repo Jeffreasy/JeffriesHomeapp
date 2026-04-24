@@ -1645,3 +1645,40 @@ a,
 }
 .migratie-banner svg { flex-shrink: 0; }
 .migratie-result { font-size: 0.8rem; margin-left: auto; }
+
+/* ─── Finance cockpit refinements ─────────────────────────────────────────── */
+
+.finance-dashboard-shell .finance-import .finance-uploader {
+  min-height: 0;
+}
+
+.finance-dashboard-shell .finance-import .dropzone {
+  min-height: 84px;
+  padding: 12px 14px;
+  border-width: 1px;
+  border-radius: var(--radius-sm);
+  flex-direction: row;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.finance-dashboard-shell .finance-import .dropzone__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.finance-dashboard-shell .finance-import .dropzone__icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.finance-dashboard-shell .finance-import .btn {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}

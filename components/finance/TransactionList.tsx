@@ -61,23 +61,33 @@ function CategorieEditor({
 interface Props {
   transactions: TransactionRow[];
   onCategorie: (id: Id<"transactions">, cat: string | undefined) => void;
+  formatAmount?: (amount: number) => string;
   isDone: boolean;
   onLoadMore: () => void;
   isLoading: boolean;
 }
 
-export function TransactionList({ transactions, onCategorie, isDone, onLoadMore, isLoading }: Props) {
+function defaultFormatAmount(amount: number) {
+  return `${amount >= 0 ? "+" : ""}${amount.toLocaleString("nl-NL", { style: "currency", currency: "EUR" })}`;
+}
+
+export function TransactionList({
+  transactions,
+  onCategorie,
+  formatAmount = defaultFormatAmount,
+  isDone,
+  onLoadMore,
+  isLoading,
+}: Props) {
   if (transactions.length === 0 && !isLoading) {
     return <div className="tx-empty"><p>Geen transacties gevonden voor deze filters.</p></div>;
   }
 
-  let lastDatum = "";
-
   return (
     <div className="tx-list">
-      {transactions.map((tx) => {
-        const showDateHeader = tx.datum !== lastDatum;
-        lastDatum = tx.datum;
+      {transactions.map((tx, index) => {
+        const previous = transactions[index - 1];
+        const showDateHeader = !previous || tx.datum !== previous.datum;
 
         return (
           <div key={tx._id}>
@@ -122,8 +132,7 @@ export function TransactionList({ transactions, onCategorie, isDone, onLoadMore,
               {/* Bedrag */}
               <span className={`tx-bedrag ${tx.bedrag >= 0 ? "tx-bedrag--plus" : "tx-bedrag--min"}`}>
                 {tx.bedrag >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-                {tx.bedrag >= 0 ? "+" : ""}
-                {tx.bedrag.toLocaleString("nl-NL", { style: "currency", currency: "EUR" })}
+                {formatAmount(tx.bedrag)}
               </span>
             </div>
           </div>

@@ -204,6 +204,7 @@ export const getStats = query({
       .query("transactions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
+    const jaren = Array.from(new Set(alleTxs.map((t) => t.datum.slice(0, 4)))).sort().reverse();
 
     // Filter op IBAN als geselecteerd
     let txs = args.ibanFilter
@@ -377,6 +378,7 @@ export const getStats = query({
       storneringen,
       aantalTxs:      txs.length,
       maanden,
+      jaren,
       ibannen,
     };
   },

@@ -8,11 +8,12 @@ interface CategoryCardProps {
   bedrag: number;
   count: number;
   percentage: number;
+  amountLabel?: string;
   onClick: () => void;
   isActive: boolean;
 }
 
-export function CategoryCard({ categorie, bedrag, count, percentage, onClick, isActive }: CategoryCardProps) {
+export function CategoryCard({ categorie, bedrag, count, percentage, amountLabel, onClick, isActive }: CategoryCardProps) {
   const color = getCatColor(categorie);
   return (
     <motion.button
@@ -25,7 +26,7 @@ export function CategoryCard({ categorie, bedrag, count, percentage, onClick, is
       <div className="category-card__bar" style={{ width: `${Math.min(percentage, 100)}%`, background: color }} />
       <div className="category-card__content">
         <span className="category-card__name">{categorie}</span>
-        <span className="category-card__amount">{eur(bedrag)}</span>
+        <span className="category-card__amount">{amountLabel ?? eur(bedrag)}</span>
       </div>
       <div className="category-card__meta">
         <span>{count}x</span>
