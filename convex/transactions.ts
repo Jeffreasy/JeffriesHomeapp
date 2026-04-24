@@ -62,6 +62,15 @@ export const updateCategorie = mutation({
   },
 });
 
+export const updateCategorieInternal = internalMutation({
+  args: { userId: v.string(), id: v.id("transactions"), categorie: v.optional(v.string()) },
+  handler: async (ctx, { userId, id, categorie }) => {
+    const tx = await ctx.db.get(id);
+    if (!tx || tx.userId !== userId) throw new Error("Transactie niet gevonden");
+    await ctx.db.patch(id, { categorie });
+  },
+});
+
 // ─── Queries ────────────────────────────────────────────────────────────────
 
 /**

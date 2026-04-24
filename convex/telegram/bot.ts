@@ -247,8 +247,8 @@ async function processText(ctx: ActionCtx, chatId: number, text: string): Promis
     if (cmd === "/noteer" && customVraag) {
       vraag = `Maak een notitie aan met de volgende inhoud: ${customVraag}`;
     }
-    const result = await ctx.runAction(api.ai.grok.chat.chat, {
-      userId: OWNER_USER_ID, vraag,
+    const result = await ctx.runAction(internal.ai.grok.chat.chat, {
+      vraag,
       agentId: mapping.agentId, history: grokHistory,
     }) as GrokChatResult;
     await saveAndReply(ctx, chatId, result, mapping.agentId);
@@ -258,8 +258,8 @@ async function processText(ctx: ActionCtx, chatId: number, text: string): Promis
   // Vrije tekst → smart routing
   await sendTyping(chatId);
   const detectedAgent = detectAgent(text);
-  const result = await ctx.runAction(api.ai.grok.chat.chat, {
-    userId: OWNER_USER_ID, vraag: text, agentId: detectedAgent, history: grokHistory,
+  const result = await ctx.runAction(internal.ai.grok.chat.chat, {
+    vraag: text, agentId: detectedAgent, history: grokHistory,
   }) as GrokChatResult;
   await saveAndReply(ctx, chatId, result, detectedAgent);
 }

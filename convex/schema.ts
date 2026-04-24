@@ -58,6 +58,30 @@ export default defineSchema({
   })
     .index("by_chat", ["chatId"]),
 
+  // ─── AI Pending Actions (Grok write-confirmation queue) ────────────────────
+  aiPendingActions: defineTable({
+    userId:      v.string(),
+    agentId:     v.string(),
+    toolName:    v.string(),
+    argsJson:    v.string(),
+    summary:     v.string(),
+    code:        v.string(),
+    status:      v.union(
+      v.literal("pending"),
+      v.literal("confirmed"),
+      v.literal("cancelled"),
+      v.literal("expired"),
+      v.literal("failed"),
+    ),
+    createdAt:   v.string(),
+    expiresAt:   v.string(),
+    confirmedAt: v.optional(v.string()),
+    result:      v.optional(v.string()),
+    error:       v.optional(v.string()),
+  })
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_code_status", ["userId", "code", "status"]),
+
   // ─── Automations ───────────────────────────────────────────────────────────
   automations: defineTable({
     userId:    v.string(), // Clerk user ID

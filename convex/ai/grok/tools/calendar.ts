@@ -21,14 +21,36 @@ function displayEndDate(e: any): string {
 
 export async function handleAfspraakBewerken(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
-    const zoekterm = (args.zoekterm as string).toLowerCase();
+    const eventId = args.eventId as string | undefined;
+    const zoekterm = (args.zoekterm as string | undefined)?.toLowerCase();
     const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
+
+    if (!eventId) {
+      if (!zoekterm) {
+        return JSON.stringify({ error: "eventId is verplicht. Gebruik eerst afsprakenOpvragen om de exacte afspraak te kiezen." });
+      }
+      const options = allEvents
+        .filter((e: any) => e.status === "Aankomend" && e.titel?.toLowerCase().includes(zoekterm))
+        .slice(0, 10)
+        .map((e: any) => ({
+          eventId: e.eventId,
+          titel: e.titel,
+          datum: e.startDatum,
+          tijd: e.heledag ? "hele dag" : `${e.startTijd}-${e.eindTijd}`,
+        }));
+      return JSON.stringify({
+        error: "Exacte eventId vereist voordat ik een afspraak wijzig.",
+        opties: options,
+        hint: "Vraag de gebruiker welke afspraak bedoeld wordt en roep daarna afspraakBewerken aan met eventId.",
+      });
+    }
+
     const matches = allEvents.filter((e: any) =>
-      e.status === "Aankomend" && e.titel?.toLowerCase().includes(zoekterm)
+      e.status === "Aankomend" && e.eventId === eventId
     );
 
     if (matches.length === 0) {
-      return JSON.stringify({ error: `Geen aankomende afspraak gevonden met "${args.zoekterm}"` });
+      return JSON.stringify({ error: `Geen aankomende afspraak gevonden met eventId "${eventId}"` });
     }
 
     // Meerdere matches? Geef lijst terug zodat Grok kan disambigueren
@@ -122,16 +144,41 @@ export async function handleAfspraakMaken(ctx: any, args: Record<string, unknown
 
 export async function handleAfspraakVerwijderen(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
-    // Zoek de afspraak op titel
-    const zoekterm = (args.zoekterm as string).toLowerCase();
+    const eventId = args.eventId as string | undefined;
+    const zoekterm = (args.zoekterm as string | undefined)?.toLowerCase();
     const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
+
+    if (!eventId) {
+      if (!zoekterm) {
+        return JSON.stringify({ error: "eventId is verplicht. Gebruik eerst afsprakenOpvragen om de exacte afspraak te kiezen." });
+      }
+      const options = allEvents
+        .filter((e: any) =>
+          e.status !== "VERWIJDERD" &&
+          e.status !== "Voorbij" &&
+          e.titel?.toLowerCase().includes(zoekterm)
+        )
+        .slice(0, 10)
+        .map((e: any) => ({
+          eventId: e.eventId,
+          titel: e.titel,
+          datum: e.startDatum,
+          tijd: e.heledag ? "hele dag" : `${e.startTijd}-${e.eindTijd}`,
+        }));
+      return JSON.stringify({
+        error: "Exacte eventId vereist voordat ik een afspraak verwijder.",
+        opties: options,
+        hint: "Vraag de gebruiker welke afspraak bedoeld wordt en roep daarna afspraakVerwijderen aan met eventId.",
+      });
+    }
+
     const matches = allEvents.filter((e: any) =>
       e.status !== "VERWIJDERD" && e.status !== "Voorbij" &&
-      e.titel?.toLowerCase().includes(zoekterm)
+      e.eventId === eventId
     );
 
     if (matches.length === 0) {
-      return JSON.stringify({ error: `Geen aankomende afspraak gevonden met "${args.zoekterm}"` });
+      return JSON.stringify({ error: `Geen aankomende afspraak gevonden met eventId "${eventId}"` });
     }
 
     if (matches.length > 1) {
@@ -186,6 +233,7 @@ export async function handleAfsprakenOpvragen(ctx: any, args: Record<string, unk
       const dienst = schedule.find((s: any) => s.startDatum === e.startDatum && s.status !== "VERWIJDERD");
       const endDatum = displayEndDate(e);
       return {
+        eventId: e.eventId,
         titel: e.titel, datum: e.startDatum, dag: weekdays[d.getDay()],
         eindDatum: e.startDatum !== endDatum ? endDatum : undefined,
         tijd: e.heledag ? "Hele dag" : `${e.startTijd ?? "?"} - ${e.eindTijd ?? "?"}`,

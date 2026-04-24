@@ -5,7 +5,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { api, internal } from "../../../_generated/api";
+import { internal } from "../../../_generated/api";
 import { MAAND_NAMEN, IBAN_LABELS } from "../types";
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -77,6 +77,7 @@ export async function handleTransactiesZoeken(ctx: any, args: Record<string, unk
       .sort((a: any, b: any) => b.datum.localeCompare(a.datum))
       .slice(0, maxAantal)
       .map((tx: any) => ({
+        id: tx._id,
         datum: tx.datum, bedrag: tx.bedrag,
         tegenpartij: tx.tegenpartijNaam ?? "Onbekend",
         omschrijving: tx.omschrijving,
@@ -275,22 +276,47 @@ export async function handleVasteLastenAnalyse(ctx: any, _args: Record<string, u
 
 export async function handleCategorieWijzigen(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
-    const zoekterm = (args.zoekterm as string).toLowerCase();
+    const transactieId = args.transactieId as string | undefined;
+    const zoekterm = (args.zoekterm as string | undefined)?.toLowerCase();
     const nieuweCategorie = args.categorie as string;
 
     const allTxs = await ctx.runQuery(internal.transactions.listInternal, { userId });
-    const match = allTxs
-      .sort((a: any, b: any) => b.datum.localeCompare(a.datum))
-      .find((tx: any) =>
-        tx.tegenpartijNaam?.toLowerCase().includes(zoekterm) ||
-        tx.omschrijving?.toLowerCase().includes(zoekterm)
-      );
-
-    if (!match) {
-      return JSON.stringify({ error: `Geen transactie gevonden met "${args.zoekterm}"` });
+    if (!transactieId) {
+      if (!zoekterm) {
+        return JSON.stringify({ error: "transactieId is verplicht. Gebruik eerst transactiesZoeken om de exacte transactie te kiezen." });
+      }
+      const opties = allTxs
+        .sort((a: any, b: any) => b.datum.localeCompare(a.datum))
+        .filter((tx: any) =>
+          tx.tegenpartijNaam?.toLowerCase().includes(zoekterm) ||
+          tx.omschrijving?.toLowerCase().includes(zoekterm)
+        )
+        .slice(0, 10)
+        .map((tx: any) => ({
+          id: tx._id,
+          datum: tx.datum,
+          bedrag: tx.bedrag,
+          tegenpartij: tx.tegenpartijNaam ?? "Onbekend",
+          omschrijving: tx.omschrijving,
+          categorie: tx.categorie ?? "Geen",
+        }));
+      return JSON.stringify({
+        error: "Exacte transactieId vereist voordat ik een categorie wijzig.",
+        opties,
+        hint: "Vraag de gebruiker welke transactie bedoeld wordt en roep daarna categorieWijzigen aan met transactieId.",
+      });
     }
 
-    await ctx.runMutation(api.transactions.updateCategorie, {
+    const match = allTxs
+      .sort((a: any, b: any) => b.datum.localeCompare(a.datum))
+      .find((tx: any) => String(tx._id) === transactieId);
+
+    if (!match) {
+      return JSON.stringify({ error: `Geen transactie gevonden met id "${transactieId}"` });
+    }
+
+    await ctx.runMutation(internal.transactions.updateCategorieInternal, {
+      userId,
       id: match._id,
       categorie: nieuweCategorie,
     });
@@ -317,6 +343,10 @@ export async function handleBulkCategoriseren(ctx: any, args: Record<string, unk
   try {
     const tegenpartij = (args.tegenpartij as string).toLowerCase();
     const categorie = args.categorie as string;
+
+    if (tegenpartij.length < 3) {
+      return JSON.stringify({ error: "Tegenpartij is te kort voor bulk categoriseren (minimaal 3 tekens)." });
+    }
 
     const allTxs = await ctx.runQuery(internal.transactions.listInternal, { userId });
     const matches = allTxs.filter((tx: any) =>

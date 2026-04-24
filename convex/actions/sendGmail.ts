@@ -8,13 +8,42 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { action, internalAction } from "../_generated/server";
+import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { google } from "googleapis";
 import { createOAuthClient } from "../lib/googleAuth";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function sanitizeHeaderValue(value: string, field: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) throw new Error(`${field} is verplicht`);
+  if (/[\r\n]/.test(trimmed)) throw new Error(`${field} bevat ongeldige headertekens`);
+  return trimmed;
+}
+
+function sanitizeOptionalHeaderValue(value: string | undefined, field: string): string | undefined {
+  if (!value) return undefined;
+  return sanitizeHeaderValue(value, field);
+}
+
+function sanitizeAddressList(value: string, field: string): string {
+  const cleaned = sanitizeHeaderValue(value, field);
+  const parts = cleaned.split(",").map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) throw new Error(`${field} bevat geen adressen`);
+  for (const part of parts) {
+    if (!/^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$/.test(part.replace(/^.*<([^>]+)>$/, "$1"))) {
+      throw new Error(`${field} bevat een ongeldig emailadres`);
+    }
+  }
+  return parts.join(", ");
+}
+
+function sanitizeOptionalAddressList(value: string | undefined, field: string): string | undefined {
+  if (!value) return undefined;
+  return sanitizeAddressList(value, field);
+}
 
 function buildRawEmail(opts: {
   to: string;
@@ -26,16 +55,23 @@ function buildRawEmail(opts: {
   references?: string;
   threadId?: string;
 }): string {
+  const to = sanitizeAddressList(opts.to, "To");
+  const subject = sanitizeHeaderValue(opts.subject, "Subject");
+  const cc = sanitizeOptionalAddressList(opts.cc, "Cc");
+  const bcc = sanitizeOptionalAddressList(opts.bcc, "Bcc");
+  const inReplyTo = sanitizeOptionalHeaderValue(opts.inReplyTo, "In-Reply-To");
+  const references = sanitizeOptionalHeaderValue(opts.references, "References");
+
   const lines = [
-    `To: ${opts.to}`,
-    `Subject: ${opts.subject}`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
     `Content-Type: text/html; charset=UTF-8`,
     `MIME-Version: 1.0`,
   ];
-  if (opts.cc)         lines.push(`Cc: ${opts.cc}`);
-  if (opts.bcc)        lines.push(`Bcc: ${opts.bcc}`);
-  if (opts.inReplyTo)  lines.push(`In-Reply-To: ${opts.inReplyTo}`);
-  if (opts.references) lines.push(`References: ${opts.references}`);
+  if (cc)         lines.push(`Cc: ${cc}`);
+  if (bcc)        lines.push(`Bcc: ${bcc}`);
+  if (inReplyTo)  lines.push(`In-Reply-To: ${inReplyTo}`);
+  if (references) lines.push(`References: ${references}`);
   lines.push("", opts.body);
 
   const raw = lines.join("\r\n");
@@ -50,7 +86,7 @@ function buildRawEmail(opts: {
 // ─── Send Email ──────────────────────────────────────────────────────────────
 
 /** Nieuw email versturen via Gmail API. */
-export const sendEmail = action({
+export const sendEmail = internalAction({
   args: {
     userId:  v.string(),
     to:      v.string(),
@@ -85,7 +121,7 @@ export const sendEmail = action({
 // ─── Reply ───────────────────────────────────────────────────────────────────
 
 /** Reply op een bestaand email thread. */
-export const replyToEmail = action({
+export const replyToEmail = internalAction({
   args: {
     userId:   v.string(),
     gmailId:  v.string(),        // ID van het bericht waarop gereageerd wordt
@@ -133,7 +169,7 @@ export const replyToEmail = action({
 // ─── Trash / Untrash ─────────────────────────────────────────────────────────
 
 /** Verplaats email naar prullenbak. */
-export const trashEmail = action({
+export const trashEmail = internalAction({
   args: { userId: v.string(), gmailId: v.string() },
   handler: async (ctx, { userId, gmailId }) => {
     const auth  = createOAuthClient();
@@ -145,7 +181,7 @@ export const trashEmail = action({
 });
 
 /** Herstel email uit prullenbak. */
-export const untrashEmail = action({
+export const untrashEmail = internalAction({
   args: { userId: v.string(), gmailId: v.string() },
   handler: async (ctx, { userId, gmailId }) => {
     const auth  = createOAuthClient();
@@ -159,14 +195,14 @@ export const untrashEmail = action({
 // ─── Labels ──────────────────────────────────────────────────────────────────
 
 /** Labels toevoegen of verwijderen van een bericht. */
-export const modifyLabels = action({
+export const modifyLabels = internalAction({
   args: {
     userId:        v.string(),
     gmailId:       v.string(),
     addLabels:     v.optional(v.array(v.string())),
     removeLabels:  v.optional(v.array(v.string())),
   },
-  handler: async (ctx, { userId, gmailId, addLabels, removeLabels }) => {
+  handler: async (_ctx, { gmailId, addLabels, removeLabels }) => {
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.modify({
@@ -184,7 +220,7 @@ export const modifyLabels = action({
 // ─── Markeer gelezen/ongelezen ────────────────────────────────────────────────
 
 /** Markeer bericht als gelezen. */
-export const markGelezen = action({
+export const markGelezen = internalAction({
   args: { userId: v.string(), gmailId: v.string(), gelezen: v.boolean() },
   handler: async (ctx, { userId, gmailId, gelezen }) => {
     const auth  = createOAuthClient();
@@ -204,7 +240,7 @@ export const markGelezen = action({
 });
 
 /** Markeer bericht met ster. */
-export const markSter = action({
+export const markSter = internalAction({
   args: { userId: v.string(), gmailId: v.string(), ster: v.boolean() },
   handler: async (ctx, { userId, gmailId, ster }) => {
     const auth  = createOAuthClient();
@@ -226,7 +262,7 @@ export const markSter = action({
 // ─── Bulk Operations (Gmail batchModify) ─────────────────────────────────────
 
 /** Batch markeer meerdere emails als gelezen/ongelezen. */
-export const bulkMarkGelezen = action({
+export const bulkMarkGelezen = internalAction({
   args: {
     userId:   v.string(),
     gmailIds: v.array(v.string()),
@@ -257,7 +293,7 @@ export const bulkMarkGelezen = action({
 });
 
 /** Batch verwijder meerdere emails (naar prullenbak). */
-export const bulkTrash = action({
+export const bulkTrash = internalAction({
   args: {
     userId:   v.string(),
     gmailIds: v.array(v.string()),

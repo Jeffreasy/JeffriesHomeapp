@@ -7,6 +7,13 @@
 
 import { api, internal } from "../../../_generated/api";
 
+const MAX_BULK_EMAILS = 50;
+
+function limitedIds(value: unknown): string[] {
+  const ids = Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+  return ids.slice(0, MAX_BULK_EMAILS);
+}
+
 /** Strip HTML naar leesbare plain text. */
 function cleanHtml(html: string): string {
   return html
@@ -122,7 +129,7 @@ export async function handleEmailBeantwoorden(ctx: any, args: Record<string, unk
 }
 
 export async function handleBulkMarkeerGelezen(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
-  const gmailIds = args.gmailIds as string[];
+  const gmailIds = limitedIds(args.gmailIds);
   if (!gmailIds.length) return JSON.stringify({ error: "Geen gmailIds opgegeven" });
   try {
     const result = await ctx.runAction(internal.actions.sendGmail.bulkMarkGelezenInternal, {
@@ -135,7 +142,7 @@ export async function handleBulkMarkeerGelezen(ctx: any, args: Record<string, un
 }
 
 export async function handleBulkVerwijder(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
-  const gmailIds = args.gmailIds as string[];
+  const gmailIds = limitedIds(args.gmailIds);
   if (!gmailIds.length) return JSON.stringify({ error: "Geen gmailIds opgegeven" });
   try {
     const result = await ctx.runAction(internal.actions.sendGmail.bulkTrashInternal, {
@@ -152,7 +159,7 @@ export async function handleInboxOpruimen(ctx: any, args: Record<string, unknown
     const allEmails = await ctx.runQuery(api.emails.list, { userId });
     const active = allEmails.filter((e: any) => !e.isVerwijderd);
     const filter = args.filter as string;
-    const maxAantal = (args.maxAantal as number) ?? 50;
+    const maxAantal = Math.min((args.maxAantal as number) ?? MAX_BULK_EMAILS, MAX_BULK_EMAILS);
     let filtered: any[] = [];
 
     switch (filter) {

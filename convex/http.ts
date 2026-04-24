@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal, api } from "./_generated/api";
+import { JEFFREY_USER_ID } from "./lib/config";
 
 const http = httpRouter();
 
@@ -221,25 +222,23 @@ http.route({
 
 /**
  * GET /ai/briefing — Daily briefing (Dashboard Agent shortcut).
- * Query params: userId
  */
 http.route({
   path: "/ai/briefing",
   method: "GET",
   handler: httpAction(async (ctx, req) => {
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
-    const url = new URL(req.url);
-    const userId = url.searchParams.get("userId");
-    if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
 
-    const result = await ctx.runQuery(api.ai.router.getBriefing, { userId });
+    const result = await ctx.runQuery(internal.ai.router.internalGetBriefing, {
+      userId: JEFFREY_USER_ID,
+    });
     return json(result);
   }),
 });
 
 /**
  * GET /ai/agent/* — Haal context op van een specifieke agent.
- * URL: /ai/agent/lampen?userId=xxx
+ * URL: /ai/agent/lampen
  */
 http.route({
   pathPrefix: "/ai/agent/",
@@ -248,18 +247,19 @@ http.route({
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
     const url = new URL(req.url);
     const agentId = url.pathname.replace(/^\/ai\/agent\//, "").split("/")[0];
-    const userId  = url.searchParams.get("userId");
     if (!agentId) return json({ ok: false, error: "agentId ontbreekt in URL" }, 400);
-    if (!userId)  return json({ ok: false, error: "userId verplicht" }, 400);
 
-    const result = await ctx.runQuery(api.ai.router.getAgentContext, { agentId, userId });
+    const result = await ctx.runQuery(internal.ai.router.internalGetAgentContext, {
+      agentId,
+      userId: JEFFREY_USER_ID,
+    });
     return json(result);
   }),
 });
 
 /**
  * POST /ai/chat — Chat met een agent via Grok AI.
- * Body: { userId, vraag, agentId?, history? }
+ * Body: { vraag, agentId?, history? }
  */
 http.route({
   path: "/ai/chat",
@@ -267,18 +267,16 @@ http.route({
   handler: httpAction(async (ctx, req) => {
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
 
-    let body: { userId?: string; vraag?: string; agentId?: string; history?: Array<{ role: "user" | "assistant"; content: string }> };
+    let body: { vraag?: string; agentId?: string; history?: Array<{ role: "user" | "assistant"; content: string }> };
     try {
       body = await req.json();
     } catch {
       return json({ ok: false, error: "Invalid JSON body" }, 400);
     }
 
-    if (!body.userId) return json({ ok: false, error: "userId verplicht" }, 400);
     if (!body.vraag)  return json({ ok: false, error: "vraag verplicht" }, 400);
 
-    const result = await ctx.runAction(api.ai.grok.chat.chat, {
-      userId:  body.userId,
+    const result = await ctx.runAction(internal.ai.grok.chat.chat, {
       vraag:   body.vraag,
       agentId: body.agentId,
       history: body.history,
@@ -505,12 +503,7 @@ http.route({
           "deletePersonalEvent.deleteEvent — Verwijder event uit Google Calendar + DB",
           "updatePersonalEvent.updateEvent — Update event in Google Calendar + DB",
           "syncGmail.syncNow — Sync Gmail metadata (incremental/full)",
-          "sendGmail.sendEmail — Nieuw email versturen",
-          "sendGmail.replyToEmail — Reply op thread",
-          "sendGmail.trashEmail — Verplaats naar prullenbak",
-          "sendGmail.markGelezen — Markeer gelezen/ongelezen",
-          "sendGmail.markSter — Ster toevoegen/verwijderen",
-          "sendGmail.modifyLabels — Labels wijzigen",
+          "sendGmail.* — intern-only Gmail mutaties via bevestigde Grok acties",
           "getGmailBody.getBody — Volledige email body ophalen (on-demand)",
           "getGmailBody.getAttachment — Bijlage downloaden",
         ],

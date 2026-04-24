@@ -271,13 +271,14 @@ BELANGRIJK — Professioneel Template Protocol:
     type: "function" as const,
     function: {
       name: "afspraakVerwijderen",
-      description: "Verwijder een persoonlijke afspraak. Zoekt op titel (zoekterm). De afspraak wordt ook uit Google Calendar verwijderd. Gebruik dit als de gebruiker een afspraak wil verwijderen, annuleren, of cancelen.",
+      description: "Verwijder een persoonlijke afspraak. Gebruik eerst afsprakenOpvragen om de exacte eventId te vinden. De afspraak wordt ook uit Google Calendar verwijderd. Deze tool vraagt server-side bevestiging voordat er iets gebeurt.",
       parameters: {
         type: "object",
         properties: {
-          zoekterm: { type: "string", description: "Deel van de titel om de afspraak te vinden (bijv. 'koffie')" },
+          eventId: { type: "string", description: "Exacte eventId uit afsprakenOpvragen" },
+          zoekterm: { type: "string", description: "Alleen voor disambiguatie als eventId nog niet bekend is" },
         },
-        required: ["zoekterm"],
+        required: ["eventId"],
       },
     },
   },
@@ -299,11 +300,12 @@ BELANGRIJK — Professioneel Template Protocol:
     type: "function" as const,
     function: {
       name: "afspraakBewerken",
-      description: "Bewerk een bestaande persoonlijke afspraak. Wijzig titel, datum, tijd, locatie of beschrijving. De wijziging wordt automatisch gesynchroniseerd naar Google Calendar. Gebruik dit als de gebruiker een afspraak wil verzetten, verplaatsen, of details wil aanpassen.",
+      description: "Bewerk een bestaande persoonlijke afspraak. Gebruik eerst afsprakenOpvragen om de exacte eventId te vinden. Wijzigingen worden gesynchroniseerd naar Google Calendar en vragen server-side bevestiging.",
       parameters: {
         type: "object",
         properties: {
-          zoekterm: { type: "string", description: "Deel van de titel om de afspraak te vinden (bijv. 'koffie')" },
+          eventId: { type: "string", description: "Exacte eventId uit afsprakenOpvragen" },
+          zoekterm: { type: "string", description: "Alleen voor disambiguatie als eventId nog niet bekend is" },
           titel: { type: "string", description: "Nieuwe titel (optioneel, alleen als deze wijzigt)" },
           startDatum: { type: "string", description: "Nieuwe startdatum YYYY-MM-DD (optioneel)" },
           eindDatum: { type: "string", description: "Nieuwe einddatum YYYY-MM-DD (optioneel)" },
@@ -313,7 +315,7 @@ BELANGRIJK — Professioneel Template Protocol:
           locatie: { type: "string", description: "Nieuwe locatie (optioneel)" },
           beschrijving: { type: "string", description: "Nieuwe beschrijving (optioneel)" },
         },
-        required: ["zoekterm"],
+        required: ["eventId"],
       },
     },
   },
@@ -380,14 +382,15 @@ BELANGRIJK — Professioneel Template Protocol:
     type: "function" as const,
     function: {
       name: "categorieWijzigen",
-      description: "Wijzig de categorie van een enkele transactie. Zoek de transactie op basis van tegenpartij of omschrijving en ken een nieuwe categorie toe. Gebruik dit als de gebruiker een specifieke transactie wil herindelen.",
+      description: "Wijzig de categorie van een enkele transactie. Gebruik eerst transactiesZoeken om de exacte transactieId te vinden. Deze tool vraagt server-side bevestiging voordat er iets gebeurt.",
       parameters: {
         type: "object",
         properties: {
-          zoekterm: { type: "string", description: "Zoekterm om de transactie te vinden (tegenpartij of omschrijving)" },
+          transactieId: { type: "string", description: "Exacte id uit transactiesZoeken" },
+          zoekterm: { type: "string", description: "Alleen voor disambiguatie als transactieId nog niet bekend is" },
           categorie: { type: "string", description: "Nieuwe categorie", enum: ["Boodschappen", "Brandstof", "Coffeeshop", "Crypto", "Familie", "Fastfood", "Gaming", "Geldopname", "Interne Overboeking", "Online Winkelen", "Persoonlijk", "SaaS", "SaaS Abonnementen", "Salaris", "Sport", "Streaming", "Telecom", "Toeslagen", "Vakantie", "Vaste Lasten", "Vervoer", "Verzekeringen", "Vrienden", "Vrije Tijd", "Zakelijk", "Zorgverzekering"] },
         },
-        required: ["zoekterm", "categorie"],
+        required: ["transactieId", "categorie"],
       },
     },
   },

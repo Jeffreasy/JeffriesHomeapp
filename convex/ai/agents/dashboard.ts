@@ -31,20 +31,17 @@ export const dashboardAgent: AgentDefinition = {
   ],
   tools: [
     {
-      naam: "ai.router.getBriefing", type: "query",
+      naam: "GET /ai/briefing", type: "query",
       beschrijving: "Volledige daily briefing ophalen",
       endpoint: "GET /ai/briefing",
-      parameters: [
-        { naam: "userId", type: "string", beschrijving: "Gebruiker ID", verplicht: true },
-      ],
+      parameters: [],
     },
     {
-      naam: "ai.router.getAgentContext", type: "query",
+      naam: "GET /ai/agent/:id", type: "query",
       beschrijving: "Context ophalen van een specifieke sub-agent",
       endpoint: "GET /ai/agent/:id",
       parameters: [
         { naam: "agentId", type: "string", beschrijving: "Agent ID", verplicht: true, enum: ["lampen", "rooster", "finance", "email", "automations", "notes", "habits"] },
-        { naam: "userId", type: "string", beschrijving: "Gebruiker ID", verplicht: true },
       ],
     },
   ],
@@ -82,7 +79,7 @@ export const dashboardAgent: AgentDefinition = {
       habits,
 
       instructie: "Dit is een compact overzicht van alle domeinen. " +
-                  "Gebruik getAgentContext met het specifieke agentId voor gedetailleerde informatie.",
+                  "Gebruik de beveiligde /ai/agent route met het specifieke agentId voor gedetailleerde informatie.",
     };
   },
 };
