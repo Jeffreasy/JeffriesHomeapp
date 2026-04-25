@@ -74,6 +74,15 @@ const TOOL_POLICIES: Record<string, ToolPolicy> = {
   habitNotitie:    { agents: ["habits"], mutates: true, requiresConfirmation: false },
 };
 
+export function listToolPolicies() {
+  return Object.entries(TOOL_POLICIES).map(([toolName, policy]) => ({
+    toolName,
+    agents: policy.agents,
+    mutates: policy.mutates,
+    requiresConfirmation: policy.requiresConfirmation,
+  }));
+}
+
 function toolPolicy(toolName: string): ToolPolicy | undefined {
   return TOOL_POLICIES[toolName];
 }

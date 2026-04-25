@@ -54,6 +54,11 @@ export async function setWebhook(url: string, secret: string): Promise<unknown> 
   });
 }
 
+/** Haal webhook status op. */
+export async function getWebhookInfo(): Promise<unknown> {
+  return tgFetch("getWebhookInfo", {});
+}
+
 /** Verwijder webhook. */
 export async function deleteWebhook(): Promise<unknown> {
   return tgFetch("deleteWebhook", { drop_pending_updates: true });

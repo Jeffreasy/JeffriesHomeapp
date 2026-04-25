@@ -45,6 +45,38 @@ if (!BRIDGE_SECRET) {
 
 const convex = new ConvexHttpClient(CONVEX_URL);
 let isPolling = false;
+const bridgeId = process.env.HOMEAPP_BRIDGE_ID || "default";
+const bridgeVersion = "1.1.0";
+const stats = {
+  commandsSeen: 0,
+  commandsDone: 0,
+  commandsFailed: 0,
+  lastPollAt: undefined,
+  lastSuccessAt: undefined,
+  lastErrorAt: undefined,
+  lastError: undefined,
+};
+
+async function heartbeat(status = "online") {
+  try {
+    await convex.mutation(api.bridgeHealth.heartbeat, {
+      bridgeSecret: BRIDGE_SECRET,
+      bridgeId,
+      status,
+      apiBase: API_BASE,
+      version: bridgeVersion,
+      lastPollAt: stats.lastPollAt,
+      lastSuccessAt: stats.lastSuccessAt,
+      lastErrorAt: stats.lastErrorAt,
+      lastError: stats.lastError,
+      commandsSeen: stats.commandsSeen,
+      commandsDone: stats.commandsDone,
+      commandsFailed: stats.commandsFailed,
+    });
+  } catch (err) {
+    console.error(`⚠️ Heartbeat mislukt: ${err.message}`);
+  }
+}
 
 // ─── Local WiZ API helpers ───────────────────────────────────────────────────
 
@@ -91,9 +123,11 @@ async function pollAndExecute() {
     const pending = await convex.query(api.deviceCommands.listPending, {
       bridgeSecret: BRIDGE_SECRET,
     });
+    stats.lastPollAt = new Date().toISOString();
     if (!pending || pending.length === 0) return;
 
     console.log(`⚡ ${pending.length} pending command(s)`);
+    stats.commandsSeen += pending.length;
     const devices = await getDevices();
 
     for (const cmd of pending) {
@@ -111,15 +145,25 @@ async function pollAndExecute() {
         await convex.mutation(api.deviceCommands.markDone, {
           id: cmd._id, status: "done", bridgeSecret: BRIDGE_SECRET,
         });
+        stats.commandsDone += 1;
+        stats.lastSuccessAt = new Date().toISOString();
+        stats.lastError = undefined;
       } catch (err) {
         console.error(`  ❌ ${err.message}`);
         await convex.mutation(api.deviceCommands.markDone, {
           id: cmd._id, status: "failed", error: err.message, bridgeSecret: BRIDGE_SECRET,
         });
+        stats.commandsFailed += 1;
+        stats.lastErrorAt = new Date().toISOString();
+        stats.lastError = err.message;
       }
     }
+    await heartbeat(stats.lastError ? "warning" : "online");
   } catch (err) {
     console.error(`⚠️ ${err.message}`);
+    stats.lastErrorAt = new Date().toISOString();
+    stats.lastError = err.message;
+    await heartbeat("error");
   } finally {
     isPolling = false;
   }
@@ -130,7 +174,10 @@ console.log(`   Convex: ${CONVEX_URL}`);
 console.log(`   WiZ API: ${API_BASE}`);
 console.log(`   API Key: ${API_KEY ? "✅ geladen" : "❌ ONTBREEKT"}`);
 console.log(`   Bridge Secret: ${BRIDGE_SECRET ? "✅ geladen" : "❌ ONTBREEKT"}`);
+console.log(`   Bridge ID: ${bridgeId}`);
 console.log(`   Poll: ${POLL_INTERVAL}ms\n`);
 
 setInterval(pollAndExecute, POLL_INTERVAL);
+setInterval(() => heartbeat(stats.lastError ? "warning" : "online"), 30_000);
+heartbeat("online");
 pollAndExecute();

@@ -11,6 +11,7 @@
 
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 
 const commandShape = {
   on:               v.optional(v.boolean()),
@@ -28,6 +29,24 @@ function requireBridgeSecret(provided: string) {
   if (provided !== expected) throw new Error("Unauthorized");
 }
 
+async function auditCommand(
+  ctx: MutationCtx,
+  args: { userId?: string; actor: string; action: string; entityId?: string; status: string; summary: string; metadata?: string },
+) {
+  await ctx.db.insert("auditLogs", {
+    userId: args.userId,
+    actor: args.actor,
+    source: "deviceCommands",
+    action: args.action,
+    entity: "deviceCommands",
+    entityId: args.entityId,
+    status: args.status,
+    summary: args.summary,
+    metadata: args.metadata,
+    createdAt: new Date().toISOString(),
+  });
+}
+
 /** Zet een nieuw commando in de queue vanuit trusted Convex code. */
 export const queueCommand = internalMutation({
   args: {
@@ -37,7 +56,7 @@ export const queueCommand = internalMutation({
     bron:     v.string(),                // "telegram", "grok", "automation"
   },
   handler: async (ctx, args) => {
-    return ctx.db.insert("deviceCommands", {
+    const id = await ctx.db.insert("deviceCommands", {
       userId:    args.userId,
       deviceId:  args.deviceId,
       command:   args.command,
@@ -45,6 +64,16 @@ export const queueCommand = internalMutation({
       bron:      args.bron,
       createdAt: new Date().toISOString(),
     });
+    await auditCommand(ctx, {
+      userId: args.userId,
+      actor: args.bron,
+      action: "queue",
+      entityId: id,
+      status: "pending",
+      summary: `Lampcommando in wachtrij (${args.bron})`,
+      metadata: JSON.stringify({ deviceId: args.deviceId ?? "all" }),
+    });
+    return id;
   },
 });
 
@@ -57,7 +86,7 @@ export const queueForUser = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Niet ingelogd");
-    return ctx.db.insert("deviceCommands", {
+    const id = await ctx.db.insert("deviceCommands", {
       userId:    identity.subject,
       deviceId:  args.deviceId,
       command:   args.command,
@@ -65,6 +94,16 @@ export const queueForUser = mutation({
       bron:      "web-ui",
       createdAt: new Date().toISOString(),
     });
+    await auditCommand(ctx, {
+      userId: identity.subject,
+      actor: "user",
+      action: "queue",
+      entityId: id,
+      status: "pending",
+      summary: "Lampcommando via web UI",
+      metadata: JSON.stringify({ deviceId: args.deviceId ?? "all" }),
+    });
+    return id;
   },
 });
 
@@ -90,10 +129,20 @@ export const markDone = mutation({
   },
   handler: async (ctx, { id, status, error, bridgeSecret }) => {
     requireBridgeSecret(bridgeSecret);
+    const command = await ctx.db.get(id);
     await ctx.db.patch(id, {
       status,
       doneAt: new Date().toISOString(),
       error,
+    });
+    await auditCommand(ctx, {
+      userId: command?.userId,
+      actor: "bridge",
+      action: "markDone",
+      entityId: id,
+      status,
+      summary: status === "done" ? "Lampcommando uitgevoerd" : "Lampcommando mislukt",
+      metadata: error ? JSON.stringify({ error: error.slice(0, 300) }) : undefined,
     });
   },
 });

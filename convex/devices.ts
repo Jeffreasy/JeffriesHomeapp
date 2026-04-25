@@ -42,6 +42,20 @@ async function assertUniqueIp(ctx: AuthCtx, userId: string, ipAddress: string, c
   }
 }
 
+async function auditDevice(ctx: MutationCtx, userId: string, action: string, entityId: string | undefined, summary: string) {
+  await ctx.db.insert("auditLogs", {
+    userId,
+    actor: "user",
+    source: "settings.devices",
+    action,
+    entity: "devices",
+    entityId,
+    status: "success",
+    summary,
+    createdAt: new Date().toISOString(),
+  });
+}
+
 // ─── List all devices for a user (internal/legacy — takes explicit userId) ────
 export const list = internalQuery({
   args: { userId: v.string() },
@@ -99,7 +113,7 @@ export const create = mutation({
     await validateRoom(ctx, userId, args.roomId);
     await assertUniqueIp(ctx, userId, args.ipAddress);
 
-    return ctx.db.insert("devices", {
+    const id = await ctx.db.insert("devices", {
       userId,
       name:           args.name,
       ipAddress:      args.ipAddress,
@@ -111,6 +125,8 @@ export const create = mutation({
       currentState:   args.currentState ?? DEFAULT_STATE,
       commissionedAt: new Date().toISOString(),
     });
+    await auditDevice(ctx, userId, "create", id, `Device '${args.name}' toegevoegd`);
+    return id;
   },
 });
 
@@ -163,6 +179,7 @@ export const update = mutation({
     if (patch.roomId !== undefined)    updates.roomId    = patch.roomId ?? undefined;
     if (patch.ipAddress !== undefined) updates.ipAddress = patch.ipAddress;
     await ctx.db.patch(id, updates);
+    await auditDevice(ctx, userId, "update", id, `Device '${patch.name ?? id}' bijgewerkt`);
   },
 });
 
@@ -191,8 +208,9 @@ export const remove = mutation({
   args: { id: v.id("devices") },
   handler: async (ctx, { id }) => {
     const userId = await requireCurrentUserId(ctx);
-    await requireOwnedDevice(ctx, id, userId);
+    const device = await requireOwnedDevice(ctx, id, userId);
     await ctx.db.delete(id);
+    await auditDevice(ctx, userId, "delete", id, `Device '${device.name}' verwijderd`);
   },
 });
 

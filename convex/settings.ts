@@ -30,6 +30,11 @@ export const getOverview = query({
       notes,
       habits,
       transactions,
+      pendingActions,
+      syncStatuses,
+      bridgeRows,
+      auditRows,
+      privacySettings,
     ] = await Promise.all([
       ctx.db.query("devices").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("rooms").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
@@ -47,9 +52,23 @@ export const getOverview = query({
       ctx.db.query("notes").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("habits").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("transactions").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db
+        .query("aiPendingActions")
+        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "pending"))
+        .collect(),
+      ctx.db.query("syncStatus").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("bridgeHealth").withIndex("by_updated").collect(),
+      ctx.db.query("auditLogs").withIndex("by_user_created", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("privacySettings").withIndex("by_user", (q) => q.eq("userId", userId)).first(),
     ]);
 
     const latestScheduleMeta = scheduleMeta.sort((a, b) => b.importedAt.localeCompare(a.importedAt))[0] ?? null;
+    const latestBridge = bridgeRows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+    const recentAudit = auditRows.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8);
+    const now = new Date();
+    const bridgeAgeMs = latestBridge ? now.getTime() - new Date(latestBridge.lastSeenAt).getTime() : null;
+    const bridgeOnline = typeof bridgeAgeMs === "number" && bridgeAgeMs < 45_000;
+    const pendingNotExpired = pendingActions.filter((action) => action.expiresAt > now.toISOString());
 
     return {
       account: {
@@ -76,6 +95,33 @@ export const getOverview = query({
         pending: commands.filter((command) => command.status === "pending").length,
         failed: commands.filter((command) => command.status === "failed").length,
       },
+      bridge: latestBridge ? {
+        bridgeId: latestBridge.bridgeId,
+        status: bridgeOnline ? latestBridge.status : "offline",
+        online: bridgeOnline,
+        lastSeenAt: latestBridge.lastSeenAt,
+        lastPollAt: latestBridge.lastPollAt ?? null,
+        lastSuccessAt: latestBridge.lastSuccessAt ?? null,
+        lastErrorAt: latestBridge.lastErrorAt ?? null,
+        lastError: latestBridge.lastError ?? null,
+        commandsSeen: latestBridge.commandsSeen,
+        commandsDone: latestBridge.commandsDone,
+        commandsFailed: latestBridge.commandsFailed,
+        version: latestBridge.version ?? null,
+      } : null,
+      confirmations: {
+        pending: pendingNotExpired.length,
+        expired: pendingActions.length - pendingNotExpired.length,
+      },
+      sync: Object.fromEntries(syncStatuses.map((status) => [status.source, {
+        status: status.status,
+        startedAt: status.startedAt ?? null,
+        finishedAt: status.finishedAt ?? null,
+        lastSuccessAt: status.lastSuccessAt ?? null,
+        lastErrorAt: status.lastErrorAt ?? null,
+        lastError: status.lastError ?? null,
+        result: status.result ?? null,
+      }])),
       schedule: {
         total: schedule.length,
         upcoming: schedule.filter((item) => item.status === "Opkomend" || item.status === "Bezig").length,
@@ -97,6 +143,31 @@ export const getOverview = query({
         habits: habits.length,
         activeHabits: habits.filter((habit) => habit.isActief).length,
         transactions: transactions.length,
+      },
+      privacy: privacySettings ? {
+        finance: privacySettings.finance,
+        habits: privacySettings.habits,
+        notes: privacySettings.notes,
+        email: privacySettings.email,
+        account: privacySettings.account,
+      } : {
+        finance: true,
+        habits: true,
+        notes: true,
+        email: true,
+        account: true,
+      },
+      audit: {
+        recent: recentAudit.map((row) => ({
+          _id: row._id,
+          actor: row.actor,
+          source: row.source,
+          action: row.action,
+          entity: row.entity,
+          status: row.status,
+          summary: row.summary,
+          createdAt: row.createdAt,
+        })),
       },
       integrations: {
         convex: true,

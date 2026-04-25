@@ -148,6 +148,40 @@ export const syncPersonalNow = action({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Niet ingelogd");
     if (userId && userId !== identity.subject) throw new Error("Unauthorized");
-    return ctx.runAction(internal.actions.syncPersonalEvents.syncFromCalendar, { userId: identity.subject });
+    const owner = identity.subject;
+    await ctx.runMutation(internal.syncStatus.markRunning, { userId: owner, source: "personal" });
+    try {
+      const result = await ctx.runAction(internal.actions.syncPersonalEvents.syncFromCalendar, { userId: owner });
+      await ctx.runMutation(internal.syncStatus.markSuccess, {
+        userId: owner,
+        source: "personal",
+        result: JSON.stringify(result),
+      });
+      await ctx.runMutation(internal.auditLogs.recordInternal, {
+        userId: owner,
+        actor: "user",
+        source: "settings.sync",
+        action: "sync",
+        entity: "personalEvents",
+        status: "success",
+        summary: `Persoonlijke agenda sync voltooid (${result.total} items)`,
+        metadata: JSON.stringify(result),
+      });
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await ctx.runMutation(internal.syncStatus.markFailed, { userId: owner, source: "personal", error: message });
+      await ctx.runMutation(internal.auditLogs.recordInternal, {
+        userId: owner,
+        actor: "user",
+        source: "settings.sync",
+        action: "sync",
+        entity: "personalEvents",
+        status: "failed",
+        summary: "Persoonlijke agenda sync mislukt",
+        metadata: JSON.stringify({ error: message }),
+      });
+      throw err;
+    }
   },
 });

@@ -17,6 +17,20 @@ async function requireOwnedRoom(ctx: AuthCtx, id: Id<"rooms">, userId: string) {
   return room;
 }
 
+async function auditRoom(ctx: MutationCtx, userId: string, action: string, entityId: string | undefined, summary: string) {
+  await ctx.db.insert("auditLogs", {
+    userId,
+    actor: "user",
+    source: "settings.rooms",
+    action,
+    entity: "rooms",
+    entityId,
+    status: "success",
+    summary,
+    createdAt: new Date().toISOString(),
+  });
+}
+
 export const listForUser = query({
   args: {},
   handler: async (ctx) => {
@@ -40,7 +54,7 @@ export const createForUser = mutation({
     const userId = await requireCurrentUserId(ctx);
     const now = new Date().toISOString();
 
-    return ctx.db.insert("rooms", {
+    const id = await ctx.db.insert("rooms", {
       userId,
       name: args.name.trim(),
       icon: args.icon ?? "room",
@@ -48,6 +62,8 @@ export const createForUser = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    await auditRoom(ctx, userId, "create", id, `Kamer '${args.name.trim()}' aangemaakt`);
+    return id;
   },
 });
 
@@ -60,7 +76,7 @@ export const updateForUser = mutation({
   },
   handler: async (ctx, { id, ...fields }) => {
     const userId = await requireCurrentUserId(ctx);
-    await requireOwnedRoom(ctx, id, userId);
+    const room = await requireOwnedRoom(ctx, id, userId);
 
     const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     if (fields.name !== undefined) patch.name = fields.name.trim();
@@ -68,6 +84,7 @@ export const updateForUser = mutation({
     if (fields.floorNumber !== undefined) patch.floorNumber = fields.floorNumber;
 
     await ctx.db.patch(id, patch);
+    await auditRoom(ctx, userId, "update", id, `Kamer '${fields.name ?? room.name}' bijgewerkt`);
   },
 });
 
@@ -75,7 +92,7 @@ export const removeForUser = mutation({
   args: { id: v.id("rooms") },
   handler: async (ctx, { id }) => {
     const userId = await requireCurrentUserId(ctx);
-    await requireOwnedRoom(ctx, id, userId);
+    const room = await requireOwnedRoom(ctx, id, userId);
     const roomId = id as string;
 
     const devices = await ctx.db
@@ -89,6 +106,7 @@ export const removeForUser = mutation({
     }
 
     await ctx.db.delete(id);
+    await auditRoom(ctx, userId, "delete", id, `Kamer '${room.name}' verwijderd`);
     return { detachedDevices: devices.length };
   },
 });

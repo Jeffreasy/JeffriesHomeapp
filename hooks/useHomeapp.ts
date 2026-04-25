@@ -21,5 +21,6 @@ export {
 export {
   useRooms,
   useCreateRoom,
+  useUpdateRoom,
   useDeleteRoom,
 } from "@/hooks/useRooms";

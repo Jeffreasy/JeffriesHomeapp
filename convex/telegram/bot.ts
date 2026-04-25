@@ -15,6 +15,7 @@ import {
   sendTyping,
   setWebhook as tgSetWebhook,
   getMe,
+  getWebhookInfo,
   getFile,
   downloadFile,
   transcribeVoice,
@@ -400,8 +401,33 @@ export const registerWebhook = action({
 
 export const status = action({
   args: {},
-  handler: async () => {
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Niet ingelogd");
     const me = await getMe() as { username: string; first_name: string; id: number };
-    return { ok: true, bot: me };
+    const webhook = await getWebhookInfo() as {
+      url?: string;
+      has_custom_certificate?: boolean;
+      pending_update_count?: number;
+      last_error_date?: number;
+      last_error_message?: string;
+      max_connections?: number;
+    };
+    const ownerChatId = process.env.TELEGRAM_OWNER_CHAT_ID;
+    return {
+      ok: true,
+      bot: me,
+      ownerConfigured: Boolean(ownerChatId),
+      ownerChatSuffix: ownerChatId ? ownerChatId.slice(-4) : null,
+      webhookSecretConfigured: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
+      webhook: {
+        configured: Boolean(webhook.url),
+        urlHost: webhook.url ? new URL(webhook.url).host : null,
+        pendingUpdateCount: webhook.pending_update_count ?? 0,
+        lastErrorDate: webhook.last_error_date ?? null,
+        lastErrorMessage: webhook.last_error_message ?? null,
+        maxConnections: webhook.max_connections ?? null,
+      },
+    };
   },
 });

@@ -59,6 +59,69 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_user",   ["userId"]),
 
+  // ─── Bridge Health (lokale command bridge heartbeat) ──────────────────────
+  bridgeHealth: defineTable({
+    bridgeId:       v.string(),
+    status:         v.string(),                  // "online" | "warning" | "error"
+    apiBase:        v.optional(v.string()),
+    version:        v.optional(v.string()),
+    lastSeenAt:     v.string(),
+    lastPollAt:     v.optional(v.string()),
+    lastSuccessAt:  v.optional(v.string()),
+    lastErrorAt:    v.optional(v.string()),
+    lastError:      v.optional(v.string()),
+    commandsSeen:   v.number(),
+    commandsDone:   v.number(),
+    commandsFailed: v.number(),
+    updatedAt:      v.string(),
+  })
+    .index("by_bridge", ["bridgeId"])
+    .index("by_updated", ["updatedAt"]),
+
+  // ─── Audit Log (gevoelige acties en systeemmutaties) ──────────────────────
+  auditLogs: defineTable({
+    userId:    v.optional(v.string()),
+    actor:     v.string(),                       // "user" | "telegram" | "grok" | "bridge" | "system"
+    source:    v.string(),                       // pagina/tool/route
+    action:    v.string(),
+    entity:    v.string(),
+    entityId:  v.optional(v.string()),
+    status:    v.string(),                       // "success" | "failed" | "pending" | "cancelled"
+    summary:   v.string(),
+    metadata:  v.optional(v.string()),           // JSON string, nooit secrets
+    createdAt: v.string(),
+  })
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_created", ["createdAt"]),
+
+  // ─── Sync Status (laatste run per databron) ────────────────────────────────
+  syncStatus: defineTable({
+    userId:        v.string(),
+    source:        v.string(),                   // "schedule" | "personal" | "gmail"
+    status:        v.string(),                   // "running" | "success" | "failed"
+    startedAt:     v.optional(v.string()),
+    finishedAt:    v.optional(v.string()),
+    lastSuccessAt: v.optional(v.string()),
+    lastErrorAt:   v.optional(v.string()),
+    lastError:     v.optional(v.string()),
+    result:        v.optional(v.string()),       // JSON summary
+    updatedAt:     v.string(),
+  })
+    .index("by_user_source", ["userId", "source"])
+    .index("by_user", ["userId"]),
+
+  // ─── Privacy Settings (centrale privacy voorkeuren) ───────────────────────
+  privacySettings: defineTable({
+    userId:     v.string(),
+    finance:    v.boolean(),
+    habits:     v.boolean(),
+    notes:      v.boolean(),
+    email:      v.boolean(),
+    account:    v.boolean(),
+    updatedAt:  v.string(),
+  })
+    .index("by_user", ["userId"]),
+
   // ─── Chat Messages (Telegram conversation memory) ──────────────────────────
   chatMessages: defineTable({
     chatId:    v.number(),                   // Telegram chat ID

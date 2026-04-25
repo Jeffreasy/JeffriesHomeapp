@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import { useAction, useQuery } from "convex/react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAction, useMutation as useConvexMutation, useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -14,10 +14,13 @@ import {
   CheckCircle2,
   Cloud,
   Database,
+  Download,
   Eye,
   EyeOff,
+  FileJson,
   Gauge,
   Home,
+  Hourglass,
   KeyRound,
   Lightbulb,
   Loader2,
@@ -25,8 +28,8 @@ import {
   Mail,
   Network,
   PlugZap,
+  RadioTower,
   RefreshCw,
-  Router,
   Server,
   Settings,
   ShieldCheck,
@@ -34,11 +37,11 @@ import {
   Smartphone,
   StickyNote,
   Target,
-  Trash2,
   TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useDevices } from "@/hooks/useDevices";
 import { useRooms, useDeleteRoom } from "@/hooks/useRooms";
 import { usePrivacy } from "@/hooks/usePrivacy";
@@ -48,11 +51,38 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { DeviceRow } from "@/components/settings/DeviceRow";
 import { AddDeviceForm } from "@/components/settings/AddDeviceForm";
 import { AddRoomForm } from "@/components/settings/AddRoomForm";
+import { RoomRow } from "@/components/settings/RoomRow";
+import { DeviceDiscoveryPanel } from "@/components/settings/DeviceDiscoveryPanel";
 import { type Room } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 type Tone = "amber" | "green" | "rose" | "sky" | "indigo" | "slate";
 type SyncTarget = "calendar" | "gmail" | "all";
+type PrivacyScope = "finance" | "habits" | "notes" | "email" | "account";
+type SyncStatusView = {
+  status: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastSuccessAt: string | null;
+  lastErrorAt: string | null;
+  lastError: string | null;
+  result: string | null;
+};
+type TelegramStatusResult = {
+  ok: boolean;
+  bot: { username: string; first_name: string; id: number };
+  ownerConfigured: boolean;
+  ownerChatSuffix: string | null;
+  webhookSecretConfigured: boolean;
+  webhook: {
+    configured: boolean;
+    urlHost: string | null;
+    pendingUpdateCount: number;
+    lastErrorDate: number | null;
+    lastErrorMessage: string | null;
+    maxConnections: number | null;
+  };
+};
 
 const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string }> = {
   amber: {
@@ -138,8 +168,21 @@ export default function SettingsPage() {
   const syncSchedule = useAction(api.actions.syncSchedule.syncNow);
   const syncPersonal = useAction(api.actions.syncPersonalEvents.syncPersonalNow);
   const syncGmail = useAction(api.actions.syncGmail.syncNow);
+  const confirmPendingAction = useAction(api.ai.grok.pendingActions.confirmForUser);
+  const telegramStatusAction = useAction(api.telegram.bot.status);
+  const cancelPendingAction = useConvexMutation(api.ai.grok.pendingActions.cancelForUser);
+  const updatePrivacySettings = useConvexMutation(api.privacySettings.updateForUser);
+  const pendingActions = useQuery(api.ai.grok.pendingActions.listForUser, { limit: 8 }) ?? [];
+  const auditLogs = useQuery(api.auditLogs.listForUser, { limit: 8 }) ?? [];
+  const grokCapabilities = useQuery(api.ai.grok.capabilities.listForUser);
+  const privacySettings = useQuery(api.privacySettings.getForUser);
 
   const [syncing, setSyncing] = useState<SyncTarget | null>(null);
+  const [pendingBusyId, setPendingBusyId] = useState<Id<"aiPendingActions"> | null>(null);
+  const [telegramStatus, setTelegramStatus] = useState<TelegramStatusResult | null>(null);
+  const [telegramChecking, setTelegramChecking] = useState(false);
+  const [backupRequested, setBackupRequested] = useState(false);
+  const backupData = useQuery(api.backup.exportForUser, backupRequested ? {} : "skip");
 
   const onlineDevices = devices.filter((device) => device.status === "online").length;
   const activeDevices = devices.filter((device) => device.current_state?.on).length;
@@ -162,6 +205,7 @@ export default function SettingsPage() {
   const accountEmail = user?.primaryEmailAddress?.emailAddress ?? overview?.account.email ?? "Clerk account";
   const convexHost = formatHost(process.env.NEXT_PUBLIC_CONVEX_URL);
   const localApiHost = formatHost(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1");
+  const syncMap = (overview?.sync ?? {}) as Record<string, SyncStatusView | undefined>;
 
   const roomRows = useMemo(() => {
     return rooms.map((room) => ({
@@ -169,6 +213,20 @@ export default function SettingsPage() {
       devices: devices.filter((device) => device.room_id === room.id),
     }));
   }, [devices, rooms]);
+
+  useEffect(() => {
+    if (!backupRequested || !backupData) return;
+    const json = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `jeffries-homeapp-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setBackupRequested(false);
+    success("Backup export klaargezet");
+  }, [backupData, backupRequested, success]);
 
   const runSync = async (target: SyncTarget, task: () => Promise<void>, doneMessage: string) => {
     setSyncing(target);
@@ -236,6 +294,52 @@ export default function SettingsPage() {
       },
       onError: (err) => toastError(err instanceof Error ? err.message : "Verwijderen mislukt"),
     });
+  };
+
+  const handleConfirmPending = async (id: Id<"aiPendingActions">) => {
+    setPendingBusyId(id);
+    try {
+      const result = await confirmPendingAction({ id }) as { summary?: string };
+      success(result.summary ?? "Actie uitgevoerd");
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Bevestigen mislukt");
+    } finally {
+      setPendingBusyId(null);
+    }
+  };
+
+  const handleCancelPending = async (id: Id<"aiPendingActions">) => {
+    setPendingBusyId(id);
+    try {
+      await cancelPendingAction({ id });
+      success("Actie geannuleerd");
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Annuleren mislukt");
+    } finally {
+      setPendingBusyId(null);
+    }
+  };
+
+  const handleTelegramCheck = async () => {
+    setTelegramChecking(true);
+    try {
+      setTelegramStatus(await telegramStatusAction({}) as TelegramStatusResult);
+      success("Telegram status bijgewerkt");
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Telegram check mislukt");
+    } finally {
+      setTelegramChecking(false);
+    }
+  };
+
+  const togglePrivacyScope = async (scope: PrivacyScope) => {
+    const current = privacySettings?.[scope] ?? true;
+    try {
+      await updatePrivacySettings({ [scope]: !current } as Partial<Record<PrivacyScope, boolean>>);
+      success("Privacy voorkeur bijgewerkt");
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "Privacy voorkeur opslaan mislukt");
+    }
   };
 
   if (overview === null) {
@@ -444,6 +548,11 @@ export default function SettingsPage() {
                 onClick={handleAllSync}
               />
             </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-3">
+              <SyncStatusRow label="Rooster" status={syncMap.schedule} />
+              <SyncStatusRow label="Persoonlijk" status={syncMap.personal} />
+              <SyncStatusRow label="Gmail" status={syncMap.gmail} />
+            </div>
           </Panel>
 
           <Panel>
@@ -461,6 +570,84 @@ export default function SettingsPage() {
                 label="Lokale bridge"
                 value={overview?.integrations.localBridge ? "Beveiligd" : "Secret ontbreekt"}
                 tone={overview?.integrations.localBridge ? "green" : "rose"}
+              />
+            </div>
+          </Panel>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <Panel>
+            <SectionHeader
+              icon={Hourglass}
+              label="AI safety"
+              title="Openstaande bevestigingen"
+              sub={`${pendingActions.length} actie(s)`}
+            />
+            <div className="mt-4 space-y-2">
+              {pendingActions.length === 0 ? (
+                <EmptyState icon={CheckCircle2} title="Geen openstaande Grok-acties" />
+              ) : (
+                pendingActions.map((action) => (
+                  <div key={action._id} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold uppercase text-amber-200">{action.code}</p>
+                        <p className="mt-1 text-sm font-semibold text-white">{action.summary}</p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {action.agentId} - {action.toolName} - verloopt {formatDateTime(action.expiresAt)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCancelPending(action._id)}
+                          disabled={pendingBusyId === action._id}
+                          className="h-9 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-slate-300 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+                        >
+                          Annuleer
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleConfirmPending(action._id)}
+                          disabled={pendingBusyId === action._id}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 text-xs font-bold text-emerald-200 transition-colors hover:bg-emerald-500/15 disabled:opacity-50"
+                        >
+                          {pendingBusyId === action._id && <Loader2 size={13} className="animate-spin" />}
+                          Uitvoeren
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Panel>
+
+          <Panel>
+            <SectionHeader
+              icon={RadioTower}
+              label="Bridge"
+              title="Lokale bridge"
+              sub={overview?.bridge?.lastSeenAt ? formatDateTime(overview.bridge.lastSeenAt) : "geen heartbeat"}
+            />
+            <div className="mt-4 space-y-3">
+              <StatusRow
+                icon={Smartphone}
+                label="Status"
+                value={overview?.bridge ? (overview.bridge.online ? overview.bridge.status : "offline") : "Geen heartbeat"}
+                tone={overview?.bridge?.online ? "green" : "rose"}
+              />
+              <StatusRow
+                icon={Activity}
+                label="Commands"
+                value={`${overview?.bridge?.commandsDone ?? 0} uitgevoerd / ${overview?.bridge?.commandsFailed ?? 0} mislukt`}
+                tone={(overview?.bridge?.commandsFailed ?? 0) > 0 ? "amber" : "slate"}
+              />
+              <StatusRow
+                icon={AlertTriangle}
+                label="Laatste fout"
+                value={overview?.bridge?.lastError ?? "Geen fout gemeld"}
+                tone={overview?.bridge?.lastError ? "rose" : "green"}
               />
             </div>
           </Panel>
@@ -495,6 +682,7 @@ export default function SettingsPage() {
                   <EmptyState icon={Lightbulb} title="Geen lampen gekoppeld" />
                 )}
                 <AddDeviceForm rooms={rooms} />
+                <DeviceDiscoveryPanel existingDevices={devices} />
               </div>
             </Panel>
           </ErrorBoundary>
@@ -514,26 +702,13 @@ export default function SettingsPage() {
                   ))
                 ) : roomRows.length > 0 ? (
                   roomRows.map(({ room, devices: roomDevices }) => (
-                    <div key={room.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-4">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
-                        <Router size={16} className="text-amber-300" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-slate-200">{room.name}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {plural(roomDevices.length, "lamp", "lampen")} - verdieping {room.floor_number}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRoom(room)}
-                        disabled={deletingRoom}
-                        aria-label={`Kamer ${room.name} verwijderen`}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-500 transition-colors hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
-                      >
-                        {deletingRoom ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                      </button>
-                    </div>
+                    <RoomRow
+                      key={room.id}
+                      room={room}
+                      devices={roomDevices}
+                      deleting={deletingRoom}
+                      onDelete={handleDeleteRoom}
+                    />
                   ))
                 ) : (
                   <EmptyState icon={Home} title="Nog geen kamers" />
@@ -555,6 +730,51 @@ export default function SettingsPage() {
               <IntegrationRow icon={Cloud} label="Google OAuth" ok={overview?.integrations.googleOAuth} />
               <IntegrationRow icon={Activity} label="Todoist" ok={overview?.integrations.todoist} />
             </div>
+            <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white">Telegram beheer</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {telegramStatus
+                      ? `@${telegramStatus.bot.username} - webhook ${telegramStatus.webhook.configured ? "actief" : "uit"}`
+                      : "Bot en webhook live controleren"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleTelegramCheck}
+                  disabled={telegramChecking}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 text-sm font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 disabled:opacity-50"
+                >
+                  {telegramChecking ? <Loader2 size={15} className="animate-spin" /> : <RadioTower size={15} />}
+                  Check
+                </button>
+              </div>
+              {telegramStatus && (
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <MiniInfo label="Owner" value={telegramStatus.ownerConfigured ? `*${telegramStatus.ownerChatSuffix}` : "Ontbreekt"} />
+                  <MiniInfo label="Webhook host" value={telegramStatus.webhook.urlHost ?? "Geen webhook"} />
+                  <MiniInfo label="Pending updates" value={String(telegramStatus.webhook.pendingUpdateCount)} />
+                </div>
+              )}
+            </div>
+            {grokCapabilities && (
+              <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-sm font-bold text-white">Grok capabilities</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {grokCapabilities.agents.map((agent) => (
+                    <div key={agent.id} className="rounded-lg border border-white/10 bg-black/10 px-3 py-3">
+                      <p className="truncate text-sm font-semibold text-slate-200">
+                        {agent.emoji} {agent.naam}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {agent.tools} tools - {agent.mutatingTools} mutaties - {agent.confirmationTools} met bevestiging
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </Panel>
 
           <Panel>
@@ -563,6 +783,68 @@ export default function SettingsPage() {
               {routeTiles.map((tile) => (
                 <RouteTile key={tile.href} {...tile} />
               ))}
+            </div>
+          </Panel>
+        </section>
+
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <Panel>
+            <SectionHeader icon={ShieldCheck} label="Privacy" title="Privacy center" sub="centrale voorkeuren" />
+            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {(["finance", "habits", "notes", "email", "account"] as const satisfies readonly PrivacyScope[]).map((scope) => (
+                <button
+                  key={scope}
+                  type="button"
+                  onClick={() => togglePrivacyScope(scope)}
+                  className={cn(
+                    "rounded-lg border px-3 py-3 text-left transition-colors",
+                    privacySettings?.[scope] ?? true
+                      ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-100"
+                      : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
+                  )}
+                >
+                  <span className="block text-xs font-bold uppercase">{scope}</span>
+                  <span className="mt-1 block text-sm font-semibold">
+                    {(privacySettings?.[scope] ?? true) ? "Maskeren" : "Zichtbaar"}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+              <p className="text-sm font-bold text-white">Backup/export</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Exporteert je eigen Convex-data als JSON: kamers, lampen, automations, rooster, notities, habits en finance.
+              </p>
+              <button
+                type="button"
+                onClick={() => setBackupRequested(true)}
+                disabled={backupRequested}
+                className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50"
+              >
+                {backupRequested ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                JSON export
+              </button>
+            </div>
+          </Panel>
+
+          <Panel>
+            <SectionHeader icon={FileJson} label="Audit" title="Laatste acties" sub={`${auditLogs.length} zichtbaar`} />
+            <div className="mt-4 space-y-2">
+              {auditLogs.length === 0 ? (
+                <EmptyState icon={FileJson} title="Nog geen auditregels" />
+              ) : (
+                auditLogs.map((log) => (
+                  <div key={log._id} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate text-sm font-semibold text-slate-200">{log.summary}</p>
+                      <StatusPill ok={log.status === "success" || log.status === "confirmed"} label={log.status} />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {log.actor} - {log.action} - {formatDateTime(log.createdAt)}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </Panel>
         </section>
@@ -710,6 +992,51 @@ function StatusRow({
   );
 }
 
+function syncTone(status?: SyncStatusView): Tone {
+  if (!status) return "slate";
+  if (status.status === "failed") return "rose";
+  if (status.status === "running") return "amber";
+  return "green";
+}
+
+function syncTimestamp(status?: SyncStatusView) {
+  if (!status) return "Nog geen run";
+  return status.status === "failed"
+    ? formatDateTime(status.lastErrorAt ?? status.finishedAt)
+    : formatDateTime(status.lastSuccessAt ?? status.finishedAt ?? status.startedAt);
+}
+
+function SyncStatusRow({ label, status }: { label: string; status?: SyncStatusView }) {
+  const tone = syncTone(status);
+  const classes = toneClasses[tone];
+  const value = status?.status === "running"
+    ? "Bezig"
+    : status?.status === "failed"
+      ? "Mislukt"
+      : status?.status === "success"
+        ? "Succes"
+        : "Geen run";
+
+  return (
+    <div className="flex min-h-20 items-center gap-3 rounded-lg border border-white/10 bg-white/[0.025] px-3 py-3">
+      <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
+        {status?.status === "running" ? (
+          <Loader2 size={14} className={cn("animate-spin", classes.icon)} />
+        ) : (
+          <Activity size={14} className={classes.icon} />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <p className="truncate text-sm font-semibold text-slate-200">{label}</p>
+          <span className={cn("text-xs font-bold", classes.text)}>{value}</span>
+        </div>
+        <p className="mt-1 truncate text-xs text-slate-500">{status?.lastError ?? syncTimestamp(status)}</p>
+      </div>
+    </div>
+  );
+}
+
 function SyncButton({
   icon: Icon,
   title,
@@ -740,6 +1067,15 @@ function SyncButton({
         <span className="mt-1 block text-xs leading-5 text-slate-500">{meta}</span>
       </span>
     </button>
+  );
+}
+
+function MiniInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 px-3 py-2">
+      <p className="truncate text-xs font-medium text-slate-500">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-slate-200">{value}</p>
+    </div>
   );
 }
 
