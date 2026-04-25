@@ -1,38 +1,34 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
-import { Home, Settings, Zap, LogIn, Calendar, CalendarClock, Landmark, Lightbulb, StickyNote, Target } from "lucide-react";
+import { Home, LogIn } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import {
+  NAVIGATION_ITEMS,
+  NAVIGATION_SECTIONS,
+  isNavigationItemActive,
+} from "@/components/layout/navigation";
 
-const navItems = [
-  { href: "/",             icon: Home,       label: "Dashboard"    },
-  { href: "/lampen",      icon: Lightbulb,  label: "Lampen"       },
-  { href: "/rooster",     icon: Calendar,   label: "Rooster"      },
-  { href: "/agenda",      icon: CalendarClock, label: "Agenda"    },
-  { href: "/finance",     icon: Landmark,   label: "Finance"      },
-  { href: "/notities",   icon: StickyNote, label: "Notities"     },
-  { href: "/habits",      icon: Target,     label: "Habits"       },
-  { href: "/automations", icon: Zap,        label: "Automatisch"  },
-  { href: "/settings",    icon: Settings,   label: "Instellingen" },
-];
-
-/** Only render Clerk UserButton on desktop to prevent portal from leaking on mobile */
+/** Only render Clerk UserButton on desktop to prevent portal leakage on mobile. */
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(false);
+
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
-    const h = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    const handleChange = (event: MediaQueryListEvent) => setIsDesktop(event.matches);
     const initial = window.setTimeout(() => setIsDesktop(mq.matches), 0);
-    mq.addEventListener("change", h);
+
+    mq.addEventListener("change", handleChange);
     return () => {
       window.clearTimeout(initial);
-      mq.removeEventListener("change", h);
+      mq.removeEventListener("change", handleChange);
     };
   }, []);
+
   return isDesktop;
 }
 
@@ -42,90 +38,127 @@ export function Sidebar() {
   const isDesktop = useIsDesktop();
   const [mounted, setMounted] = useState(false);
 
-  // Wait for mount so isDesktop resolves correctly before rendering Clerk
   useEffect(() => {
     const initial = window.setTimeout(() => setMounted(true), 0);
     return () => window.clearTimeout(initial);
   }, []);
 
-  // On mobile: don't render at all (CSS hidden is insufficient for Clerk portals)
   if (!mounted || !isDesktop) return null;
 
   return (
-    <aside className="hidden md:flex fixed left-0 top-0 h-full w-56 flex-col glass border-r border-white/5 z-40 isolate overflow-hidden">
-      {/* Logo */}
-      <div className="px-4 py-5 border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
-            <Home size={16} className="text-amber-400" />
-          </div>
-          <span className="hidden md:block text-sm font-bold text-white tracking-tight">Homeapp</span>
+    <aside className="fixed left-0 top-0 z-40 hidden h-full w-64 flex-col overflow-hidden border-r border-white/10 bg-[#080a0f]/95 backdrop-blur-xl md:flex">
+      <Link
+        href="/"
+        className="group flex items-center gap-3 border-b border-white/[0.08] px-4 py-5 transition-colors hover:bg-white/[0.03]"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/[0.12] text-amber-300 transition-colors group-hover:bg-amber-500/[0.18]">
+          <Home size={18} />
         </div>
-      </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-white">Jeffries Homeapp</p>
+          <p className="mt-0.5 truncate text-xs font-medium text-slate-500">Prive cockpit</p>
+        </div>
+      </Link>
 
-      {/* Nav items */}
-      <nav className="flex-1 px-2 py-4 space-y-1">
-        {navItems.map(({ href, icon: Icon, label }) => {
-          const active = pathname === href;
-          return (
-            <Link key={href} href={href}>
-              <motion.div
-                whileTap={{ scale: 0.96 }}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150",
-                  active
-                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/20"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                )}
-              >
-                <Icon size={17} className="shrink-0" />
-                <span className="hidden md:block font-medium">{label}</span>
-              </motion.div>
-            </Link>
-          );
-        })}
+      <nav aria-label="Hoofdnavigatie" className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="space-y-5">
+          {NAVIGATION_SECTIONS.map((section) => {
+            const items = NAVIGATION_ITEMS.filter((item) => item.section === section.id);
+
+            return (
+              <section key={section.id} aria-labelledby={`nav-section-${section.id}`}>
+                <h2
+                  id={`nav-section-${section.id}`}
+                  className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-600"
+                >
+                  {section.label}
+                </h2>
+
+                <div className="space-y-1">
+                  {items.map(({ href, icon: Icon, label, description }) => {
+                    const active = isNavigationItemActive(pathname, href);
+
+                    return (
+                      <Link key={href} href={href} aria-current={active ? "page" : undefined}>
+                        <motion.div
+                          whileTap={{ scale: 0.98 }}
+                          className={cn(
+                            "relative flex min-h-12 items-center gap-3 overflow-hidden rounded-lg border px-3 py-2.5 transition-colors",
+                            active
+                              ? "border-amber-500/25 text-amber-100"
+                              : "border-transparent text-slate-400 hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-slate-100",
+                          )}
+                        >
+                          {active && (
+                            <motion.span
+                              layoutId="sidebar-active"
+                              className="absolute inset-0 rounded-lg bg-amber-500/[0.12]"
+                              transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                            />
+                          )}
+                          <span
+                            className={cn(
+                              "relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors",
+                              active
+                                ? "border-amber-500/25 bg-amber-500/15 text-amber-300"
+                                : "border-white/[0.08] bg-white/[0.03] text-slate-500",
+                            )}
+                          >
+                            <Icon size={17} />
+                          </span>
+                          <span className="relative z-10 min-w-0">
+                            <span className="block truncate text-sm font-semibold">{label}</span>
+                            <span className={cn("mt-0.5 block truncate text-[11px]", active ? "text-amber-100/[0.55]" : "text-slate-600")}>
+                              {description}
+                            </span>
+                          </span>
+                        </motion.div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </nav>
 
-      {/* User account */}
-      <div className="px-3 py-3 border-t border-white/5">
+      <div className="border-t border-white/[0.08] px-3 py-3">
         {!isLoaded ? (
-          /* Loading skeleton */
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse shrink-0" />
-            <div className="hidden md:flex flex-col gap-1.5 flex-1">
-              <div className="h-2.5 w-20 bg-white/5 rounded animate-pulse" />
-              <div className="h-2 w-28 bg-white/5 rounded animate-pulse" />
+          <div className="flex items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+            <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-white/[0.06]" />
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <div className="h-2.5 w-24 animate-pulse rounded bg-white/[0.06]" />
+              <div className="h-2 w-32 animate-pulse rounded bg-white/[0.06]" />
             </div>
           </div>
         ) : isSignedIn ? (
-          <div className="flex items-center gap-3 min-w-0">
-            {isDesktop && (
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-8 h-8 shrink-0",
-                    userButtonPopoverCard: {
-                      background: "#111118",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                    },
+          <div className="flex min-w-0 items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "h-9 w-9 shrink-0",
+                  userButtonPopoverCard: {
+                    background: "#111118",
+                    border: "1px solid rgba(255,255,255,0.1)",
                   },
-                }}
-              />
-            )}
-            <div className="hidden md:flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-slate-200 truncate">
+                },
+              }}
+            />
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-xs font-semibold text-slate-200">
                 {user.firstName ?? user.username ?? "Gebruiker"}
               </span>
-              <span className="text-[10px] text-slate-500 truncate">
+              <span className="truncate text-[10px] text-slate-500">
                 {user.primaryEmailAddress?.emailAddress ?? ""}
               </span>
             </div>
           </div>
         ) : (
-          <SignInButton mode="redirect" >
-            <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition-all text-sm border border-transparent hover:border-amber-500/20">
+          <SignInButton mode="redirect">
+            <button className="flex h-11 w-full items-center gap-3 rounded-lg border border-transparent px-3 text-sm font-semibold text-slate-400 transition-colors hover:border-amber-500/20 hover:bg-amber-500/10 hover:text-amber-300">
               <LogIn size={17} className="shrink-0" />
-              <span className="hidden md:block font-medium">Inloggen</span>
+              Inloggen
             </button>
           </SignInButton>
         )}
