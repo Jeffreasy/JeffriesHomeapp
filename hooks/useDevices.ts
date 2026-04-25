@@ -3,7 +3,8 @@
 import { useQuery as useConvexQuery, useMutation as useConvexMutation } from "convex/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/convex/_generated/api";
-import { devicesApi, type Device, type DeviceCommand } from "@/lib/api";
+import { type Device, type DeviceCommand } from "@/lib/api";
+import type { Id } from "@/convex/_generated/dataModel";
 
 // ─── Map Convex camelCase → app snake_case Device interface ───────────────────
 
@@ -79,7 +80,26 @@ export function useLampCommand() {
 
 // ─── Device Update (rename, room assign) ─────────────────────────────────────
 
+export function useCreateDevice() {
+  const createDevice = useConvexMutation(api.devices.create);
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { name: string; ip_address: string; room_id?: string | null }) =>
+      createDevice({
+        name: data.name,
+        ipAddress: data.ip_address,
+        deviceType: "color_light",
+        ...(data.room_id ? { roomId: data.room_id } : {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+    },
+  });
+}
+
 export function useUpdateDevice() {
+  const updateDevice = useConvexMutation(api.devices.update);
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -89,12 +109,20 @@ export function useUpdateDevice() {
     }: {
       id: string;
       data: { name?: string; room_id?: string | null; ip_address?: string };
-    }) =>
-      devicesApi.update(id, {
-        name: data.name,
-        ip_address: data.ip_address,
-        room_id: data.room_id ?? undefined,
-      }),
+    }) => {
+      const payload: {
+        id: Id<"devices">;
+        name?: string;
+        roomId?: string | null;
+        ipAddress?: string;
+      } = {
+        id: id as Id<"devices">,
+      };
+      if (data.name !== undefined) payload.name = data.name;
+      if (data.ip_address !== undefined) payload.ipAddress = data.ip_address;
+      if (data.room_id !== undefined) payload.roomId = data.room_id;
+      return updateDevice(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["devices"] });
     },
@@ -104,10 +132,11 @@ export function useUpdateDevice() {
 // ─── Delete Device ────────────────────────────────────────────────────────────
 
 export function useDeleteDevice() {
+  const removeDevice = useConvexMutation(api.devices.remove);
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => devicesApi.delete(id),
+    mutationFn: (id: string) => removeDevice({ id: id as Id<"devices"> }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["devices"] });
     },

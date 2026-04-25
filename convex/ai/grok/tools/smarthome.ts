@@ -5,7 +5,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { api, internal } from "../../../_generated/api";
+import { internal } from "../../../_generated/api";
 import type { ActionCtx } from "../../../_generated/server";
 import type { Doc } from "../../../_generated/dataModel";
 
@@ -43,7 +43,7 @@ export async function handleLampBedien(ctx: ActionCtx, args: Record<string, unkn
   let deviceId: string | undefined;
 
   if (lampNaam) {
-    const devices = await ctx.runQuery(api.devices.list, { userId }) as Doc<"devices">[];
+    const devices = await ctx.runQuery(internal.devices.list, { userId }) as Doc<"devices">[];
     const match = devices.find((d) =>
       d.name?.toLowerCase().includes(lampNaam.toLowerCase())
     );

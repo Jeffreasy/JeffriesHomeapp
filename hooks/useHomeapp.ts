@@ -12,6 +12,7 @@
 
 export {
   useDevices,
+  useCreateDevice,
   useLampCommand,
   useUpdateDevice,
   useDeleteDevice,

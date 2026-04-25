@@ -1,11 +1,49 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 // ─── Default state helper ─────────────────────────────────────────────────────
 const DEFAULT_STATE = { on: false, brightness: 100, color_temp: 4000, r: 0, g: 0, b: 0 };
+const stateShape = {
+  on: v.boolean(), brightness: v.number(),
+  color_temp: v.number(), r: v.number(), g: v.number(), b: v.number(),
+};
+
+type AuthCtx = QueryCtx | MutationCtx;
+
+async function requireCurrentUserId(ctx: AuthCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Niet ingelogd");
+  return identity.subject;
+}
+
+async function requireOwnedDevice(ctx: AuthCtx, id: Id<"devices">, userId: string) {
+  const device = await ctx.db.get(id);
+  if (!device || device.userId !== userId) throw new Error("Device niet gevonden");
+  return device;
+}
+
+async function validateRoom(ctx: AuthCtx, userId: string, roomId: string | null | undefined) {
+  if (!roomId) return;
+  const normalized = ctx.db.normalizeId("rooms", roomId);
+  if (!normalized) throw new Error("Kamer niet gevonden");
+  const room = await ctx.db.get(normalized);
+  if (!room || room.userId !== userId) throw new Error("Kamer niet gevonden");
+}
+
+async function assertUniqueIp(ctx: AuthCtx, userId: string, ipAddress: string, currentId?: Id<"devices">) {
+  const existing = await ctx.db
+    .query("devices")
+    .withIndex("by_user_ip", (q) => q.eq("userId", userId).eq("ipAddress", ipAddress))
+    .first();
+  if (existing && existing._id !== currentId) {
+    throw new Error(`IP ${ipAddress} al in gebruik door '${existing.name}'`);
+  }
+}
 
 // ─── List all devices for a user (internal/legacy — takes explicit userId) ────
-export const list = query({
+export const list = internalQuery({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) =>
     ctx.db.query("devices").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
@@ -27,11 +65,16 @@ export const listForUser = query({
 // ─── Get single device by v.id ───────────────────────────────────────────────
 export const get = query({
   args: { id: v.id("devices") },
-  handler: async (ctx, { id }) => ctx.db.get(id),
+  handler: async (ctx, { id }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+    const device = await ctx.db.get(id);
+    return device?.userId === identity.subject ? device : null;
+  },
 });
 
 // ─── Get single device by raw string ID (for HTTP actions) ───────────────────
-export const getByStringId = query({
+export const getByStringId = internalQuery({
   args: { id: v.string() },
   handler: async (ctx, { id }) => {
     const normalId = ctx.db.normalizeId("devices", id);
@@ -43,6 +86,36 @@ export const getByStringId = query({
 // ─── Create a new device ──────────────────────────────────────────────────────
 export const create = mutation({
   args: {
+    name:         v.string(),
+    ipAddress:    v.string(),
+    deviceType:   v.optional(v.string()),
+    roomId:       v.optional(v.string()),
+    manufacturer: v.optional(v.string()),
+    model:        v.optional(v.string()),
+    currentState: v.optional(v.object(stateShape)),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
+    await validateRoom(ctx, userId, args.roomId);
+    await assertUniqueIp(ctx, userId, args.ipAddress);
+
+    return ctx.db.insert("devices", {
+      userId,
+      name:           args.name,
+      ipAddress:      args.ipAddress,
+      deviceType:     args.deviceType ?? "color_light",
+      roomId:         args.roomId,
+      manufacturer:   args.manufacturer,
+      model:          args.model,
+      status:         "online",
+      currentState:   args.currentState ?? DEFAULT_STATE,
+      commissionedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const createInternal = internalMutation({
+  args: {
     userId:       v.string(),
     name:         v.string(),
     ipAddress:    v.string(),
@@ -50,18 +123,11 @@ export const create = mutation({
     roomId:       v.optional(v.string()),
     manufacturer: v.optional(v.string()),
     model:        v.optional(v.string()),
-    currentState: v.optional(v.object({
-      on: v.boolean(), brightness: v.number(),
-      color_temp: v.number(), r: v.number(), g: v.number(), b: v.number(),
-    })),
+    currentState: v.optional(v.object(stateShape)),
   },
   handler: async (ctx, args) => {
     // Prevent duplicate IPs per user
-    const existing = await ctx.db
-      .query("devices")
-      .withIndex("by_user_ip", (q) => q.eq("userId", args.userId).eq("ipAddress", args.ipAddress))
-      .first();
-    if (existing) throw new Error(`IP ${args.ipAddress} al in gebruik door '${existing.name}'`);
+    await assertUniqueIp(ctx, args.userId, args.ipAddress);
 
     return ctx.db.insert("devices", {
       userId:         args.userId,
@@ -83,15 +149,38 @@ export const update = mutation({
   args: {
     id:        v.id("devices"),
     name:      v.optional(v.string()),
-    roomId:    v.optional(v.string()),
+    roomId:    v.optional(v.union(v.string(), v.null())),
+    ipAddress: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, ...patch }) => {
+    const userId = await requireCurrentUserId(ctx);
+    await requireOwnedDevice(ctx, id, userId);
+    if (patch.roomId !== undefined) await validateRoom(ctx, userId, patch.roomId);
+    if (patch.ipAddress !== undefined) await assertUniqueIp(ctx, userId, patch.ipAddress, id);
+
+    const updates: Record<string, unknown> = {};
+    if (patch.name !== undefined)      updates.name      = patch.name;
+    if (patch.roomId !== undefined)    updates.roomId    = patch.roomId ?? undefined;
+    if (patch.ipAddress !== undefined) updates.ipAddress = patch.ipAddress;
+    await ctx.db.patch(id, updates);
+  },
+});
+
+export const updateInternal = internalMutation({
+  args: {
+    id:        v.id("devices"),
+    name:      v.optional(v.string()),
+    roomId:    v.optional(v.union(v.string(), v.null())),
     ipAddress: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...patch }) => {
     const device = await ctx.db.get(id);
     if (!device) throw new Error("Device niet gevonden");
+    if (patch.ipAddress !== undefined) await assertUniqueIp(ctx, device.userId, patch.ipAddress, id);
+
     const updates: Record<string, unknown> = {};
     if (patch.name !== undefined)      updates.name      = patch.name;
-    if (patch.roomId !== undefined)    updates.roomId    = patch.roomId;
+    if (patch.roomId !== undefined)    updates.roomId    = patch.roomId ?? undefined;
     if (patch.ipAddress !== undefined) updates.ipAddress = patch.ipAddress;
     await ctx.db.patch(id, updates);
   },
@@ -99,6 +188,15 @@ export const update = mutation({
 
 // ─── Delete device ────────────────────────────────────────────────────────────
 export const remove = mutation({
+  args: { id: v.id("devices") },
+  handler: async (ctx, { id }) => {
+    const userId = await requireCurrentUserId(ctx);
+    await requireOwnedDevice(ctx, id, userId);
+    await ctx.db.delete(id);
+  },
+});
+
+export const removeInternal = internalMutation({
   args: { id: v.id("devices") },
   handler: async (ctx, { id }) => {
     const device = await ctx.db.get(id);

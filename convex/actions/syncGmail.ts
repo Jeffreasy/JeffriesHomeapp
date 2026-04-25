@@ -21,10 +21,34 @@ import { createOAuthClient } from "../lib/googleAuth";
 const MAX_INITIAL_SYNC = 200;
 const BATCH_SIZE       = 20; // parallel message.get calls per batch
 
+type GmailHeader = { name?: string | null; value?: string | null };
+type GmailPart = { filename?: string | null };
+type GmailMessage = {
+  id?: string | null;
+  threadId?: string | null;
+  internalDate?: string | null;
+  snippet?: string | null;
+  labelIds?: string[] | null;
+  payload?: {
+    headers?: GmailHeader[] | null;
+    parts?: GmailPart[] | null;
+  } | null;
+};
+
+type ParsedEmail = {
+  userId: string; gmailId: string; threadId: string;
+  from: string; to: string; cc?: string; bcc?: string;
+  subject: string; snippet: string; datum: string; ontvangen: number;
+  isGelezen: boolean; isSter: boolean; isVerwijderd: boolean; isDraft: boolean;
+  labelIds: string[]; categorie?: string;
+  heeftBijlagen: boolean; bijlagenCount: number;
+  searchText: string; syncedAt: string;
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getHeader(headers: { name: string; value: string }[], name: string): string {
-  return headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? "";
+function getHeader(headers: GmailHeader[], name: string): string {
+  return headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? "";
 }
 
 function categorizeLabels(labelIds: string[]): string | undefined {
@@ -36,15 +60,17 @@ function categorizeLabels(labelIds: string[]): string | undefined {
   return "primary";
 }
 
-function parseEmail(msg: any, userId: string): {
-  userId: string; gmailId: string; threadId: string;
-  from: string; to: string; cc?: string; bcc?: string;
-  subject: string; snippet: string; datum: string; ontvangen: number;
-  isGelezen: boolean; isSter: boolean; isVerwijderd: boolean; isDraft: boolean;
-  labelIds: string[]; categorie?: string;
-  heeftBijlagen: boolean; bijlagenCount: number;
-  searchText: string; syncedAt: string;
-} {
+function errorCode(err: unknown) {
+  return typeof err === "object" && err !== null && "code" in err
+    ? (err as { code?: unknown }).code
+    : undefined;
+}
+
+function errorMessage(err: unknown) {
+  return err instanceof Error ? err.message : "";
+}
+
+function parseEmail(msg: GmailMessage, userId: string): ParsedEmail {
   const headers   = msg.payload?.headers ?? [];
   const labelIds  = msg.labelIds ?? [];
   const parts     = msg.payload?.parts ?? [];
@@ -58,14 +84,14 @@ function parseEmail(msg: any, userId: string): {
   const ontvangen = parseInt(msg.internalDate ?? "0", 10);
   const datum     = new Date(ontvangen).toISOString().slice(0, 10);
 
-  const attachments = parts.filter((p: any) => p.filename && p.filename.length > 0);
+  const attachments = parts.filter((part) => Boolean(part.filename?.length));
 
   const searchText = [subject, msg.snippet ?? "", from, to].join(" ").slice(0, 500);
 
   return {
     userId,
-    gmailId:       msg.id,
-    threadId:      msg.threadId ?? msg.id,
+    gmailId:       msg.id ?? "",
+    threadId:      msg.threadId ?? msg.id ?? "",
     from, to, cc, bcc,
     subject,
     snippet:       msg.snippet ?? "",
@@ -151,9 +177,9 @@ export const syncFromGmail = internalAction({
         });
 
         return { synced: emails.length, mode: "incremental" };
-      } catch (e: any) {
+      } catch (e: unknown) {
         // Als historyId verlopen is → full sync
-        if (e.code === 404 || e.message?.includes("Start history id")) {
+        if (errorCode(e) === 404 || errorMessage(e).includes("Start history id")) {
           console.log("[Gmail Sync] History verlopen, fallback naar full sync");
         } else {
           throw e;
@@ -233,9 +259,11 @@ export const syncFromGmail = internalAction({
 // ─── Publieke action (voor frontend "Sync nu" knop) ──────────────────────────
 
 export const syncNow = action({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, { userId }): Promise<{ synced: number; mode: string; reconciled?: number }> => {
-    if (!userId) throw new Error("userId is vereist");
-    return ctx.runAction(internal.actions.syncGmail.syncFromGmail, { userId });
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Niet ingelogd");
+    if (userId && userId !== identity.subject) throw new Error("Unauthorized");
+    return ctx.runAction(internal.actions.syncGmail.syncFromGmail, { userId: identity.subject });
   },
 });

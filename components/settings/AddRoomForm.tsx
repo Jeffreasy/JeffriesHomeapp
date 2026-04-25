@@ -15,8 +15,9 @@ export function AddRoomForm() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) return;
+    const floorNumber = Number.parseInt(floor, 10);
     createRoom(
-      { name, icon: "room", floor_number: parseInt(floor) },
+      { name, icon: "room", floor_number: Number.isNaN(floorNumber) ? 0 : floorNumber },
       {
         onSuccess: () => {
           success(`Kamer '${name}' aangemaakt`);
@@ -31,7 +32,7 @@ export function AddRoomForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/15 text-slate-500 text-sm hover:border-amber-500/30 hover:text-amber-400 transition-all"
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-lg border border-dashed border-white/15 text-slate-500 text-sm hover:border-amber-500/30 hover:text-amber-400 transition-all"
       >
         <Plus size={15} />
         Kamer toevoegen
@@ -40,7 +41,7 @@ export function AddRoomForm() {
   }
 
   return (
-    <form onSubmit={submit} className="glass rounded-xl p-4 space-y-3">
+    <form onSubmit={submit} className="glass rounded-lg p-4 space-y-3">
       <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
         <Router size={14} className="text-amber-400" />
         Nieuwe kamer
@@ -78,7 +79,7 @@ export function AddRoomForm() {
         <button
           type="submit"
           disabled={isPending}
-          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-colors"
         >
           {isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
           Aanmaken
@@ -86,7 +87,7 @@ export function AddRoomForm() {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="px-4 py-2 rounded-xl bg-white/5 text-slate-400 border border-white/10 text-sm hover:bg-white/10 transition-colors"
+          className="px-4 py-2 rounded-lg bg-white/5 text-slate-400 border border-white/10 text-sm hover:bg-white/10 transition-colors"
         >
           Annuleren
         </button>

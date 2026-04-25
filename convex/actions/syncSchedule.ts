@@ -28,6 +28,15 @@ const KEYWORDS_EXCLUDE = ["vrij", "vakantie"];
 
 const NL_DAYS = ["Zondag", "Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag", "Zaterdag"];
 
+type CalendarEvent = {
+  id?: string | null;
+  summary?: string | null;
+  description?: string | null;
+  location?: string | null;
+  start?: { date?: string | null; dateTime?: string | null } | null;
+  end?: { date?: string | null; dateTime?: string | null } | null;
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function datumStr(d: Date) {
@@ -94,7 +103,7 @@ export const syncFromCalendar = internalAction({
     const end   = new Date(now); end.setDate(end.getDate() + SYNC_DAYS_FORWARD);
 
     // Haal alle events op met paginatie
-    const allEvents: any[] = [];
+    const allEvents: CalendarEvent[] = [];
     let pageToken: string | undefined;
 
     do {
@@ -123,12 +132,16 @@ export const syncFromCalendar = internalAction({
     // Zet om naar dienst-records
     const diensten = gefilterd.map((ev) => {
       const isAllDay = !!ev.start?.date && !ev.start?.dateTime;
+      const startValue = isAllDay ? ev.start?.date : ev.start?.dateTime;
+      const endValue = isAllDay ? ev.end?.date : ev.end?.dateTime;
+      if (!startValue || !endValue) return null;
+
       const startDt  = isAllDay
-        ? new Date(ev.start!.date! + "T00:00:00")
-        : new Date(ev.start!.dateTime!);
+        ? new Date(startValue + "T00:00:00")
+        : new Date(startValue);
       const eindDt   = isAllDay
-        ? new Date(ev.end!.date! + "T00:00:00")
-        : new Date(ev.end!.dateTime!);
+        ? new Date(endValue + "T00:00:00")
+        : new Date(endValue);
 
       const locatie   = ev.location ?? "";
       const shiftType = getShiftType(startDt, isAllDay);
@@ -153,7 +166,7 @@ export const syncFromCalendar = internalAction({
         beschrijving: ev.description ?? "",
         heledag:     isAllDay,
       };
-    });
+    }).filter((dienst): dienst is NonNullable<typeof dienst> => dienst !== null);
 
     // Sla op via internalMutation
     const result = await ctx.runMutation(internal.schedule.bulkUpsertFromCalendar, {
@@ -169,9 +182,11 @@ export const syncFromCalendar = internalAction({
 // ─── Publieke action (voor frontend "Sync nu" knop) ──────────────────────────
 
 export const syncNow = action({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, { userId }): Promise<{ upserted: number; deleted: number; total: number }> => {
-    if (!userId) throw new Error("userId is vereist");
-    return ctx.runAction(internal.actions.syncSchedule.syncFromCalendar, { userId });
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Niet ingelogd");
+    if (userId && userId !== identity.subject) throw new Error("Unauthorized");
+    return ctx.runAction(internal.actions.syncSchedule.syncFromCalendar, { userId: identity.subject });
   },
 });

@@ -26,6 +26,17 @@ export default defineSchema({
     .index("by_user",    ["userId"])
     .index("by_user_ip", ["userId", "ipAddress"]),
 
+  // ─── Rooms (lokale smart-home groepering) ─────────────────────────────────
+  rooms: defineTable({
+    userId:      v.string(),
+    name:        v.string(),
+    icon:        v.string(),
+    floorNumber: v.number(),
+    createdAt:   v.string(),
+    updatedAt:   v.string(),
+  })
+    .index("by_user", ["userId"]),
+
   // ─── Device Commands (queue voor Telegram/AI → lokale bridge) ──────────────
   deviceCommands: defineTable({
     userId:    v.string(),

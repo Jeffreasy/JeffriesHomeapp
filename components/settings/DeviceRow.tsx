@@ -55,7 +55,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
   };
 
   return (
-    <div className="glass rounded-xl p-4 flex items-center gap-3">
+    <div className="glass rounded-lg p-4 flex items-center gap-3">
       <div
         className={cn(
           "w-2 h-2 rounded-full flex-shrink-0",
@@ -117,7 +117,12 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
               {updating ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
             </button>
             <button
-              onClick={() => { setEditing(false); setName(device.name); }}
+              onClick={() => {
+                setEditing(false);
+                setName(device.name);
+                setRoomId(device.room_id ?? "");
+                setIp(device.ip_address ?? "");
+              }}
               aria-label="Annuleren"
               className="w-8 h-8 rounded-lg bg-white/5 text-slate-400 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
             >

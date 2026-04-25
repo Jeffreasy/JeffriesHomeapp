@@ -21,6 +21,47 @@ function json(body: unknown, status = 200) {
   });
 }
 
+type DeviceStatePatch = {
+  on?: boolean;
+  brightness?: number;
+  color_temp?: number;
+  r?: number;
+  g?: number;
+  b?: number;
+};
+
+type DeviceUpdatePatch = {
+  name?: string;
+  roomId?: string | null;
+  ipAddress?: string;
+};
+
+type DeviceCreateBody = {
+  userId: string;
+  name: string;
+  ipAddress: string;
+  deviceType: string;
+  roomId?: string;
+  manufacturer?: string;
+  model?: string;
+  currentState?: {
+    on: boolean;
+    brightness: number;
+    color_temp: number;
+    r: number;
+    g: number;
+    b: number;
+  };
+};
+
+function getErrorMessage(err: unknown, fallback = "DB fout") {
+  return err instanceof Error ? err.message : fallback;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
+}
+
 
 // ─── Python automation engine routes hieronder ────────────────────────────────
 // Called by Python automation engine to fetch active automations.
@@ -68,17 +109,17 @@ http.route({
   handler: httpAction(async (ctx, req) => {
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
 
-    let body: any;
+    let body: unknown;
     try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON" }, 400); }
 
-    const { automationId } = body;
+    const automationId = asRecord(body)?.automationId;
     if (!automationId) return json({ ok: false, error: "automationId verplicht" }, 400);
 
     try {
-      await ctx.runMutation(internal.automations.markFiredInternal, { automationId });
+      await ctx.runMutation(internal.automations.markFiredInternal, { automationId: String(automationId) });
       return json({ ok: true });
-    } catch (e: any) {
-      return json({ ok: false, error: e.message ?? "DB fout" }, 500);
+    } catch (e: unknown) {
+      return json({ ok: false, error: getErrorMessage(e) }, 500);
     }
   }),
 });
@@ -93,7 +134,7 @@ http.route({
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId");
     if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
-    const devices = await ctx.runQuery(api.devices.list, { userId });
+    const devices = await ctx.runQuery(internal.devices.list, { userId });
     return json({ ok: true, devices });
   }),
 });
@@ -105,15 +146,16 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, req) => {
     if (!checkAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
-    let body: any;
+    let body: unknown;
     try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON" }, 400); }
     try {
-      const id = await ctx.runMutation(api.devices.create, body);
-      const device = await ctx.runQuery(api.devices.get, { id });
+      const id = await ctx.runMutation(internal.devices.createInternal, body as DeviceCreateBody);
+      const device = await ctx.runQuery(internal.devices.getByStringId, { id });
       return json({ ok: true, device }, 201);
-    } catch (e: any) {
-      const status = e.message?.includes("al in gebruik") ? 409 : 500;
-      return json({ ok: false, error: e.message ?? "DB fout" }, status);
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e);
+      const status = msg.includes("al in gebruik") ? 409 : 500;
+      return json({ ok: false, error: msg }, status);
     }
   }),
 });
@@ -129,7 +171,7 @@ http.route({
     const url = new URL(req.url);
     const rawId = url.pathname.replace(/^\/devices\//, "").split("/")[0];
     if (!rawId) return json({ ok: false, error: "ID ontbreekt" }, 400);
-    const device = await ctx.runQuery(api.devices.getByStringId, { id: rawId });
+    const device = await ctx.runQuery(internal.devices.getByStringId, { id: rawId });
     if (!device) return json({ ok: false, error: "Niet gevonden" }, 404);
     return json({ ok: true, device });
   }),
@@ -152,32 +194,34 @@ http.route({
     const sub      = parts[1]; // "state" | "status" | undefined
     if (!deviceId) return json({ ok: false, error: "ID ontbreekt" }, 400);
 
-    let body: any;
+    let body: unknown;
     try { body = await req.json(); } catch { return json({ ok: false, error: "Invalid JSON" }, 400); }
 
     try {
       if (sub === "state") {
         // Update lamp state after UDP command executed by FastAPI
-        await ctx.runMutation(internal.devices.updateStateInternal, { deviceId, state: body });
+        await ctx.runMutation(internal.devices.updateStateInternal, { deviceId, state: body as DeviceStatePatch });
         return json({ ok: true });
 
       } else if (sub === "status") {
         // Set online/offline status from engine poll
-        const { status } = body;
+        const status = asRecord(body)?.status;
         if (!status) return json({ ok: false, error: "status verplicht" }, 400);
+        if (status !== "online" && status !== "offline") {
+          return json({ ok: false, error: "status ongeldig" }, 400);
+        }
         await ctx.runMutation(internal.devices.setStatusInternal, { deviceId, status });
         return json({ ok: true });
 
       } else {
         // General update: name, room, ip
-        const device = await ctx.runQuery(api.devices.getByStringId, { id: deviceId });
+        const device = await ctx.runQuery(internal.devices.getByStringId, { id: deviceId });
         if (!device) return json({ ok: false, error: "Ongeldig device ID" }, 400);
-        await ctx.runMutation(api.devices.update, { id: device._id, ...body });
+        await ctx.runMutation(internal.devices.updateInternal, { id: device._id, ...(body as DeviceUpdatePatch) });
         return json({ ok: true, device });
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "DB fout";
-      return json({ ok: false, error: msg }, 500);
+      return json({ ok: false, error: getErrorMessage(e) }, 500);
     }
   }),
 });
@@ -193,9 +237,9 @@ http.route({
     const deviceId = url.pathname.replace(/^\/devices\//, "").split("/")[0];
     if (!deviceId) return json({ ok: false, error: "ID ontbreekt" }, 400);
     try {
-      const device = await ctx.runQuery(api.devices.getByStringId, { id: deviceId });
+      const device = await ctx.runQuery(internal.devices.getByStringId, { id: deviceId });
       if (!device) return json({ ok: false, error: "Ongeldig device ID" }, 400);
-      await ctx.runMutation(api.devices.remove, { id: device._id });
+      await ctx.runMutation(internal.devices.removeInternal, { id: device._id });
       return json({ ok: true });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "DB fout";

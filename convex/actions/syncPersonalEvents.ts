@@ -22,6 +22,30 @@ const PRIMARY_CALENDAR_ID = "primary";
 const SYNC_DAYS_BACK    = 30;
 const SYNC_DAYS_FORWARD = 90;
 
+type CalendarEvent = {
+  id?: string | null;
+  summary?: string | null;
+  start?: { date?: string | null; dateTime?: string | null } | null;
+  end?: { date?: string | null; dateTime?: string | null } | null;
+  location?: string | null;
+  description?: string | null;
+};
+
+type PersonalEventUpsert = {
+  userId: string;
+  eventId: string;
+  titel: string;
+  startDatum: string;
+  startTijd?: string;
+  eindDatum: string;
+  eindTijd?: string;
+  locatie?: string;
+  beschrijving?: string;
+  heledag: boolean;
+  status: string;
+  kalender: string;
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function datumStr(d: Date) {
@@ -55,7 +79,7 @@ export const syncFromCalendar = internalAction({
     const end   = new Date(now); end.setDate(end.getDate() + SYNC_DAYS_FORWARD);
 
     // Haal alle events op met paginatie
-    const allEvents: any[] = [];
+    const allEvents: CalendarEvent[] = [];
     let pageToken: string | undefined;
 
     do {
@@ -73,18 +97,22 @@ export const syncFromCalendar = internalAction({
     } while (pageToken);
 
     // Zet om naar PersonalEvent records
-    const afspraken: any[] = [];
+    const afspraken: PersonalEventUpsert[] = [];
 
     for (const ev of allEvents) {
       if (!ev.start) continue;
 
       const isAllDay = !!ev.start?.date && !ev.start?.dateTime;
+      const startValue = isAllDay ? ev.start.date : ev.start.dateTime;
+      const endValue = isAllDay ? ev.end?.date : ev.end?.dateTime;
+      if (!startValue || !endValue) continue;
+
       const startDt  = isAllDay
-        ? new Date(ev.start!.date! + "T00:00:00")
-        : new Date(ev.start!.dateTime!);
+        ? new Date(startValue + "T00:00:00")
+        : new Date(startValue);
       const eindDt   = isAllDay
-        ? new Date(ev.end!.date! + "T00:00:00")
-        : new Date(ev.end!.dateTime!);
+        ? new Date(endValue + "T00:00:00")
+        : new Date(endValue);
 
       afspraken.push({
         userId,
@@ -115,9 +143,11 @@ export const syncFromCalendar = internalAction({
 // ─── Publieke action (voor frontend "Sync nu" knop) ──────────────────────────
 
 export const syncPersonalNow = action({
-  args: { userId: v.string() },
+  args: { userId: v.optional(v.string()) },
   handler: async (ctx, { userId }): Promise<{ upserted: number; deleted: number; total: number }> => {
-    if (!userId) throw new Error("userId is vereist");
-    return ctx.runAction(internal.actions.syncPersonalEvents.syncFromCalendar, { userId });
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Niet ingelogd");
+    if (userId && userId !== identity.subject) throw new Error("Unauthorized");
+    return ctx.runAction(internal.actions.syncPersonalEvents.syncFromCalendar, { userId: identity.subject });
   },
 });
