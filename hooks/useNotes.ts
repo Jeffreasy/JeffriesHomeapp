@@ -53,7 +53,7 @@ export function useNotes() {
 
   const raw = useQuery(
     api.notes.list,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   ) as NoteRecord[] | undefined;
 
   const createNote  = useMutation(api.notes.create);
@@ -101,7 +101,7 @@ export function useNotes() {
     count: active.length,
 
     create: (data: NoteCreateData) =>
-      createNote({ userId, ...data }),
+      createNote(data),
     update: (id: Id<"notes">, data: NoteUpdateData) =>
       updateNote({ id, ...data }),
     togglePin: (id: Id<"notes">) => togglePin({ id }),

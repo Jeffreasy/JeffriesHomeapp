@@ -1,24 +1,210 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  StickyNote, Plus, Search, Archive, Tag, X,
-  Eye, EyeOff, Filter, ArrowDownAZ, ArrowUpDown, Clock,
+  AlertTriangle,
+  Archive,
+  ArrowDownAZ,
+  ArrowUpDown,
+  CalendarClock,
+  Clock3,
+  Eye,
+  EyeOff,
+  FolderOpen,
+  Hash,
+  LayoutGrid,
+  ListChecks,
+  NotebookPen,
+  Pin,
+  Plus,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  StickyNote,
+  Tag,
+  X,
+  type LucideIcon,
 } from "lucide-react";
-import { useNotes, type NoteRecord } from "@/hooks/useNotes";
+import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { NoteCard } from "@/components/notes/NoteCard";
 import { NoteEditor } from "@/components/notes/NoteEditor";
+import { cn } from "@/lib/utils";
 import type { Id } from "@/convex/_generated/dataModel";
 
 type ViewMode = "active" | "archived";
 type SortMode = "recent" | "oldest" | "title" | "deadline";
+type Tone = "amber" | "green" | "rose" | "sky" | "indigo" | "slate";
+
+const SORT_OPTIONS: Array<{ id: SortMode; label: string; icon: LucideIcon }> = [
+  { id: "recent", label: "Nieuwst", icon: ArrowUpDown },
+  { id: "oldest", label: "Oudst", icon: Clock3 },
+  { id: "title", label: "A-Z", icon: ArrowDownAZ },
+  { id: "deadline", label: "Deadline", icon: CalendarClock },
+];
+
+const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string }> = {
+  amber: {
+    border: "border-amber-500/25",
+    surface: "bg-amber-500/10",
+    icon: "text-amber-300",
+    text: "text-amber-200",
+  },
+  green: {
+    border: "border-emerald-500/20",
+    surface: "bg-emerald-500/10",
+    icon: "text-emerald-300",
+    text: "text-emerald-200",
+  },
+  rose: {
+    border: "border-rose-500/20",
+    surface: "bg-rose-500/10",
+    icon: "text-rose-300",
+    text: "text-rose-200",
+  },
+  sky: {
+    border: "border-sky-500/20",
+    surface: "bg-sky-500/10",
+    icon: "text-sky-300",
+    text: "text-sky-200",
+  },
+  indigo: {
+    border: "border-indigo-500/20",
+    surface: "bg-indigo-500/10",
+    icon: "text-indigo-300",
+    text: "text-indigo-200",
+  },
+  slate: {
+    border: "border-white/10",
+    surface: "bg-white/[0.04]",
+    icon: "text-slate-300",
+    text: "text-slate-200",
+  },
+};
+
+function MetricTile({
+  icon: Icon,
+  label,
+  value,
+  meta,
+  tone = "slate",
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  meta: string;
+  tone?: Tone;
+}) {
+  const toneClass = toneClasses[tone];
+
+  return (
+    <div className={cn("rounded-lg border bg-white/[0.035] p-4", toneClass.border)}>
+      <div className="flex items-start gap-3">
+        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", toneClass.surface)}>
+          <Icon size={18} className={toneClass.icon} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+          <p className={cn("mt-2 truncate text-2xl font-bold leading-tight", toneClass.text)}>{value}</p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">{meta}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SectionTitle({
+  icon: Icon,
+  title,
+  subtitle,
+  action,
+}: {
+  icon: LucideIcon;
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10">
+          <Icon size={17} className="text-amber-300" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-bold text-white">{title}</h2>
+          {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function SegmentedButton({
+  active,
+  icon: Icon,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  icon: LucideIcon;
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
+        active
+          ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
+          : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+      )}
+    >
+      <Icon size={15} />
+      {children}
+    </button>
+  );
+}
+
+function formatDate(iso?: string) {
+  if (!iso) return "Geen datum";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Onbekend";
+  return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
+}
+
+function getChecklistInfo(text: string) {
+  const lines = text.split("\n");
+  const total = lines.filter((line) => /^- \[[ x]\] /i.test(line)).length;
+  const done = lines.filter((line) => /^- \[x\] /i.test(line)).length;
+  return { total, done };
+}
+
+function getDisplayTitle(note: NoteRecord) {
+  return note.titel || note.inhoud.slice(0, 50) || "Zonder titel";
+}
+
+function tagLabel(tag: string, index: number, masked: boolean) {
+  return masked ? `Tag ${index + 1}` : tag;
+}
 
 export default function NotitiesPage() {
   const {
-    notes, archived, pinned, allTags, isLoading, count,
-    create, update, togglePin, archive, remove,
+    notes,
+    archived,
+    pinned,
+    allTags,
+    isLoading,
+    count,
+    create,
+    update,
+    togglePin,
+    archive,
+    remove,
   } = useNotes();
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy();
 
@@ -28,81 +214,123 @@ export default function NotitiesPage() {
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editNote, setEditNote] = useState<NoteRecord | null>(null);
+  const [nowMs, setNowMs] = useState<number | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // ─── Keyboard shortcuts ─────────────────────────────────────────
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Don't trigger when typing in inputs
-      const target = e.target as HTMLElement;
+    const updateNow = () => setNowMs(Date.now());
+    updateNow();
+    const interval = window.setInterval(updateNow, 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
-      if (e.key === "n" || e.key === "N") {
-        e.preventDefault();
+      if (event.key === "n" || event.key === "N") {
+        event.preventDefault();
         setEditNote(null);
         setEditorOpen(true);
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault();
+
+      if ((event.ctrlKey || event.metaKey) && event.key === "k") {
+        event.preventDefault();
         searchRef.current?.focus();
       }
     };
+
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // ─── Sort + Filter ──────────────────────────────────────────────
-  const displayed = useMemo(() => {
-    let list = viewMode === "active" ? [...notes] : [...archived];
+  const sourceNotes = viewMode === "active" ? notes : archived;
 
-    // Tag filter
+  const tagCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const note of sourceNotes) {
+      for (const tag of note.tags ?? []) {
+        map.set(tag, (map.get(tag) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [sourceNotes]);
+
+  const displayed = useMemo(() => {
+    let list = [...sourceNotes];
+
     if (tagFilter) {
-      list = list.filter((n) => (n.tags ?? []).includes(tagFilter));
+      list = list.filter((note) => (note.tags ?? []).includes(tagFilter));
     }
 
-    // Search filter
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((n) => {
-        const haystack = `${n.titel ?? ""} ${n.inhoud} ${(n.tags ?? []).join(" ")}`.toLowerCase();
-        return haystack.includes(q);
+    const query = search.trim().toLowerCase();
+    if (query) {
+      list = list.filter((note) => {
+        const haystack = `${note.titel ?? ""} ${note.inhoud} ${(note.tags ?? []).join(" ")}`.toLowerCase();
+        return haystack.includes(query);
       });
     }
 
-    // Sort (pinned always first in active view)
     list.sort((a, b) => {
       if (viewMode === "active" && a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+
       switch (sortMode) {
-        case "oldest":   return a.gewijzigd.localeCompare(b.gewijzigd);
-        case "title":    return (a.titel ?? a.inhoud).localeCompare(b.titel ?? b.inhoud, "nl");
+        case "oldest":
+          return a.gewijzigd.localeCompare(b.gewijzigd);
+        case "title":
+          return getDisplayTitle(a).localeCompare(getDisplayTitle(b), "nl");
         case "deadline": {
-          // Notes with deadline first, sorted ascending (earliest first)
-          const aDl = a.deadline ?? "";
-          const bDl = b.deadline ?? "";
-          if (aDl && !bDl) return -1;
-          if (!aDl && bDl) return 1;
-          if (aDl && bDl) return aDl.localeCompare(bDl);
+          const aDeadline = a.deadline ?? "";
+          const bDeadline = b.deadline ?? "";
+          if (aDeadline && !bDeadline) return -1;
+          if (!aDeadline && bDeadline) return 1;
+          if (aDeadline && bDeadline) return aDeadline.localeCompare(bDeadline);
           return b.gewijzigd.localeCompare(a.gewijzigd);
         }
-        default:         return b.gewijzigd.localeCompare(a.gewijzigd);
+        default:
+          return b.gewijzigd.localeCompare(a.gewijzigd);
       }
     });
 
     return list;
-  }, [notes, archived, viewMode, tagFilter, search, sortMode]);
+  }, [search, sortMode, sourceNotes, tagFilter, viewMode]);
 
-  // Tag counts for filter chips
-  const tagCounts = useMemo(() => {
-    const map = new Map<string, number>();
-    const source = viewMode === "active" ? notes : archived;
-    for (const n of source) {
-      for (const t of n.tags ?? []) {
-        map.set(t, (map.get(t) ?? 0) + 1);
-      }
-    }
-    return map;
-  }, [notes, archived, viewMode]);
+  const checklistStats = useMemo(() => {
+    return notes.reduce(
+      (total, note) => {
+        const info = getChecklistInfo(note.inhoud);
+        total.done += info.done;
+        total.total += info.total;
+        return total;
+      },
+      { done: 0, total: 0 }
+    );
+  }, [notes]);
+
+  const deadlineStats = useMemo(() => {
+    if (!nowMs) return { overdue: 0, soon: 0, next: null as NoteRecord | null };
+    const week = nowMs + 7 * 24 * 60 * 60 * 1000;
+    const withDeadline = notes
+      .filter((note) => note.deadline)
+      .sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
+
+    return {
+      overdue: withDeadline.filter((note) => new Date(note.deadline as string).getTime() < nowMs).length,
+      soon: withDeadline.filter((note) => {
+        const time = new Date(note.deadline as string).getTime();
+        return time >= nowMs && time <= week;
+      }).length,
+      next: withDeadline.find((note) => new Date(note.deadline as string).getTime() >= nowMs) ?? null,
+    };
+  }, [notes, nowMs]);
+
+  const highPriorityCount = notes.filter((note) => note.prioriteit === "hoog").length;
+  const linkedCount = notes.filter((note) => note.linkedEventId).length;
+  const totalCount = notes.length + archived.length;
+  const activeFilters = [search.trim(), tagFilter, viewMode === "archived", sortMode !== "recent"].filter(Boolean).length;
+  const activeSort = SORT_OPTIONS.find((option) => option.id === sortMode) ?? SORT_OPTIONS[0];
 
   const handleEdit = (note: NoteRecord) => {
     setEditNote(note);
@@ -114,7 +342,7 @@ export default function NotitiesPage() {
     setEditorOpen(true);
   };
 
-  const handleSave = async (data: { titel?: string; inhoud: string; tags?: string[]; kleur?: string; deadline?: string; prioriteit?: string }) => {
+  const handleSave = async (data: NoteCreateData) => {
     if (editNote) {
       await update(editNote._id, data);
     } else {
@@ -128,215 +356,337 @@ export default function NotitiesPage() {
     }
   };
 
-  // Inline checkbox toggle (update content without opening the editor)
   const handleUpdateContent = async (id: Id<"notes">, inhoud: string) => {
     await update(id, { inhoud });
   };
 
-  const cycleSortMode = () => {
-    const modes: SortMode[] = ["recent", "oldest", "title", "deadline"];
-    const idx = modes.indexOf(sortMode);
-    setSortMode(modes[(idx + 1) % modes.length]);
+  const handleNavigateToNote = (title: string) => {
+    setViewMode("active");
+    setTagFilter(null);
+    setSearch(title);
+    searchRef.current?.focus();
   };
 
-  const sortLabel = { recent: "Nieuwst", oldest: "Oudst", title: "A→Z", deadline: "Deadline" }[sortMode];
+  const clearFilters = () => {
+    setSearch("");
+    setTagFilter(null);
+    setSortMode("recent");
+    setViewMode("active");
+  };
 
   return (
-    <div className="min-h-screen overflow-x-hidden" style={{ background: "#0a0a0f" }}>
-      {/* ─── Header ──────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 py-4">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center">
-              <StickyNote size={18} className="text-amber-400" />
+    <div className="min-h-screen bg-[#0a0a0f] pb-28 text-slate-100">
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/95 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10">
+              <StickyNote size={20} className="text-amber-300" />
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-white">Notities</h1>
-              <p className="text-xs text-slate-500">
-                {count} notitie{count !== 1 ? "s" : ""} · {pinned.length} vastgezet
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase text-slate-500">Knowledge base</p>
+              <h1 className="mt-1 truncate text-2xl font-bold text-white">Notities</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                {isLoading
+                  ? "Notities laden"
+                  : `${count} actief - ${archived.length} archief - ${pinned.length} vastgezet`}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Privacy toggle */}
+          <div className="flex shrink-0 items-center gap-2">
             <button
+              type="button"
               onClick={togglePrivacy}
-              title={privacyOn ? "Tonen" : "Verbergen"}
-              className={`p-2 rounded-xl text-xs border transition-all cursor-pointer ${
+              title={privacyOn ? "Notities tonen" : "Notities verbergen"}
+              aria-label={privacyOn ? "Notities tonen" : "Notities verbergen"}
+              className={cn(
+                "inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
                 privacyOn
-                  ? "bg-indigo-500/15 text-indigo-400 border-indigo-500/30"
-                  : "bg-white/5 text-slate-500 border-white/10 hover:text-slate-300"
-              }`}
+                  ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
+                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+              )}
             >
-              {privacyOn ? <EyeOff size={14} /> : <Eye size={14} />}
+              {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}
+              <span className="hidden sm:inline">{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
             </button>
-
-            {/* New note */}
             <motion.button
-              whileTap={{ scale: 0.93 }}
+              type="button"
+              whileTap={{ scale: 0.94 }}
               onClick={handleNew}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer"
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
             >
-              <Plus size={14} />
+              <Plus size={16} />
               <span className="hidden sm:inline">Nieuw</span>
-              <kbd className="hidden sm:inline text-[9px] text-amber-400/40 bg-amber-500/10 px-1 rounded">N</kbd>
             </motion.button>
           </div>
         </div>
       </header>
 
-      <main className="px-6 py-5 pb-24 max-w-4xl mx-auto space-y-4">
-        {/* ─── Search + Sort + View ────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Search */}
-          <div className="flex-1 flex items-center gap-2 px-3 py-2 glass rounded-xl border border-white/5">
-            <Search size={14} className="text-slate-500 shrink-0" />
-            <input
-              ref={searchRef}
-              type="text"
-              placeholder="Zoek in notities... (Ctrl+K)"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-600 outline-none"
+      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+            <SectionTitle
+              icon={Search}
+              title="Zoeken en ordenen"
+              subtitle={
+                activeFilters > 0
+                  ? `${activeFilters} actieve instelling(en)`
+                  : "Actieve notities, archief, tags en sortering"
+              }
+              action={
+                activeFilters > 0 ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+                  >
+                    <RotateCcw size={14} />
+                    Reset
+                  </button>
+                ) : null
+              }
             />
-            {search && (
-              <button
-                onClick={() => setSearch("")}
-                className="text-slate-600 hover:text-slate-400 cursor-pointer"
-                aria-label="Zoekterm wissen"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
 
-          {/* Sort */}
-          <button
-            onClick={cycleSortMode}
-            aria-label={`Sorteer op ${sortLabel}`}
-            className="flex items-center gap-1.5 px-3 py-2 glass rounded-xl border border-white/5 text-xs text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
-          >
-            {sortMode === "title" ? <ArrowDownAZ size={13} /> : sortMode === "oldest" ? <Clock size={13} /> : <ArrowUpDown size={13} />}
-            {sortLabel}
-          </button>
-
-          {/* View toggle */}
-          <div className="flex items-center gap-1 glass rounded-xl border border-white/5 p-1">
-            <button
-              onClick={() => setViewMode("active")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
-                viewMode === "active"
-                  ? "bg-amber-500/20 text-amber-400"
-                  : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              Actief ({notes.length})
-            </button>
-            <button
-              onClick={() => setViewMode("archived")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all cursor-pointer ${
-                viewMode === "archived"
-                  ? "bg-amber-500/20 text-amber-400"
-                  : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <Archive size={12} className="inline mr-1" />
-              Archief ({archived.length})
-            </button>
-          </div>
-        </div>
-
-        {/* Tag filter chips */}
-        {allTags.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <Filter size={12} className="text-slate-600 shrink-0" />
-            <button
-              onClick={() => setTagFilter(null)}
-              className={`px-2 py-0.5 text-[10px] rounded-md border transition-all cursor-pointer ${
-                !tagFilter
-                  ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                  : "text-slate-500 border-white/8 hover:border-white/15"
-              }`}
-            >
-              Alle
-            </button>
-            {allTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
-                className={`inline-flex items-center gap-0.5 px-2 py-0.5 text-[10px] rounded-md border transition-all cursor-pointer ${
-                  tagFilter === tag
-                    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
-                    : "text-slate-500 border-white/8 hover:border-white/15"
-                }`}
-              >
-                <Tag size={8} /> {tag}
-                <span className="text-slate-600 ml-0.5">{tagCounts.get(tag) ?? 0}</span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* ─── Notes Grid ──────────────────────────────────────────── */}
-        {isLoading ? (
-          <div className="text-center py-16">
-            <div className="w-8 h-8 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin mx-auto" />
-          </div>
-        ) : displayed.length === 0 ? (
-          <div className="text-center py-16">
-            <StickyNote size={32} className="text-slate-600 mx-auto mb-3" />
-            <p className="text-sm text-slate-500 mb-1">
-              {search || tagFilter ? "Geen notities gevonden" : "Nog geen notities"}
-            </p>
-            {search || tagFilter ? (
-              <button
-                onClick={() => { setSearch(""); setTagFilter(null); }}
-                className="text-xs text-amber-400/60 hover:text-amber-400 cursor-pointer"
-              >
-                Filters wissen
-              </button>
-            ) : (
-              <div className="space-y-2 mt-4">
-                <button
-                  onClick={handleNew}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/25 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-                >
-                  <Plus size={12} /> Eerste notitie maken
-                </button>
-                <p className="text-[10px] text-slate-600">
-                  Druk op <kbd className="px-1 py-0.5 bg-white/5 rounded text-slate-400">N</kbd> voor een nieuwe notitie
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <AnimatePresence mode="popLayout">
-              {displayed.map((note) => (
-                <NoteCard
-                  key={note._id}
-                  note={note}
-                  onEdit={handleEdit}
-                  onTogglePin={togglePin}
-                  onArchive={archive}
-                  onDelete={handleDelete}
-                  onUpdateContent={handleUpdateContent}
-                  masked={privacyOn}
+            <div className="mt-5 grid gap-4">
+              <div className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3">
+                <Search size={16} className="shrink-0 text-slate-500" />
+                <input
+                  ref={searchRef}
+                  type="search"
+                  placeholder="Zoek in notities..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-600"
                 />
-              ))}
-            </AnimatePresence>
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    aria-label="Zoekterm wissen"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <SegmentedButton active={viewMode === "active"} icon={LayoutGrid} onClick={() => setViewMode("active")}>
+                  Actief <span className="text-xs opacity-70">{notes.length}</span>
+                </SegmentedButton>
+                <SegmentedButton active={viewMode === "archived"} icon={Archive} onClick={() => setViewMode("archived")}>
+                  Archief <span className="text-xs opacity-70">{archived.length}</span>
+                </SegmentedButton>
+              </div>
+
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {SORT_OPTIONS.map((option) => (
+                  <SegmentedButton
+                    key={option.id}
+                    active={sortMode === option.id}
+                    icon={option.icon}
+                    onClick={() => setSortMode(option.id)}
+                  >
+                    {option.label}
+                  </SegmentedButton>
+                ))}
+              </div>
+            </div>
           </div>
+
+          <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+            <SectionTitle icon={ShieldCheck} title="Signalen" subtitle="Context voor je huidige notities" />
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              <MetricTile
+                icon={Pin}
+                label="Vastgezet"
+                value={`${pinned.length}`}
+                meta={pinned.length === 1 ? "Belangrijke notitie bovenaan" : "Belangrijke notities bovenaan"}
+                tone={pinned.length > 0 ? "amber" : "slate"}
+              />
+              <MetricTile
+                icon={AlertTriangle}
+                label="Aandacht"
+                value={`${deadlineStats.overdue + highPriorityCount}`}
+                meta={`${deadlineStats.overdue} verlopen - ${highPriorityCount} hoge prioriteit`}
+                tone={deadlineStats.overdue + highPriorityCount > 0 ? "rose" : "green"}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricTile
+            icon={StickyNote}
+            label="Totaal"
+            value={`${totalCount}`}
+            meta={`${notes.length} actief, ${archived.length} gearchiveerd`}
+            tone="amber"
+          />
+          <MetricTile
+            icon={ListChecks}
+            label="Checklists"
+            value={`${checklistStats.done}/${checklistStats.total}`}
+            meta={checklistStats.total > 0 ? "Afgevinkte items in actieve notities" : "Geen checklist-items actief"}
+            tone={checklistStats.total > 0 && checklistStats.done === checklistStats.total ? "green" : "sky"}
+          />
+          <MetricTile
+            icon={CalendarClock}
+            label="Deadlines"
+            value={`${deadlineStats.soon}`}
+            meta={deadlineStats.next ? `Volgende: ${formatDate(deadlineStats.next.deadline)}` : "Geen aankomende deadlines"}
+            tone={deadlineStats.overdue > 0 ? "rose" : deadlineStats.soon > 0 ? "amber" : "slate"}
+          />
+          <MetricTile
+            icon={Hash}
+            label="Tags"
+            value={`${allTags.length}`}
+            meta={linkedCount > 0 ? `${linkedCount} gekoppeld aan agenda` : "Labels voor snelle selectie"}
+            tone="indigo"
+          />
+        </section>
+
+        {allTags.length > 0 && (
+          <section className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+            <SectionTitle
+              icon={Tag}
+              title="Tags"
+              subtitle={tagFilter ? `Filter actief: ${privacyOn ? "verborgen tag" : tagFilter}` : "Klik een tag om te filteren"}
+              action={
+                tagFilter ? (
+                  <button
+                    type="button"
+                    onClick={() => setTagFilter(null)}
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+                  >
+                    <X size={14} />
+                    Wissen
+                  </button>
+                ) : null
+              }
+            />
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setTagFilter(null)}
+                className={cn(
+                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
+                  !tagFilter
+                    ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
+                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                )}
+              >
+                <FolderOpen size={14} />
+                Alle
+              </button>
+              {allTags.map((tag, index) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setTagFilter(tagFilter === tag ? null : tag)}
+                  className={cn(
+                    "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
+                    tagFilter === tag
+                      ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
+                      : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                  )}
+                >
+                  <Tag size={13} />
+                  {tagLabel(tag, index, privacyOn)}
+                  <span className="text-xs opacity-60">{tagCounts.get(tag) ?? 0}</span>
+                </button>
+              ))}
+            </div>
+          </section>
         )}
+
+        <section className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+          <SectionTitle
+            icon={NotebookPen}
+            title={viewMode === "active" ? "Actieve notities" : "Archief"}
+            subtitle={
+              isLoading
+                ? "Laden..."
+                : `${displayed.length} zichtbaar - sortering: ${activeSort.label.toLowerCase()}`
+            }
+            action={
+              <button
+                type="button"
+                onClick={handleNew}
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+              >
+                <Plus size={16} />
+                Nieuwe notitie
+              </button>
+            }
+          />
+
+          {isLoading ? (
+            <div className="flex min-h-[260px] items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
+            </div>
+          ) : displayed.length === 0 ? (
+            <div className="mt-5 flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-4 py-12 text-center">
+              <Sparkles size={34} className="text-slate-700" />
+              <p className="mt-4 font-semibold text-slate-200">
+                {search || tagFilter ? "Geen notities gevonden" : "Nog geen notities"}
+              </p>
+              <p className="mt-1 max-w-md text-sm text-slate-500">
+                {search || tagFilter
+                  ? "Pas je zoekterm of tagfilter aan om meer notities te zien."
+                  : "Maak je eerste notitie en leg losse gedachten meteen vast."}
+              </p>
+              {search || tagFilter ? (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+                >
+                  <RotateCcw size={14} />
+                  Filters wissen
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleNew}
+                  className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+                >
+                  <Plus size={14} />
+                  Eerste notitie maken
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <AnimatePresence mode="popLayout">
+                {displayed.map((note) => (
+                  <NoteCard
+                    key={note._id}
+                    note={note}
+                    onEdit={handleEdit}
+                    onTogglePin={togglePin}
+                    onArchive={archive}
+                    onDelete={handleDelete}
+                    onUpdateContent={handleUpdateContent}
+                    onNavigateToNote={handleNavigateToNote}
+                    masked={privacyOn}
+                  />
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </section>
       </main>
 
-      {/* ─── Editor Modal ────────────────────────────────────────── */}
       <AnimatePresence>
         {editorOpen && (
           <NoteEditor
             note={editNote}
             onSave={handleSave}
-            onClose={() => { setEditorOpen(false); setEditNote(null); }}
+            onClose={() => {
+              setEditorOpen(false);
+              setEditNote(null);
+            }}
           />
         )}
       </AnimatePresence>

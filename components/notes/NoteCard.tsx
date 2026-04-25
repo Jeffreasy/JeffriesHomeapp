@@ -32,7 +32,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
   const allLines = note.inhoud.split("\n");
   const deadlineInfo = note.deadline ? getDeadlineInfo(note.deadline) : null;
   const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
-  const backlinks = useQuery(api.notes.getBacklinks, { noteId: note._id });
+  const backlinks = useQuery(api.notes.getBacklinks, masked ? "skip" : { noteId: note._id });
 
   const toggleCheckbox = (originalLineIndex: number) => {
     if (!onUpdateContent) return;
@@ -137,17 +137,26 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
         {/* Footer: tags + time + actions */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            {(note.tags ?? []).slice(0, 2).map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 bg-white/5 px-1.5 py-0.5 rounded-md"
-              >
+            {masked ? (
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded-md">
                 <Tag size={8} aria-hidden="true" />
-                {tag}
+                ••••
               </span>
-            ))}
-            {(note.tags ?? []).length > 2 && (
-              <span className="text-[10px] text-slate-600">+{(note.tags ?? []).length - 2}</span>
+            ) : (
+              <>
+                {(note.tags ?? []).slice(0, 2).map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 bg-white/5 px-1.5 py-0.5 rounded-md"
+                  >
+                    <Tag size={8} aria-hidden="true" />
+                    {tag}
+                  </span>
+                ))}
+                {(note.tags ?? []).length > 2 && (
+                  <span className="text-[10px] text-slate-600">+{(note.tags ?? []).length - 2}</span>
+                )}
+              </>
             )}
             <span className="text-[10px] text-slate-600">{age}</span>
           </div>
@@ -164,7 +173,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
             <button
               onClick={(e) => { e.stopPropagation(); onArchive(note._id); }}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
-              aria-label="Archiveren"
+              aria-label={note.isArchived ? "Terugzetten" : "Archiveren"}
             >
               <Archive size={14} className="text-slate-500" />
             </button>

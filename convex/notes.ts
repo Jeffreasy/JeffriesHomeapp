@@ -1,12 +1,29 @@
 import { v } from "convex/values";
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
-import { internal } from "./_generated/api";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+
+type AuthCtx = QueryCtx | MutationCtx;
+
+async function getCurrentUserId(ctx: AuthCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  return identity?.subject ?? null;
+}
+
+async function requireCurrentUserId(ctx: AuthCtx) {
+  const userId = await getCurrentUserId(ctx);
+  if (!userId) throw new Error("Niet ingelogd");
+  return userId;
+}
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const list = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return [];
+
     return ctx.db
       .query("notes")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -16,8 +33,11 @@ export const list = query({
 });
 
 export const search = query({
-  args: { userId: v.string(), zoekterm: v.string() },
-  handler: async (ctx, { userId, zoekterm }) => {
+  args: { zoekterm: v.string() },
+  handler: async (ctx, { zoekterm }) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return [];
+
     return ctx.db
       .query("notes")
       .withSearchIndex("search_notes", (q) =>
@@ -28,8 +48,11 @@ export const search = query({
 });
 
 export const recent = query({
-  args: { userId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { userId, limit }) => {
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit }) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return [];
+
     return ctx.db
       .query("notes")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -94,7 +117,6 @@ export const searchInternal = internalQuery({
 
 export const create = mutation({
   args: {
-    userId:        v.string(),
     titel:         v.optional(v.string()),
     inhoud:        v.string(),
     tags:          v.optional(v.array(v.string())),
@@ -104,9 +126,10 @@ export const create = mutation({
     prioriteit:    v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
     const now = new Date().toISOString();
     const noteId = await ctx.db.insert("notes", {
-      userId:        args.userId,
+      userId,
       titel:         args.titel,
       inhoud:        args.inhoud,
       tags:          args.tags,
@@ -119,7 +142,7 @@ export const create = mutation({
       aangemaakt:    now,
       gewijzigd:     now,
     });
-    await syncNoteLinksHelper(ctx, noteId, args.userId, args.inhoud);
+    await syncNoteLinksHelper(ctx, noteId, userId, args.inhoud);
     return noteId;
   },
 });
@@ -136,8 +159,9 @@ export const update = mutation({
     prioriteit:    v.optional(v.string()),
   },
   handler: async (ctx, { id, ...fields }) => {
+    const userId = await requireCurrentUserId(ctx);
     const existing = await ctx.db.get(id);
-    if (!existing) throw new Error("Notitie niet gevonden");
+    if (!existing || existing.userId !== userId) throw new Error("Notitie niet gevonden");
 
     const patch: Record<string, unknown> = { gewijzigd: new Date().toISOString() };
     if (fields.titel !== undefined)         patch.titel         = fields.titel;
@@ -157,8 +181,9 @@ export const update = mutation({
 export const togglePin = mutation({
   args: { id: v.id("notes") },
   handler: async (ctx, { id }) => {
+    const userId = await requireCurrentUserId(ctx);
     const note = await ctx.db.get(id);
-    if (!note) throw new Error("Notitie niet gevonden");
+    if (!note || note.userId !== userId) throw new Error("Notitie niet gevonden");
     await ctx.db.patch(id, {
       isPinned: !note.isPinned,
       gewijzigd: new Date().toISOString(),
@@ -169,8 +194,9 @@ export const togglePin = mutation({
 export const archive = mutation({
   args: { id: v.id("notes") },
   handler: async (ctx, { id }) => {
+    const userId = await requireCurrentUserId(ctx);
     const note = await ctx.db.get(id);
-    if (!note) throw new Error("Notitie niet gevonden");
+    if (!note || note.userId !== userId) throw new Error("Notitie niet gevonden");
     await ctx.db.patch(id, {
       isArchived: !note.isArchived,
       isPinned: false,
@@ -182,8 +208,9 @@ export const archive = mutation({
 export const remove = mutation({
   args: { id: v.id("notes") },
   handler: async (ctx, { id }) => {
+    const userId = await requireCurrentUserId(ctx);
     const note = await ctx.db.get(id);
-    if (!note) throw new Error("Notitie niet gevonden");
+    if (!note || note.userId !== userId) throw new Error("Notitie niet gevonden");
     await ctx.db.delete(id);
   },
 });
@@ -353,7 +380,7 @@ export const triageNotesInternal = internalMutation({
     const now = new Date().toISOString();
     const staleThreshold = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const candidateIds: string[] = [];
+    const candidateIds: Id<"notes">[] = [];
     for (const n of all) {
       if (n.deadline && n.deadline < now) { candidateIds.push(n._id); continue; }
       const unchecked = (n.inhoud.match(/- \[ \]/g) ?? []).length;
@@ -373,7 +400,7 @@ export const triageNotesInternal = internalMutation({
 
     // Set new flags
     for (const id of candidateIds) {
-      const note = await ctx.db.get(id as any);
+      const note = await ctx.db.get(id);
       if (note) await ctx.db.patch(note._id, { triageFlag: true });
     }
 
@@ -383,15 +410,12 @@ export const triageNotesInternal = internalMutation({
 
 /** Bulk archiveer notities (AI triage bevestiging) */
 export const bulkArchiveInternal = internalMutation({
-  args: { ids: v.array(v.string()) },
+  args: { ids: v.array(v.id("notes")) },
   handler: async (ctx, { ids }) => {
     const now = new Date().toISOString();
     let count = 0;
     for (const id of ids) {
-      const note = await ctx.db
-        .query("notes")
-        .filter((q) => q.eq(q.field("_id"), id))
-        .first();
+      const note = await ctx.db.get(id);
       if (note && !note.isArchived) {
         await ctx.db.patch(note._id, {
           isArchived: true,
@@ -410,8 +434,11 @@ export const bulkArchiveInternal = internalMutation({
 
 /** Autocomplete voor [[ syntax — doorzoekt titels */
 export const searchTitles = query({
-  args: { userId: v.string(), term: v.string() },
-  handler: async (ctx, { userId, term }) => {
+  args: { term: v.string() },
+  handler: async (ctx, { term }) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return [];
+
     const all = await ctx.db
       .query("notes")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -433,6 +460,12 @@ export const searchTitles = query({
 export const getBacklinks = query({
   args: { noteId: v.id("notes") },
   handler: async (ctx, { noteId }) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return [];
+
+    const target = await ctx.db.get(noteId);
+    if (!target || target.userId !== userId) return [];
+
     const links = await ctx.db
       .query("noteLinks")
       .withIndex("by_target", (q) => q.eq("targetId", noteId))
@@ -441,7 +474,7 @@ export const getBacklinks = query({
     const results = [];
     for (const link of links) {
       const source = await ctx.db.get(link.sourceId);
-      if (source && !source.isArchived) {
+      if (source && source.userId === userId && !source.isArchived) {
         results.push({ id: source._id, titel: source.titel || source.inhoud.slice(0, 40) });
       }
     }
@@ -451,15 +484,15 @@ export const getBacklinks = query({
 
 /** Parse [[titel]] uit inhoud en synchroniseer noteLinks tabel */
 async function syncNoteLinksHelper(
-  ctx: any,
-  noteId: any,
+  ctx: MutationCtx,
+  noteId: Id<"notes">,
   userId: string,
   inhoud: string,
 ) {
   // Extract alle [[titel]] matches
   const linkRegex = /\[\[([^\]]+)\]\]/g;
   const linkedTitles: string[] = [];
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = linkRegex.exec(inhoud)) !== null) {
     linkedTitles.push(match[1]);
   }
@@ -467,14 +500,14 @@ async function syncNoteLinksHelper(
   // Resolve titels naar IDs
   const allNotes = await ctx.db
     .query("notes")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
-    .filter((q: any) => q.eq(q.field("isArchived"), false))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .filter((q) => q.eq(q.field("isArchived"), false))
     .collect();
 
-  const targetIds: Set<string> = new Set();
+  const targetIds: Set<Id<"notes">> = new Set();
   for (const title of linkedTitles) {
     const lower = title.toLowerCase();
-    const target = allNotes.find((n: any) =>
+    const target = allNotes.find((n) =>
       (n.titel ?? "").toLowerCase() === lower && n._id !== noteId
     );
     if (target) targetIds.add(target._id);
@@ -483,10 +516,10 @@ async function syncNoteLinksHelper(
   // Haal bestaande links op
   const existing = await ctx.db
     .query("noteLinks")
-    .withIndex("by_source", (q: any) => q.eq("sourceId", noteId))
+    .withIndex("by_source", (q) => q.eq("sourceId", noteId))
     .collect();
 
-  const existingTargetIds = new Set(existing.map((l: any) => l.targetId));
+  const existingTargetIds = new Set(existing.map((link) => link.targetId));
 
   // Verwijder links die niet meer in de inhoud staan
   for (const link of existing) {
@@ -502,7 +535,7 @@ async function syncNoteLinksHelper(
       await ctx.db.insert("noteLinks", {
         userId,
         sourceId: noteId,
-        targetId: targetId as any,
+        targetId,
         aangemaakt: now,
       });
     }

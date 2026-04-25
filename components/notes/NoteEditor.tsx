@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, ChevronDown, Link2 } from "lucide-react";
 import { useQuery } from "convex/react";
-import { useUser } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 
@@ -26,9 +25,6 @@ interface NoteEditorProps {
 }
 
 export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
-  const { user } = useUser();
-  const userId = user?.id ?? "";
-
   const [titel, setTitel]           = useState(note?.titel ?? "");
   const [inhoud, setInhoud]         = useState(note?.inhoud ?? "");
   const [tags, setTags]             = useState<string[]>(note?.tags ?? []);
@@ -46,8 +42,8 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
 
   const linkResults = useQuery(
     api.notes.searchTitles,
-    linkActive && linkSearch.length > 0 && userId
-      ? { userId, term: linkSearch }
+    linkActive && linkSearch.length > 0
+      ? { term: linkSearch }
       : "skip"
   );
 
@@ -205,9 +201,6 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
             {note ? "Notitie bewerken" : "Nieuwe notitie"}
           </h3>
           <div className="flex items-center gap-1">
-            <span className="text-[10px] text-slate-600 mr-2 hidden sm:block">
-              Ctrl+Enter = opslaan · Esc = sluiten
-            </span>
             <button onClick={onClose} className="p-2 -mr-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
               <X size={18} className="text-slate-400" />
             </button>
@@ -228,7 +221,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
           {/* Content */}
           <textarea
             ref={textRef}
-            placeholder="Schrijf je notitie...  (tip: gebruik - [ ] voor checklists)"
+            placeholder="Schrijf je notitie..."
             value={inhoud}
             onChange={(e) => handleContentChange(e.target.value)}
             onKeyDown={(e) => {
