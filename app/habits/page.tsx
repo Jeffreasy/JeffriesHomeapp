@@ -24,6 +24,7 @@ import { HabitForm } from "@/components/habits/HabitForm";
 import { HabitHeatmap } from "@/components/habits/HabitHeatmap";
 import { HabitStats } from "@/components/habits/HabitStats";
 import { BadgeShowcase } from "@/components/habits/BadgeShowcase";
+import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { formatLevel, formatXP } from "@/lib/habit-constants";
 import type { HabitCreateData } from "@/hooks/useHabits";
@@ -107,6 +108,7 @@ export default function HabitsPage() {
   const [editingHabit, setEditingHabit] = useState<Id<"habits"> | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Id<"habits"> | null>(null);
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("habits");
+  const { success, error: toastError } = useToast();
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setSelectedDate(todayStr()), 0);
@@ -155,14 +157,26 @@ export default function HabitsPage() {
     [editingHabit, habits],
   );
 
-  const handleCreate = (data: HabitCreateData) => {
-    create(data);
+  const handleCreate = async (data: HabitCreateData) => {
+    try {
+      await create(data);
+      success("Habit toegevoegd");
+    } catch (error) {
+      toastError("Habit toevoegen is mislukt");
+      throw error;
+    }
   };
 
-  const handleEdit = (data: HabitCreateData) => {
+  const handleEdit = async (data: HabitCreateData) => {
     if (!editingHabit) return;
-    update(editingHabit, data);
-    setEditingHabit(null);
+    const habitId = editingHabit;
+    try {
+      await update(habitId, data);
+      success("Habit opgeslagen");
+    } catch (error) {
+      toastError("Habit opslaan is mislukt");
+      throw error;
+    }
   };
 
   const handleDelete = () => {
@@ -505,14 +519,14 @@ export default function HabitsPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setConfirmDelete(null)}
-              className="fixed inset-0 z-50 bg-black/65 backdrop-blur-sm"
+              className="fixed inset-0 z-[90] bg-black/65 backdrop-blur-sm"
             />
             <motion.div
               key="delete-dialog"
               initial={{ opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.94 }}
-              className="fixed inset-x-4 top-1/2 z-50 mx-auto max-w-sm -translate-y-1/2 rounded-lg border border-rose-500/20 bg-[#11141c] p-5 shadow-2xl"
+              className="fixed inset-x-4 top-1/2 z-[91] mx-auto max-w-sm -translate-y-1/2 rounded-lg border border-rose-500/20 bg-[#11141c] p-5 shadow-2xl"
             >
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-rose-500/25 bg-rose-500/10">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Zap, Clock, CalendarDays, Timer, Hash, Ruler } from "lucide-react";
 import { HABIT_EMOJIS, ROOSTER_FILTER_OPTIONS } from "@/convex/lib/habitConstants";
@@ -15,11 +15,12 @@ import type { HabitCreateData } from "@/hooks/useHabits";
 interface HabitFormProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: HabitCreateData) => void;
+  onSubmit: (data: HabitCreateData) => void | Promise<void>;
   initial?: Partial<HabitCreateData>;
 }
 
 export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) {
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [naam, setNaam] = useState(initial?.naam ?? "");
   const [emoji, setEmoji] = useState(initial?.emoji ?? "🎯");
   const [type, setType] = useState<"positief" | "negatief">(initial?.type ?? "positief");
@@ -36,6 +37,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
   const [doelTijd, setDoelTijd] = useState(initial?.doelTijd ?? "");
   const [showEmojis, setShowEmojis] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Reset state when form opens or initial values change
   useEffect(() => {
@@ -58,31 +60,60 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
       setDoelTijd(initial?.doelTijd ?? "");
       setShowEmojis(false);
       setIsSubmitting(false);
+      setSubmitError(null);
     }, 0);
 
     return () => window.clearTimeout(timeout);
   }, [open, initial]);
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const canAutofocus = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    if (!canAutofocus) return;
+
+    const timeout = window.setTimeout(() => nameInputRef.current?.focus(), 180);
+    return () => window.clearTimeout(timeout);
+  }, [open]);
+
+  const handleSubmit = async () => {
     if (!naam.trim() || isSubmitting) return;
+
     setIsSubmitting(true);
-    onSubmit({
-      naam: naam.trim(),
-      emoji,
-      type,
-      frequentie,
-      aangepasteDagen: frequentie === "aangepast" ? aangepasteDagen : undefined,
-      moeilijkheid,
-      roosterFilter: roosterFilter === "alle" ? undefined : roosterFilter,
-      isKwantitatief,
-      doelWaarde: isKwantitatief ? doelWaarde : undefined,
-      eenheid: isKwantitatief ? eenheid || undefined : undefined,
-      doelAantal: (frequentie === "x_per_week" || frequentie === "x_per_maand") ? doelAantal : undefined,
-      doelTijd: doelTijd || undefined,
-      kleur,
-      beschrijving: beschrijving.trim() || undefined,
-    });
-    onClose();
+    setSubmitError(null);
+
+    try {
+      await onSubmit({
+        naam: naam.trim(),
+        emoji,
+        type,
+        frequentie,
+        aangepasteDagen: frequentie === "aangepast" ? aangepasteDagen : undefined,
+        moeilijkheid,
+        roosterFilter: roosterFilter === "alle" ? undefined : roosterFilter,
+        isKwantitatief,
+        doelWaarde: isKwantitatief ? doelWaarde : undefined,
+        eenheid: isKwantitatief ? eenheid || undefined : undefined,
+        doelAantal: (frequentie === "x_per_week" || frequentie === "x_per_maand") ? doelAantal : undefined,
+        doelTijd: doelTijd || undefined,
+        kleur,
+        beschrijving: beschrijving.trim() || undefined,
+      });
+      onClose();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Habit opslaan is mislukt.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -96,44 +127,48 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm"
           />
 
           {/* Sheet — full-height on mobile, centered modal on desktop */}
           <motion.div
             key="sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={initial ? "Habit bewerken" : "Nieuwe habit"}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-50 max-h-[92vh] md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:max-w-lg md:w-full md:rounded-2xl md:max-h-[80vh]"
+            className="fixed inset-x-0 bottom-0 z-[91] flex max-h-[calc(100dvh-10px)] flex-col rounded-t-3xl shadow-2xl md:inset-auto md:bottom-auto md:left-1/2 md:top-1/2 md:w-full md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:max-h-[min(760px,88vh)]"
             style={{
               background: "rgba(15, 15, 20, 0.98)",
-              borderTop: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "24px 24px 0 0",
+              border: "1px solid rgba(255,255,255,0.08)",
             }}
           >
             {/* Drag handle (mobile) */}
-            <div className="flex justify-center pt-3 pb-1 md:hidden">
+            <div className="flex shrink-0 justify-center pb-1 pt-3 md:hidden">
               <div className="w-10 h-1 rounded-full bg-white/10" />
             </div>
 
-            {/* Scrollable content */}
-            <div className="overflow-y-auto max-h-[85dvh] md:max-h-[75vh] px-5 pb-8 pt-2 overscroll-contain"
-              style={{ paddingBottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}>
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-5 pb-4 pt-2 md:pt-4">
+              <h2 className="text-lg font-bold text-slate-200">
+                {initial ? "Habit bewerken" : "Nieuwe Habit"}
+              </h2>
+              <button
+                onClick={onClose}
+                className="w-11 h-11 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-90"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              {/* Header */}
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-bold text-slate-200">
-                  {initial ? "Habit bewerken" : "Nieuwe Habit"}
-                </h2>
-                <button
-                  onClick={onClose}
-                  className="w-11 h-11 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-90"
-                >
-                  <X size={18} />
-                </button>
-              </div>
+            {/* Scrollable content */}
+            <div
+              className="flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-4"
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
 
               {/* Emoji + Naam */}
               <div className="flex gap-3 mb-4">
@@ -145,12 +180,12 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                   {emoji}
                 </button>
                 <input
+                  ref={nameInputRef}
                   type="text"
                   value={naam}
                   onChange={(e) => setNaam(e.target.value)}
                   placeholder="Naam van habit..."
                   className="flex-1 bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 min-h-[56px]"
-                  autoFocus
                 />
               </div>
 
@@ -428,11 +463,16 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
               </div>
             </div>
 
-            {/* Fixed submit button — respects safe area */}
+            {/* Submit button — above mobile nav, outside the scroll area */}
             <div
-              className="absolute bottom-0 inset-x-0 p-4 bg-linear-to-t from-[rgba(15,15,20,1)] via-[rgba(15,15,20,0.95)] to-transparent"
+              className="shrink-0 border-t border-white/5 bg-[rgba(15,15,20,0.98)] p-4"
               style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))" }}
             >
+              {submitError && (
+                <p className="mb-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-200">
+                  {submitError}
+                </p>
+              )}
               <button
                 onClick={handleSubmit}
                 disabled={!naam.trim() || isSubmitting}
@@ -443,7 +483,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 }}
               >
                 <Plus size={16} className="inline mr-2" />
-                {initial ? "Opslaan" : "Habit toevoegen"}
+                {isSubmitting ? "Opslaan..." : initial ? "Opslaan" : "Habit toevoegen"}
               </button>
             </div>
           </motion.div>
