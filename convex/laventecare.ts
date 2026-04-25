@@ -283,6 +283,7 @@ type CreateLeadInput = {
   companyName?: string;
   website?: string;
   bron?: string;
+  sourceId?: string;
   pijnpunt?: string;
   prioriteit?: string;
   fitScore?: number;
@@ -344,6 +345,24 @@ type CreateActionInput = {
   linkedProjectId?: Id<"laventecareProjects">;
 };
 
+type WebsiteIntakeInput = {
+  requestId?: string;
+  source?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  companyName?: string;
+  website?: string;
+  projectType?: string;
+  budget?: string;
+  timeline?: string;
+  goal?: string;
+  message?: string;
+  pageUrl?: string;
+  origin?: string;
+  submittedAt?: string;
+};
+
 type CreateDecisionInput = {
   projectId?: Id<"laventecareProjects">;
   titel: string;
@@ -382,8 +401,18 @@ async function validateProjectAccess(ctx: MutationCtx, userId: string, projectId
 
 async function createLeadRecord(ctx: MutationCtx, userId: string, args: CreateLeadInput) {
   const now = new Date().toISOString();
+  const source = args.bron?.trim() || "handmatig";
+  const sourceId = args.sourceId?.trim() || undefined;
   let companyId: Id<"laventecareCompanies"> | undefined = undefined;
   const companyName = args.companyName?.trim();
+
+  if (sourceId) {
+    const existing = await ctx.db
+      .query("laventecareLeads")
+      .withIndex("by_user_source", (q) => q.eq("userId", userId).eq("bron", source).eq("sourceId", sourceId))
+      .first();
+    if (existing) return existing._id;
+  }
 
   if (companyName) {
     const companies = await ctx.db
@@ -399,7 +428,7 @@ async function createLeadRecord(ctx: MutationCtx, userId: string, args: CreateLe
       status:     "prospect",
       fitScore:   scoreLead(args),
       tags:       ["lead"],
-      bron:       args.bron ?? "handmatig",
+      bron:       source,
       notities:   args.pijnpunt,
       aangemaakt: now,
       gewijzigd:  now,
@@ -410,7 +439,8 @@ async function createLeadRecord(ctx: MutationCtx, userId: string, args: CreateLe
     userId,
     companyId,
     titel:              args.titel.trim(),
-    bron:               args.bron ?? "handmatig",
+    bron:               source,
+    sourceId,
     status:             "nieuw",
     fitScore:           scoreLead(args),
     pijnpunt:           args.pijnpunt,
@@ -609,6 +639,159 @@ async function createActionRecord(ctx: MutationCtx, userId: string, args: Create
     createdAt:       now,
     updatedAt:       now,
   });
+}
+
+function compactLines(lines: Array<string | undefined>) {
+  return lines.filter((line): line is string => Boolean(line?.trim())).join("\n");
+}
+
+function websiteLeadPriority(input: WebsiteIntakeInput) {
+  const timeline = normalize(input.timeline ?? "");
+  if (timeline.includes("snel") || timeline.includes("direct") || timeline.includes("urgent")) return "hoog";
+  return "normaal";
+}
+
+function websiteLeadFitScore(input: WebsiteIntakeInput) {
+  let score = 45;
+  const budget = input.budget?.trim();
+  if (input.companyName?.trim()) score += 10;
+  if (input.projectType?.trim()) score += 10;
+  if (budget && !budget.startsWith("<")) score += budget.includes("10.000+") ? 20 : 15;
+  if ((input.goal ?? input.message ?? "").trim().length > 80) score += 15;
+  if (websiteLeadPriority(input) === "hoog") score += 5;
+  return Math.min(95, score);
+}
+
+async function attachWebsiteContact(
+  ctx: MutationCtx,
+  userId: string,
+  leadId: Id<"laventecareLeads">,
+  input: WebsiteIntakeInput,
+) {
+  const name = input.name.trim();
+  const email = input.email.trim().toLowerCase();
+  const phone = input.phone?.trim() || undefined;
+  const lead = await ctx.db.get(leadId);
+  if (!lead || lead.userId !== userId) throw new Error("Lead niet gevonden");
+
+  const now = new Date().toISOString();
+  const contacts = await ctx.db
+    .query("laventecareContacts")
+    .withIndex("by_user_email", (q) => q.eq("userId", userId).eq("email", email))
+    .collect();
+  const existing = contacts[0];
+
+  if (existing) {
+    await ctx.db.patch(existing._id, {
+      companyId:   existing.companyId ?? lead.companyId,
+      naam:        name || existing.naam,
+      telefoon:    phone ?? existing.telefoon,
+      rol:         existing.rol ?? "Website aanvraag",
+      isBeslisser: true,
+      gewijzigd:   now,
+    });
+    await ctx.db.patch(leadId, { contactId: existing._id, gewijzigd: now });
+    return existing._id;
+  }
+
+  const contactId = await ctx.db.insert("laventecareContacts", {
+    userId,
+    companyId:   lead.companyId,
+    naam:        name,
+    email,
+    telefoon:    phone,
+    rol:         "Website aanvraag",
+    isBeslisser: true,
+    aangemaakt:  now,
+    gewijzigd:   now,
+  });
+
+  await ctx.db.patch(leadId, { contactId, gewijzigd: now });
+  return contactId;
+}
+
+async function ingestWebsiteIntakeRecord(ctx: MutationCtx, userId: string, input: WebsiteIntakeInput) {
+  const source = input.source?.trim() || "laventecare.nl";
+  const sourceId = input.requestId?.trim() || `${input.email.trim().toLowerCase()}:${input.submittedAt ?? amsterdamDate()}`;
+
+  const existingActions = await ctx.db
+    .query("laventecareActionItems")
+    .withIndex("by_user_source", (q) => q.eq("userId", userId).eq("source", source).eq("sourceId", sourceId))
+    .collect();
+  const existingAction = existingActions.find((action) => action.linkedLeadId) ?? existingActions[0];
+  if (existingAction?.linkedLeadId) {
+    return {
+      leadId:    existingAction.linkedLeadId,
+      actionId:  existingAction._id,
+      contactId: undefined,
+      reused:    true,
+    };
+  }
+
+  const companyOrName = input.companyName?.trim() || input.name.trim();
+  const projectType = input.projectType?.trim();
+  const title = projectType ? `${companyOrName} - ${projectType}` : `Website aanvraag: ${companyOrName}`;
+  const dueDate = input.timeline && normalize(input.timeline).includes("lange termijn") ? amsterdamDate(3) : amsterdamDate(1);
+  const priority = websiteLeadPriority(input);
+  const summary = compactLines([
+    `Contact: ${input.name.trim()} <${input.email.trim().toLowerCase()}>${input.phone ? ` | ${input.phone.trim()}` : ""}`,
+    input.companyName ? `Bedrijf: ${input.companyName.trim()}` : undefined,
+    projectType ? `Projecttype: ${projectType}` : undefined,
+    input.budget ? `Budget: ${input.budget.trim()}` : undefined,
+    input.timeline ? `Tijdlijn: ${input.timeline.trim()}` : undefined,
+    input.goal ? `Doel: ${input.goal.trim()}` : undefined,
+    input.message ? `Bericht: ${input.message.trim()}` : undefined,
+    input.pageUrl ? `Pagina: ${input.pageUrl.trim()}` : undefined,
+    input.origin ? `Origin: ${input.origin.trim()}` : undefined,
+  ]);
+
+  const leadId = await createLeadRecord(ctx, userId, {
+    titel:              title,
+    companyName:        input.companyName,
+    website:            input.website,
+    bron:               source,
+    sourceId,
+    pijnpunt:           summary,
+    prioriteit:         priority,
+    fitScore:           websiteLeadFitScore(input),
+    volgendeStap:       "Plan intake, kwalificeer scope/budget/tijdlijn en bepaal discovery-fit.",
+    volgendeActieDatum: dueDate,
+  });
+  const contactId = await attachWebsiteContact(ctx, userId, leadId, input);
+  const actionId = await createActionRecord(ctx, userId, {
+    source,
+    sourceId,
+    title:        `Website lead opvolgen: ${companyOrName}`,
+    summary,
+    actionType:   "lead_opvolgen",
+    status:       "open",
+    priority,
+    dueDate,
+    linkedLeadId: leadId,
+  });
+
+  await ctx.db.insert("auditLogs", {
+    userId,
+    actor:    "system",
+    source:   "laventecare/intake",
+    action:   "website_intake_ingested",
+    entity:   "laventecareLead",
+    entityId: leadId,
+    status:   "success",
+    summary:  `Website intake verwerkt: ${title}`,
+    metadata: JSON.stringify({
+      source,
+      sourceId,
+      email: input.email.trim().toLowerCase(),
+      companyName: input.companyName,
+      projectType: input.projectType,
+      priority,
+      fitScore: websiteLeadFitScore(input),
+    }),
+    createdAt: new Date().toISOString(),
+  });
+
+  return { leadId, actionId, contactId, reused: false };
 }
 
 function knowledgeDocumentForDb(userId: string, document: (typeof LAVENTECARE_DOCUMENTS)[number], now: string) {
@@ -849,6 +1032,7 @@ export const createLead = mutation({
     companyName:        v.optional(v.string()),
     website:            v.optional(v.string()),
     bron:               v.optional(v.string()),
+    sourceId:           v.optional(v.string()),
     pijnpunt:           v.optional(v.string()),
     prioriteit:         v.optional(v.string()),
     fitScore:           v.optional(v.number()),
@@ -868,6 +1052,7 @@ export const createLeadInternal = internalMutation({
     companyName:        v.optional(v.string()),
     website:            v.optional(v.string()),
     bron:               v.optional(v.string()),
+    sourceId:           v.optional(v.string()),
     pijnpunt:           v.optional(v.string()),
     prioriteit:         v.optional(v.string()),
     fitScore:           v.optional(v.number()),
@@ -875,6 +1060,28 @@ export const createLeadInternal = internalMutation({
     volgendeActieDatum: v.optional(v.string()),
   },
   handler: async (ctx, { userId, ...args }) => createLeadRecord(ctx, userId, args),
+});
+
+export const ingestWebsiteIntakeInternal = internalMutation({
+  args: {
+    userId:      v.string(),
+    requestId:   v.optional(v.string()),
+    source:      v.optional(v.string()),
+    name:        v.string(),
+    email:       v.string(),
+    phone:       v.optional(v.string()),
+    companyName: v.optional(v.string()),
+    website:     v.optional(v.string()),
+    projectType: v.optional(v.string()),
+    budget:      v.optional(v.string()),
+    timeline:    v.optional(v.string()),
+    goal:        v.optional(v.string()),
+    message:     v.optional(v.string()),
+    pageUrl:     v.optional(v.string()),
+    origin:      v.optional(v.string()),
+    submittedAt: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, ...input }) => ingestWebsiteIntakeRecord(ctx, userId, input),
 });
 
 export const listLeadsInternal = internalQuery({

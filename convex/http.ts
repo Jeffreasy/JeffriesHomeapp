@@ -14,6 +14,14 @@ function checkAuth(req: Request): string | null {
   return provided;
 }
 
+function checkLaventeCareIntakeAuth(req: Request): string | null {
+  const expectedSecret = process.env.LAVENTECARE_INTAKE_SECRET || process.env.HOMEAPP_GAS_SECRET;
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+  if (!expectedSecret || provided !== expectedSecret) return null;
+  return provided;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -71,12 +79,61 @@ type EmailListItem = {
   searchText: string;
 };
 
+type LaventeCareIntakeBody = {
+  requestId?: string;
+  source?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  companyName?: string;
+  website?: string;
+  projectType?: string;
+  budget?: string;
+  timeline?: string;
+  goal?: string;
+  message?: string;
+  pageUrl?: string;
+  origin?: string;
+  submittedAt?: string;
+};
+
 function getErrorMessage(err: unknown, fallback = "DB fout") {
   return err instanceof Error ? err.message : fallback;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
+}
+
+function optionalString(value: unknown, max = 2000): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, max);
+}
+
+function parseLaventeCareIntake(body: Record<string, unknown>): LaventeCareIntakeBody {
+  return {
+    requestId:   optionalString(body.requestId, 128),
+    source:      optionalString(body.source, 80),
+    name:        optionalString(body.name, 120),
+    email:       optionalString(body.email, 254),
+    phone:       optionalString(body.phone ?? body.telefoon, 60),
+    companyName: optionalString(body.companyName ?? body.bedrijf, 160),
+    website:     optionalString(body.website, 300),
+    projectType: optionalString(body.projectType ?? body.dienst, 160),
+    budget:      optionalString(body.budget, 160),
+    timeline:    optionalString(body.timeline ?? body.timing, 160),
+    goal:        optionalString(body.goal, 2000),
+    message:     optionalString(body.message, 2000),
+    pageUrl:     optionalString(body.pageUrl, 500),
+    origin:      optionalString(body.origin, 300),
+    submittedAt: optionalString(body.submittedAt, 80),
+  };
+}
+
+function validEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 
@@ -261,6 +318,58 @@ http.route({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "DB fout";
       return json({ ok: false, error: msg }, 500);
+    }
+  }),
+});
+
+// ─── LaventeCare Website Intake Bridge ──────────────────────────────────────
+// Called by LaventeCareAuthSystems after a public website intake/contact request.
+// Body: structured contact/intake details; response contains lead/action ids.
+http.route({
+  path: "/laventecare/intake",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    if (!checkLaventeCareIntakeAuth(req)) return json({ ok: false, error: "Unauthorized" }, 401);
+
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return json({ ok: false, error: "Invalid JSON" }, 400);
+    }
+
+    const record = asRecord(rawBody);
+    if (!record) return json({ ok: false, error: "JSON object verplicht" }, 400);
+
+    const intake = parseLaventeCareIntake(record);
+    if (!intake.name || intake.name.length < 2) return json({ ok: false, error: "name verplicht" }, 400);
+    if (!intake.email || !validEmail(intake.email)) return json({ ok: false, error: "email ongeldig" }, 400);
+    if (!intake.goal && !intake.message && !intake.projectType) {
+      return json({ ok: false, error: "goal, message of projectType verplicht" }, 400);
+    }
+
+    try {
+      const result = await ctx.runMutation(internal.laventecare.ingestWebsiteIntakeInternal, {
+        userId:      JEFFREY_USER_ID,
+        requestId:   intake.requestId,
+        source:      intake.source,
+        name:        intake.name,
+        email:       intake.email,
+        phone:       intake.phone,
+        companyName: intake.companyName,
+        website:     intake.website,
+        projectType: intake.projectType,
+        budget:      intake.budget,
+        timeline:    intake.timeline,
+        goal:        intake.goal,
+        message:     intake.message,
+        pageUrl:     intake.pageUrl,
+        origin:      intake.origin,
+        submittedAt: intake.submittedAt,
+      });
+      return json({ ok: true, ...result }, result.reused ? 200 : 201);
+    } catch (e: unknown) {
+      return json({ ok: false, error: getErrorMessage(e, "LaventeCare intake fout") }, 500);
     }
   }),
 });

@@ -16,6 +16,17 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## LaventeCare Intake Bridge
+
+The Convex HTTP endpoint `POST /laventecare/intake` accepts structured website intakes from
+LaventeCareAuthSystems and turns them into a LaventeCare lead, contact, and follow-up action.
+Incoming requests are idempotent by `(userId, bron, sourceId)`, contacts are matched by e-mail, and
+successful ingests are written to `auditLogs` for traceability.
+
+Set `LAVENTECARE_INTAKE_SECRET` in Convex and use the same value as
+`HOMEAPP_LAVENTECARE_INTAKE_SECRET` in LaventeCareAuthSystems. The AuthSystems URL should point to
+`https://<convex-deployment>.convex.site/laventecare/intake`.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

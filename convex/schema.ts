@@ -202,6 +202,7 @@ export default defineSchema({
     gewijzigd:    v.string(),
   })
     .index("by_user", ["userId"])
+    .index("by_user_email", ["userId", "email"])
     .index("by_company", ["companyId"]),
 
   // ─── LaventeCare Leads ────────────────────────────────────────────────────
@@ -211,6 +212,7 @@ export default defineSchema({
     contactId:           v.optional(v.id("laventecareContacts")),
     titel:               v.string(),
     bron:                v.string(),
+    sourceId:            v.optional(v.string()),
     status:              v.string(),          // nieuw | intake | discovery | voorstel | gewonnen | verloren | no_match
     fitScore:            v.optional(v.number()),
     pijnpunt:            v.optional(v.string()),
@@ -222,6 +224,7 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"])
+    .index("by_user_source", ["userId", "bron", "sourceId"])
     .index("by_user_next_action", ["userId", "volgendeActieDatum"]),
 
   // ─── LaventeCare Projects ─────────────────────────────────────────────────
