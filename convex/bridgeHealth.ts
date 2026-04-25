@@ -11,6 +11,10 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 export const heartbeat = mutation({
   args: {
     bridgeSecret: v.string(),
@@ -34,7 +38,7 @@ export const heartbeat = mutation({
       .withIndex("by_bridge", (q) => q.eq("bridgeId", bridgeId))
       .first();
     const now = nowIso();
-    const patch = {
+    const patch = withoutUndefined({
       bridgeId,
       status: args.status ?? (args.lastError ? "error" : "online"),
       apiBase: args.apiBase,
@@ -48,7 +52,7 @@ export const heartbeat = mutation({
       commandsDone: args.commandsDone ?? existing?.commandsDone ?? 0,
       commandsFailed: args.commandsFailed ?? existing?.commandsFailed ?? 0,
       updatedAt: now,
-    };
+    });
 
     if (existing) {
       await ctx.db.patch(existing._id, patch);

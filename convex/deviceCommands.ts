@@ -29,11 +29,15 @@ function requireBridgeSecret(provided: string) {
   if (provided !== expected) throw new Error("Unauthorized");
 }
 
+function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 async function auditCommand(
   ctx: MutationCtx,
   args: { userId?: string; actor: string; action: string; entityId?: string; status: string; summary: string; metadata?: string },
 ) {
-  await ctx.db.insert("auditLogs", {
+  await ctx.db.insert("auditLogs", withoutUndefined({
     userId: args.userId,
     actor: args.actor,
     source: "deviceCommands",
@@ -44,7 +48,7 @@ async function auditCommand(
     summary: args.summary,
     metadata: args.metadata,
     createdAt: new Date().toISOString(),
-  });
+  }));
 }
 
 /** Zet een nieuw commando in de queue vanuit trusted Convex code. */
@@ -130,13 +134,14 @@ export const markDone = mutation({
   handler: async (ctx, { id, status, error, bridgeSecret }) => {
     requireBridgeSecret(bridgeSecret);
     const command = await ctx.db.get(id);
-    await ctx.db.patch(id, {
+    if (!command) throw new Error("Command niet gevonden");
+    await ctx.db.patch(id, withoutUndefined({
       status,
       doneAt: new Date().toISOString(),
       error,
-    });
+    }));
     await auditCommand(ctx, {
-      userId: command?.userId,
+      userId: command.userId,
       actor: "bridge",
       action: "markDone",
       entityId: id,

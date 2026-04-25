@@ -142,6 +142,7 @@ export default defineSchema({
     code:        v.string(),
     status:      v.union(
       v.literal("pending"),
+      v.literal("executing"),
       v.literal("confirmed"),
       v.literal("cancelled"),
       v.literal("expired"),

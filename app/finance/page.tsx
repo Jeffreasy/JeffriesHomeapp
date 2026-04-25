@@ -301,7 +301,7 @@ export default function FinancePage() {
   const [filters, setFilters] = useState<TransactionFilter>(DEFAULT_FILTERS);
 
   const loonstroken = useLoonstroken();
-  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy();
+  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("finance");
   const {
     transactions,
     stats,

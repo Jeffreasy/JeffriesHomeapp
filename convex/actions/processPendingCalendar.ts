@@ -14,6 +14,15 @@ import { v } from "convex/values";
 import { google } from "googleapis";
 import { createOAuthClient } from "../lib/googleAuth";
 
+const requireMatchingUser = async (
+  ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } },
+  userId: string
+) => {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity || identity.subject !== userId) {
+    throw new Error("Geen toegang tot calendar-verwerking voor deze gebruiker");
+  }
+};
 
 // ─── Internal action (voor cron en handmatige trigger) ───────────────────────
 
@@ -189,6 +198,7 @@ export const processPendingNow = action({
   args: { userId: v.string() },
   handler: async (ctx, { userId }): Promise<{ aangemaakt: number; gefaald: number; verwijderd: number }> => {
     if (!userId) throw new Error("userId is vereist");
+    await requireMatchingUser(ctx, userId);
     return ctx.runAction(internal.actions.processPendingCalendar.processPending, { userId });
   },
 });

@@ -106,7 +106,7 @@ export default function HabitsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Id<"habits"> | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Id<"habits"> | null>(null);
-  const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy();
+  const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("habits");
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setSelectedDate(todayStr()), 0);

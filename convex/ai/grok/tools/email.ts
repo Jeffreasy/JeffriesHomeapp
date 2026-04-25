@@ -5,7 +5,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { api, internal } from "../../../_generated/api";
+import { internal } from "../../../_generated/api";
 
 const MAX_BULK_EMAILS = 50;
 
@@ -52,7 +52,7 @@ export async function handleLeesEmail(ctx: any, args: Record<string, unknown>, u
 export async function handleZoekEmails(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
     const zoekterm = (args.zoekterm as string).toLowerCase();
-    const allEmails = await ctx.runQuery(api.emails.list, { userId });
+    const allEmails = await ctx.runQuery(internal.emails.listInternal, { userId });
     const matches = allEmails
       .filter((e: any) =>
         e.subject?.toLowerCase().includes(zoekterm) ||
@@ -156,7 +156,7 @@ export async function handleBulkVerwijder(ctx: any, args: Record<string, unknown
 
 export async function handleInboxOpruimen(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
-    const allEmails = await ctx.runQuery(api.emails.list, { userId });
+    const allEmails = await ctx.runQuery(internal.emails.listInternal, { userId });
     const active = allEmails.filter((e: any) => !e.isVerwijderd);
     const filter = args.filter as string;
     const maxAantal = Math.min((args.maxAantal as number) ?? MAX_BULK_EMAILS, MAX_BULK_EMAILS);

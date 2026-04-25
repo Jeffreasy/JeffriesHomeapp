@@ -5,12 +5,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { api } from "../../../_generated/api";
+import { internal } from "../../../_generated/api";
 import { getWeekNumber, WEEKDAYS, MAAND_NAMEN } from "../types";
 
 export async function handleDienstenOpvragen(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
-    const allSchedule = await ctx.runQuery(api.schedule.list, { userId });
+    const allSchedule = await ctx.runQuery(internal.schedule.listInternal, { userId });
     const active = allSchedule.filter((s: any) => s.status !== "VERWIJDERD");
 
     let vanDatum: string;
@@ -31,7 +31,7 @@ export async function handleDienstenOpvragen(ctx: any, args: Record<string, unkn
       .filter((s: any) => s.startDatum >= vanDatum && s.startDatum <= totDatum)
       .sort((a: any, b: any) => a.startDatum.localeCompare(b.startDatum));
 
-    const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
+    const allEvents = await ctx.runQuery(internal.personalEvents.listInternal, { userId });
 
     const weken: Record<string, any[]> = {};
     let totaalUren = 0;
@@ -106,7 +106,7 @@ export async function handleSalarisOpvragen(ctx: any, args: Record<string, unkno
     const jaar = (args.jaar as number) ?? new Date().getFullYear();
     const periode = `${jaar}-${String(maand).padStart(2, "0")}`;
 
-    const stored = await ctx.runQuery(api.salary.getByPeriode, { userId, periode });
+    const stored = await ctx.runQuery(internal.salary.getByPeriodeInternal, { userId, periode });
     if (stored) {
       return JSON.stringify({
         bron: "opgeslagen", periode,
@@ -116,7 +116,7 @@ export async function handleSalarisOpvragen(ctx: any, args: Record<string, unkno
       });
     }
 
-    const berekend = await ctx.runQuery(api.salary.computeFromSchedule, { userId });
+    const berekend = await ctx.runQuery(internal.salary.computeFromScheduleInternal, { userId });
     const maandData = berekend.find((s: any) => s.periode === periode);
     if (maandData) {
       return JSON.stringify({

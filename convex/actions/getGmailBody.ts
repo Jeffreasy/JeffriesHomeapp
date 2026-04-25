@@ -10,6 +10,7 @@
  */
 
 import { action, internalAction } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { google } from "googleapis";
 import { createOAuthClient } from "../lib/googleAuth";
@@ -75,14 +76,27 @@ function extractAttachments(payload: any, gmailId: string): {
 
 // ─── Action ──────────────────────────────────────────────────────────────────
 
+async function requireUserId(ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } }) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Niet ingelogd");
+  return identity.subject;
+}
+
+async function verifyKnownEmail(ctx: any, userId: string, gmailId: string) {
+  const email = await ctx.runQuery(internal.emails.getByGmailIdInternal, { userId, gmailId });
+  if (!email) throw new Error("Email niet gevonden voor deze gebruiker");
+}
+
 /** Haal de volledige body + bijlagen metadata op voor een specifiek email. */
 export const getBody = action({
   args: {
     userId:  v.string(),
     gmailId: v.string(),
   },
-  handler: async (_ctx, { userId, gmailId }) => {
-    if (!userId) throw new Error("userId is vereist");
+  handler: async (ctx, { userId, gmailId }) => {
+    const owner = await requireUserId(ctx);
+    if (owner !== userId) throw new Error("Unauthorized");
+    await verifyKnownEmail(ctx, owner, gmailId);
 
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
@@ -123,7 +137,10 @@ export const getAttachment = action({
     gmailId:      v.string(),
     attachmentId: v.string(),
   },
-  handler: async (_ctx, { gmailId, attachmentId }) => {
+  handler: async (ctx, { gmailId, attachmentId }) => {
+    const userId = await requireUserId(ctx);
+    await verifyKnownEmail(ctx, userId, gmailId);
+
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
 
@@ -145,7 +162,9 @@ export const getAttachment = action({
 /** Internal: email body ophalen vanuit Grok action. */
 export const getBodyInternal = internalAction({
   args: { userId: v.string(), gmailId: v.string() },
-  handler: async (_ctx, { userId, gmailId }) => {
+  handler: async (ctx, { userId, gmailId }) => {
+    await verifyKnownEmail(ctx, userId, gmailId);
+
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     const res = await gmail.users.messages.get({ userId: "me", id: gmailId, format: "full" });

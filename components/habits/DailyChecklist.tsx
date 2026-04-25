@@ -13,7 +13,7 @@ import { formatLevel } from "@/lib/habit-constants";
  */
 export function DailyChecklist() {
   const { todayHabits, todaySummary, level, toggle, isLoading } = useHabits();
-  const { hidden: privacyOn } = usePrivacy();
+  const { hidden: privacyOn } = usePrivacy("habits");
 
   if (isLoading) {
     return (

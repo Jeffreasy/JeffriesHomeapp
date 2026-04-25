@@ -123,19 +123,27 @@ async function handlePendingIntent(
     return { ok: true, antwoord: `Geannuleerd: ${action.summary}` };
   }
 
-  if (!isToolAllowed(action.agentId, action.toolName)) {
+  const claimedAction = await ctx.runMutation(internal.ai.grok.pendingActions.claimForUser, {
+    id: action._id,
+    userId,
+  }) as PendingAction | null;
+  if (!claimedAction) {
+    return { ok: false, error: "Deze actie is verlopen of wordt al uitgevoerd." };
+  }
+
+  if (!isToolAllowed(claimedAction.agentId, claimedAction.toolName)) {
     await ctx.runMutation(internal.ai.grok.pendingActions.markStatus, {
-      id: action._id,
+      id: claimedAction._id,
       status: "failed",
       error: "Tool is niet toegestaan voor deze agent.",
     });
     return { ok: false, error: "Deze actie is niet meer toegestaan voor deze agent." };
   }
 
-  const args = safeJsonParse(action.argsJson);
+  const args = safeJsonParse(claimedAction.argsJson);
   if (!args) {
     await ctx.runMutation(internal.ai.grok.pendingActions.markStatus, {
-      id: action._id,
+      id: claimedAction._id,
       status: "failed",
       error: "Ongeldige opgeslagen tool arguments.",
     });
@@ -143,11 +151,11 @@ async function handlePendingIntent(
   }
 
   try {
-    const result = await executeTool(ctx, action.toolName, args, userId);
+    const result = await executeTool(ctx, claimedAction.toolName, args, userId);
     const parsed = safeJsonParse(result);
     const status = parsed?.error ? "failed" : "confirmed";
     await ctx.runMutation(internal.ai.grok.pendingActions.markStatus, {
-      id: action._id,
+      id: claimedAction._id,
       status,
       ...(status === "confirmed" ? { result } : { error: String(parsed?.error ?? result) }),
     });
@@ -159,7 +167,7 @@ async function handlePendingIntent(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await ctx.runMutation(internal.ai.grok.pendingActions.markStatus, {
-      id: action._id,
+      id: claimedAction._id,
       status: "failed",
       error: message,
     });

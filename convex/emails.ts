@@ -1,6 +1,37 @@
 import { v } from "convex/values";
 import { query, internalMutation, internalQuery } from "./_generated/server";
 
+async function resolveUserId(
+  ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } },
+  requestedUserId: string,
+) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Niet ingelogd");
+  if (requestedUserId !== identity.subject) throw new Error("Unauthorized");
+  return identity.subject;
+}
+
+async function listEmails(
+  ctx: { db: any },
+  userId: string,
+  label?: string,
+  onlyOngelezen?: boolean,
+) {
+  const rows = await ctx.db
+    .query("emails")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .collect();
+
+  return rows
+    .filter((e: any) => {
+      if (e.isVerwijderd && label !== "TRASH") return false;
+      if (label && !e.labelIds.includes(label)) return false;
+      if (onlyOngelezen && e.isGelezen) return false;
+      return true;
+    })
+    .sort((a: any, b: any) => b.ontvangen - a.ontvangen);
+}
+
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 /** Inbox listing — alle niet-verwijderde emails, nieuwste eerst. */
@@ -11,34 +42,34 @@ export const list = query({
     onlyOngelezen: v.optional(v.boolean()),
   },
   handler: async (ctx, { userId, label, onlyOngelezen }) => {
-    let q = ctx.db
-      .query("emails")
-      .withIndex("by_user", (q) => q.eq("userId", userId));
-
-    const rows = await q.collect();
-
-    return rows
-      .filter((e) => {
-        if (e.isVerwijderd && label !== "TRASH") return false;
-        if (label && !e.labelIds.includes(label)) return false;
-        if (onlyOngelezen && e.isGelezen) return false;
-        return true;
-      })
-      .sort((a, b) => b.ontvangen - a.ontvangen);
+    const owner = await resolveUserId(ctx, userId);
+    return listEmails(ctx, owner, label, onlyOngelezen);
   },
+});
+
+export const listInternal = internalQuery({
+  args: {
+    userId:    v.string(),
+    label:     v.optional(v.string()),
+    onlyOngelezen: v.optional(v.boolean()),
+  },
+  handler: async (ctx, { userId, label, onlyOngelezen }) =>
+    listEmails(ctx, userId, label, onlyOngelezen),
 });
 
 /** Alle berichten in een thread, chronologisch. */
 export const getThread = query({
   args: { userId: v.string(), threadId: v.string() },
-  handler: async (ctx, { userId, threadId }) =>
-    (await ctx.db
+  handler: async (ctx, { userId, threadId }) => {
+    const owner = await resolveUserId(ctx, userId);
+    return (await ctx.db
       .query("emails")
       .withIndex("by_user_thread", (q) =>
-        q.eq("userId", userId).eq("threadId", threadId)
+        q.eq("userId", owner).eq("threadId", threadId)
       )
       .collect()
-    ).sort((a, b) => a.ontvangen - b.ontvangen),
+    ).sort((a, b) => a.ontvangen - b.ontvangen);
+  },
 });
 
 /** Full-text search over emails. */
@@ -49,12 +80,13 @@ export const search = query({
     inclVerwijderd: v.optional(v.boolean()),
   },
   handler: async (ctx, { userId, zoekterm, inclVerwijderd }) => {
+    const owner = await resolveUserId(ctx, userId);
     if (!zoekterm.trim()) return [];
 
     const results = await ctx.db
       .query("emails")
       .withSearchIndex("search_emails", (q) => {
-        let sq = q.search("searchText", zoekterm).eq("userId", userId);
+        let sq = q.search("searchText", zoekterm).eq("userId", owner);
         if (!inclVerwijderd) sq = sq.eq("isVerwijderd", false);
         return sq;
       })
@@ -68,9 +100,10 @@ export const search = query({
 export const getStats = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
+    const owner = await resolveUserId(ctx, userId);
     const all = await ctx.db
       .query("emails")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .collect();
 
     const active = all.filter((e) => !e.isVerwijderd);
@@ -98,9 +131,10 @@ export const getStats = query({
 export const aiSummary = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
+    const owner = await resolveUserId(ctx, userId);
     const all = await ctx.db
       .query("emails")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .collect();
 
     const active = all.filter((e) => !e.isVerwijderd);
@@ -180,9 +214,10 @@ export const aiSummary = query({
 export const senderAnalysis = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
+    const owner = await resolveUserId(ctx, userId);
     const all = await ctx.db
       .query("emails")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .collect();
 
     const active = all.filter((e) => !e.isVerwijderd);
@@ -229,9 +264,10 @@ export const senderAnalysis = query({
 export const recentByCategory = query({
   args: { userId: v.string(), categorie: v.string(), limiet: v.optional(v.number()) },
   handler: async (ctx, { userId, categorie, limiet }) => {
+    const owner = await resolveUserId(ctx, userId);
     const all = await ctx.db
       .query("emails")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .collect();
 
     return all
@@ -252,6 +288,15 @@ export const recentByCategory = query({
 });
 
 // ─── Internal Mutations (voor sync actions) ─────────────────────────────────
+
+export const getByGmailIdInternal = internalQuery({
+  args: { userId: v.string(), gmailId: v.string() },
+  handler: async (ctx, { userId, gmailId }) =>
+    ctx.db
+      .query("emails")
+      .withIndex("by_user_gmailId", (q) => q.eq("userId", userId).eq("gmailId", gmailId))
+      .first(),
+});
 
 /** Alle gmailIds ophalen — voor reconciliatie (sync vergelijking). */
 export const listAllGmailIds = internalQuery({

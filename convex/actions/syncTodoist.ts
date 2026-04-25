@@ -17,6 +17,16 @@ import { v } from "convex/values";
 const TODOIST_BASE   = "https://api.todoist.com/api/v1/";
 const TODOIST_LABEL  = "Rooster";
 
+const requireMatchingUser = async (
+  ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } },
+  userId: string
+) => {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity || identity.subject !== userId) {
+    throw new Error("Geen toegang tot Todoist-sync voor deze gebruiker");
+  }
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TodoistTask {
@@ -203,6 +213,7 @@ export const syncTodoistNow = action({
   args: { userId: v.string() },
   handler: async (ctx, { userId }): Promise<{ created: number; updated: number; closed: number }> => {
     if (!userId) throw new Error("userId is vereist");
+    await requireMatchingUser(ctx, userId);
     return ctx.runAction(internal.actions.syncTodoist.syncTodoist, { userId });
   },
 });

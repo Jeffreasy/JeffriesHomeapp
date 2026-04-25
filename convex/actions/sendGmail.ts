@@ -83,6 +83,18 @@ function buildRawEmail(opts: {
     .replace(/=+$/, "");
 }
 
+async function requireKnownEmail(ctx: any, userId: string, gmailId: string) {
+  const email = await ctx.runQuery(internal.emails.getByGmailIdInternal, { userId, gmailId });
+  if (!email) throw new Error("Email niet gevonden voor deze gebruiker");
+  return email;
+}
+
+async function requireKnownEmails(ctx: any, userId: string, gmailIds: string[]) {
+  for (const gmailId of gmailIds) {
+    await requireKnownEmail(ctx, userId, gmailId);
+  }
+}
+
 // ─── Send Email ──────────────────────────────────────────────────────────────
 
 /** Nieuw email versturen via Gmail API. */
@@ -95,7 +107,7 @@ export const sendEmail = internalAction({
     cc:      v.optional(v.string()),
     bcc:     v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (_ctx, args) => {
     if (!args.userId) throw new Error("userId is vereist");
 
     const auth  = createOAuthClient();
@@ -132,6 +144,7 @@ export const replyToEmail = internalAction({
   },
   handler: async (ctx, args) => {
     if (!args.userId) throw new Error("userId is vereist");
+    await requireKnownEmail(ctx, args.userId, args.gmailId);
 
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
@@ -172,6 +185,7 @@ export const replyToEmail = internalAction({
 export const trashEmail = internalAction({
   args: { userId: v.string(), gmailId: v.string() },
   handler: async (ctx, { userId, gmailId }) => {
+    await requireKnownEmail(ctx, userId, gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.trash({ userId: "me", id: gmailId });
@@ -184,6 +198,7 @@ export const trashEmail = internalAction({
 export const untrashEmail = internalAction({
   args: { userId: v.string(), gmailId: v.string() },
   handler: async (ctx, { userId, gmailId }) => {
+    await requireKnownEmail(ctx, userId, gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.untrash({ userId: "me", id: gmailId });
@@ -202,7 +217,8 @@ export const modifyLabels = internalAction({
     addLabels:     v.optional(v.array(v.string())),
     removeLabels:  v.optional(v.array(v.string())),
   },
-  handler: async (_ctx, { gmailId, addLabels, removeLabels }) => {
+  handler: async (ctx, { userId, gmailId, addLabels, removeLabels }) => {
+    await requireKnownEmail(ctx, userId, gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.modify({
@@ -223,6 +239,7 @@ export const modifyLabels = internalAction({
 export const markGelezen = internalAction({
   args: { userId: v.string(), gmailId: v.string(), gelezen: v.boolean() },
   handler: async (ctx, { userId, gmailId, gelezen }) => {
+    await requireKnownEmail(ctx, userId, gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
 
@@ -243,6 +260,7 @@ export const markGelezen = internalAction({
 export const markSter = internalAction({
   args: { userId: v.string(), gmailId: v.string(), ster: v.boolean() },
   handler: async (ctx, { userId, gmailId, ster }) => {
+    await requireKnownEmail(ctx, userId, gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
 
@@ -270,6 +288,7 @@ export const bulkMarkGelezen = internalAction({
   },
   handler: async (ctx, { userId, gmailIds, gelezen }) => {
     if (gmailIds.length === 0) return { ok: true, count: 0 };
+    await requireKnownEmails(ctx, userId, gmailIds);
 
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
@@ -300,6 +319,7 @@ export const bulkTrash = internalAction({
   },
   handler: async (ctx, { userId, gmailIds }) => {
     if (gmailIds.length === 0) return { ok: true, count: 0 };
+    await requireKnownEmails(ctx, userId, gmailIds);
 
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
@@ -327,6 +347,7 @@ export const bulkTrash = internalAction({
 export const markGelezenInternal = internalAction({
   args: { userId: v.string(), gmailId: v.string(), gelezen: v.boolean() },
   handler: async (ctx, { userId, gmailId, gelezen }) => {
+    await requireKnownEmail(ctx, userId, gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.modify({
@@ -342,6 +363,7 @@ export const markGelezenInternal = internalAction({
 export const markSterInternal = internalAction({
   args: { userId: v.string(), gmailId: v.string(), ster: v.boolean() },
   handler: async (ctx, { userId, gmailId, ster }) => {
+    await requireKnownEmail(ctx, userId, gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.modify({
@@ -357,6 +379,7 @@ export const markSterInternal = internalAction({
 export const trashEmailInternal = internalAction({
   args: { userId: v.string(), gmailId: v.string() },
   handler: async (ctx, { userId, gmailId }) => {
+    await requireKnownEmail(ctx, userId, gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.trash({ userId: "me", id: gmailId });
@@ -370,6 +393,7 @@ export const bulkMarkGelezenInternal = internalAction({
   args: { userId: v.string(), gmailIds: v.array(v.string()), gelezen: v.boolean() },
   handler: async (ctx, { userId, gmailIds, gelezen }) => {
     if (gmailIds.length === 0) return { ok: true, count: 0 };
+    await requireKnownEmails(ctx, userId, gmailIds);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.batchModify({
@@ -391,6 +415,7 @@ export const bulkTrashInternal = internalAction({
   args: { userId: v.string(), gmailIds: v.array(v.string()) },
   handler: async (ctx, { userId, gmailIds }) => {
     if (gmailIds.length === 0) return { ok: true, count: 0 };
+    await requireKnownEmails(ctx, userId, gmailIds);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     await gmail.users.messages.batchModify({
@@ -438,7 +463,8 @@ export const replyToEmailInternal = internalAction({
     body:     v.string(),
     cc:       v.optional(v.string()),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    await requireKnownEmail(ctx, args.userId, args.gmailId);
     const auth  = createOAuthClient();
     const gmail = google.gmail({ version: "v1", auth });
     const orig = await gmail.users.messages.get({

@@ -2,6 +2,16 @@ import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { dienstFields } from "./lib/fields";
 
+async function resolveUserId(
+  ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } },
+  requestedUserId: string,
+) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Niet ingelogd");
+  if (requestedUserId !== identity.subject) throw new Error("Unauthorized");
+  return identity.subject;
+}
+
 // ─── Smart upsert per eventId (gebruikt door syncSchedule action) ─────────────
 export const bulkUpsertFromCalendar = internalMutation({
   args: {
@@ -82,27 +92,42 @@ export const listInternal = internalQuery({
 /** Alle actieve diensten voor de gebruiker (filtert VERWIJDERD server-side). */
 export const list = query({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }) =>
-    (await ctx.db
+  handler: async (ctx, { userId }) => {
+    const owner = await resolveUserId(ctx, userId);
+    return (await ctx.db
       .query("schedule")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .collect()
-    ).filter((d) => d.status !== "VERWIJDERD"),
+    ).filter((d) => d.status !== "VERWIJDERD");
+  },
 });
 
 // ─── Get schedule meta ────────────────────────────────────────────────────────
 export const getMeta = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
+    const owner = await resolveUserId(ctx, userId);
     return ctx.db
       .query("scheduleMeta")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .first();
   },
 });
 
 /** Diensten op een specifieke datum (filtert VERWIJDERD). */
 export const listByDate = query({
+  args: { userId: v.string(), date: v.string() },
+  handler: async (ctx, { userId, date }) => {
+    const owner = await resolveUserId(ctx, userId);
+    return ctx.db
+      .query("schedule")
+      .withIndex("by_user_date", (q) => q.eq("userId", owner).eq("startDatum", date))
+      .filter((q) => q.neq(q.field("status"), "VERWIJDERD"))
+      .collect();
+  },
+});
+
+export const listByDateInternal = internalQuery({
   args: { userId: v.string(), date: v.string() },
   handler: async (ctx, { userId, date }) =>
     ctx.db
@@ -121,22 +146,23 @@ export const bulkImport = mutation({
     fileName:   v.string(),
   },
   handler: async (ctx, { userId, diensten, importedAt, fileName }) => {
+    const owner = await resolveUserId(ctx, userId);
     const existing = await ctx.db
       .query("schedule")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .collect();
     await Promise.all(existing.map((r) => ctx.db.delete(r._id)));
-    await Promise.all(diensten.map((d) => ctx.db.insert("schedule", d)));
+    await Promise.all(diensten.map((d) => ctx.db.insert("schedule", { ...d, userId: owner })));
 
     const existingMeta = await ctx.db
       .query("scheduleMeta")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .first();
 
     if (existingMeta) {
       await ctx.db.patch(existingMeta._id, { importedAt, fileName, totalRows: diensten.length });
     } else {
-      await ctx.db.insert("scheduleMeta", { userId, importedAt, fileName, totalRows: diensten.length });
+      await ctx.db.insert("scheduleMeta", { userId: owner, importedAt, fileName, totalRows: diensten.length });
     }
 
     return { count: diensten.length };

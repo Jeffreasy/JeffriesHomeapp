@@ -6,10 +6,10 @@
  */
 
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 
 /** Sla een bericht op (user of assistant). */
-export const save = mutation({
+export const save = internalMutation({
   args: {
     chatId:  v.number(),
     role:    v.union(v.literal("user"), v.literal("assistant")),
@@ -35,7 +35,7 @@ export const save = mutation({
 });
 
 /** Haal de laatste N berichten op voor een chat. */
-export const getHistory = query({
+export const getHistory = internalQuery({
   args: {
     chatId: v.number(),
     limit:  v.optional(v.number()),

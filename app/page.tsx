@@ -171,7 +171,7 @@ export default function DashboardPage() {
     withConflicts,
     isLoading: eventsLoading,
   } = usePersonalEvents({ diensten: thisWeek });
-  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy();
+  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("finance");
   const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 

@@ -4,41 +4,59 @@ import { eventFields } from "./lib/fields";
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
-async function requireAuth(ctx: { auth: { getUserIdentity: () => Promise<any> } }) {
+async function requireAuth(ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } }) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Niet ingelogd");
-  return identity.subject as string; // Clerk user ID
+  return identity.subject; // Clerk user ID
+}
+
+async function resolveUserId(
+  ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } },
+  requestedUserId?: string,
+) {
+  const userId = await requireAuth(ctx);
+  if (requestedUserId && requestedUserId !== userId) throw new Error("Unauthorized");
+  return userId;
+}
+
+async function listVisibleEvents(ctx: { db: any }, userId: string) {
+  const rows = await ctx.db
+    .query("personalEvents")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .collect();
+
+  const order = { Aankomend: 0, PendingCreate: 0, Voorbij: 1 } as Record<string, number>;
+  return rows
+    .filter((r: any) => r.status !== "VERWIJDERD")
+    .sort((a: any, b: any) => {
+      const sA = order[a.status] ?? 1;
+      const sB = order[b.status] ?? 1;
+      if (sA !== sB) return sA - sB;
+      return a.status === "Aankomend" || a.status === "PendingCreate"
+        ? a.startDatum.localeCompare(b.startDatum)
+        : b.startDatum.localeCompare(a.startDatum);
+    });
 }
 
 /** Alle persoonlijke events voor een user. Filtert VERWIJDERD server-side. */
 export const list = query({
   args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
-    const rows = await ctx.db
-      .query("personalEvents")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-
-    const order = { Aankomend: 0, PendingCreate: 0, Voorbij: 1 } as Record<string, number>;
-    return rows
-      .filter((r) => r.status !== "VERWIJDERD")
-      .sort((a, b) => {
-        const sA = order[a.status] ?? 1;
-        const sB = order[b.status] ?? 1;
-        if (sA !== sB) return sA - sB;
-        return a.status === "Aankomend" || a.status === "PendingCreate"
-          ? a.startDatum.localeCompare(b.startDatum)
-          : b.startDatum.localeCompare(a.startDatum);
-      });
+    const userId = await resolveUserId(ctx, args.userId);
+    return listVisibleEvents(ctx, userId);
   },
+});
+
+export const listInternal = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => listVisibleEvents(ctx, userId),
 });
 
 /** Alleen aankomende events — voor dashboard en widgets. */
 export const listUpcoming = query({
   args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     return ctx.db
       .query("personalEvents")
       .withIndex("by_user_status", (q) =>
@@ -55,7 +73,7 @@ export const listUpcoming = query({
 export const listByDate = query({
   args: { userId: v.optional(v.string()), date: v.string() },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     return ctx.db
       .query("personalEvents")
       .withIndex("by_user_date", (q) =>
@@ -208,10 +226,42 @@ export const create = mutation({
     beschrijving: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     const eventId = `${args.titel}::pending::${Date.now()}`;
     await ctx.db.insert("personalEvents", {
       userId,
+      eventId,
+      titel:        args.titel,
+      startDatum:   args.startDatum,
+      eindDatum:    args.eindDatum,
+      heledag:      args.heledag,
+      startTijd:    args.startTijd,
+      eindTijd:     args.eindTijd,
+      locatie:      args.locatie,
+      beschrijving: args.beschrijving,
+      status:       "PendingCreate",
+      kalender:     "Main",
+    });
+    return { ok: true, eventId };
+  },
+});
+
+export const createInternal = internalMutation({
+  args: {
+    userId:       v.string(),
+    titel:        v.string(),
+    startDatum:   v.string(),
+    eindDatum:    v.string(),
+    heledag:      v.boolean(),
+    startTijd:    v.optional(v.string()),
+    eindTijd:     v.optional(v.string()),
+    locatie:      v.optional(v.string()),
+    beschrijving: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const eventId = `${args.titel}::pending::${Date.now()}`;
+    await ctx.db.insert("personalEvents", {
+      userId: args.userId,
       eventId,
       titel:        args.titel,
       startDatum:   args.startDatum,
@@ -241,7 +291,7 @@ export const remove = mutation({
     zoekterm: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     let target;
 
     if (args.eventId) {
@@ -339,7 +389,7 @@ export const updateStatus = mutation({
     googleId: v.optional(v.string()), // Google Calendar event ID
   },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     const existing = await ctx.db
       .query("personalEvents")
       .withIndex("by_user_eventId", (q) =>

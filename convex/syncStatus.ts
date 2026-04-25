@@ -6,6 +6,10 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 async function upsertStatus(ctx: MutationCtx, args: {
   userId: string;
   source: string;
@@ -22,7 +26,7 @@ async function upsertStatus(ctx: MutationCtx, args: {
     .withIndex("by_user_source", (q) => q.eq("userId", args.userId).eq("source", args.source))
     .first();
   const updatedAt = nowIso();
-  const patch = { ...args, updatedAt };
+  const patch = withoutUndefined({ ...args, updatedAt });
   if (existing) {
     await ctx.db.patch(existing._id, patch);
     return existing._id;

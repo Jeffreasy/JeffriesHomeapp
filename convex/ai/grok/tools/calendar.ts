@@ -5,7 +5,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { api } from "../../../_generated/api";
+import { internal } from "../../../_generated/api";
 import { todayCET } from "../types";
 
 /** Corrigeert Google's +1 dag quirk voor hele-dag events. */
@@ -23,7 +23,7 @@ export async function handleAfspraakBewerken(ctx: any, args: Record<string, unkn
   try {
     const eventId = args.eventId as string | undefined;
     const zoekterm = (args.zoekterm as string | undefined)?.toLowerCase();
-    const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
+    const allEvents = await ctx.runQuery(internal.personalEvents.listInternal, { userId });
 
     if (!eventId) {
       if (!zoekterm) {
@@ -67,7 +67,7 @@ export async function handleAfspraakBewerken(ctx: any, args: Record<string, unkn
 
     const match = matches[0];
 
-    const result = await ctx.runAction(api.actions.updatePersonalEvent.updateEvent, {
+    const result = await ctx.runAction(internal.actions.updatePersonalEvent.updateEventInternal, {
       userId,
       eventId: match.eventId,
       titel: (args.titel as string) ?? match.titel,
@@ -111,7 +111,7 @@ export async function handleAfspraakMaken(ctx: any, args: Record<string, unknown
       ? `${rawBeschrijving} [categorie:${categorie}]`
       : `[categorie:${categorie}]`;
 
-    const result = await ctx.runMutation(api.personalEvents.create, {
+    const result = await ctx.runMutation(internal.personalEvents.createInternal, {
       userId,
       titel: args.titel as string,
       startDatum: args.startDatum as string,
@@ -146,7 +146,7 @@ export async function handleAfspraakVerwijderen(ctx: any, args: Record<string, u
   try {
     const eventId = args.eventId as string | undefined;
     const zoekterm = (args.zoekterm as string | undefined)?.toLowerCase();
-    const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
+    const allEvents = await ctx.runQuery(internal.personalEvents.listInternal, { userId });
 
     if (!eventId) {
       if (!zoekterm) {
@@ -195,7 +195,7 @@ export async function handleAfspraakVerwijderen(ctx: any, args: Record<string, u
     const match = matches[0];
 
     // Instant dual-write: verwijder uit Google Calendar + Convex DB in één stap
-    const result = await ctx.runAction(api.actions.deletePersonalEvent.deleteEvent, {
+    const result = await ctx.runAction(internal.actions.deletePersonalEvent.deleteEventInternal, {
       userId, eventId: match.eventId,
     });
 
@@ -220,12 +220,12 @@ export async function handleAfsprakenOpvragen(ctx: any, args: Record<string, unk
     const today = todayCET();
     const endDate = new Date(Date.now() + aantalDagen * 86400000).toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
 
-    const allEvents = await ctx.runQuery(api.personalEvents.list, { userId });
+    const allEvents = await ctx.runQuery(internal.personalEvents.listInternal, { userId });
     const upcoming = allEvents
       .filter((e: any) => e.status === "Aankomend" && e.startDatum >= today && e.startDatum <= endDate)
       .sort((a: any, b: any) => a.startDatum.localeCompare(b.startDatum));
 
-    const schedule = await ctx.runQuery(api.schedule.list, { userId });
+    const schedule = await ctx.runQuery(internal.schedule.listInternal, { userId });
     const weekdays = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
 
     const afspraken = upcoming.map((e: any) => {

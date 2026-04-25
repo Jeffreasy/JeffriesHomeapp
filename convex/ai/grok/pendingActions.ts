@@ -112,6 +112,19 @@ export const getPendingById = internalQuery({
   },
 });
 
+export const claimForUser = internalMutation({
+  args: {
+    id:     v.id("aiPendingActions"),
+    userId: v.string(),
+  },
+  handler: async (ctx, { id, userId }) => {
+    const action = await ctx.db.get(id);
+    if (!action || action.userId !== userId || action.status !== "pending" || action.expiresAt <= nowIso()) return null;
+    await ctx.db.patch(id, { status: "executing" });
+    return action;
+  },
+});
+
 export const cancelForUser = mutation({
   args: { id: v.id("aiPendingActions") },
   handler: async (ctx, { id }) => {
@@ -138,8 +151,8 @@ export const confirmForUser = action({
   args: { id: v.id("aiPendingActions") },
   handler: async (ctx, { id }) => {
     const userId = await requireUserId(ctx);
-    const actionToRun = await ctx.runQuery(internal.ai.grok.pendingActions.getPendingById, { id, userId });
-    if (!actionToRun) throw new Error("Actie niet gevonden of verlopen");
+    const actionToRun = await ctx.runMutation(internal.ai.grok.pendingActions.claimForUser, { id, userId });
+    if (!actionToRun) throw new Error("Actie niet gevonden, verlopen of al in uitvoering");
     if (!isToolAllowed(actionToRun.agentId, actionToRun.toolName)) {
       await ctx.runMutation(internal.ai.grok.pendingActions.markStatus, {
         id,
@@ -211,6 +224,7 @@ export const markStatus = internalMutation({
       v.literal("confirmed"),
       v.literal("cancelled"),
       v.literal("expired"),
+      v.literal("executing"),
       v.literal("failed"),
     ),
     result: v.optional(v.string()),

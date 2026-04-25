@@ -164,7 +164,7 @@ export default function SettingsPage() {
   const { openConfirm } = useConfirm();
   const { success, error: toastError } = useToast();
   const { user, isLoaded: userLoaded } = useUser();
-  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy();
+  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("account");
   const syncSchedule = useAction(api.actions.syncSchedule.syncNow);
   const syncPersonal = useAction(api.actions.syncPersonalEvents.syncPersonalNow);
   const syncGmail = useAction(api.actions.syncGmail.syncNow);

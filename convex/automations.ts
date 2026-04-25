@@ -1,15 +1,44 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
+
+async function currentUserId(ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } }) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new Error("Niet ingelogd");
+  return identity.subject;
+}
+
+async function resolveUserId(
+  ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } },
+  requestedUserId?: string,
+) {
+  const userId = await currentUserId(ctx);
+  if (requestedUserId && requestedUserId !== userId) throw new Error("Unauthorized");
+  return userId;
+}
+
+function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
 
 // ─── List all automations for the current user ────────────────────────────────
 export const list = query({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
+    const owner = await resolveUserId(ctx, userId);
     return ctx.db
       .query("automations")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .collect();
   },
+});
+
+export const listInternal = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) =>
+    ctx.db
+      .query("automations")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect(),
 });
 
 // ─── Create a new automation ──────────────────────────────────────────────────
@@ -36,7 +65,8 @@ export const create = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    return ctx.db.insert("automations", { ...args, lastFiredAt: undefined });
+    const userId = await resolveUserId(ctx, args.userId);
+    return ctx.db.insert("automations", withoutUndefined({ ...args, userId }));
   },
 });
 
@@ -44,8 +74,10 @@ export const create = mutation({
 export const toggle = mutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
+    const userId = await currentUserId(ctx);
     const existing = await ctx.db.get(id);
     if (!existing) throw new Error("Automation niet gevonden");
+    if (existing.userId !== userId) throw new Error("Unauthorized");
     await ctx.db.patch(id, { enabled: !existing.enabled });
   },
 });
@@ -54,6 +86,9 @@ export const toggle = mutation({
 export const remove = mutation({
   args: { id: v.id("automations") },
   handler: async (ctx, { id }) => {
+    const userId = await currentUserId(ctx);
+    const existing = await ctx.db.get(id);
+    if (!existing || existing.userId !== userId) throw new Error("Automation niet gevonden");
     await ctx.db.delete(id);
   },
 });
@@ -62,6 +97,9 @@ export const remove = mutation({
 export const markFired = mutation({
   args: { id: v.id("automations"), firedAt: v.string() },
   handler: async (ctx, { id, firedAt }) => {
+    const userId = await currentUserId(ctx);
+    const existing = await ctx.db.get(id);
+    if (!existing || existing.userId !== userId) throw new Error("Automation niet gevonden");
     await ctx.db.patch(id, { lastFiredAt: firedAt });
   },
 });
@@ -70,9 +108,10 @@ export const markFired = mutation({
 export const removeByGroup = mutation({
   args: { userId: v.string(), group: v.string() },
   handler: async (ctx, { userId, group }) => {
+    const owner = await resolveUserId(ctx, userId);
     const rows = await ctx.db
       .query("automations")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", owner))
       .filter((q) => q.eq(q.field("group"), group))
       .collect();
     await Promise.all(rows.map((r) => ctx.db.delete(r._id)));

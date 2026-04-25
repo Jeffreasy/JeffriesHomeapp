@@ -17,6 +17,10 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function withoutUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as T;
+}
+
 async function currentUserId(ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } }) {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Niet ingelogd");
@@ -26,10 +30,10 @@ async function currentUserId(ctx: { auth: { getUserIdentity: () => Promise<{ sub
 export const recordInternal = internalMutation({
   args: auditArgs,
   handler: async (ctx, args) => {
-    return ctx.db.insert("auditLogs", {
+    return ctx.db.insert("auditLogs", withoutUndefined({
       ...args,
       createdAt: nowIso(),
-    });
+    }));
   },
 });
 
@@ -45,12 +49,12 @@ export const recordForUser = mutation({
   },
   handler: async (ctx, args) => {
     const userId = await currentUserId(ctx);
-    return ctx.db.insert("auditLogs", {
+    return ctx.db.insert("auditLogs", withoutUndefined({
       userId,
       actor: "user",
       ...args,
       createdAt: nowIso(),
-    });
+    }));
   },
 });
 

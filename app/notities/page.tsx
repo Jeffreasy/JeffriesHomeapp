@@ -206,7 +206,7 @@ export default function NotitiesPage() {
     archive,
     remove,
   } = useNotes();
-  const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy();
+  const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("notes");
 
   const [viewMode, setViewMode] = useState<ViewMode>("active");
   const [sortMode, setSortMode] = useState<SortMode>("recent");

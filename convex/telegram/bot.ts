@@ -8,7 +8,7 @@
  */
 
 import { action, internalAction, type ActionCtx } from "../_generated/server";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import {
   sendMessage,
@@ -40,6 +40,15 @@ function getOwnerChatId(): string {
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function safeUrlHost(value?: string): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).host;
+  } catch {
+    return null;
+  }
 }
 
 async function sendPlainText(chatId: number, text: string): Promise<void> {
@@ -218,7 +227,7 @@ async function processText(ctx: ActionCtx, chatId: number, text: string): Promis
   if (text === "/help")  { await sendMessage(chatId, buildHelpText()); return; }
 
   // Sla user bericht op
-  await ctx.runMutation(api.chatMessages.save, { chatId, role: "user", content: text });
+  await ctx.runMutation(internal.chatMessages.save, { chatId, role: "user", content: text });
 
   // Lamp commando → direct uitvoeren
   const lampCmd = detectLampCommand(text);
@@ -227,13 +236,13 @@ async function processText(ctx: ActionCtx, chatId: number, text: string): Promis
       userId: OWNER_USER_ID, command: lampCmd.command, bron: "telegram",
     });
     const reply = `💡 ${lampCmd.beschrijving} — commando verstuurd!`;
-    await ctx.runMutation(api.chatMessages.save, { chatId, role: "assistant", content: reply, agentId: "lampen" });
+    await ctx.runMutation(internal.chatMessages.save, { chatId, role: "assistant", content: reply, agentId: "lampen" });
     await sendPlainText(chatId, reply);
     return;
   }
 
   // Chat history laden
-  const history = await ctx.runQuery(api.chatMessages.getHistory, { chatId, limit: 10 }) as ChatHistoryMessage[];
+  const history = await ctx.runQuery(internal.chatMessages.getHistory, { chatId, limit: 10 }) as ChatHistoryMessage[];
   const grokHistory = history.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
 
   // Slash commando routing
@@ -377,7 +386,7 @@ async function saveAndReply(
   if (result.ok && result.antwoord) {
     let antwoord = escapeHtml(result.antwoord);
     if (antwoord.length > 4000) antwoord = antwoord.slice(0, 3997) + "...";
-    await ctx.runMutation(api.chatMessages.save, { chatId, role: "assistant" as const, content: result.antwoord, agentId });
+    await ctx.runMutation(internal.chatMessages.save, { chatId, role: "assistant" as const, content: result.antwoord, agentId });
     await sendMessage(chatId, antwoord);
   } else {
     const escaped = escapeHtml(result.error ?? "Kon geen antwoord genereren");
@@ -422,7 +431,7 @@ export const status = action({
       webhookSecretConfigured: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
       webhook: {
         configured: Boolean(webhook.url),
-        urlHost: webhook.url ? new URL(webhook.url).host : null,
+        urlHost: safeUrlHost(webhook.url),
         pendingUpdateCount: webhook.pending_update_count ?? 0,
         lastErrorDate: webhook.last_error_date ?? null,
         lastErrorMessage: webhook.last_error_message ?? null,

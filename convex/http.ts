@@ -54,6 +54,23 @@ type DeviceCreateBody = {
   };
 };
 
+type EmailListItem = {
+  gmailId: string;
+  from: string;
+  subject: string;
+  snippet: string;
+  datum: string;
+  ontvangen: number;
+  isGelezen: boolean;
+  isSter: boolean;
+  isVerwijderd: boolean;
+  labelIds: string[];
+  categorie?: string;
+  heeftBijlagen: boolean;
+  bijlagenCount: number;
+  searchText: string;
+};
+
 function getErrorMessage(err: unknown, fallback = "DB fout") {
   return err instanceof Error ? err.message : fallback;
 }
@@ -76,7 +93,7 @@ http.route({
     const userId = url.searchParams.get("userId");
     if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
 
-    const automations = await ctx.runQuery(api.automations.list, { userId });
+    const automations = await ctx.runQuery(internal.automations.listInternal, { userId });
     return json({ ok: true, automations });
   }),
 });
@@ -95,7 +112,7 @@ http.route({
     const date   = url.searchParams.get("date");   // "YYYY-MM-DD"
     if (!userId || !date) return json({ ok: false, error: "userId + date verplicht" }, 400);
 
-    const diensten = await ctx.runQuery(api.schedule.listByDate, { userId, date });
+    const diensten = await ctx.runQuery(internal.schedule.listByDateInternal, { userId, date });
     return json({ ok: true, diensten });
   }),
 });
@@ -344,7 +361,53 @@ http.route({
     const userId = url.searchParams.get("userId");
     if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
 
-    const summary = await ctx.runQuery(api.emails.aiSummary, { userId });
+    const all = await ctx.runQuery(internal.emails.listInternal, { userId }) as EmailListItem[];
+    const syncMeta = await ctx.runQuery(internal.emails.getSyncMeta, { userId });
+    const active = all.filter((email) => !email.isVerwijderd);
+    const inbox = active.filter((email) => email.labelIds.includes("INBOX"));
+    const ongelezen = inbox.filter((email) => !email.isGelezen);
+    const senderCount = new Map<string, number>();
+    const categorien: Record<string, number> = {};
+    const dagVerdeling: Record<string, number> = {};
+    const now = Date.now();
+    for (const email of active) {
+      const sender = email.from.replace(/<.*>/, "").trim() || email.from;
+      senderCount.set(sender, (senderCount.get(sender) ?? 0) + 1);
+      const cat = email.categorie ?? "overig";
+      categorien[cat] = (categorien[cat] ?? 0) + 1;
+      if (now - email.ontvangen < 7 * 24 * 60 * 60 * 1000) {
+        dagVerdeling[email.datum] = (dagVerdeling[email.datum] ?? 0) + 1;
+      }
+    }
+    const summary = {
+      stats: {
+        totaal: active.length,
+        inbox: inbox.length,
+        ongelezen: ongelezen.length,
+        verzonden: active.filter((email) => email.labelIds.includes("SENT")).length,
+        metBijlagen: active.filter((email) => email.heeftBijlagen).length,
+        ster: active.filter((email) => email.isSter).length,
+      },
+      topAfzenders: [...senderCount.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([naam, aantal]) => ({ naam, aantal })),
+      categorien,
+      recenteOngelezen: ongelezen
+        .sort((a, b) => b.ontvangen - a.ontvangen)
+        .slice(0, 15)
+        .map((email) => ({
+          gmailId: email.gmailId,
+          van: email.from.replace(/<.*>/, "").trim() || email.from,
+          onderwerp: email.subject,
+          snippet: email.snippet,
+          datum: email.datum,
+          bijlagen: email.bijlagenCount,
+          labels: email.labelIds.filter((label) => !["INBOX", "UNREAD", "CATEGORY_PERSONAL"].includes(label)),
+        })),
+      dagVerdeling,
+      syncInfo: syncMeta ? { laatsteSync: syncMeta.lastFullSync, totaalGesynct: syncMeta.totalSynced } : null,
+    };
     return json({ ok: true, ...summary });
   }),
 });
@@ -364,7 +427,16 @@ http.route({
     if (!userId)   return json({ ok: false, error: "userId verplicht" }, 400);
     if (!zoekterm)  return json({ ok: false, error: "q (zoekterm) verplicht" }, 400);
 
-    const results = await ctx.runQuery(api.emails.search, { userId, zoekterm });
+    const needle = zoekterm.toLowerCase();
+    const all = await ctx.runQuery(internal.emails.listInternal, { userId }) as EmailListItem[];
+    const results = all
+      .filter((email) => !email.isVerwijderd)
+      .filter((email) =>
+        email.searchText.toLowerCase().includes(needle) ||
+        email.subject.toLowerCase().includes(needle) ||
+        email.from.toLowerCase().includes(needle)
+      )
+      .slice(0, 50);
     return json({ ok: true, count: results.length, results });
   }),
 });
@@ -381,7 +453,46 @@ http.route({
     const userId = url.searchParams.get("userId");
     if (!userId) return json({ ok: false, error: "userId verplicht" }, 400);
 
-    const senders = await ctx.runQuery(api.emails.senderAnalysis, { userId });
+    const all = await ctx.runQuery(internal.emails.listInternal, { userId }) as EmailListItem[];
+    const sendersMap = new Map<string, {
+      email: string;
+      naam: string;
+      totaal: number;
+      ongelezen: number;
+      categorieen: Record<string, number>;
+      laatsteEmail: string;
+      heeftBijlagen: number;
+    }>();
+    for (const email of all.filter((item) => !item.isVerwijderd)) {
+      const emailMatch = email.from.match(/<(.+?)>/);
+      const address = emailMatch?.[1] ?? email.from;
+      const naam = email.from.replace(/<.*>/, "").trim() || address;
+      const existing: {
+        email: string;
+        naam: string;
+        totaal: number;
+        ongelezen: number;
+        categorieen: Record<string, number>;
+        laatsteEmail: string;
+        heeftBijlagen: number;
+      } = sendersMap.get(address) ?? {
+        email: address,
+        naam,
+        totaal: 0,
+        ongelezen: 0,
+        categorieen: {},
+        laatsteEmail: email.datum,
+        heeftBijlagen: 0,
+      };
+      existing.totaal++;
+      if (!email.isGelezen) existing.ongelezen++;
+      if (email.heeftBijlagen) existing.heeftBijlagen++;
+      const cat = email.categorie ?? "overig";
+      existing.categorieen[cat] = (existing.categorieen[cat] ?? 0) + 1;
+      if (email.datum > existing.laatsteEmail) existing.laatsteEmail = email.datum;
+      sendersMap.set(address, existing);
+    }
+    const senders = [...sendersMap.values()].sort((a, b) => b.totaal - a.totaal).slice(0, 25);
     return json({ ok: true, count: senders.length, senders });
   }),
 });
@@ -402,7 +513,7 @@ http.route({
     const label = url.searchParams.get("label") ?? undefined;
     const onlyOngelezen = url.searchParams.get("ongelezen") === "true" ? true : undefined;
 
-    const emails = await ctx.runQuery(api.emails.list, { userId, label, onlyOngelezen });
+    const emails = await ctx.runQuery(internal.emails.listInternal, { userId, label, onlyOngelezen }) as EmailListItem[];
     return json({ ok: true, count: emails.length, emails });
   }),
 });
@@ -577,12 +688,14 @@ http.route({
   handler: httpAction(async (ctx, req) => {
     // ── Security: valideer Telegram webhook secret ────────────────────────
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
-    if (secret) {
-      const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
-      if (headerSecret !== secret) {
-        console.warn("[Webhook] ❌ Ongeautoriseerd: ongeldige secret token");
-        return new Response("Unauthorized", { status: 401 });
-      }
+    if (!secret) {
+      console.error("[Webhook] TELEGRAM_WEBHOOK_SECRET ontbreekt; webhook verwerkt geen updates");
+      return new Response("Webhook secret not configured", { status: 503 });
+    }
+    const headerSecret = req.headers.get("x-telegram-bot-api-secret-token");
+    if (headerSecret !== secret) {
+      console.warn("[Webhook] ❌ Ongeautoriseerd: ongeldige secret token");
+      return new Response("Unauthorized", { status: 401 });
     }
 
     try {

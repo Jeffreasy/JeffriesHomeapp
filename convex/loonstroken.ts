@@ -8,10 +8,21 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-const requireAuth = async (ctx: any) => {
+const requireAuth = async (ctx: {
+  auth: { getUserIdentity: () => Promise<{ subject: string } | null> };
+}) => {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) throw new Error("Niet ingelogd");
   return identity.subject;
+};
+
+const resolveUserId = async (
+  ctx: { auth: { getUserIdentity: () => Promise<{ subject: string } | null> } },
+  requested?: string
+) => {
+  const userId = await requireAuth(ctx);
+  if (requested && requested !== userId) throw new Error("Geen toegang tot deze loonstroken");
+  return userId;
 };
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
@@ -19,7 +30,7 @@ const requireAuth = async (ctx: any) => {
 export const list = query({
   args: { userId: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     return ctx.db
       .query("loonstroken")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -34,7 +45,7 @@ export const getByPeriode = query({
     periode: v.number(),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     return ctx.db
       .query("loonstroken")
       .withIndex("by_user_periode", (q) =>
@@ -80,7 +91,7 @@ export const bulkUpsert = mutation({
     loonstroken:  v.array(v.object(loonstrookFields)),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     let toegevoegd = 0;
     let bijgewerkt = 0;
 
@@ -119,7 +130,7 @@ export const remove = mutation({
     periode: v.number(),
   },
   handler: async (ctx, args) => {
-    const userId = args.userId || await requireAuth(ctx);
+    const userId = await resolveUserId(ctx, args.userId);
     const existing = await ctx.db
       .query("loonstroken")
       .withIndex("by_user_periode", (q) =>
