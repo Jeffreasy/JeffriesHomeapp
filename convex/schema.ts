@@ -171,6 +171,143 @@ export default defineSchema({
     .index("by_user_status", ["userId", "status"])
     .index("by_user_code_status", ["userId", "code", "status"]),
 
+  // ─── LaventeCare Companies (bedrijfscockpit) ───────────────────────────────
+  laventecareCompanies: defineTable({
+    userId:    v.string(),
+    naam:      v.string(),
+    website:   v.optional(v.string()),
+    sector:    v.optional(v.string()),
+    omvang:    v.optional(v.string()),
+    status:    v.string(),                   // prospect | klant | partner | archived
+    fitScore:  v.optional(v.number()),        // 0-100 kwalificatie
+    tags:      v.optional(v.array(v.string())),
+    bron:      v.optional(v.string()),
+    notities:  v.optional(v.string()),
+    aangemaakt: v.string(),
+    gewijzigd:  v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"]),
+
+  // ─── LaventeCare Contacts ─────────────────────────────────────────────────
+  laventecareContacts: defineTable({
+    userId:       v.string(),
+    companyId:    v.optional(v.id("laventecareCompanies")),
+    naam:         v.string(),
+    email:        v.optional(v.string()),
+    telefoon:     v.optional(v.string()),
+    rol:          v.optional(v.string()),
+    isBeslisser:  v.boolean(),
+    aangemaakt:   v.string(),
+    gewijzigd:    v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_company", ["companyId"]),
+
+  // ─── LaventeCare Leads ────────────────────────────────────────────────────
+  laventecareLeads: defineTable({
+    userId:              v.string(),
+    companyId:           v.optional(v.id("laventecareCompanies")),
+    contactId:           v.optional(v.id("laventecareContacts")),
+    titel:               v.string(),
+    bron:                v.string(),
+    status:              v.string(),          // nieuw | intake | discovery | voorstel | gewonnen | verloren | no_match
+    fitScore:            v.optional(v.number()),
+    pijnpunt:            v.optional(v.string()),
+    prioriteit:          v.optional(v.string()),
+    volgendeStap:        v.optional(v.string()),
+    volgendeActieDatum:  v.optional(v.string()),
+    aangemaakt:          v.string(),
+    gewijzigd:           v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_next_action", ["userId", "volgendeActieDatum"]),
+
+  // ─── LaventeCare Projects ─────────────────────────────────────────────────
+  laventecareProjects: defineTable({
+    userId:          v.string(),
+    companyId:       v.optional(v.id("laventecareCompanies")),
+    leadId:          v.optional(v.id("laventecareLeads")),
+    naam:            v.string(),
+    fase:            v.string(),              // intake | discovery | blueprint | realisatie | sla | evolution | afgerond
+    status:          v.string(),              // actief | wacht_op_klant | geblokkeerd | afgerond | archived
+    waardeIndicatie: v.optional(v.number()),
+    startDatum:      v.optional(v.string()),
+    deadline:        v.optional(v.string()),
+    samenvatting:    v.optional(v.string()),
+    aangemaakt:      v.string(),
+    gewijzigd:       v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_fase", ["userId", "fase"])
+    .index("by_company", ["companyId"]),
+
+  // ─── LaventeCare Documents (geindexeerde bedrijfsdocumentatie) ────────────
+  laventecareDocuments: defineTable({
+    userId:      v.string(),
+    documentKey: v.string(),
+    titel:       v.string(),
+    categorie:   v.string(),
+    fase:        v.optional(v.string()),
+    versie:      v.string(),
+    sourcePath:  v.optional(v.string()),
+    samenvatting: v.string(),
+    tags:        v.array(v.string()),
+    aangemaakt:  v.string(),
+    gewijzigd:   v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_key", ["userId", "documentKey"]),
+
+  // ─── LaventeCare Decisions ────────────────────────────────────────────────
+  laventecareDecisions: defineTable({
+    userId:     v.string(),
+    projectId:  v.optional(v.id("laventecareProjects")),
+    titel:      v.string(),
+    besluit:    v.string(),
+    reden:      v.string(),
+    impact:     v.optional(v.string()),
+    status:     v.string(),                   // voorgesteld | genomen | herzien
+    datum:      v.string(),
+    aangemaakt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"]),
+
+  // ─── LaventeCare Change Requests ──────────────────────────────────────────
+  laventecareChangeRequests: defineTable({
+    userId:         v.string(),
+    projectId:      v.optional(v.id("laventecareProjects")),
+    titel:          v.string(),
+    impact:         v.string(),
+    planningImpact: v.optional(v.string()),
+    budgetImpact:   v.optional(v.string()),
+    status:         v.string(),               // nieuw | beoordeeld | akkoord | afgewezen | uitgevoerd
+    aangemaakt:     v.string(),
+    gewijzigd:      v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"]),
+
+  // ─── LaventeCare SLA Incidents ────────────────────────────────────────────
+  laventecareSlaIncidents: defineTable({
+    userId:           v.string(),
+    projectId:        v.optional(v.id("laventecareProjects")),
+    titel:            v.string(),
+    prioriteit:       v.string(),             // P1 | P2 | P3 | P4
+    status:           v.string(),             // open | in_behandeling | wacht_op_klant | opgelost | gesloten
+    kanaal:           v.string(),
+    gemeldOp:         v.string(),
+    reactieDeadline:  v.optional(v.string()),
+    samenvatting:     v.optional(v.string()),
+    aangemaakt:       v.string(),
+    gewijzigd:        v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"])
+    .index("by_user_status", ["userId", "status"]),
+
   // ─── Automations ───────────────────────────────────────────────────────────
   automations: defineTable({
     userId:    v.string(), // Clerk user ID

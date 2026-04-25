@@ -84,6 +84,9 @@ import { notesAgent }           from "./agents/notes";
 // Habits agent
 import { habitsAgent }          from "./agents/habits";
 
+// LaventeCare business agent
+import { laventecareAgent }     from "./agents/laventecare";
+
 export const AGENT_REGISTRY: AgentDefinition[] = [
   // ── Core ──────────────────────────
   brainAgent,
@@ -102,6 +105,9 @@ export const AGENT_REGISTRY: AgentDefinition[] = [
 
   // ── Habits ─────────────────────────
   habitsAgent,
+
+  // ── Business ───────────────────────
+  laventecareAgent,
 ];
 
 export function getAgent(id: string): AgentDefinition | undefined {

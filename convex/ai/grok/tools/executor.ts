@@ -27,6 +27,12 @@ import {
   handleBulkArchiveer,
 } from "./notes";
 import { handleHabitTool } from "./habits";
+import {
+  handleLaventeCareCockpit,
+  handleLaventeCareKennisZoeken,
+  handleLaventeCareLeadMaken,
+  handleLaventeCareProjectMaken,
+} from "./laventecare";
 
 // ─── Tool name → handler mapping ─────────────────────────────────────────────
 
@@ -86,6 +92,12 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   habitBadges:         (ctx, args, userId) => handleHabitTool(ctx, "habitBadges", args, userId),
   habitRapport:        (ctx, args, userId) => handleHabitTool(ctx, "habitRapport", args, userId),
   habitNotitie:        (ctx, args, userId) => handleHabitTool(ctx, "habitNotitie", args, userId),
+
+  // LaventeCare
+  laventecareCockpit:      handleLaventeCareCockpit,
+  laventecareKennisZoeken: handleLaventeCareKennisZoeken,
+  laventecareLeadMaken:    handleLaventeCareLeadMaken,
+  laventecareProjectMaken: handleLaventeCareProjectMaken,
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import {
+  BriefcaseBusiness,
   Calendar,
   CalendarClock,
   Home,
@@ -11,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type NavigationSectionId = "start" | "planning" | "persoonlijk" | "systeem";
+export type NavigationSectionId = "start" | "planning" | "persoonlijk" | "bedrijf" | "systeem";
 
 export interface NavigationItem {
   href: string;
@@ -27,6 +28,7 @@ export const NAVIGATION_SECTIONS: Array<{ id: NavigationSectionId; label: string
   { id: "start", label: "Start" },
   { id: "planning", label: "Planning" },
   { id: "persoonlijk", label: "Persoonlijk" },
+  { id: "bedrijf", label: "Bedrijf" },
   { id: "systeem", label: "Systeem" },
 ];
 
@@ -101,6 +103,15 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     description: "Gewoontes, streaks en XP",
     icon: Target,
     section: "persoonlijk",
+    mobile: "more",
+  },
+  {
+    href: "/laventecare",
+    label: "LaventeCare",
+    shortLabel: "Bedrijf",
+    description: "Bedrijfsbrein, funnel en delivery",
+    icon: BriefcaseBusiness,
+    section: "bedrijf",
     mobile: "more",
   },
   {

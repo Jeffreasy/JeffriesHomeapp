@@ -24,6 +24,7 @@ const FINANCE_WRITE_AGENTS = ["finance", ...BRAIN_AGENTS];
 const CALENDAR_WRITE_AGENTS = ["agenda", "rooster", ...BRAIN_AGENTS];
 const NOTES_WRITE_AGENTS = ["notes", ...BRAIN_AGENTS];
 const HABITS_WRITE_AGENTS = ["habits", ...BRAIN_AGENTS];
+const LAVENTECARE_WRITE_AGENTS = ["laventecare", ...BRAIN_AGENTS];
 
 const TOOL_POLICIES: Record<string, ToolPolicy> = {
   // Email
@@ -69,6 +70,12 @@ const TOOL_POLICIES: Record<string, ToolPolicy> = {
   notitieArchiveren:        { agents: NOTES_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   notitiesOverzicht:        { agents: ["notes", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   bulkArchiveerNotities:    { agents: NOTES_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+
+  // LaventeCare
+  laventecareCockpit:      { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
+  laventecareKennisZoeken: { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
+  laventecareLeadMaken:    { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareProjectMaken: { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
 
   // Habits
   habitAanmaken:   { agents: HABITS_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
@@ -157,6 +164,10 @@ export function describePendingAction(toolName: string, args: Record<string, unk
       return `${countArg(args, "noteIds") ?? 0} notities archiveren`;
     case "habitIncident":
       return `Incident loggen voor habit "${textArg(args, "habitNaam")}"`;
+    case "laventecareLeadMaken":
+      return `LaventeCare lead aanmaken: "${textArg(args, "titel")}"${args.companyName ? ` voor ${textArg(args, "companyName")}` : ""}`;
+    case "laventecareProjectMaken":
+      return `LaventeCare project aanmaken: "${textArg(args, "naam")}"`;
     default:
       return `${toolName} uitvoeren`;
   }

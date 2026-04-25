@@ -535,6 +535,77 @@ BELANGRIJK — Professioneel Template Protocol:
       },
     },
   },
+  // ──────────────── LaventeCare tools ───────────────────────────────────────
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareCockpit",
+      description: "Haal het LaventeCare bedrijfsoverzicht op: propositie, proces, funnel, projecten, documentbasis, fit-criteria en SLA-context. Gebruik bij vragen over Jeffrey's bedrijf, LaventeCare, leads, klanten, proposals, discovery, scope of SLA.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareKennisZoeken",
+      description: "Zoek in de LaventeCare bedrijfsdocumentatie. Gebruik voor vragen over werkwijze, prijzen, discovery, blueprint, algemene voorwaarden, privacy, SLA, security, scope, change requests of voorstellen.",
+      parameters: {
+        type: "object",
+        properties: {
+          term: { type: "string", description: "Zoekterm voor de LaventeCare documentatie" },
+        },
+        required: ["term"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareLeadMaken",
+      description: "Maak een LaventeCare lead aan. Gebruik alleen wanneer Jeffrey expliciet vraagt om een zakelijke lead/prospect vast te leggen. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          titel:              { type: "string", description: "Leadnaam of zakelijk vraagstuk" },
+          companyName:        { type: "string", description: "Bedrijfsnaam" },
+          website:            { type: "string", description: "Website van de prospect" },
+          bron:               { type: "string", description: "Bron, bijv. telegram, website, netwerk" },
+          pijnpunt:           { type: "string", description: "Belangrijkste procespijn of businesscase" },
+          prioriteit:         { type: "string", enum: ["laag", "normaal", "hoog"], description: "Prioriteit" },
+          fitScore:           { type: "number", description: "Optionele fit-score 0-100" },
+          volgendeStap:       { type: "string", description: "Concrete opvolgstap" },
+          volgendeActieDatum: { type: "string", description: "Datum voor follow-up, YYYY-MM-DD" },
+        },
+        required: ["titel"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareProjectMaken",
+      description: "Maak een LaventeCare project aan vanuit een opdracht, gewonnen lead of intake. Gebruik alleen wanneer Jeffrey expliciet vraagt om een project vast te leggen. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          naam:            { type: "string", description: "Projectnaam" },
+          companyId:       { type: "string", description: "Optioneel exact companyId uit de cockpit" },
+          leadId:          { type: "string", description: "Optioneel exact leadId uit de cockpit" },
+          fase:            { type: "string", enum: ["intake", "discovery", "blueprint", "realisatie", "sla", "evolution", "afgerond"], description: "Projectfase" },
+          status:          { type: "string", enum: ["actief", "wacht_op_klant", "geblokkeerd", "afgerond", "archived"], description: "Projectstatus" },
+          waardeIndicatie: { type: "number", description: "Indicatieve projectwaarde in EUR" },
+          startDatum:      { type: "string", description: "Startdatum YYYY-MM-DD" },
+          deadline:        { type: "string", description: "Deadline YYYY-MM-DD" },
+          samenvatting:    { type: "string", description: "Korte projectcontext" },
+        },
+        required: ["naam"],
+      },
+    },
+  },
   // ──────────────── Habits tools ────────────────────────────────────────────
   {
     type: "function" as const,

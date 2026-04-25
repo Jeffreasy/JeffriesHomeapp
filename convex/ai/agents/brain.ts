@@ -15,6 +15,7 @@ import { emailAgent }       from "./email";
 import { automationsAgent } from "./automations";
 import { notesAgent }       from "./notes";
 import { habitsAgent }      from "./habits";
+import { laventecareAgent } from "./laventecare";
 
 function amsterdamDate(offsetDays = 0): string {
   const date = new Date(Date.now() + offsetDays * 86400000);
@@ -36,16 +37,18 @@ export const brainAgent: AgentDefinition = {
   id:           "brain",
   naam:         "Jeffries Brain",
   emoji:        "🧠",
-  beschrijving: "Centrale AI-regiekamer voor Jeffrey. Combineert rooster, agenda, lampen, finance, email, notities, habits en systeemstatus tot één samenhangend beeld. Beslist welke specialistische context en tools nodig zijn, bewaakt risico's, en vertaalt losse signalen naar concrete acties.",
+  beschrijving: "Centrale AI-regiekamer voor Jeffrey. Combineert rooster, agenda, lampen, finance, email, notities, habits, LaventeCare en systeemstatus tot één samenhangend beeld. Beslist welke specialistische context en tools nodig zijn, bewaakt risico's, en vertaalt losse signalen naar concrete acties.",
   domein:       [
     "schedule", "personalEvents", "devices", "rooms", "automations",
     "salary", "transactions", "emails", "notes", "habits",
-    "habitLogs", "habitBadges", "syncStatus", "bridgeHealth", "aiPendingActions",
+    "habitLogs", "habitBadges", "laventecareLeads", "laventecareProjects",
+    "laventecareDocuments", "laventecareSlaIncidents", "syncStatus", "bridgeHealth", "aiPendingActions",
   ],
   capabilities: [
     "Cross-domain dagbeeld en planning maken",
-    "Signalen uit rooster, agenda, notities, habits en email combineren",
+    "Signalen uit rooster, agenda, notities, habits, email en LaventeCare combineren",
     "Open acties, risico's, conflicten en follow-ups prioriteren",
+    "Zakelijke leads, projecten, discovery, scope en SLA context meenemen",
     "Specialistische tools kiezen zonder de gebruiker door te verwijzen",
     "Lezen en analyseren over alle domeinen heen",
     "Wijzigingen veilig voorbereiden met server-side bevestiging",
@@ -83,6 +86,7 @@ export const brainAgent: AgentDefinition = {
       automations,
       notes,
       habits,
+      laventecare,
       syncStatus,
       bridgeHealth,
       pendingActions,
@@ -96,6 +100,7 @@ export const brainAgent: AgentDefinition = {
       automationsAgent.getContext(ctx, userId, { lite: true }),
       notesAgent.getContext(ctx, userId, { lite: true }),
       habitsAgent.getContext(ctx, userId, { lite: true }),
+      laventecareAgent.getContext(ctx, userId, { lite: true }),
       ctx.db.query("syncStatus").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("bridgeHealth").withIndex("by_updated").order("desc").take(3),
       ctx.db.query("aiPendingActions").withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "pending")).collect(),
@@ -140,6 +145,7 @@ export const brainAgent: AgentDefinition = {
           automations,
           notities: notes,
           habits,
+          laventecare,
         },
       },
       operationeel: {
@@ -160,7 +166,8 @@ export const brainAgent: AgentDefinition = {
       openActies: activePending,
       beslisregels: [
         "Beantwoord algemene vragen vanuit Brain, niet vanuit een losse specialist.",
-        "Combineer domeinen wanneer dat nuttig is: rooster + notities + habits + email + lampen.",
+        "Combineer domeinen wanneer dat nuttig is: rooster + notities + habits + email + lampen + LaventeCare.",
+        "Beschouw zakelijke vragen over klanten, leads, discovery, voorstellen, scope en SLA als LaventeCare-context.",
         "Gebruik read-tools voor exacte details buiten de compacte context.",
         "Bereid maximaal één wijzigende actie per beurt voor.",
         "Claim nooit dat een risicovolle wijziging is uitgevoerd voordat de bevestigingsqueue dit teruggeeft.",

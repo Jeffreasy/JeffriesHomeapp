@@ -14,6 +14,7 @@ import { emailAgent }       from "./email";
 import { automationsAgent } from "./automations";
 import { notesAgent }       from "./notes";
 import { habitsAgent }      from "./habits";
+import { laventecareAgent } from "./laventecare";
 
 export const dashboardAgent: AgentDefinition = {
   id:           "dashboard",
@@ -21,7 +22,18 @@ export const dashboardAgent: AgentDefinition = {
   emoji:        "📊",
   beschrijving: "Cross-domain overzicht specialist. Delegeert naar sub-agents voor " +
                 "compacte samenvattingen en bouwt één unified daily briefing.",
-  domein:       ["schedule", "personalEvents", "devices", "emails", "salary", "automations", "notes", "habits"],
+  domein:       [
+    "schedule",
+    "personalEvents",
+    "devices",
+    "emails",
+    "salary",
+    "automations",
+    "notes",
+    "habits",
+    "laventecareLeads",
+    "laventecareProjects",
+  ],
   capabilities: [
     "Dagelijkse briefing genereren (cross-domain)",
     "Volgende dienst + type tonen",
@@ -29,6 +41,7 @@ export const dashboardAgent: AgentDefinition = {
     "Ongelezen emails samenvatten",
     "Lamp status overview",
     "Financieel snapshot (maand prognose)",
+    "LaventeCare funnel en bedrijfsstatus samenvatten",
     "Systeem gezondheid status",
   ],
   tools: [
@@ -43,7 +56,7 @@ export const dashboardAgent: AgentDefinition = {
       beschrijving: "Context ophalen van een specifieke sub-agent",
       endpoint: "GET /ai/agent/:id",
       parameters: [
-        { naam: "agentId", type: "string", beschrijving: "Agent ID", verplicht: true, enum: ["lampen", "rooster", "agenda", "finance", "email", "automations", "notes", "habits"] },
+        { naam: "agentId", type: "string", beschrijving: "Agent ID", verplicht: true, enum: ["lampen", "rooster", "agenda", "finance", "email", "automations", "notes", "habits", "laventecare"] },
       ],
     },
   ],
@@ -57,7 +70,7 @@ export const dashboardAgent: AgentDefinition = {
 
     // ── Inter-agent delegation: lite mode ─────────────────────────────────
     // Elke sub-agent geeft een compacte samenvatting terug.
-    const [lampen, rooster, agenda, finance, email, automations, notes, habits] = await Promise.all([
+    const [lampen, rooster, agenda, finance, email, automations, notes, habits, laventecare] = await Promise.all([
       lampenAgent.getContext(ctx, userId, { lite: true }),
       roosterAgent.getContext(ctx, userId, { lite: true }),
       agendaAgent.getContext(ctx, userId, { lite: true }),
@@ -66,6 +79,7 @@ export const dashboardAgent: AgentDefinition = {
       automationsAgent.getContext(ctx, userId, { lite: true }),
       notesAgent.getContext(ctx, userId, { lite: true }),
       habitsAgent.getContext(ctx, userId, { lite: true }),
+      laventecareAgent.getContext(ctx, userId, { lite: true }),
     ]);
 
     return {
@@ -81,6 +95,7 @@ export const dashboardAgent: AgentDefinition = {
       automations,
       notities: notes,
       habits,
+      laventecare,
 
       instructie: "Dit is een compact overzicht van alle domeinen. " +
                   "Gebruik de beveiligde /ai/agent route met het specifieke agentId voor gedetailleerde informatie.",
