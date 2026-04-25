@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useMutation, useQuery } from "convex/react";
 import {
+  AlertTriangle,
   ArrowRight,
   BookOpenText,
   BriefcaseBusiness,
@@ -14,11 +15,13 @@ import {
   FileText,
   Flag,
   FolderKanban,
+  GitPullRequest,
   Handshake,
   Layers3,
   LifeBuoy,
   Loader2,
   Plus,
+  ScrollText,
   Search,
   ShieldCheck,
   Sparkles,
@@ -104,6 +107,37 @@ type ActionItem = {
   linkedLeadId?: Id<"laventecareLeads">;
   linkedProjectId?: Id<"laventecareProjects">;
   updatedAt?: string;
+};
+
+type DecisionItem = {
+  _id?: string;
+  titel: string;
+  besluit: string;
+  reden: string;
+  impact?: string;
+  status: string;
+  datum: string;
+};
+
+type ChangeRequestItem = {
+  _id?: string;
+  titel: string;
+  impact: string;
+  planningImpact?: string;
+  budgetImpact?: string;
+  status: string;
+  gewijzigd?: string;
+};
+
+type SlaIncidentItem = {
+  _id?: string;
+  titel: string;
+  prioriteit: string;
+  status: string;
+  kanaal: string;
+  gemeldOp: string;
+  reactieDeadline?: string;
+  samenvatting?: string;
 };
 
 type LeadForm = {
@@ -374,6 +408,36 @@ function ActionItemCard({
   );
 }
 
+function OperationCard({
+  icon: Icon,
+  title,
+  meta,
+  body,
+  tone,
+}: {
+  icon: LucideIcon;
+  title: string;
+  meta: string;
+  body: string;
+  tone: Tone;
+}) {
+  const toneClass = toneClasses[tone];
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+      <div className="flex items-start gap-3">
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", toneClass.border, toneClass.surface)}>
+          <Icon size={16} className={toneClass.icon} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{meta}</p>
+          <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-white">{title}</h3>
+          <p className="mt-2 line-clamp-3 text-sm leading-5 text-slate-400">{body}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LaventeCarePage() {
   const cockpit = useQuery(api.laventecare.getCockpit);
   const createLead = useMutation(api.laventecare.createLead);
@@ -396,6 +460,9 @@ export default function LaventeCarePage() {
   const businessSignals = useMemo(() => (cockpit?.businessSignals ?? []) as BusinessSignal[], [cockpit]);
   const actionItems = useMemo(() => (cockpit?.actionItems ?? []) as ActionItem[], [cockpit]);
   const followUps = useMemo(() => (cockpit?.followUps ?? []) as FollowUpSignal[], [cockpit]);
+  const openIncidents = useMemo(() => (cockpit?.openIncidents ?? []) as SlaIncidentItem[], [cockpit]);
+  const openChanges = useMemo(() => (cockpit?.openChanges ?? []) as ChangeRequestItem[], [cockpit]);
+  const recentDecisions = useMemo(() => (cockpit?.recentDecisions ?? []) as DecisionItem[], [cockpit]);
 
   const filteredDocuments = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -875,6 +942,86 @@ export default function LaventeCarePage() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-5 rounded-lg border border-white/10 bg-white/[0.035] p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Operatie</p>
+              <h2 className="mt-1 text-lg font-bold text-white">Besluiten, wijzigingen en SLA</h2>
+            </div>
+            <ClipboardList size={20} className="text-slate-400" />
+          </div>
+          <div className="mt-4 grid gap-4 xl:grid-cols-3">
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <ScrollText size={16} className="text-sky-300" />
+                <h3 className="text-sm font-bold text-slate-200">Decision log</h3>
+              </div>
+              <div className="space-y-3">
+                {recentDecisions.length === 0 ? (
+                  <EmptyState title="Geen besluiten" body="Besluiten die je via Telegram vastlegt verschijnen hier als audit trail." />
+                ) : (
+                  recentDecisions.slice(0, 3).map((decision) => (
+                    <OperationCard
+                      key={decision._id ?? `${decision.titel}-${decision.datum}`}
+                      icon={ScrollText}
+                      title={decision.titel}
+                      meta={`${formatDate(decision.datum)} - ${label(decision.status)}`}
+                      body={decision.besluit}
+                      tone="sky"
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <GitPullRequest size={16} className="text-amber-300" />
+                <h3 className="text-sm font-bold text-slate-200">Change requests</h3>
+              </div>
+              <div className="space-y-3">
+                {openChanges.length === 0 ? (
+                  <EmptyState title="Geen open changes" body="Scope-, planning- of budgetwijzigingen blijven hier zichtbaar tot ze zijn afgehandeld." />
+                ) : (
+                  openChanges.slice(0, 3).map((change) => (
+                    <OperationCard
+                      key={change._id ?? change.titel}
+                      icon={GitPullRequest}
+                      title={change.titel}
+                      meta={label(change.status)}
+                      body={change.impact}
+                      tone="amber"
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <AlertTriangle size={16} className="text-rose-300" />
+                <h3 className="text-sm font-bold text-slate-200">SLA incidenten</h3>
+              </div>
+              <div className="space-y-3">
+                {openIncidents.length === 0 ? (
+                  <EmptyState title="Geen open incidenten" body="Support- of beheerissues die je vastlegt komen hier met prioriteit en kanaal terug." />
+                ) : (
+                  openIncidents.slice(0, 3).map((incident) => (
+                    <OperationCard
+                      key={incident._id ?? incident.titel}
+                      icon={AlertTriangle}
+                      title={incident.titel}
+                      meta={`${incident.prioriteit} - ${label(incident.status)} - ${label(incident.kanaal)}`}
+                      body={incident.samenvatting ?? `Gemeld op ${formatDate(incident.gemeldOp)}`}
+                      tone={incident.prioriteit === "P1" || incident.prioriteit === "P2" ? "rose" : "violet"}
+                    />
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </section>

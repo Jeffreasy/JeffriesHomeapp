@@ -28,11 +28,16 @@ import {
 } from "./notes";
 import { handleHabitTool } from "./habits";
 import {
+  handleLaventeCareActieAfronden,
   handleLaventeCareActieMaken,
+  handleLaventeCareActiesOpvragen,
+  handleLaventeCareBesluitMaken,
+  handleLaventeCareChangeRequestMaken,
   handleLaventeCareCockpit,
   handleLaventeCareKennisZoeken,
   handleLaventeCareLeadMaken,
   handleLaventeCareProjectMaken,
+  handleLaventeCareSlaIncidentMaken,
 } from "./laventecare";
 
 // ─── Tool name → handler mapping ─────────────────────────────────────────────
@@ -100,6 +105,11 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   laventecareLeadMaken:    handleLaventeCareLeadMaken,
   laventecareProjectMaken: handleLaventeCareProjectMaken,
   laventecareActieMaken:   handleLaventeCareActieMaken,
+  laventecareActiesOpvragen: handleLaventeCareActiesOpvragen,
+  laventecareActieAfronden:  handleLaventeCareActieAfronden,
+  laventecareBesluitMaken:   handleLaventeCareBesluitMaken,
+  laventecareChangeRequestMaken: handleLaventeCareChangeRequestMaken,
+  laventecareSlaIncidentMaken:   handleLaventeCareSlaIncidentMaken,
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

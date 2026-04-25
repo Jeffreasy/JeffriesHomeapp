@@ -30,6 +30,11 @@ function numberArg(args: Record<string, unknown>, key: string): number | undefin
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+function booleanArg(args: Record<string, unknown>, key: string): boolean | undefined {
+  const value = args[key];
+  return typeof value === "boolean" ? value : undefined;
+}
+
 export async function handleLaventeCareCockpit(
   ctx: GrokToolCtx,
   _args: Record<string, unknown>,
@@ -65,6 +70,48 @@ export async function handleLaventeCareKennisZoeken(
     gevonden: results.length,
     term,
     documenten: results,
+  });
+}
+
+export async function handleLaventeCareActiesOpvragen(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const acties = await ctx.runQuery<Record<string, unknown>[]>(internal.laventecare.listActionsInternal, {
+    userId,
+    status:          text(args, "status"),
+    includeArchived: booleanArg(args, "includeArchived") ?? booleanArg(args, "includeAfgerond"),
+    limit:           numberArg(args, "limit") ?? numberArg(args, "aantal"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    aantal: acties.length,
+    acties,
+  });
+}
+
+export async function handleLaventeCareActieAfronden(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const actionId = text(args, "actionId") ?? text(args, "actieId") ?? text(args, "id");
+  if (!actionId) {
+    return JSON.stringify({ error: "actionId is verplicht. Vraag eerst laventecareActiesOpvragen als je het ID niet weet." });
+  }
+
+  await ctx.runMutation<string>(internal.laventecare.updateActionStatusInternal, {
+    userId,
+    id:     actionId,
+    status: text(args, "status") ?? "afgerond",
+  });
+
+  return JSON.stringify({
+    ok: true,
+    message: "LaventeCare actie afgerond.",
+    actionId,
   });
 }
 
@@ -126,6 +173,93 @@ export async function handleLaventeCareActieMaken(
     ok: true,
     message: `LaventeCare actie klaargezet: ${title}.`,
     actionId: id,
+  });
+}
+
+export async function handleLaventeCareBesluitMaken(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const titel = text(args, "titel") ?? text(args, "title");
+  const besluit = text(args, "besluit") ?? text(args, "decision");
+  const reden = text(args, "reden") ?? text(args, "reason");
+  if (!titel || !besluit || !reden) {
+    return JSON.stringify({ error: "titel, besluit en reden zijn verplicht." });
+  }
+
+  const id = await ctx.runMutation<string>(internal.laventecare.createDecisionInternal, {
+    userId,
+    projectId: text(args, "projectId"),
+    titel,
+    besluit,
+    reden,
+    impact:    text(args, "impact"),
+    status:    text(args, "status") ?? "genomen",
+    datum:     text(args, "datum") ?? text(args, "date"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    message: `LaventeCare besluit vastgelegd: ${titel}.`,
+    decisionId: id,
+  });
+}
+
+export async function handleLaventeCareChangeRequestMaken(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const titel = text(args, "titel") ?? text(args, "title");
+  const impact = text(args, "impact");
+  if (!titel || !impact) {
+    return JSON.stringify({ error: "titel en impact zijn verplicht." });
+  }
+
+  const id = await ctx.runMutation<string>(internal.laventecare.createChangeRequestInternal, {
+    userId,
+    projectId:      text(args, "projectId"),
+    titel,
+    impact,
+    planningImpact: text(args, "planningImpact"),
+    budgetImpact:   text(args, "budgetImpact"),
+    status:         text(args, "status") ?? "nieuw",
+  });
+
+  return JSON.stringify({
+    ok: true,
+    message: `LaventeCare change request vastgelegd: ${titel}.`,
+    changeRequestId: id,
+  });
+}
+
+export async function handleLaventeCareSlaIncidentMaken(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const titel = text(args, "titel") ?? text(args, "title");
+  if (!titel) {
+    return JSON.stringify({ error: "titel is verplicht." });
+  }
+
+  const id = await ctx.runMutation<string>(internal.laventecare.createSlaIncidentInternal, {
+    userId,
+    projectId:       text(args, "projectId"),
+    titel,
+    prioriteit:      text(args, "prioriteit") ?? text(args, "priority") ?? "P3",
+    status:          text(args, "status") ?? "open",
+    kanaal:          text(args, "kanaal") ?? text(args, "channel") ?? "telegram",
+    gemeldOp:        text(args, "gemeldOp"),
+    reactieDeadline: text(args, "reactieDeadline"),
+    samenvatting:    text(args, "samenvatting") ?? text(args, "summary"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    message: `LaventeCare SLA-incident vastgelegd: ${titel}.`,
+    incidentId: id,
   });
 }
 

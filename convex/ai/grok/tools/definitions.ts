@@ -628,6 +628,97 @@ BELANGRIJK — Professioneel Template Protocol:
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareActiesOpvragen",
+      description: "Haal open LaventeCare acties/follow-ups op. Gebruik dit wanneer Jeffrey vraagt wat er zakelijk nog open staat, welke acties er zijn, of welk actionId nodig is om iets af te ronden.",
+      parameters: {
+        type: "object",
+        properties: {
+          status:          { type: "string", description: "Optionele statusfilter, bijvoorbeeld open, bezig, afgerond" },
+          includeArchived: { type: "boolean", description: "Neem afgeronde/gearchiveerde acties mee" },
+          limit:           { type: "number", description: "Maximaal aantal acties, default 10" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareActieAfronden",
+      description: "Rond een LaventeCare actie af of wijzig de status. Gebruik eerst laventecareActiesOpvragen als het actionId niet bekend is. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          actionId: { type: "string", description: "Exact actionId uit laventecareActiesOpvragen of cockpit" },
+          status:   { type: "string", enum: ["afgerond", "bezig", "wacht_op_klant", "archived"], description: "Nieuwe status, default afgerond" },
+        },
+        required: ["actionId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareBesluitMaken",
+      description: "Leg een LaventeCare besluit vast in de decision log. Gebruik wanneer Jeffrey expliciet een besluit, keuze of afspraak rond scope/proces/project wil bewaren. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          titel:     { type: "string", description: "Korte titel van het besluit" },
+          besluit:   { type: "string", description: "Wat is besloten" },
+          reden:     { type: "string", description: "Waarom dit besluit is genomen" },
+          impact:    { type: "string", description: "Impact op scope, planning, budget of werkwijze" },
+          status:    { type: "string", enum: ["voorgesteld", "genomen", "herzien"], description: "Besluitstatus" },
+          datum:     { type: "string", description: "Datum YYYY-MM-DD" },
+          projectId: { type: "string", description: "Optioneel exact projectId uit de cockpit" },
+        },
+        required: ["titel", "besluit", "reden"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareChangeRequestMaken",
+      description: "Leg een LaventeCare change request vast. Gebruik wanneer scope, planning, budget of deliverables wijzigen. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          titel:          { type: "string", description: "Korte titel van de wijziging" },
+          impact:         { type: "string", description: "Functionele of operationele impact" },
+          planningImpact: { type: "string", description: "Impact op planning" },
+          budgetImpact:   { type: "string", description: "Impact op budget" },
+          status:         { type: "string", enum: ["nieuw", "beoordeeld", "akkoord", "afgewezen", "uitgevoerd"], description: "Change request status" },
+          projectId:      { type: "string", description: "Optioneel exact projectId uit de cockpit" },
+        },
+        required: ["titel", "impact"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareSlaIncidentMaken",
+      description: "Leg een LaventeCare SLA-incident of beheerissue vast. Gebruik voor productieproblemen, supportsignalen, bugs of beheerafspraken. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          titel:           { type: "string", description: "Incidenttitel" },
+          prioriteit:      { type: "string", enum: ["P1", "P2", "P3", "P4"], description: "SLA-prioriteit" },
+          status:          { type: "string", enum: ["open", "in_behandeling", "wacht_op_klant", "opgelost", "gesloten"], description: "Incidentstatus" },
+          kanaal:          { type: "string", description: "Kanaal, bijvoorbeeld telegram, email, klantportaal" },
+          gemeldOp:        { type: "string", description: "ISO-tijdstip of datum waarop het incident is gemeld" },
+          reactieDeadline: { type: "string", description: "Reactiedeadline, ISO of YYYY-MM-DD" },
+          samenvatting:    { type: "string", description: "Korte context of symptomen" },
+          projectId:       { type: "string", description: "Optioneel exact projectId uit de cockpit" },
+        },
+        required: ["titel"],
+      },
+    },
+  },
   // ──────────────── Habits tools ────────────────────────────────────────────
   {
     type: "function" as const,

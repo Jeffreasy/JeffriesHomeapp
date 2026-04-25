@@ -32,6 +32,8 @@ export const laventecareAgent: AgentDefinition = {
     "SLA-incidenten en beheercontext samenvatten",
     "Zakelijke signalen herkennen in email, agenda en notities",
     "Acties en follow-ups vastleggen vanuit signalen of Telegram",
+    "Open acties opvragen en afronden met bevestigde Telegram-mutaties",
+    "Besluiten, change requests en SLA-incidenten als operationele log bijhouden",
     "Voorstellen, onboarding en juridische documenten in de juiste volgorde plaatsen",
     "Cross-domain signalen koppelen aan agenda, email, notities en finance via Brain",
   ],
@@ -79,6 +81,50 @@ export const laventecareAgent: AgentDefinition = {
         { naam: "title", type: "string", beschrijving: "Korte actietitel", verplicht: true },
         { naam: "summary", type: "string", beschrijving: "Context of gewenste uitkomst", verplicht: false },
         { naam: "dueDate", type: "string", beschrijving: "Opvolgdatum YYYY-MM-DD", verplicht: false },
+      ],
+    },
+    {
+      naam: "laventecareActiesOpvragen",
+      type: "query",
+      beschrijving: "Haalt open LaventeCare acties op",
+      parameters: [
+        { naam: "status", type: "string", beschrijving: "Optionele statusfilter", verplicht: false },
+      ],
+    },
+    {
+      naam: "laventecareActieAfronden",
+      type: "mutation",
+      beschrijving: "Rondt een LaventeCare actie af na bevestiging",
+      parameters: [
+        { naam: "actionId", type: "string", beschrijving: "Exact actionId", verplicht: true },
+      ],
+    },
+    {
+      naam: "laventecareBesluitMaken",
+      type: "mutation",
+      beschrijving: "Legt een besluit vast in de decision log",
+      parameters: [
+        { naam: "titel", type: "string", beschrijving: "Besluittitel", verplicht: true },
+        { naam: "besluit", type: "string", beschrijving: "Wat is besloten", verplicht: true },
+        { naam: "reden", type: "string", beschrijving: "Waarom", verplicht: true },
+      ],
+    },
+    {
+      naam: "laventecareChangeRequestMaken",
+      type: "mutation",
+      beschrijving: "Legt een scope-, planning- of budgetwijziging vast",
+      parameters: [
+        { naam: "titel", type: "string", beschrijving: "Change request titel", verplicht: true },
+        { naam: "impact", type: "string", beschrijving: "Impact", verplicht: true },
+      ],
+    },
+    {
+      naam: "laventecareSlaIncidentMaken",
+      type: "mutation",
+      beschrijving: "Legt een SLA-incident of beheerissue vast",
+      parameters: [
+        { naam: "titel", type: "string", beschrijving: "Incidenttitel", verplicht: true },
+        { naam: "prioriteit", type: "string", beschrijving: "P1/P2/P3/P4", verplicht: false },
       ],
     },
   ],

@@ -77,6 +77,11 @@ const TOOL_POLICIES: Record<string, ToolPolicy> = {
   laventecareLeadMaken:    { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   laventecareProjectMaken: { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   laventecareActieMaken:   { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareActiesOpvragen: { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
+  laventecareActieAfronden:  { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareBesluitMaken:   { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareChangeRequestMaken: { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareSlaIncidentMaken:   { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
 
   // Habits
   habitAanmaken:   { agents: HABITS_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
@@ -171,6 +176,14 @@ export function describePendingAction(toolName: string, args: Record<string, unk
       return `LaventeCare project aanmaken: "${textArg(args, "naam")}"`;
     case "laventecareActieMaken":
       return `LaventeCare actie klaarzetten: "${textArg(args, "title", textArg(args, "titel"))}"`;
+    case "laventecareActieAfronden":
+      return `LaventeCare actie afronden: ${textArg(args, "actionId", textArg(args, "actieId", textArg(args, "id")))}`;
+    case "laventecareBesluitMaken":
+      return `LaventeCare besluit vastleggen: "${textArg(args, "titel", textArg(args, "title"))}"`;
+    case "laventecareChangeRequestMaken":
+      return `LaventeCare change request vastleggen: "${textArg(args, "titel", textArg(args, "title"))}"`;
+    case "laventecareSlaIncidentMaken":
+      return `LaventeCare SLA-incident vastleggen: "${textArg(args, "titel", textArg(args, "title"))}"`;
     default:
       return `${toolName} uitvoeren`;
   }

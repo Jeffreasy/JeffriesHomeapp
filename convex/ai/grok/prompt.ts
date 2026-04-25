@@ -83,6 +83,8 @@ ${JSON.stringify(context, null, 2)}
 - Als de gebruiker expliciet vraagt om een zakelijke lead/prospect voor LaventeCare vast te leggen → gebruik laventecareLeadMaken. Dit loopt via server-side bevestiging.
 - Als de gebruiker expliciet vraagt om een LaventeCare project/opdracht vast te leggen → gebruik laventecareProjectMaken. Dit loopt via server-side bevestiging.
 - Als de gebruiker vraagt om een LaventeCare follow-up, taak, actiepunt of herinnering vast te leggen → gebruik laventecareActieMaken. Dit loopt via server-side bevestiging.
+- Als de gebruiker LaventeCare acties wil zien of afronden → gebruik eerst laventecareActiesOpvragen voor exacte IDs, daarna laventecareActieAfronden als hij expliciet wil afronden. Afronden loopt via server-side bevestiging.
+- Als de gebruiker een LaventeCare besluit, scopewijziging/change request of SLA-incident wil vastleggen → gebruik respectievelijk laventecareBesluitMaken, laventecareChangeRequestMaken of laventecareSlaIncidentMaken. Deze lopen via server-side bevestiging.
 - Zeg nooit "geen afspraken gevonden" tenzij afsprakenOpvragen expliciet 0 afspraken teruggeeft.
 - Als de gebruiker salaris vraagt → gebruik salarisOpvragen
 - Als de gebruiker emails wil verwijderen/markeren → gebruik de juiste email tool

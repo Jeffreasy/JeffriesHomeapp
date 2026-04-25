@@ -315,6 +315,42 @@ type CreateActionInput = {
   linkedProjectId?: Id<"laventecareProjects">;
 };
 
+type CreateDecisionInput = {
+  projectId?: Id<"laventecareProjects">;
+  titel: string;
+  besluit: string;
+  reden: string;
+  impact?: string;
+  status?: string;
+  datum?: string;
+};
+
+type CreateChangeRequestInput = {
+  projectId?: Id<"laventecareProjects">;
+  titel: string;
+  impact: string;
+  planningImpact?: string;
+  budgetImpact?: string;
+  status?: string;
+};
+
+type CreateSlaIncidentInput = {
+  projectId?: Id<"laventecareProjects">;
+  titel: string;
+  prioriteit?: string;
+  status?: string;
+  kanaal?: string;
+  gemeldOp?: string;
+  reactieDeadline?: string;
+  samenvatting?: string;
+};
+
+async function validateProjectAccess(ctx: MutationCtx, userId: string, projectId?: Id<"laventecareProjects">) {
+  if (!projectId) return;
+  const project = await ctx.db.get(projectId);
+  if (!project || project.userId !== userId) throw new Error("Project niet gevonden");
+}
+
 async function createLeadRecord(ctx: MutationCtx, userId: string, args: CreateLeadInput) {
   const now = new Date().toISOString();
   let companyId: Id<"laventecareCompanies"> | undefined = undefined;
@@ -381,6 +417,59 @@ async function createProjectRecord(ctx: MutationCtx, userId: string, args: Creat
     waardeIndicatie: args.waardeIndicatie,
     startDatum:      args.startDatum,
     deadline:        args.deadline,
+    samenvatting:    args.samenvatting,
+    aangemaakt:      now,
+    gewijzigd:       now,
+  });
+}
+
+async function createDecisionRecord(ctx: MutationCtx, userId: string, args: CreateDecisionInput) {
+  const now = new Date().toISOString();
+  await validateProjectAccess(ctx, userId, args.projectId);
+
+  return ctx.db.insert("laventecareDecisions", {
+    userId,
+    projectId:  args.projectId,
+    titel:      args.titel.trim(),
+    besluit:    args.besluit.trim(),
+    reden:      args.reden.trim(),
+    impact:     args.impact,
+    status:     args.status ?? "genomen",
+    datum:      args.datum ?? amsterdamDate(),
+    aangemaakt: now,
+  });
+}
+
+async function createChangeRequestRecord(ctx: MutationCtx, userId: string, args: CreateChangeRequestInput) {
+  const now = new Date().toISOString();
+  await validateProjectAccess(ctx, userId, args.projectId);
+
+  return ctx.db.insert("laventecareChangeRequests", {
+    userId,
+    projectId:      args.projectId,
+    titel:          args.titel.trim(),
+    impact:         args.impact.trim(),
+    planningImpact: args.planningImpact,
+    budgetImpact:   args.budgetImpact,
+    status:         args.status ?? "nieuw",
+    aangemaakt:     now,
+    gewijzigd:      now,
+  });
+}
+
+async function createSlaIncidentRecord(ctx: MutationCtx, userId: string, args: CreateSlaIncidentInput) {
+  const now = new Date().toISOString();
+  await validateProjectAccess(ctx, userId, args.projectId);
+
+  return ctx.db.insert("laventecareSlaIncidents", {
+    userId,
+    projectId:       args.projectId,
+    titel:           args.titel.trim(),
+    prioriteit:      args.prioriteit ?? "P3",
+    status:          args.status ?? "open",
+    kanaal:          args.kanaal ?? "telegram",
+    gemeldOp:        args.gemeldOp ?? now,
+    reactieDeadline: args.reactieDeadline,
     samenvatting:    args.samenvatting,
     aangemaakt:      now,
     gewijzigd:       now,
@@ -763,6 +852,139 @@ export const updateActionItemStatus = mutation({
   },
 });
 
+export const updateActionStatusInternal = internalMutation({
+  args: {
+    userId: v.string(),
+    id:     v.id("laventecareActionItems"),
+    status: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, id, status }) => {
+    const action = await ctx.db.get(id);
+    if (!action || action.userId !== userId) throw new Error("Actie niet gevonden");
+
+    await ctx.db.patch(id, {
+      status:    status ?? "afgerond",
+      updatedAt: new Date().toISOString(),
+    });
+
+    return id;
+  },
+});
+
+export const listActionsInternal = internalQuery({
+  args: {
+    userId:          v.string(),
+    status:          v.optional(v.string()),
+    includeArchived: v.optional(v.boolean()),
+    limit:           v.optional(v.number()),
+  },
+  handler: async (ctx, { userId, status, includeArchived, limit }) => {
+    const max = Math.max(1, Math.min(limit ?? 10, 25));
+    const actions = status
+      ? await ctx.db.query("laventecareActionItems").withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", status)).collect()
+      : await ctx.db.query("laventecareActionItems").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
+
+    return actions
+      .filter((action) => includeArchived || isOpenStatus(action.status))
+      .sort((a, b) => {
+        const byDue = (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31");
+        if (byDue !== 0) return byDue;
+        return b.updatedAt.localeCompare(a.updatedAt);
+      })
+      .slice(0, max);
+  },
+});
+
+export const createDecision = mutation({
+  args: {
+    projectId: v.optional(v.id("laventecareProjects")),
+    titel:     v.string(),
+    besluit:   v.string(),
+    reden:     v.string(),
+    impact:    v.optional(v.string()),
+    status:    v.optional(v.string()),
+    datum:     v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
+    return createDecisionRecord(ctx, userId, args);
+  },
+});
+
+export const createDecisionInternal = internalMutation({
+  args: {
+    userId:    v.string(),
+    projectId: v.optional(v.id("laventecareProjects")),
+    titel:     v.string(),
+    besluit:   v.string(),
+    reden:     v.string(),
+    impact:    v.optional(v.string()),
+    status:    v.optional(v.string()),
+    datum:     v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, ...args }) => createDecisionRecord(ctx, userId, args),
+});
+
+export const createChangeRequest = mutation({
+  args: {
+    projectId:      v.optional(v.id("laventecareProjects")),
+    titel:          v.string(),
+    impact:         v.string(),
+    planningImpact: v.optional(v.string()),
+    budgetImpact:   v.optional(v.string()),
+    status:         v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
+    return createChangeRequestRecord(ctx, userId, args);
+  },
+});
+
+export const createChangeRequestInternal = internalMutation({
+  args: {
+    userId:         v.string(),
+    projectId:      v.optional(v.id("laventecareProjects")),
+    titel:          v.string(),
+    impact:         v.string(),
+    planningImpact: v.optional(v.string()),
+    budgetImpact:   v.optional(v.string()),
+    status:         v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, ...args }) => createChangeRequestRecord(ctx, userId, args),
+});
+
+export const createSlaIncident = mutation({
+  args: {
+    projectId:       v.optional(v.id("laventecareProjects")),
+    titel:           v.string(),
+    prioriteit:      v.optional(v.string()),
+    status:          v.optional(v.string()),
+    kanaal:          v.optional(v.string()),
+    gemeldOp:        v.optional(v.string()),
+    reactieDeadline: v.optional(v.string()),
+    samenvatting:    v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
+    return createSlaIncidentRecord(ctx, userId, args);
+  },
+});
+
+export const createSlaIncidentInternal = internalMutation({
+  args: {
+    userId:          v.string(),
+    projectId:       v.optional(v.id("laventecareProjects")),
+    titel:           v.string(),
+    prioriteit:      v.optional(v.string()),
+    status:          v.optional(v.string()),
+    kanaal:          v.optional(v.string()),
+    gemeldOp:        v.optional(v.string()),
+    reactieDeadline: v.optional(v.string()),
+    samenvatting:    v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, ...args }) => createSlaIncidentRecord(ctx, userId, args),
+});
+
 export const convertSignalToLead = mutation({
   args: {
     source:      v.string(),
@@ -888,11 +1110,13 @@ export const createProjectInternal = internalMutation({
 export const getAgentContextInternal = internalQuery({
   args: { userId: v.string(), lite: v.optional(v.boolean()) },
   handler: async (ctx, { userId, lite }) => {
-    const [companies, leads, projects, incidents, documents, actions, emails, events, notes] = await Promise.all([
+    const [companies, leads, projects, incidents, changes, decisions, documents, actions, emails, events, notes] = await Promise.all([
       ctx.db.query("laventecareCompanies").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareLeads").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareProjects").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareSlaIncidents").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("laventecareChangeRequests").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("laventecareDecisions").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareDocuments").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareActionItems").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("emails").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(50),
@@ -903,6 +1127,11 @@ export const getAgentContextInternal = internalQuery({
     const openLeads = leads.filter((lead) => isOpenStatus(lead.status));
     const activeProjects = projects.filter((project) => isOpenStatus(project.status));
     const openIncidents = incidents.filter((incident) => isOpenStatus(incident.status));
+    const openChanges = changes
+      .filter((change) => isOpenStatus(change.status))
+      .sort((a, b) => b.gewijzigd.localeCompare(a.gewijzigd))
+      .slice(0, 6);
+    const recentDecisions = [...decisions].sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 6);
     const openActions = actions
       .filter((action) => isOpenStatus(action.status))
       .sort((a, b) => {
@@ -923,6 +1152,8 @@ export const getAgentContextInternal = internalQuery({
         funnel: `${openLeads.length} open leads, ${activeProjects.length} actieve projecten`,
         documentatie: `${documents.length || LAVENTECARE_DOCUMENTS.length} documenten beschikbaar`,
         sla: `${openIncidents.length} open incidenten`,
+        changes: `${openChanges.length} open change requests`,
+        decisions: recentDecisions.slice(0, 3),
         signalen: `${businessSignals.length} zakelijke signalen uit email/agenda/notities`,
         acties: `${openActions.length} open LaventeCare acties`,
         openActies: openActions.slice(0, 3),
@@ -945,6 +1176,8 @@ export const getAgentContextInternal = internalQuery({
         projecten: projects.length,
         actieveProjecten: activeProjects.slice(0, 10),
         openIncidenten: openIncidents.slice(0, 10),
+        openChanges,
+        decisions: recentDecisions,
         openActies: openActions,
         followUps,
       },
