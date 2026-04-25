@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Target, Check, AlertTriangle, ChevronRight, Flame } from "lucide-react";
 import Link from "next/link";
 import { useHabits, type HabitWithLog } from "@/hooks/useHabits";
-import { formatStreak, formatLevel } from "@/lib/habit-constants";
+import { usePrivacy } from "@/hooks/usePrivacy";
+import { formatLevel } from "@/lib/habit-constants";
 
 /**
  * DailyChecklist — Dashboard widget.
@@ -12,6 +13,7 @@ import { formatStreak, formatLevel } from "@/lib/habit-constants";
  */
 export function DailyChecklist() {
   const { todayHabits, todaySummary, level, toggle, isLoading } = useHabits();
+  const { hidden: privacyOn } = usePrivacy();
 
   if (isLoading) {
     return (
@@ -95,6 +97,7 @@ export function DailyChecklist() {
             <HabitCheckItem
               key={habit._id}
               habit={habit}
+              masked={privacyOn}
               onToggle={() => toggle(habit._id)}
             />
           ))}
@@ -104,7 +107,7 @@ export function DailyChecklist() {
   );
 }
 
-function HabitCheckItem({ habit, onToggle }: { habit: HabitWithLog; onToggle: () => void }) {
+function HabitCheckItem({ habit, onToggle, masked }: { habit: HabitWithLog; onToggle: () => void; masked: boolean }) {
   const isCompleted = habit.log?.voltooid === true;
   const isNegative = habit.type === "negatief";
   const hasIncident = habit.log?.isIncident === true;
@@ -157,7 +160,7 @@ function HabitCheckItem({ habit, onToggle }: { habit: HabitWithLog; onToggle: ()
 
       {/* Emoji + name */}
       <div className="flex items-center gap-2 min-w-0 flex-1">
-        <span className="text-base shrink-0">{habit.emoji}</span>
+        <span className="text-base shrink-0">{masked ? "•" : habit.emoji}</span>
         <span
           className="text-sm font-medium truncate transition-all"
           style={{
@@ -165,7 +168,7 @@ function HabitCheckItem({ habit, onToggle }: { habit: HabitWithLog; onToggle: ()
             textDecoration: isSuccess && !isNegative ? "line-through" : "none",
           }}
         >
-          {habit.naam}
+          {masked ? "Verborgen habit" : habit.naam}
         </span>
       </div>
 

@@ -1,9 +1,70 @@
 import { v } from "convex/values";
 import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { computeXP, getNewBadges, getLevel, OVERLOAD_THRESHOLDS, type Moeilijkheid } from "./lib/habitConstants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+type AuthCtx = QueryCtx | MutationCtx;
+type RoosterFilter = NonNullable<Doc<"habits">["roosterFilter"]>;
+
+const ROOSTER_FILTERS: ReadonlySet<string> = new Set([
+  "alle",
+  "werkdagen",
+  "vrijeDagen",
+  "vroegeDienst",
+  "lateDienst",
+]);
+
+const EMPTY_STATS = {
+  totaalXP: 0,
+  totaalHabits: 0,
+  totaalVoltooid: 0,
+  topStreaks: [] as Array<{ naam: string; emoji: string; streak: number; type: string }>,
+  badgeCount: 0,
+  langsteStreakOoit: 0,
+};
+
+async function getCurrentUserId(ctx: AuthCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  return identity?.subject ?? null;
+}
+
+async function requireCurrentUserId(ctx: AuthCtx) {
+  const userId = await getCurrentUserId(ctx);
+  if (!userId) throw new Error("Niet ingelogd");
+  return userId;
+}
+
+async function requireOwnedHabit(ctx: AuthCtx, habitId: Id<"habits">, userId: string) {
+  const habit = await ctx.db.get(habitId);
+  if (!habit || habit.userId !== userId) throw new Error("Habit niet gevonden");
+  return habit;
+}
+
+function normalizeRoosterFilter(value: string | undefined): RoosterFilter | undefined {
+  return value && ROOSTER_FILTERS.has(value) ? value as RoosterFilter : undefined;
+}
+
+async function getWeeklyReportForUser(ctx: QueryCtx, userId: string) {
+  const today = todayStr();
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 6);
+  const weekStart = weekAgo.toISOString().slice(0, 10);
+
+  const logs = await ctx.db
+    .query("habitLogs")
+    .withIndex("by_user_datum", (q) => q.eq("userId", userId).gte("datum", weekStart))
+    .filter((q) => q.lte(q.field("datum"), today))
+    .collect();
+
+  const completions = logs.filter((log) => log.voltooid).length;
+  const incidents = logs.filter((log) => log.isIncident).length;
+  const xpEarned = logs.reduce((sum, log) => sum + log.xpVerdiend, 0);
+
+  return { completions, incidents, xpEarned, logCount: logs.length };
+}
 
 function todayStr(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
@@ -106,7 +167,7 @@ function computeNegativeStreakFrom(
  * - Negatief: telt opeenvolgende due-dagen ZONDER incident (auto-groei)
  */
 async function computeCurrentStreak(
-  ctx: any,
+  ctx: AuthCtx,
   habitId: Id<"habits">,
   frequentie: string,
   aangepasteDagen: number[] | undefined,
@@ -117,13 +178,13 @@ async function computeCurrentStreak(
 
   const logs = await ctx.db
     .query("habitLogs")
-    .withIndex("by_habit", (q: any) => q.eq("habitId", habitId))
+    .withIndex("by_habit", (q) => q.eq("habitId", habitId))
     .collect();
 
   // ── Negatieve habits: auto-groei (geen check nodig) ────────────────────
   if (type === "negatief") {
     const incidentDates = new Set<string>(
-      logs.filter((l: any) => l.isIncident).map((l: any) => l.datum as string),
+      logs.filter((log) => log.isIncident).map((log) => log.datum),
     );
     const createdDate = aangemaakt ? aangemaakt.slice(0, 10) : today;
     return computeNegativeStreakFrom(incidentDates, frequentie, aangepasteDagen, today, createdDate);
@@ -131,7 +192,7 @@ async function computeCurrentStreak(
 
   // ── Positieve habits: opeenvolgende voltooiingen ───────────────────────
   const completedDates = new Set<string>(
-    logs.filter((l: any) => l.voltooid).map((l: any) => l.datum as string),
+    logs.filter((log) => log.voltooid).map((log) => log.datum),
   );
 
   // Start vandaag: als due + voltooid → streak vanaf vandaag
@@ -164,7 +225,7 @@ async function computeCurrentStreak(
  * Fixes: correcte streak berekening, enkele XP patch, badge check.
  */
 async function coreToggle(
-  ctx: any,
+  ctx: MutationCtx,
   userId: string,
   habitId: Id<"habits">,
   datum: string,
@@ -173,11 +234,11 @@ async function coreToggle(
   notitie?: string,
 ): Promise<{ action: string; xp: number; streak: number; levelUp?: number; newBadges: Array<{ naam: string; emoji: string }> }> {
   const habit = await ctx.db.get(habitId);
-  if (!habit) throw new Error("Habit niet gevonden");
+  if (!habit || habit.userId !== userId) throw new Error("Habit niet gevonden");
 
   const existingLog = await ctx.db
     .query("habitLogs")
-    .withIndex("by_habit_datum", (q: any) => q.eq("habitId", habitId).eq("datum", datum))
+    .withIndex("by_habit_datum", (q) => q.eq("habitId", habitId).eq("datum", datum))
     .first();
 
   if (existingLog) {
@@ -229,9 +290,9 @@ async function coreToggle(
   // Badge check
   const existingBadges = await ctx.db
     .query("habitBadges")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .collect();
-  const behaald = new Set<string>(existingBadges.map((b: any) => b.badgeId as string));
+  const behaald = new Set<string>(existingBadges.map((badge) => badge.badgeId));
   const newBadges = getNewBadges(newStreak, newTotal, behaald);
 
   let bonusXP = 0;
@@ -290,8 +351,11 @@ async function coreToggle(
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export const list = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return [];
+
     return ctx.db
       .query("habits")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -301,8 +365,11 @@ export const list = query({
 });
 
 export const listAll = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return [];
+
     return ctx.db
       .query("habits")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -312,9 +379,12 @@ export const listAll = query({
 
 /** Habits + log status voor een specifieke datum, met rooster-aware filtering */
 export const getForDate = query({
-  args: { userId: v.string(), datum: v.optional(v.string()) },
-  handler: async (ctx, { userId, datum }) => {
+  args: { datum: v.optional(v.string()) },
+  handler: async (ctx, { datum }) => {
+    const userId = await getCurrentUserId(ctx);
     const targetDate = datum ?? todayStr();
+    if (!userId) return { datum: targetDate, dienst: null, habits: [] };
+
     const dow = dayOfWeek(targetDate);
 
     // Haal dienst op voor deze datum (rooster integratie)
@@ -391,8 +461,11 @@ export const getForDate = query({
 
 /** Globale stats: totaal XP, level, streak overview */
 export const getStats = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return EMPTY_STATS;
+
     const habits = await ctx.db
       .query("habits")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -426,8 +499,11 @@ export const getStats = query({
 
 /** 365 dagen heatmap data — rate berekend o.b.v. due habits per dag */
 export const getHeatmapData = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return { days: [], habitCount: 0 };
+
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - 364);
@@ -475,8 +551,11 @@ export const getHeatmapData = query({
 });
 
 export const getBadges = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return [];
+
     return ctx.db
       .query("habitBadges")
       .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -486,25 +565,17 @@ export const getBadges = query({
 });
 
 export const getWeeklyReport = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
-    const today = todayStr();
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 6);
-    const weekStart = weekAgo.toISOString().slice(0, 10);
-
-    const logs = await ctx.db
-      .query("habitLogs")
-      .withIndex("by_user_datum", (q) => q.eq("userId", userId).gte("datum", weekStart))
-      .filter((q) => q.lte(q.field("datum"), today))
-      .collect();
-
-    const completions = logs.filter((l) => l.voltooid).length;
-    const incidents = logs.filter((l) => l.isIncident).length;
-    const xpEarned = logs.reduce((sum, l) => sum + l.xpVerdiend, 0);
-
-    return { completions, incidents, xpEarned, logCount: logs.length };
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getCurrentUserId(ctx);
+    if (!userId) return { completions: 0, incidents: 0, xpEarned: 0, logCount: 0 };
+    return getWeeklyReportForUser(ctx, userId);
   },
+});
+
+export const getWeeklyReportInternal = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => getWeeklyReportForUser(ctx, userId),
 });
 
 // ─── Internal Queries (for AI agent context) ──────────────────────────────────
@@ -566,7 +637,6 @@ export const listForAgent = internalQuery({
 
 export const create = mutation({
   args: {
-    userId:            v.string(),
     naam:              v.string(),
     emoji:             v.string(),
     type:              v.union(v.literal("positief"), v.literal("negatief")),
@@ -584,17 +654,18 @@ export const create = mutation({
     kleur:             v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
     const now = new Date().toISOString();
     const moeilijkheid = args.moeilijkheid ?? "normaal";
 
     const existing = await ctx.db
       .query("habits")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     const maxOrder = existing.reduce((m, h) => Math.max(m, h.volgorde), -1);
 
     return ctx.db.insert("habits", {
-      userId:            args.userId,
+      userId,
       naam:              args.naam,
       emoji:             args.emoji,
       type:              args.type,
@@ -629,6 +700,7 @@ export const update = mutation({
     id:                v.id("habits"),
     naam:              v.optional(v.string()),
     emoji:             v.optional(v.string()),
+    type:              v.optional(v.union(v.literal("positief"), v.literal("negatief"))),
     beschrijving:      v.optional(v.string()),
     frequentie:        v.optional(v.union(v.literal("dagelijks"), v.literal("weekdagen"), v.literal("weekenddagen"), v.literal("aangepast"), v.literal("x_per_week"), v.literal("x_per_maand"))),
     aangepasteDagen:   v.optional(v.array(v.number())),
@@ -643,8 +715,8 @@ export const update = mutation({
     kleur:             v.optional(v.string()),
   },
   handler: async (ctx, { id, ...fields }) => {
-    const existing = await ctx.db.get(id);
-    if (!existing) throw new Error("Habit niet gevonden");
+    const userId = await requireCurrentUserId(ctx);
+    await requireOwnedHabit(ctx, id, userId);
 
     const patch: Record<string, unknown> = { gewijzigd: new Date().toISOString() };
     for (const [key, val] of Object.entries(fields)) {
@@ -661,7 +733,6 @@ export const update = mutation({
 /** Toggle completion voor een specifieke datum */
 export const toggleCompletion = mutation({
   args: {
-    userId:  v.string(),
     habitId: v.id("habits"),
     datum:   v.optional(v.string()),
     waarde:  v.optional(v.number()),
@@ -669,24 +740,24 @@ export const toggleCompletion = mutation({
     bron:    v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
     const datum = args.datum ?? todayStr();
     const bron = args.bron ?? "web";
-    return coreToggle(ctx, args.userId, args.habitId, datum, bron, args.waarde, args.notitie);
+    return coreToggle(ctx, userId, args.habitId, datum, bron, args.waarde, args.notitie);
   },
 });
 
 /** Negatieve habit: log incident (streak reset) */
 export const logIncident = mutation({
   args: {
-    userId:  v.string(),
     habitId: v.id("habits"),
     trigger: v.optional(v.string()),
     notitie: v.optional(v.string()),
     bron:    v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const habit = await ctx.db.get(args.habitId);
-    if (!habit) throw new Error("Habit niet gevonden");
+    const userId = await requireCurrentUserId(ctx);
+    const habit = await requireOwnedHabit(ctx, args.habitId, userId);
     if (habit.type !== "negatief") throw new Error("Alleen voor negatieve habits");
 
     const datum = todayStr();
@@ -703,7 +774,7 @@ export const logIncident = mutation({
     if (existing) await ctx.db.delete(existing._id);
 
     await ctx.db.insert("habitLogs", {
-      userId:     args.userId,
+      userId,
       habitId:    args.habitId,
       datum,
       voltooid:   false,
@@ -728,15 +799,14 @@ export const logIncident = mutation({
 /** Kwantitatief: increment waarde (auto-complete bij doel) */
 export const incrementWaarde = mutation({
   args: {
-    userId:  v.string(),
     habitId: v.id("habits"),
     stap:    v.number(),
     datum:   v.optional(v.string()),
     bron:    v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const habit = await ctx.db.get(args.habitId);
-    if (!habit) throw new Error("Habit niet gevonden");
+    const userId = await requireCurrentUserId(ctx);
+    const habit = await requireOwnedHabit(ctx, args.habitId, userId);
     if (!habit.isKwantitatief) throw new Error("Niet kwantitatief");
 
     const datum = args.datum ?? todayStr();
@@ -773,15 +843,15 @@ export const incrementWaarde = mutation({
         // Badge check
         const existingBadges = await ctx.db
           .query("habitBadges")
-          .withIndex("by_user", (q: any) => q.eq("userId", args.userId))
+          .withIndex("by_user", (q) => q.eq("userId", userId))
           .collect();
-        const behaald = new Set<string>(existingBadges.map((b: any) => b.badgeId as string));
+        const behaald = new Set<string>(existingBadges.map((badge) => badge.badgeId));
         const newBadges = getNewBadges(newStreak, newTotal, behaald);
         let bonusXP = 0;
         for (const badge of newBadges) {
           bonusXP += badge.xpBonus;
           await ctx.db.insert("habitBadges", {
-            userId: args.userId, badgeId: badge.id, habitId: args.habitId,
+            userId, badgeId: badge.id, habitId: args.habitId,
             naam: badge.naam, emoji: badge.emoji, beschrijving: badge.beschrijving,
             xpBonus: badge.xpBonus, behaaldOp: new Date().toISOString(),
           });
@@ -818,7 +888,7 @@ export const incrementWaarde = mutation({
 
     // Nieuw log
     await ctx.db.insert("habitLogs", {
-      userId: args.userId, habitId: args.habitId, datum,
+      userId, habitId: args.habitId, datum,
       voltooid: doelBereikt, waarde: newWaarde,
       isIncident: false, bron,
       xpVerdiend: 0, aangemaakt: new Date().toISOString(),
@@ -831,8 +901,12 @@ export const incrementWaarde = mutation({
 export const reorder = mutation({
   args: { items: v.array(v.object({ id: v.id("habits"), volgorde: v.number() })) },
   handler: async (ctx, { items }) => {
+    const userId = await requireCurrentUserId(ctx);
+    for (const { id } of items) {
+      await requireOwnedHabit(ctx, id, userId);
+    }
     for (const { id, volgorde } of items) {
-      await ctx.db.patch(id, { volgorde });
+      await ctx.db.patch(id, { volgorde, gewijzigd: new Date().toISOString() });
     }
   },
 });
@@ -840,8 +914,8 @@ export const reorder = mutation({
 export const togglePause = mutation({
   args: { id: v.id("habits") },
   handler: async (ctx, { id }) => {
-    const h = await ctx.db.get(id);
-    if (!h) throw new Error("Habit niet gevonden");
+    const userId = await requireCurrentUserId(ctx);
+    const h = await requireOwnedHabit(ctx, id, userId);
     await ctx.db.patch(id, {
       isPauze:     !h.isPauze,
       gepauzeerOm: h.isPauze ? undefined : new Date().toISOString(),
@@ -853,8 +927,8 @@ export const togglePause = mutation({
 export const archive = mutation({
   args: { id: v.id("habits") },
   handler: async (ctx, { id }) => {
-    const h = await ctx.db.get(id);
-    if (!h) throw new Error("Habit niet gevonden");
+    const userId = await requireCurrentUserId(ctx);
+    await requireOwnedHabit(ctx, id, userId);
     await ctx.db.patch(id, { isActief: false, gewijzigd: new Date().toISOString() });
   },
 });
@@ -862,8 +936,8 @@ export const archive = mutation({
 export const remove = mutation({
   args: { id: v.id("habits") },
   handler: async (ctx, { id }) => {
-    const h = await ctx.db.get(id);
-    if (!h) throw new Error("Habit niet gevonden");
+    const userId = await requireCurrentUserId(ctx);
+    const h = await requireOwnedHabit(ctx, id, userId);
     // Verwijder gerelateerde logs
     const logs = await ctx.db
       .query("habitLogs")
@@ -892,7 +966,7 @@ export const createInternal = internalMutation({
     beschrijving:   v.optional(v.string()),
     frequentie:     v.union(v.literal("dagelijks"), v.literal("weekdagen"), v.literal("weekenddagen"), v.literal("aangepast"), v.literal("x_per_week"), v.literal("x_per_maand")),
     moeilijkheid:   v.optional(v.union(v.literal("makkelijk"), v.literal("normaal"), v.literal("moeilijk"))),
-    roosterFilter:  v.optional(v.string()),
+    roosterFilter:  v.optional(v.union(v.literal("alle"), v.literal("werkdagen"), v.literal("vrijeDagen"), v.literal("vroegeDienst"), v.literal("lateDienst"))),
     kleur:          v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -911,7 +985,7 @@ export const createInternal = internalMutation({
       isKwantitatief:   false,
       moeilijkheid,
       xpPerVoltooiing:  computeXP(moeilijkheid),
-      roosterFilter:    args.roosterFilter as any,
+      roosterFilter:    normalizeRoosterFilter(args.roosterFilter),
       kleur:            args.kleur,
       huidigeStreak:    0,
       langsteStreak:    0,
@@ -947,7 +1021,8 @@ export const logIncidentInternal = internalMutation({
   handler: async (ctx, args) => {
     const habitId = args.habitId as Id<"habits">;
     const habit = await ctx.db.get(habitId);
-    if (!habit) throw new Error("Habit niet gevonden");
+    if (!habit || habit.userId !== args.userId) throw new Error("Habit niet gevonden");
+    if (habit.type !== "negatief") throw new Error("Alleen voor negatieve habits");
 
     const datum = todayStr();
 
@@ -976,6 +1051,8 @@ export const addNoteInternal = internalMutation({
   args: { userId: v.string(), habitId: v.string(), notitie: v.string() },
   handler: async (ctx, args) => {
     const habitId = args.habitId as Id<"habits">;
+    const habit = await ctx.db.get(habitId);
+    if (!habit || habit.userId !== args.userId) throw new Error("Habit niet gevonden");
     const datum = todayStr();
 
     const existingLog = await ctx.db

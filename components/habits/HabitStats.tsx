@@ -9,8 +9,8 @@ import { formatXP, formatStreak, formatLevel } from "@/lib/habit-constants";
  * HabitStats — Statistics dashboard.
  * Mobile-first: stacked cards, XP progress bar, streak leaderboard.
  */
-export function HabitStats() {
-  const { stats, level, badges } = useHabits();
+export function HabitStats({ masked = false }: { masked?: boolean }) {
+  const { stats, level } = useHabits();
 
   if (!stats) {
     return (
@@ -98,10 +98,12 @@ export function HabitStats() {
               <div key={i} className="flex items-center justify-between py-1.5">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-500 w-4">#{i + 1}</span>
-                  <span className="text-sm">{s.emoji}</span>
-                  <span className="text-xs text-slate-300">{s.naam}</span>
+                  <span className="text-sm">{masked ? "•" : s.emoji}</span>
+                  <span className="text-xs text-slate-300">{masked ? `Habit ${i + 1}` : s.naam}</span>
                   {s.type === "negatief" && (
-                    <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/10 text-green-400/70 border border-green-500/10">Auto</span>
+                    <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/10 text-green-400/70 border border-green-500/10">
+                      {masked ? "Prive" : "Auto"}
+                    </span>
                   )}
                 </div>
                 <span className="text-xs font-bold text-orange-400">

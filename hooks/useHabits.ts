@@ -93,22 +93,22 @@ export function useHabits(datum?: string) {
   // Queries
   const forDate = useQuery(
     api.habits.getForDate,
-    userId ? { userId, datum } : "skip",
+    userId ? { datum } : "skip",
   ) as { datum: string; dienst: { shiftType: string; team: string } | null; habits: HabitWithLog[] } | undefined;
 
   const stats = useQuery(
     api.habits.getStats,
-    userId ? { userId } : "skip",
+    userId ? {} : "skip",
   );
 
   const badges = useQuery(
     api.habits.getBadges,
-    userId ? { userId } : "skip",
+    userId ? {} : "skip",
   ) as HabitBadgeRecord[] | undefined;
 
   const allHabits = useQuery(
     api.habits.list,
-    userId ? { userId } : "skip",
+    userId ? {} : "skip",
   ) as HabitRecord[] | undefined;
 
   // Mutations
@@ -152,15 +152,15 @@ export function useHabits(datum?: string) {
 
     // Actions
     create: (data: HabitCreateData) =>
-      createHabit({ userId, ...data }),
+      createHabit(data),
     update: (id: Id<"habits">, data: Partial<HabitCreateData>) =>
       updateHabit({ id, ...data }),
     toggle: (habitId: Id<"habits">, waarde?: number, notitie?: string) =>
-      toggleCompletion({ userId, habitId, datum, waarde, notitie }),
+      toggleCompletion({ habitId, datum, waarde, notitie }),
     increment: (habitId: Id<"habits">, stap: number) =>
-      incrementWaarde({ userId, habitId, stap, datum }),
+      incrementWaarde({ habitId, stap, datum }),
     incident: (habitId: Id<"habits">, trigger?: string, notitie?: string) =>
-      logIncident({ userId, habitId, trigger, notitie }),
+      logIncident({ habitId, trigger, notitie }),
     reorder: (items: Array<{ id: Id<"habits">; volgorde: number }>) =>
       reorderHabits({ items }),
     pause:   (id: Id<"habits">) => togglePause({ id }),

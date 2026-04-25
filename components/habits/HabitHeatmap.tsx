@@ -20,7 +20,7 @@ export function HabitHeatmap() {
 
   const data = useQuery(
     api.habits.getHeatmapData,
-    userId ? { userId } : "skip",
+    userId ? {} : "skip",
   );
 
   const { weeks, monthLabels } = useMemo(() => {

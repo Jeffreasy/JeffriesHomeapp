@@ -39,7 +39,9 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
 
   // Reset state when form opens or initial values change
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+
+    const timeout = window.setTimeout(() => {
       setNaam(initial?.naam ?? "");
       setEmoji(initial?.emoji ?? "🎯");
       setType(initial?.type ?? "positief");
@@ -56,7 +58,9 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
       setDoelTijd(initial?.doelTijd ?? "");
       setShowEmojis(false);
       setIsSubmitting(false);
-    }
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, [open, initial]);
 
   const handleSubmit = () => {
@@ -144,7 +148,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                   type="text"
                   value={naam}
                   onChange={(e) => setNaam(e.target.value)}
-                  placeholder="Gym, Water drinken, Geen fastfood..."
+                  placeholder="Naam van habit..."
                   className="flex-1 bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 min-h-[56px]"
                   autoFocus
                 />
@@ -261,7 +265,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                   {ROOSTER_FILTER_OPTIONS.map(({ value, label }) => (
                     <button
                       key={value}
-                      onClick={() => setRoosterFilter(value as any)}
+                      onClick={() => setRoosterFilter(value)}
                       className="py-2 px-3 rounded-lg text-xs font-medium transition-all min-h-[40px]"
                       style={{
                         background: roosterFilter === value ? "rgba(59,130,246,0.10)" : "rgba(255,255,255,0.03)",

@@ -7,7 +7,6 @@
 
 import type { AgentDefinition, ContextOptions } from "../registry";
 import { internal } from "../../_generated/api";
-import { api } from "../../_generated/api";
 import { getLevel } from "../../lib/habitConstants";
 
 export const habitsAgent: AgentDefinition = {
@@ -104,7 +103,7 @@ export const habitsAgent: AgentDefinition = {
     const level = getLevel(data.totaalXP);
 
     // Haal recente incidenten op voor correlatie-analyse
-    const recentLogs = await ctx.runQuery(api.habits.getWeeklyReport, { userId });
+    const recentLogs = await ctx.runQuery(internal.habits.getWeeklyReportInternal, { userId });
 
     return {
       level: {

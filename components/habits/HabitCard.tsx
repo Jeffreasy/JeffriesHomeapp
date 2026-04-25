@@ -15,11 +15,11 @@ import type { HabitWithLog } from "@/hooks/useHabits";
  */
 
 const ROOSTER_LABELS: Record<string, string> = {
-  altijd:        "Altijd",
-  werkdagen:     "Alleen werkdagen",
-  vrije_dagen:   "Alleen vrije dagen",
-  vroege_dienst: "Vroege diensten",
-  late_dienst:   "Late diensten",
+  alle:         "Altijd",
+  werkdagen:    "Alleen werkdagen",
+  vrijeDagen:   "Alleen vrije dagen",
+  vroegeDienst: "Vroege diensten",
+  lateDienst:   "Late diensten",
 };
 
 interface HabitCardProps {
@@ -31,9 +31,10 @@ interface HabitCardProps {
   onArchive: () => void;
   onRemove: () => void;
   onEdit: () => void;
+  masked?: boolean;
 }
 
-export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, onArchive, onRemove, onEdit }: HabitCardProps) {
+export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, onArchive, onRemove, onEdit, masked = false }: HabitCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showTriggerModal, setShowTriggerModal] = useState(false);
@@ -62,6 +63,10 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
   const stap = DEFAULT_STAP[habit.eenheid ?? "x"] ?? 1;
   const currentWaarde = habit.log?.waarde ?? 0;
   const progress = isQuantitative ? Math.min(1, currentWaarde / habit.doelWaarde!) : 0;
+  const displayName = masked ? "Verborgen habit" : habit.naam;
+  const displayEmoji = masked ? "•" : habit.emoji;
+  const typeLabel = masked ? "Afgeschermd" : "Vermijden";
+  const frequencyLabel = masked ? "Schema" : FREQUENTIE_LABELS[habit.frequentie] ?? habit.frequentie;
 
   const handleIncidentSubmit = () => {
     onIncident(selectedTrigger, triggerNotitie || undefined);
@@ -116,7 +121,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
             {isCompleted ? (
               <Check size={20} className="text-white" />
             ) : (
-              <span className="text-xl">{habit.emoji}</span>
+              <span className="text-xl">{displayEmoji}</span>
             )}
           </div>
         ) : (
@@ -131,7 +136,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
             {isCompleted ? (
               <Check size={20} className="text-white" />
             ) : (
-              <span className="text-xl">{habit.emoji}</span>
+              <span className="text-xl">{displayEmoji}</span>
             )}
           </button>
         )}
@@ -149,11 +154,11 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                 textDecoration: isSuccess && !isNegative ? "line-through" : "none",
               }}
             >
-              {habit.naam}
+              {displayName}
             </span>
             {isNegative && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-400 border border-red-500/15">
-                Vermijden
+                {typeLabel}
               </span>
             )}
             <ChevronDown
@@ -175,7 +180,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
             <span className="text-[10px] text-slate-600">
               {MOEILIJKHEID_LABELS[habit.moeilijkheid]}
             </span>
-            {habit.doelTijd && (
+            {habit.doelTijd && !masked && (
               <span className="text-[10px] text-sky-400/60">⏰ {habit.doelTijd}</span>
             )}
           </div>
@@ -231,10 +236,10 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
             {/* Current value display */}
             <div className="flex-1 text-center">
               <span className="text-sm font-bold" style={{ color: isCompleted ? color : "rgba(255,255,255,0.8)" }}>
-                {currentWaarde}
+                {masked ? "••" : currentWaarde}
               </span>
               <span className="text-[10px] text-slate-500">
-                {" "}/ {habit.doelWaarde} {habit.eenheid}
+                {" "}/ {masked ? "••" : `${habit.doelWaarde} ${habit.eenheid ?? ""}`}
               </span>
             </div>
 
@@ -266,7 +271,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
           >
             <div className="px-3.5 pb-3 border-t border-white/5 pt-3">
               {/* Beschrijving */}
-              {habit.beschrijving && (
+              {habit.beschrijving && !masked && (
                 <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
                   {habit.beschrijving}
                 </p>
@@ -277,7 +282,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                 <DetailStat
                   icon={<Calendar size={12} />}
                   label="Frequentie"
-                  value={FREQUENTIE_LABELS[habit.frequentie] ?? habit.frequentie}
+                  value={frequencyLabel}
                   color="#3b82f6"
                 />
                 <DetailStat
@@ -326,7 +331,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
               })()}
 
               {/* Rooster koppeling badge */}
-              {habit.roosterFilter && habit.roosterFilter !== "altijd" && (
+              {habit.roosterFilter && habit.roosterFilter !== "alle" && (
                 <div className="flex items-center gap-1.5 mt-2.5">
                   <TrendingUp size={11} className="text-cyan-400/60" />
                   <span className="text-[10px] text-cyan-400/70">
@@ -359,7 +364,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
               <p className="text-[11px] text-slate-400 font-medium mb-2.5">Wat was de trigger?</p>
 
               <div className="grid grid-cols-2 gap-1.5 mb-3">
-                {INCIDENT_TRIGGERS.map((t) => (
+                {INCIDENT_TRIGGERS.map((t, index) => (
                   <button
                     key={t.value}
                     onClick={() => setSelectedTrigger(selectedTrigger === t.value ? undefined : t.value)}
@@ -370,7 +375,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                       color: selectedTrigger === t.value ? "#f87171" : "#94a3b8",
                     }}
                   >
-                    {t.emoji} {t.label}
+                    {masked ? `Trigger ${index + 1}` : `${t.emoji} ${t.label}`}
                   </button>
                 ))}
               </div>
