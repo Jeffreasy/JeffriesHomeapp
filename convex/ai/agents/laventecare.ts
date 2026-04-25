@@ -29,6 +29,7 @@ export const laventecareAgent: AgentDefinition = {
     "Discovery- en blueprint-trajecten voorbereiden",
     "Projectfases, scope, deliverables, change requests en besluiten bewaken",
     "SLA-incidenten en beheercontext samenvatten",
+    "Zakelijke signalen herkennen in email, agenda en notities",
     "Voorstellen, onboarding en juridische documenten in de juiste volgorde plaatsen",
     "Cross-domain signalen koppelen aan agenda, email, notities en finance via Brain",
   ],

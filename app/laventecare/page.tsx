@@ -7,8 +7,10 @@ import {
   ArrowRight,
   BookOpenText,
   BriefcaseBusiness,
+  CalendarClock,
   CheckCircle2,
   ClipboardList,
+  Clock3,
   FileText,
   Flag,
   FolderKanban,
@@ -20,7 +22,9 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  StickyNote,
   Target,
+  Mail,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -63,6 +67,27 @@ type ProjectItem = {
   waardeIndicatie?: number;
   deadline?: string;
   samenvatting?: string;
+};
+
+type BusinessSignal = {
+  source: "email" | "agenda" | "notitie";
+  id: string;
+  title: string;
+  subtitle: string;
+  date: string;
+  matchedTerm: string;
+  urgency: "laag" | "normaal" | "hoog";
+  actionHint: string;
+};
+
+type FollowUpSignal = {
+  source: "lead" | "project";
+  id: string;
+  title: string;
+  date: string;
+  status: string;
+  priority: "laag" | "normaal" | "hoog";
+  actionHint: string;
 };
 
 type LeadForm = {
@@ -194,6 +219,67 @@ function EmptyState({ title, body }: { title: string; body: string }) {
   );
 }
 
+function signalMeta(source: BusinessSignal["source"]): { icon: LucideIcon; label: string; tone: Tone } {
+  if (source === "email") return { icon: Mail, label: "Email", tone: "sky" };
+  if (source === "agenda") return { icon: CalendarClock, label: "Agenda", tone: "emerald" };
+  return { icon: StickyNote, label: "Notitie", tone: "amber" };
+}
+
+function SignalCard({ signal }: { signal: BusinessSignal }) {
+  const meta = signalMeta(signal.source);
+  const Icon = meta.icon;
+  const tone = toneClasses[meta.tone];
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+      <div className="flex items-start gap-3">
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", tone.border, tone.surface)}>
+          <Icon size={16} className={tone.icon} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cn("rounded-full border px-2 py-0.5 text-xs font-bold", tone.border, tone.surface, tone.text)}>
+              {meta.label}
+            </span>
+            <span className={cn(
+              "rounded-full border px-2 py-0.5 text-xs font-bold",
+              signal.urgency === "hoog" ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-white/10 bg-white/[0.04] text-slate-400",
+            )}>
+              {signal.urgency}
+            </span>
+          </div>
+          <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-white">{signal.title}</h3>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{signal.subtitle}</p>
+          <p className="mt-3 text-xs font-semibold text-slate-400">
+            {formatDate(signal.date)} - match: {signal.matchedTerm}
+          </p>
+          <p className="mt-2 text-sm leading-5 text-slate-400">{signal.actionHint}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FollowUpCard({ followUp }: { followUp: FollowUpSignal }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{followUp.source}</p>
+          <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-white">{followUp.title}</h3>
+        </div>
+        <span className={cn(
+          "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold",
+          followUp.priority === "hoog" ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
+        )}>
+          {formatDate(followUp.date)}
+        </span>
+      </div>
+      <p className="mt-3 text-xs font-semibold text-slate-500">{label(followUp.status)}</p>
+      <p className="mt-2 text-sm leading-5 text-slate-400">{followUp.actionHint}</p>
+    </div>
+  );
+}
+
 export default function LaventeCarePage() {
   const cockpit = useQuery(api.laventecare.getCockpit);
   const createLead = useMutation(api.laventecare.createLead);
@@ -208,6 +294,8 @@ export default function LaventeCarePage() {
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
   const activeLeads = useMemo(() => (cockpit?.activeLeads ?? []) as LeadItem[], [cockpit]);
   const activeProjects = useMemo(() => (cockpit?.activeProjects ?? []) as ProjectItem[], [cockpit]);
+  const businessSignals = useMemo(() => (cockpit?.businessSignals ?? []) as BusinessSignal[], [cockpit]);
+  const followUps = useMemo(() => (cockpit?.followUps ?? []) as FollowUpSignal[], [cockpit]);
 
   const filteredDocuments = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -341,7 +429,7 @@ export default function LaventeCarePage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
                 <Sparkles size={14} />
-                Professionele basislaag actief
+                Geintegreerde businesslaag actief
               </div>
               <h2 className="mt-4 max-w-3xl text-2xl font-bold text-white sm:text-3xl">
                 Van bedrijfsdocumentatie naar een werkbaar LaventeCare-systeem.
@@ -353,7 +441,7 @@ export default function LaventeCarePage() {
             <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
               <p className="text-sm font-semibold text-white">Integratieprincipe</p>
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                Leads, projecten, documenten, decisions, change requests en SLA-signalen staan nu als eigen domein klaar voor Brain, Telegram, Agenda, Email en Finance.
+                Leads, projecten, documenten, decisions, change requests en SLA-signalen staan nu als eigen domein klaar voor Brain, Telegram, Agenda, Email, Notities en Finance.
               </p>
             </div>
           </div>
@@ -443,11 +531,51 @@ export default function LaventeCarePage() {
           </motion.section>
         )}
 
-        <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <MetricCard icon={Handshake} label="Open leads" value={summary.activeLeads} detail={`${summary.leads} totaal in de funnel`} tone="sky" />
           <MetricCard icon={FolderKanban} label="Actieve projecten" value={summary.activeProjects} detail={`${summary.projects} projecten geregistreerd`} tone="emerald" />
+          <MetricCard icon={Sparkles} label="Signalen" value={summary.businessSignals} detail={`${summary.followUps} follow-ups klaar`} tone="violet" />
           <MetricCard icon={FileText} label="Documentbasis" value={`${summary.documents || summary.knowledgeDocuments}/24`} detail={summary.documentsSeeded ? "Geindexeerd in Convex" : "Catalogus klaar om te initialiseren"} tone="amber" />
           <MetricCard icon={LifeBuoy} label="SLA signalen" value={summary.openIncidents} detail={`${summary.openChanges} open change requests`} tone={summary.openIncidents > 0 ? "rose" : "violet"} />
+        </section>
+
+        <section className="mt-5 grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+          <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Live koppelingen</p>
+                <h2 className="mt-1 text-lg font-bold text-white">Zakelijke signalen</h2>
+              </div>
+              <Sparkles size={20} className="text-violet-300" />
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {businessSignals.length === 0 ? (
+                <div className="lg:col-span-2">
+                  <EmptyState title="Nog geen zakelijke signalen" body="Emails, agenda-afspraken en notities met LaventeCare-termen of lead/projectnamen verschijnen hier automatisch." />
+                </div>
+              ) : (
+                businessSignals.slice(0, 6).map((signal) => (
+                  <SignalCard key={`${signal.source}-${signal.id}`} signal={signal} />
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+            <div className="flex items-center gap-2">
+              <Clock3 size={18} className="text-amber-300" />
+              <h2 className="text-lg font-bold text-white">Opvolging</h2>
+            </div>
+            <div className="mt-4 space-y-3">
+              {followUps.length === 0 ? (
+                <EmptyState title="Geen open follow-ups" body="Zet bij leads een volgende actie of deadline, dan neemt Brain dit mee in Telegram." />
+              ) : (
+                followUps.slice(0, 5).map((followUp) => (
+                  <FollowUpCard key={`${followUp.source}-${followUp.id}`} followUp={followUp} />
+                ))
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_0.9fr]">

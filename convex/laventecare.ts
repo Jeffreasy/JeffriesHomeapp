@@ -35,6 +35,234 @@ function isOpenStatus(status: string) {
   return !["gewonnen", "verloren", "no_match", "afgerond", "archived", "gesloten"].includes(status);
 }
 
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function amsterdamDate(daysFromNow = 0) {
+  return addDays(new Date(), daysFromNow).toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+}
+
+type BusinessSignal = {
+  source: "email" | "agenda" | "notitie";
+  id: string;
+  title: string;
+  subtitle: string;
+  date: string;
+  matchedTerm: string;
+  urgency: "laag" | "normaal" | "hoog";
+  actionHint: string;
+};
+
+type FollowUpSignal = {
+  source: "lead" | "project";
+  id: string;
+  title: string;
+  date: string;
+  status: string;
+  priority: "laag" | "normaal" | "hoog";
+  actionHint: string;
+};
+
+const LAVENTECARE_SIGNAL_TERMS = [
+  "laventecare",
+  "lavente care",
+  "laventecare.nl",
+  "discovery",
+  "blueprint",
+  "voorstel",
+  "proposal",
+  "scope",
+  "deliverables",
+  "sla",
+  "change request",
+  "decision log",
+  "verwerkersovereenkomst",
+  "algemene voorwaarden",
+  "privacyverklaring",
+  "security one pager",
+  "systeemanalyse",
+  "klant onboarding",
+] as const;
+
+function uniqueTerms(terms: string[]) {
+  const seen = new Set<string>();
+  return terms
+    .map((term) => term.trim())
+    .filter((term) => {
+      const normalized = normalize(term);
+      if (normalized.length < 4 || seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+}
+
+function businessTerms(
+  companies: Array<{ naam: string }>,
+  leads: Array<{ titel: string }>,
+  projects: Array<{ naam: string }>,
+) {
+  return uniqueTerms([
+    ...LAVENTECARE_SIGNAL_TERMS,
+    ...companies.map((company) => company.naam),
+    ...leads.map((lead) => lead.titel),
+    ...projects.map((project) => project.naam),
+  ]);
+}
+
+function matchBusinessTerm(text: string, terms: string[]) {
+  const haystack = normalize(text);
+  return terms.find((term) => haystack.includes(normalize(term))) ?? null;
+}
+
+function sortSignals<T extends { date: string }>(items: T[]) {
+  return [...items].sort((a, b) => b.date.localeCompare(a.date));
+}
+
+function isPresent<T>(value: T | null): value is T {
+  return value !== null;
+}
+
+function leadFollowUps(leads: Array<{
+  _id: Id<"laventecareLeads">;
+  titel: string;
+  status: string;
+  prioriteit?: string;
+  volgendeStap?: string;
+  volgendeActieDatum?: string;
+}>) {
+  const today = amsterdamDate();
+  return leads
+    .filter((lead) => isOpenStatus(lead.status) && lead.volgendeActieDatum)
+    .sort((a, b) => (a.volgendeActieDatum ?? "").localeCompare(b.volgendeActieDatum ?? ""))
+    .slice(0, 8)
+    .map((lead): FollowUpSignal => ({
+      source: "lead",
+      id: lead._id,
+      title: lead.titel,
+      date: lead.volgendeActieDatum ?? today,
+      status: lead.status,
+      priority: lead.prioriteit === "hoog" ? "hoog" : lead.volgendeActieDatum && lead.volgendeActieDatum <= today ? "hoog" : "normaal",
+      actionHint: lead.volgendeStap ?? "Bepaal de volgende concrete opvolgstap.",
+    }));
+}
+
+function projectFollowUps(projects: Array<{
+  _id: Id<"laventecareProjects">;
+  naam: string;
+  status: string;
+  fase: string;
+  deadline?: string;
+}>) {
+  const today = amsterdamDate();
+  return projects
+    .filter((project) => isOpenStatus(project.status) && project.deadline)
+    .sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""))
+    .slice(0, 8)
+    .map((project): FollowUpSignal => ({
+      source: "project",
+      id: project._id,
+      title: project.naam,
+      date: project.deadline ?? today,
+      status: project.fase,
+      priority: project.deadline && project.deadline <= today ? "hoog" : "normaal",
+      actionHint: "Controleer scope, voortgang en eventuele blockers.",
+    }));
+}
+
+function buildBusinessSignals({
+  terms,
+  emails,
+  events,
+  notes,
+}: {
+  terms: string[];
+  emails: Array<{
+    gmailId: string;
+    from: string;
+    subject: string;
+    snippet: string;
+    datum: string;
+    isGelezen: boolean;
+    isVerwijderd: boolean;
+  }>;
+  events: Array<{
+    eventId: string;
+    titel: string;
+    startDatum: string;
+    startTijd?: string;
+    locatie?: string;
+    status: string;
+  }>;
+  notes: Array<{
+    _id: Id<"notes">;
+    titel?: string;
+    inhoud: string;
+    deadline?: string;
+    prioriteit?: string;
+    isArchived: boolean;
+    gewijzigd: string;
+  }>;
+}): BusinessSignal[] {
+  const emailSignals = emails
+    .filter((email) => !email.isVerwijderd)
+    .map((email) => {
+      const matchedTerm = matchBusinessTerm(`${email.subject} ${email.snippet} ${email.from}`, terms);
+      if (!matchedTerm) return null;
+      return {
+        source: "email" as const,
+        id: email.gmailId,
+        title: email.subject,
+        subtitle: email.from,
+        date: email.datum,
+        matchedTerm,
+        urgency: email.isGelezen ? "normaal" as const : "hoog" as const,
+        actionHint: email.isGelezen ? "Review of dit bij een lead/project hoort." : "Ongelezen zakelijke email opvolgen.",
+      };
+    })
+    .filter(isPresent);
+
+  const eventSignals = events
+    .filter((event) => event.status !== "VERWIJDERD")
+    .map((event) => {
+      const matchedTerm = matchBusinessTerm(`${event.titel} ${event.locatie ?? ""}`, terms);
+      if (!matchedTerm) return null;
+      return {
+        source: "agenda" as const,
+        id: event.eventId,
+        title: event.titel,
+        subtitle: [event.startTijd, event.locatie].filter(Boolean).join(" - ") || "Agenda",
+        date: event.startDatum,
+        matchedTerm,
+        urgency: event.startDatum <= amsterdamDate(7) ? "hoog" as const : "normaal" as const,
+        actionHint: "Bereid agenda, intakevragen of opvolging voor.",
+      };
+    })
+    .filter(isPresent);
+
+  const noteSignals = notes
+    .filter((note) => !note.isArchived)
+    .map((note) => {
+      const matchedTerm = matchBusinessTerm(`${note.titel ?? ""} ${note.inhoud}`, terms);
+      if (!matchedTerm) return null;
+      return {
+        source: "notitie" as const,
+        id: note._id,
+        title: note.titel || note.inhoud.slice(0, 50),
+        subtitle: note.inhoud.length > 120 ? `${note.inhoud.slice(0, 120)}...` : note.inhoud,
+        date: note.deadline?.slice(0, 10) ?? note.gewijzigd.slice(0, 10),
+        matchedTerm,
+        urgency: note.prioriteit === "hoog" || (note.deadline && note.deadline.slice(0, 10) <= amsterdamDate(3)) ? "hoog" as const : "normaal" as const,
+        actionHint: "Zet om naar lead, taak, decision of projectcontext als dit nog los staat.",
+      };
+    })
+    .filter(isPresent);
+
+  return sortSignals([...emailSignals, ...eventSignals, ...noteSignals]).slice(0, 12);
+}
+
 function scoreLead(args: {
   fitScore?: number;
   pijnpunt?: string;
@@ -168,7 +396,7 @@ export const getCockpit = query({
     const userId = await getCurrentUserId(ctx);
     if (!userId) return null;
 
-    const [companies, leads, projects, incidents, changes, decisions, documents] = await Promise.all([
+    const [companies, leads, projects, incidents, changes, decisions, documents, emails, events, notes] = await Promise.all([
       ctx.db.query("laventecareCompanies").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareLeads").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareProjects").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
@@ -176,6 +404,9 @@ export const getCockpit = query({
       ctx.db.query("laventecareChangeRequests").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareDecisions").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareDocuments").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("emails").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(80),
+      ctx.db.query("personalEvents").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(120),
+      ctx.db.query("notes").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(80),
     ]);
 
     const byChanged = <T extends { gewijzigd?: string; aangemaakt?: string }>(items: T[]) =>
@@ -186,6 +417,11 @@ export const getCockpit = query({
     const openIncidents = byChanged(incidents.filter((incident) => isOpenStatus(incident.status))).slice(0, 5);
     const openChanges = byChanged(changes.filter((change) => isOpenStatus(change.status))).slice(0, 5);
     const recentDecisions = [...decisions].sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 5);
+    const terms = businessTerms(companies, leads, projects);
+    const businessSignals = buildBusinessSignals({ terms, emails, events, notes });
+    const followUps = [...leadFollowUps(leads), ...projectFollowUps(projects)]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 10);
 
     return {
       profile: LAVENTECARE_PROFILE,
@@ -201,12 +437,16 @@ export const getCockpit = query({
         openIncidents: openIncidents.length,
         openChanges: openChanges.length,
         decisions: decisions.length,
+        businessSignals: businessSignals.length,
+        followUps: followUps.length,
       },
       activeLeads,
       activeProjects,
       openIncidents,
       openChanges,
       recentDecisions,
+      businessSignals,
+      followUps,
       documentCatalog: documents.length > 0 ? documents : LAVENTECARE_DOCUMENTS.map((doc) => ({
         documentKey:  doc.key,
         titel:        doc.title,
@@ -453,16 +693,25 @@ export const createProjectInternal = internalMutation({
 export const getAgentContextInternal = internalQuery({
   args: { userId: v.string(), lite: v.optional(v.boolean()) },
   handler: async (ctx, { userId, lite }) => {
-    const [leads, projects, incidents, documents] = await Promise.all([
+    const [companies, leads, projects, incidents, documents, emails, events, notes] = await Promise.all([
+      ctx.db.query("laventecareCompanies").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareLeads").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareProjects").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareSlaIncidents").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareDocuments").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("emails").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(50),
+      ctx.db.query("personalEvents").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(80),
+      ctx.db.query("notes").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(50),
     ]);
 
     const openLeads = leads.filter((lead) => isOpenStatus(lead.status));
     const activeProjects = projects.filter((project) => isOpenStatus(project.status));
     const openIncidents = incidents.filter((incident) => isOpenStatus(incident.status));
+    const terms = businessTerms(companies, leads, projects);
+    const businessSignals = buildBusinessSignals({ terms, emails, events, notes });
+    const followUps = [...leadFollowUps(leads), ...projectFollowUps(projects)]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 8);
 
     if (lite) {
       return {
@@ -470,6 +719,8 @@ export const getAgentContextInternal = internalQuery({
         funnel: `${openLeads.length} open leads, ${activeProjects.length} actieve projecten`,
         documentatie: `${documents.length || LAVENTECARE_DOCUMENTS.length} documenten beschikbaar`,
         sla: `${openIncidents.length} open incidenten`,
+        signalen: `${businessSignals.length} zakelijke signalen uit email/agenda/notities`,
+        opvolging: followUps.slice(0, 3),
         proces: LAVENTECARE_PROCESS_STAGES.map((stage) => stage.title),
       };
     }
@@ -488,7 +739,9 @@ export const getAgentContextInternal = internalQuery({
         projecten: projects.length,
         actieveProjecten: activeProjects.slice(0, 10),
         openIncidenten: openIncidents.slice(0, 10),
+        followUps,
       },
+      signalen: businessSignals,
       documentatie: documents.length > 0 ? documents.slice(0, 24) : LAVENTECARE_DOCUMENTS,
     };
   },

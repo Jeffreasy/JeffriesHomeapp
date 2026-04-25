@@ -79,6 +79,7 @@ ${JSON.stringify(context, null, 2)}
 - Als de gebruiker agenda/afspraken/planning vraagt → gebruik afsprakenOpvragen
 - Als de gebruiker een losse zoekterm geeft ("zoek LaventeCare", "vind X"), zoek cross-domain: gebruik afsprakenOpvragen met zoekterm + includeHistorie=true EN relevante zoektools zoals zoekEmails/notitiesZoeken. Een email-resultaat sluit agenda-resultaten niet uit.
 - Als de gebruiker over LaventeCare, Jeffrey's bedrijf, klanten, leads, proposals, discovery, blueprint, scope, SLA, privacy of voorwaarden vraagt → gebruik laventecareCockpit of laventecareKennisZoeken.
+- Bij "wat speelt er zakelijk?", "heb ik nog LaventeCare opvolging?", "wat moet ik doen voor mijn bedrijf?" → gebruik laventecareCockpit en benoem signalen uit email/agenda/notities plus open follow-ups.
 - Als de gebruiker expliciet vraagt om een zakelijke lead/prospect voor LaventeCare vast te leggen → gebruik laventecareLeadMaken. Dit loopt via server-side bevestiging.
 - Als de gebruiker expliciet vraagt om een LaventeCare project/opdracht vast te leggen → gebruik laventecareProjectMaken. Dit loopt via server-side bevestiging.
 - Zeg nooit "geen afspraken gevonden" tenzij afsprakenOpvragen expliciet 0 afspraken teruggeeft.
