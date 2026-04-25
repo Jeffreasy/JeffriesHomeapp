@@ -8,6 +8,7 @@
 import type { AgentDefinition } from "../registry";
 import { lampenAgent }      from "./lampen";
 import { roosterAgent }     from "./rooster";
+import { agendaAgent }      from "./agenda";
 import { financeAgent }     from "./finance";
 import { emailAgent }       from "./email";
 import { automationsAgent } from "./automations";
@@ -24,6 +25,7 @@ export const dashboardAgent: AgentDefinition = {
   capabilities: [
     "Dagelijkse briefing genereren (cross-domain)",
     "Volgende dienst + type tonen",
+    "Agenda snapshot en afspraak-conflicten tonen",
     "Ongelezen emails samenvatten",
     "Lamp status overview",
     "Financieel snapshot (maand prognose)",
@@ -41,7 +43,7 @@ export const dashboardAgent: AgentDefinition = {
       beschrijving: "Context ophalen van een specifieke sub-agent",
       endpoint: "GET /ai/agent/:id",
       parameters: [
-        { naam: "agentId", type: "string", beschrijving: "Agent ID", verplicht: true, enum: ["lampen", "rooster", "finance", "email", "automations", "notes", "habits"] },
+        { naam: "agentId", type: "string", beschrijving: "Agent ID", verplicht: true, enum: ["lampen", "rooster", "agenda", "finance", "email", "automations", "notes", "habits"] },
       ],
     },
   ],
@@ -55,9 +57,10 @@ export const dashboardAgent: AgentDefinition = {
 
     // ── Inter-agent delegation: lite mode ─────────────────────────────────
     // Elke sub-agent geeft een compacte samenvatting terug.
-    const [lampen, rooster, finance, email, automations, notes, habits] = await Promise.all([
+    const [lampen, rooster, agenda, finance, email, automations, notes, habits] = await Promise.all([
       lampenAgent.getContext(ctx, userId, { lite: true }),
       roosterAgent.getContext(ctx, userId, { lite: true }),
+      agendaAgent.getContext(ctx, userId, { lite: true }),
       financeAgent.getContext(ctx, userId, { lite: true }),
       emailAgent.getContext(ctx, userId, { lite: true }),
       automationsAgent.getContext(ctx, userId, { lite: true }),
@@ -72,6 +75,7 @@ export const dashboardAgent: AgentDefinition = {
 
       lampen,
       rooster,
+      agenda,
       finance,
       email,
       automations,

@@ -32,6 +32,7 @@ graph TB
         Dashboard["/  Dashboard"]
         Lampen["/lampen"]
         Rooster["/rooster"]
+        Agenda["/agenda"]
         Finance["/finance"]
         Notities["/notities"]
         Habits["/habits"]
@@ -40,12 +41,12 @@ graph TB
     end
 
     subgraph ConvexBackend["Convex Backend"]
-        Schema["Schema (17 tabellen)"]
+        Schema["Schema (24 tabellen)"]
         HTTP["HTTP Router"]
         DataModules["Data Modules (8)"]
         Actions["9 Server Actions"]
-        AgentCtx["8 Agent Context Getters"]
-        Crons["6 Cron Jobs"]
+        AgentCtx["10 Agent Context Getters"]
+        Crons["10 Cron Jobs"]
         AI["Grok AI Engine"]
     end
 
@@ -78,13 +79,20 @@ graph TB
 
 ---
 
-## 3. Database Schema (18 tabellen)
+## 3. Database Schema (24 tabellen)
 
 | Tabel | Beschrijving | Key Fields | Indices |
 |-------|-------------|------------|---------|
 | **devices** | WiZ smart lampen | name, ipAddress, status, currentState (on/brightness/color_temp/r/g/b) | `by_user`, `by_user_ip` |
+| **rooms** | Lokale smart-home ruimtes | userId, name, icon, floorNumber | `by_user` |
 | **deviceCommands** | Command queue (Telegram/AI → lokale bridge) | userId, command, bron, status | `by_status`, `by_user` |
+| **bridgeHealth** | Lokale bridge heartbeat/health | bridgeId, status, lastSeenAt, commandsDone/Failed | `by_bridge`, `by_updated` |
+| **auditLogs** | Gevoelige acties en systeemmutaties | actor, source, action, entity, status, summary | `by_user_created`, `by_created` |
+| **syncStatus** | Laatste run per databron | source, status, startedAt, lastSuccessAt, lastError | `by_user_source`, `by_user` |
+| **privacySettings** | Privacy scopes per domein | finance, habits, notes, email, account | `by_user` |
+| **brainPreferences** | Gedrag/voorkeuren van Jeffries Brain | detailLevel, tone, proactiveLevel, focusAreas, briefing/quiet hours | `by_user` |
 | **chatMessages** | Telegram conversatie geheugen | chatId, role, content, agentId | `by_chat` |
+| **aiPendingActions** | Bevestigingsqueue voor AI-mutaties | userId, agentId, toolName, code, status, expiresAt | `by_user_status`, `by_user_code_status` |
 | **automations** | Tijdgestuurde lamp-automaties | name, trigger (time/days/shiftType), action (type/scene/brightness), group, lastFiredAt | `by_user` |
 | **schedule** | Werkdiensten (Google Calendar sync) | eventId, startDatum, shiftType, startTijd, eindTijd, duur, locatie, team, status | `by_user`, `by_user_date`, `by_user_eventId` |
 | **scheduleMeta** | Import metadata | importedAt, fileName, totalRows | `by_user` |
@@ -109,14 +117,17 @@ graph TB
 - **Scan window:** -30 → +90 dagen
 - **Keyword filter:** `KEYWORDS_INCLUDE` (dienst, sdb, shift) en `KEYWORDS_EXCLUDE` (vrij, vakantie)
 - **Event parsing:** All-day vs timed events, shiftType auto-detectie (`<10h = Vroeg`, `≥13h = Laat`), team prefix uit locatie
+- **Roosterkwaliteit:** shiftType gebruikt Europe/Amsterdam-uur en dedupet dubbele bronregels op datum/tijd/locatie voordat ze naar Convex gaan.
 - **Helpers:** `datumStr()`, `tijdStr()` (CET-aware), `weeknr()` (ISO week), `duurUren()`, `getTeam()`, `getStatus()`
 - **Exports:** `syncFromCalendar` (internalAction), `syncNow` (public action)
 
-### 4.2 [syncPersonalEvents.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/actions/syncPersonalEvents.ts) (124 regels)
-- **Calendar:** `primary` (gebruiker's hoofd Google Calendar)
-- **Geen keyword filter** — alle events worden opgenomen
+### 4.2 [syncPersonalEvents.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/actions/syncPersonalEvents.ts) (204 regels)
+- **Calendar bronnen:** alle leesbare Google Calendar-bronnen via `calendarList.list()`, met `SDB Planning` uitgesloten om rooster-dubbeling te voorkomen. Override mogelijk via `GOOGLE_PERSONAL_CALENDAR_IDS`.
+- **Geen keyword filter** — alle events uit opgenomen bronnen worden verwerkt
+- **Dienst-dedupe:** Todoist/andere calendar-items met roster-shadow titels (`A./R. Vroeg/Laat/Dienst`) of exacte overlap met rooster-diensten worden niet als persoonlijke afspraak opgeslagen.
 - **Status:** simpel: `start < now ? "Voorbij" : "Aankomend"`
 - **Delegeert:** `personalEvents.bulkUpsertFromCalendar` (met orphan detectie)
+- **Tracked cron wrapper:** `syncFromCalendarTracked` schrijft `syncStatus` + `auditLogs`, zodat Agenda/Brain ook bij automatische uur-sync weet of Google Calendar gezond is.
 
 ### 4.3 [syncGmail.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/actions/syncGmail.ts) (242 regels)
 - **Twee modi:**
@@ -240,7 +251,14 @@ graph TB
 - `ToolParameter` — naam, type, beschrijving, verplicht, enum?, default?
 - `toMeta()` — Strip `getContext` voor API responses
 
-**Registry:** Array van 8 `AgentDefinition` objecten, opzoekbaar via `getAgent(id)`
+**Registry:** Array van 10 `AgentDefinition` objecten, opzoekbaar via `getAgent(id)`
+
+### 6.1c Brain Orchestrator
+- **`brain` is de primaire vrije-tekst agent.** Vrije Telegram/HTTP chatvragen vallen standaard terug op `brain` in plaats van vroeg naar één specialist te routeren.
+- **Specialistische agents blijven bestaan als domeinmodules.** Brain haalt compacte context op uit lampen, rooster, agenda, finance, email, automations, notes en habits en combineert die met sync/bridge health en open AI-confirmations.
+- **Brain preferences:** `brainPreferences` bepaalt detailniveau, toon, proactiviteit, focusgebieden, briefing-tijd en stille uren. Telegram kan dit aanpassen via `/prefs` en `/pref ...`.
+- **Toolbeleid:** Brain mag alle read-tools gebruiken en kan wijzigende tools voorbereiden. Risicovolle mutaties blijven via `aiPendingActions` en server-side bevestigingscodes lopen.
+- **Dashboard blijft beschikbaar** als compacte snapshot/specialist, maar de dagelijkse briefing en vrije vragen gebruiken nu het centrale brein.
 
 ### 6.2 Agent Context Getters
 
@@ -248,12 +266,14 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 | Agent | Lite Output | Full Output |
 |-------|-------------|-------------|
-| **dashboard** | N/A (IS de lite aggregator) | datum/dag/tijdstip + lite output van alle 5 sub-agents (via `Promise.all`) |
+| **brain** | N/A (primaire orchestrator) | compacte context van alle domeinen + brainPreferences + syncStatus + bridgeHealth + openActies + beslisregels |
+| **dashboard** | N/A (IS de lite aggregator) | datum/dag/tijdstip + lite output van alle domein-agents (via `Promise.all`) |
 | **lampen** | totaal/online/aan + actieve automations count | Per-lamp details (ip/status/rgb/helderheid) + alle automations met triggers/acties |
 | **rooster** | dienst vandaag + komende count + conflicten | 7-dagen planning (diensten + afspraken per dag) + statistieken + conflicten (max 10) + aankomende events (max 10) |
+| **agenda** | vandaag/morgen count + volgende afspraak + pending/conflicten + sync health | 14-dagen agenda + aankomende afspraken (max 25) + pending wachtrij + conflict/signaal analyse tegen diensten + categorie verdeling + gekoppelde notities |
 | **finance** | salaris huidig (bruto/netto/ort) + periode | Salary history (6 maanden) + 30-dagen categorie verdeling + top 10 uitgaven + in/uit balans |
 | **email** | totaal/ongelezen/prullenbak | Stats (inbox/ongelezen/ster/verzonden) + top 10 afzenders + categorie verdeling + triage suggesties + 15 recente emails |
-| **automations** | totaal/actief | Alle regels met triggers + 5 cron jobs info + sync health (rooster/gmail/todoist/calendar) |
+| **automations** | totaal/actief | Alle regels met triggers + cron jobs info + sync health (rooster/gmail/todoist/calendar/telegram) |
 | **notes** | totaal/pin count + recente titels + triageSuggesties count + **relevanteNotities** | Alle notities + pin count + **triageSuggesties** + **relevanteNotities** (cross-domain match: deadline proximity + linkedEventId + tag match + titel overlap tegen schedule/personalEvents vandaag/morgen, max 5 met reden) |
 | **habits** | totaalHabits/actief/streak overview + vandaag voortgang | Alle habits met huidige status + daglog + streaks + XP/level + badges + **weekRapport** (voltooiingen/incidenten/xpVerdiend via `getWeeklyReport`) + rooster-integratie + **coaching instructie** voor AI correlatie-analyse |
 
@@ -268,16 +288,44 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 4. Loop (max rounds): Grok API call → tool calls parallel uitvoeren → resultaat terug naar Grok
 5. Return: antwoord + agent meta + token usage
 
-**Telegram Bot** ([bot.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/telegram/bot.ts), 277 regels):
-- **16 slash commando's:**
+**Telegram Bot** ([bot.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/convex/telegram/bot.ts)):
+- **Primaire cockpit:** vrije tekst en voice gaan standaard naar `brain`.
+- **Zoek/agenda routing:** agenda-intenties gaan naar `agenda`; brede zoekvragen krijgen een cross-domain guardrail zodat agenda-historie niet wordt overgeslagen.
+- **Directe lampbediening:** simpele lampcommando's blijven low-latency via `deviceCommands`, zonder Grok-roundtrip.
+- **Confirmation cockpit:** `/pending`, `/confirm CODE`, `/cancel CODE` bovenop `aiPendingActions`.
+- **Brain voorkeuren:** `/prefs` en `/pref ...` schrijven naar `brainPreferences`.
+- **Health cockpit:** `/status` toont bridge, sync, integrations, pending confirmations en kerncijfers.
+- **Proactieve meldingen:** `telegram-scheduled-briefing` checkt elke 15 minuten of de ingestelde briefing-tijd is bereikt; `telegram-health-alerts` stuurt alleen bij bridge/sync/command problemen en dedupet via `auditLogs`.
+
+**Cockpit commando's:**
+
+| Commando | Functie |
+|----------|---------|
+| `/status` / `/health` | Systeem-, sync-, bridge- en integratie-status |
+| `/pending` | Open AI-acties met codes en vervaltijd |
+| `/confirm CODE` / `/bevestig CODE` | Pending actie uitvoeren |
+| `/cancel CODE` / `/annuleer CODE` | Pending actie annuleren |
+| `/cancel all` | Alle open pending acties annuleren |
+| `/prefs` | Brain voorkeuren tonen |
+| `/pref detail kort\|normaal\|uitgebreid` | Antwoorddiepte instellen |
+| `/pref toon direct\|warm\|coachend` | Toon instellen |
+| `/pref proactief laag\|normaal\|hoog` | Proactiviteit instellen |
+| `/pref focus planning,gezondheid,rust` | Focusgebieden instellen |
+| `/pref briefing 08:00` | Standaard briefing-tijd instellen |
+| `/pref stil 23:00 07:00` | Stille uren instellen |
+
+**Specialistische slash commando's:**
 
 | Commando | Agent | Functie |
 |----------|-------|---------|
-| `/briefing` | dashboard | Dagelijkse briefing |
+| `/brain` | brain | Centrale assistent |
+| `/briefing` | brain | Dagelijkse briefing |
+| `/dashboard` | dashboard | Compacte dashboard snapshot |
 | `/lampen` | lampen | Lamp status |
 | `/rooster` | rooster | Weekplanning |
-| `/afspraak` | rooster | Afspraak beheren |
-| `/agenda` | rooster | Agenda overzicht |
+| `/afspraak` | agenda | Afspraak beheren |
+| `/agenda` | agenda | Agenda overzicht |
+| `/calendar` | agenda | Google Calendar |
 | `/finance` | finance | Salaris & transacties |
 | `/email` | email | Inbox overzicht |
 | `/inbox` | email | Inbox analyse |
@@ -292,7 +340,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `/check` | habits | Habit afvinken |
 | `/help` | - | Alle commando's tonen |
 
-- **Smart keyword routing** (`detectAgent()`): 6 keyword sets → agent score matching (incl. habit/streak/badge/xp)
+- **Vrije tekst routing:** geen keyword-splitsing meer; standaard naar `brain`, zodat cross-domain context behouden blijft.
 - **Lamp command detectie** (`detectLampCommand()`): Direct aan/uit/dim/scene zonder AI
 - **Voice support:** Groq Whisper STT → transcriptie → processText() + **Voice-to-Structure protocol** (Grok structureert chaotische voice dumps automatisch naar titel + bulletpoints + checklist + tags + deadline)
 
@@ -312,7 +360,8 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 - `afspraakMaken` → `personalEvents.create()` (PendingCreate → cron push met Google Calendar kleuren)
 - `afspraakBewerken` → `updatePersonalEvent.updateEvent()` (instant dual-write — met disambiguatie bij meerdere matches)
 - `afspraakVerwijderen` → `deletePersonalEvent.deleteEvent()` (instant dual-write — met disambiguatie bij meerdere matches)
-- `afsprakenOpvragen` → Query met inline conflict detectie tegen diensten
+- `afsprakenOpvragen` → Query met inline conflict detectie tegen diensten; ondersteunt `zoekterm`, `terugDagen` en `includeHistorie` zodat Telegram ook oude afspraken zoals projectnamen terugvindt.
+- **Agenda Agent:** dedicated contextlaag voor persoonlijke afspraken, pending Calendar-acties, sync-health, notitie-koppelingen en werkdienst-conflicten. Rooster blijft specialist voor diensten; Brain combineert beide.
 
 ---
 
@@ -515,7 +564,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 
 ---
 
-## 10. Cron Jobs (8 stuks)
+## 10. Cron Jobs (10 stuks)
 
 | Naam | Frequentie | Action | Doel |
 |------|-----------|--------|------|
@@ -524,6 +573,8 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 | `sync-todoist-daily` | 07:00 UTC | `syncTodoist.syncTodoist` | Schedule → Todoist taken |
 | `process-pending-calendar` | Elk uur | `processPendingCalendar.processPending` | PendingCreate → Google Calendar |
 | `sync-gmail` | Elke 5 min | `syncGmail.syncFromGmail` | Gmail incremental sync (History API) |
+| `telegram-scheduled-briefing` | Elke 15 min | `telegram.notifications.sendScheduledBriefing` | Checkt Brain briefing-tijd en stuurt maximaal 1 dagelijkse Telegram briefing |
+| `telegram-health-alerts` | Elk uur | `telegram.notifications.sendHealthAlert` | Stuurt Telegram alert bij bridge/sync/command problemen, met dedupe |
 | `purge-deleted-emails` | 03:00 UTC | `emails.purgeDeletedInternal` | Verwijder >7 dagen trash |
 | `decay-habit-streaks` | 01:00 UTC | `habits.decayStreaks` | Streak decay (positief) + auto-groei (negatief) + badge toekenning + **progressive overload** (notitie-suggestie bij streak 30/60/100 om moeilijkheid te verlagen) |
 | `triage-notes-weekly` | Ma 06:00 UTC | `notes.triageNotesInternal` | Wekelijkse schoonmaak: detecteert verstreken deadlines, volledig afgevinkte checklists, stale notities (>30 dagen) → flagged met `triageFlag=true` zodat AI archivering kan voorstellen |
@@ -648,30 +699,34 @@ convex/
 │   │       ├── notes.ts              # ~211 regels (7 handlers incl. bulk archiveer)
 │   │       └── habits.ts             # ~280 regels (8 handlers + fuzzy match)
 │   └── agents/
-│       ├── dashboard.ts               # 83 regels
-│       ├── lampen.ts                  # 126 regels
-│       ├── rooster.ts                 # 152 regels
-│       ├── finance.ts                 # 137 regels
-│       ├── email.ts                   # 111 regels
-│       ├── automations.ts             # 118 regels
+│       ├── brain.ts                   # 163 regels (centrale orchestrator)
+│       ├── dashboard.ts               # 82 regels
+│       ├── lampen.ts                  # 117 regels
+│       ├── rooster.ts                 # 140 regels
+│       ├── agenda.ts                  # 288 regels (persoonlijke agenda + sync health + conflicten)
+│       ├── finance.ts                 # 124 regels
+│       ├── email.ts                   # 100 regels
+│       ├── automations.ts             # 110 regels
 │       ├── notes.ts                   # ~170 regels (9 capabilities, 7 tools, triage + proactieve context: cross-domain schedule/events matching)
 │       └── habits.ts                  # ~130 regels (8 tools, lite/full context + weekRapport + coaching)
 └── telegram/
-    ├── bot.ts                         # ~320 regels (18 commando's)
-    └── api.ts                         # 142 regels
+    ├── bot.ts                         # 680 regels (Brain cockpit + specialist routing + prefs/status/pending)
+    ├── notifications.ts               # 151 regels (briefing + health alerts)
+    └── api.ts                         # 139 regels
 ```
 
-### Frontend (56 bestanden)
+### Frontend (~57 bestanden)
 ```
 app/
-├── page.tsx                           # 334 regels (Dashboard)
-├── lampen/page.tsx                    # 172 regels
-├── rooster/page.tsx                   # 404 regels
-├── finance/page.tsx                   # 509 regels
-├── automations/page.tsx               # 171 regels
-├── notities/page.tsx                  # ~346 regels
-├── habits/page.tsx                    # ~455 regels (datum-navigatie, delete modal, overzicht grouping, stepper+trigger integratie)
-├── settings/page.tsx                  # 129 regels
+├── page.tsx                           # 734 regels (Dashboard)
+├── lampen/page.tsx                    # 675 regels
+├── rooster/page.tsx                   # 962 regels
+├── agenda/page.tsx                    # 535 regels (Agenda cockpit: sync, wachtrij, conflicten, categorieen)
+├── finance/page.tsx                   # 943 regels
+├── automations/page.tsx               # 155 regels
+├── notities/page.tsx                  # 644 regels
+├── habits/page.tsx                    # 648 regels (datum-navigatie, delete modal, overzicht grouping, stepper+trigger integratie)
+├── settings/page.tsx                  # 1083 regels
 └── globals.css                        # 1648 regels
 
 lib/
@@ -766,7 +821,7 @@ components/
 | **React hooks** | 15 |
 | **UI components** | 37 |
 | **Lib modules** | 17 (11 frontend + 6 backend) |
-| **Cron jobs** | 8 |
+| **Cron jobs** | 10 |
 | **Auto-categorisatie regels** | 24 regex patterns |
 | **Scene presets** | 17 (6 custom + 10 WiZ + 1 uit) |
 | **Finance categorieën** | 26 |

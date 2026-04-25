@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Home, Settings, Calendar, Landmark, StickyNote, Lightbulb, Target } from "lucide-react";
+import { Home, Settings, Calendar, CalendarClock, Landmark, StickyNote, Lightbulb, Target } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ const navItems = [
   { href: "/",             icon: Home,       label: "Dashboard"    },
   { href: "/lampen",      icon: Lightbulb,  label: "Lampen"       },
   { href: "/rooster",     icon: Calendar,   label: "Rooster"      },
+  { href: "/agenda",      icon: CalendarClock, label: "Agenda"    },
   { href: "/finance",     icon: Landmark,   label: "Finance"      },
   { href: "/notities",   icon: StickyNote, label: "Notities"     },
   { href: "/habits",      icon: Target,     label: "Habits"       },

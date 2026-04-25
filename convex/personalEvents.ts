@@ -157,10 +157,10 @@ export const bulkUpsertFromCalendar = internalMutation({
     const scanEndStr   = scanEnd.toISOString().slice(0, 10);
 
     for (const doc of existing) {
-      // Check alleen afspraken uit de Google kalender die binnen afzienbare tijd plaatsvonden,
+      // Check alleen afspraken uit gesyncte Google kalenders die binnen afzienbare tijd plaatsvonden,
       // die NIET meer inkomstig zijn, NIET pending zijn voor creatie en NIET al verwijderd zijn.
       if (
-        doc.kalender === "Main" && 
+        doc.kalender && 
         doc.startDatum >= scanStartStr &&
         doc.startDatum <= scanEndStr &&
         !incomingIds.has(doc.eventId) &&

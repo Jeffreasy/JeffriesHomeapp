@@ -286,11 +286,15 @@ BELANGRIJK — Professioneel Template Protocol:
     type: "function" as const,
     function: {
       name: "afsprakenOpvragen",
-      description: "Haal persoonlijke afspraken op. Toont aankomende events met eventuele conflicten met werkdiensten. Gebruik dit als de gebruiker vraagt naar agenda, afspraken, of wat er gepland staat.",
+      description: "Haal persoonlijke afspraken op. Toont aankomende events met eventuele conflicten met werkdiensten. Kan ook zoeken op titel/locatie/beschrijving en historie meenemen. Gebruik dit als de gebruiker vraagt naar agenda, afspraken, of wat er gepland staat.",
       parameters: {
         type: "object",
         properties: {
           aantalDagen: { type: "number", description: "Hoeveel dagen vooruit kijken (default 30)" },
+          terugDagen: { type: "number", description: "Hoeveel dagen terug kijken. Gebruik bij zoeken naar oude afspraken." },
+          zoekterm: { type: "string", description: "Zoek op titel, locatie of beschrijving, bijvoorbeeld LaventeCare" },
+          includeHistorie: { type: "boolean", description: "Neem voorbij-afspraken mee. Zet true bij zoeken op titel of als de gebruiker historie bedoelt." },
+          status: { type: "string", enum: ["Aankomend", "Voorbij", "PendingCreate", "Fout"], description: "Optionele statusfilter" },
         },
         required: [],
       },

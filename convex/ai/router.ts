@@ -5,7 +5,7 @@
  *
  * - listAgents: Alle beschikbare agents met capabilities
  * - internalGetAgentContext: Volledige context van één specifieke agent
- * - internalGetBriefing: Cross-domain daily briefing (Dashboard Agent)
+ * - internalGetBriefing: Cross-domain daily briefing (Brain Agent)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -29,15 +29,15 @@ export const internalGetAgentContext = internalQuery({
 export const internalGetBriefing = internalQuery({
   args: { userId: v.string() },
   handler: async (ctx, { userId }) => {
-    const dashboard = getAgent("dashboard");
-    if (!dashboard) return { ok: false as const, error: "Dashboard agent niet gevonden" };
+    const brain = getAgent("brain");
+    if (!brain) return { ok: false as const, error: "Brain agent niet gevonden" };
 
-    const context = await dashboard.getContext(ctx, userId);
+    const context = await brain.getContext(ctx, userId);
 
     return {
       ok:    true as const,
       type:  "daily-briefing",
-      agent: toMeta(dashboard),
+      agent: toMeta(brain),
       briefing: context,
     };
   },
@@ -52,7 +52,6 @@ export const listAgents = query({
   handler: async () => ({
     agentCount: AGENT_REGISTRY.length,
     agents: AGENT_REGISTRY.map(toMeta),
-    instructie: "Gebruik de beveiligde HTTP route /ai/agent/{agentId} om context van een agent op te halen. " +
-                "Kies de agent die het beste past bij de vraag van de gebruiker.",
+    instructie: "Gebruik standaard de brain agent voor vrije vragen. Gebruik specialist-agents alleen voor expliciete domeinroutes of diepe context.",
   }),
 });

@@ -19,6 +19,45 @@ function displayEndDate(e: any): string {
   return d.toISOString().slice(0, 10);
 }
 
+function dateCET(offsetDays = 0): string {
+  return new Date(Date.now() + offsetDays * 86400000)
+    .toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+}
+
+function normalizeText(value?: string): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isScheduleDuplicateEvent(event: any, schedule: any[]): boolean {
+  const title = normalizeText(event.titel);
+  if (/^[ar]\s+(vroeg|laat|dienst)$/.test(title)) return true;
+  if (event.heledag || !event.startTijd || !event.eindTijd) return false;
+  if (!/\b(vroeg|laat|dienst)\b/.test(title)) return false;
+
+  return schedule.some((dienst: any) => {
+    const sameSlot =
+      dienst.status !== "VERWIJDERD" &&
+      dienst.startDatum === event.startDatum &&
+      dienst.startTijd === event.startTijd &&
+      dienst.eindTijd === event.eindTijd;
+    if (!sameSlot) return false;
+
+    const shift = normalizeText(dienst.shiftType);
+    const team = normalizeText(dienst.team);
+    const teamShift = normalizeText(`${dienst.team} ${dienst.shiftType}`);
+    return (
+      title === teamShift ||
+      title === normalizeText(`${team} ${shift}`) ||
+      title === shift ||
+      ["dienst", "vroeg", "laat"].includes(title) ||
+      (Boolean(team) && title.includes(team) && title.includes(shift))
+    );
+  });
+}
+
 export async function handleAfspraakBewerken(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
     const eventId = args.eventId as string | undefined;
@@ -216,19 +255,48 @@ export async function handleAfspraakVerwijderen(ctx: any, args: Record<string, u
 
 export async function handleAfsprakenOpvragen(ctx: any, args: Record<string, unknown>, userId: string): Promise<string> {
   try {
-    const aantalDagen = (args.aantalDagen as number) ?? 30;
+    const zoekterm = (args.zoekterm as string | undefined)?.trim().toLowerCase();
+    const includeHistorie = Boolean(args.includeHistorie) || Boolean(zoekterm);
+    const aantalDagen = (args.aantalDagen as number | undefined) ?? (zoekterm ? 365 : 30);
+    const terugDagen = (args.terugDagen as number | undefined) ?? (includeHistorie ? 365 : 0);
+    const status = args.status as string | undefined;
     const today = todayCET();
-    const endDate = new Date(Date.now() + aantalDagen * 86400000).toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+    const startDate = dateCET(-Math.max(0, terugDagen));
+    const endDate = dateCET(Math.max(0, aantalDagen));
 
-    const allEvents = await ctx.runQuery(internal.personalEvents.listInternal, { userId });
-    const upcoming = allEvents
-      .filter((e: any) => e.status === "Aankomend" && e.startDatum >= today && e.startDatum <= endDate)
-      .sort((a: any, b: any) => a.startDatum.localeCompare(b.startDatum));
+    const [allEvents, schedule] = await Promise.all([
+      ctx.runQuery(internal.personalEvents.listInternal, { userId }),
+      ctx.runQuery(internal.schedule.listInternal, { userId }),
+    ]);
+    const matching = allEvents
+      .filter((e: any) => {
+        if (e.status === "VERWIJDERD") return false;
+        if (isScheduleDuplicateEvent(e, schedule)) return false;
+        if (!includeHistorie && e.status === "Voorbij") return false;
+        if (status && e.status !== status) return false;
 
-    const schedule = await ctx.runQuery(internal.schedule.listInternal, { userId });
+        const eventEnd = displayEndDate(e);
+        const inRange = eventEnd >= startDate && e.startDatum <= endDate;
+        if (!inRange) return false;
+
+        if (!zoekterm) return true;
+        const haystack = [
+          e.titel,
+          e.locatie,
+          e.beschrijving,
+          e.status,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(zoekterm);
+      })
+      .sort((a: any, b: any) => {
+        const byDate = a.startDatum.localeCompare(b.startDatum);
+        if (byDate !== 0) return zoekterm ? -byDate : byDate;
+        return (a.startTijd ?? "00:00").localeCompare(b.startTijd ?? "00:00");
+      });
+
     const weekdays = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
 
-    const afspraken = upcoming.map((e: any) => {
+    const afspraken = matching.map((e: any) => {
       const d = new Date(e.startDatum + "T00:00:00");
       const dienst = schedule.find((s: any) => s.startDatum === e.startDatum && s.status !== "VERWIJDERD");
       const endDatum = displayEndDate(e);
@@ -237,14 +305,19 @@ export async function handleAfsprakenOpvragen(ctx: any, args: Record<string, unk
         titel: e.titel, datum: e.startDatum, dag: weekdays[d.getDay()],
         eindDatum: e.startDatum !== endDatum ? endDatum : undefined,
         tijd: e.heledag ? "Hele dag" : `${e.startTijd ?? "?"} - ${e.eindTijd ?? "?"}`,
-        locatie: e.locatie, beschrijving: e.beschrijving,
+        locatie: e.locatie, beschrijving: e.beschrijving, status: e.status,
         conflict: dienst ? `⚠️ Conflict met ${dienst.shiftType} dienst (${dienst.startTijd}-${dienst.eindTijd})` : null,
       };
     });
 
     return JSON.stringify({
-      periode: `${today} t/m ${endDate}`,
+      periode: `${startDate} t/m ${endDate}`,
+      vandaag: today,
+      zoekterm: zoekterm ?? null,
+      includeHistorie,
       totaal: afspraken.length,
+      aankomend: afspraken.filter((a: any) => a.status === "Aankomend").length,
+      voorbij: afspraken.filter((a: any) => a.status === "Voorbij").length,
       metConflict: afspraken.filter((a: any) => a.conflict).length,
       afspraken,
     });

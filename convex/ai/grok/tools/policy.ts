@@ -16,23 +16,30 @@ type ToolPolicy = {
   requiresConfirmation: boolean;
 };
 
-const READ_DASHBOARD_AGENTS = ["dashboard"];
+const BRAIN_AGENTS = ["brain"];
+const READ_DASHBOARD_AGENTS = ["dashboard", ...BRAIN_AGENTS];
+const EMAIL_WRITE_AGENTS = ["email", ...BRAIN_AGENTS];
+const SMART_HOME_WRITE_AGENTS = ["lampen", ...BRAIN_AGENTS];
+const FINANCE_WRITE_AGENTS = ["finance", ...BRAIN_AGENTS];
+const CALENDAR_WRITE_AGENTS = ["agenda", "rooster", ...BRAIN_AGENTS];
+const NOTES_WRITE_AGENTS = ["notes", ...BRAIN_AGENTS];
+const HABITS_WRITE_AGENTS = ["habits", ...BRAIN_AGENTS];
 
 const TOOL_POLICIES: Record<string, ToolPolicy> = {
   // Email
   leesEmail:          { agents: ["email", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   zoekEmails:         { agents: ["email", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
-  markeerGelezen:     { agents: ["email"], mutates: true, requiresConfirmation: true },
-  verwijderEmail:     { agents: ["email"], mutates: true, requiresConfirmation: true },
-  markeerSter:        { agents: ["email"], mutates: true, requiresConfirmation: true },
-  emailVersturen:     { agents: ["email"], mutates: true, requiresConfirmation: true },
-  emailBeantwoorden:  { agents: ["email"], mutates: true, requiresConfirmation: true },
-  bulkMarkeerGelezen: { agents: ["email"], mutates: true, requiresConfirmation: true },
-  bulkVerwijder:      { agents: ["email"], mutates: true, requiresConfirmation: true },
-  inboxOpruimen:      { agents: ["email"], mutates: true, requiresConfirmation: true },
+  markeerGelezen:     { agents: EMAIL_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  verwijderEmail:     { agents: EMAIL_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  markeerSter:        { agents: EMAIL_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  emailVersturen:     { agents: EMAIL_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  emailBeantwoorden:  { agents: EMAIL_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  bulkMarkeerGelezen: { agents: EMAIL_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  bulkVerwijder:      { agents: EMAIL_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  inboxOpruimen:      { agents: EMAIL_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
 
   // Smart home
-  lampBedien: { agents: ["lampen"], mutates: true, requiresConfirmation: false },
+  lampBedien: { agents: SMART_HOME_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
 
   // Schedule and salary reads
   dienstenOpvragen: { agents: ["rooster", "finance", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
@@ -44,34 +51,34 @@ const TOOL_POLICIES: Record<string, ToolPolicy> = {
   uitgavenOverzicht:  { agents: ["finance", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   maandVergelijken:   { agents: ["finance", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   vasteLastenAnalyse: { agents: ["finance", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
-  categorieWijzigen:  { agents: ["finance"], mutates: true, requiresConfirmation: true },
-  bulkCategoriseren:  { agents: ["finance"], mutates: true, requiresConfirmation: true },
+  categorieWijzigen:  { agents: FINANCE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  bulkCategoriseren:  { agents: FINANCE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   ongelabeldAnalyse:  { agents: ["finance", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
 
   // Calendar
-  afspraakMaken:       { agents: ["rooster"], mutates: true, requiresConfirmation: true },
-  afspraakBewerken:    { agents: ["rooster"], mutates: true, requiresConfirmation: true },
-  afspraakVerwijderen: { agents: ["rooster"], mutates: true, requiresConfirmation: true },
-  afsprakenOpvragen:   { agents: ["rooster", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
+  afspraakMaken:       { agents: CALENDAR_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  afspraakBewerken:    { agents: CALENDAR_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  afspraakVerwijderen: { agents: CALENDAR_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  afsprakenOpvragen:   { agents: ["agenda", "rooster", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
 
   // Notes
-  notitieMaken:             { agents: ["notes"], mutates: true, requiresConfirmation: false },
+  notitieMaken:             { agents: NOTES_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
   notitiesZoeken:           { agents: ["notes", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
-  notitiePinnen:            { agents: ["notes"], mutates: true, requiresConfirmation: false },
-  notitieBewerken:          { agents: ["notes"], mutates: true, requiresConfirmation: true },
-  notitieArchiveren:        { agents: ["notes"], mutates: true, requiresConfirmation: true },
+  notitiePinnen:            { agents: NOTES_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
+  notitieBewerken:          { agents: NOTES_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  notitieArchiveren:        { agents: NOTES_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   notitiesOverzicht:        { agents: ["notes", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
-  bulkArchiveerNotities:    { agents: ["notes"], mutates: true, requiresConfirmation: true },
+  bulkArchiveerNotities:    { agents: NOTES_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
 
   // Habits
-  habitAanmaken:   { agents: ["habits"], mutates: true, requiresConfirmation: false },
-  habitVoltooien:  { agents: ["habits"], mutates: true, requiresConfirmation: false },
-  habitIncident:   { agents: ["habits"], mutates: true, requiresConfirmation: true },
+  habitAanmaken:   { agents: HABITS_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
+  habitVoltooien:  { agents: HABITS_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
+  habitIncident:   { agents: HABITS_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   habitsOverzicht: { agents: ["habits", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   habitStreaks:    { agents: ["habits", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   habitBadges:     { agents: ["habits", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   habitRapport:    { agents: ["habits", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
-  habitNotitie:    { agents: ["habits"], mutates: true, requiresConfirmation: false },
+  habitNotitie:    { agents: HABITS_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
 };
 
 export function listToolPolicies() {

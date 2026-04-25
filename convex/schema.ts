@@ -122,6 +122,20 @@ export default defineSchema({
   })
     .index("by_user", ["userId"]),
 
+  // ─── Brain Preferences (persoonlijk gedrag van de centrale AI) ─────────────
+  brainPreferences: defineTable({
+    userId:         v.string(),
+    detailLevel:    v.union(v.literal("kort"), v.literal("normaal"), v.literal("uitgebreid")),
+    tone:           v.union(v.literal("direct"), v.literal("warm"), v.literal("coachend")),
+    proactiveLevel: v.union(v.literal("laag"), v.literal("normaal"), v.literal("hoog")),
+    focusAreas:     v.array(v.string()),
+    briefingTime:   v.optional(v.string()), // HH:MM Europe/Amsterdam
+    quietHoursStart: v.optional(v.string()), // HH:MM
+    quietHoursEnd:   v.optional(v.string()), // HH:MM
+    updatedAt:      v.string(),
+  })
+    .index("by_user", ["userId"]),
+
   // ─── Chat Messages (Telegram conversation memory) ──────────────────────────
   chatMessages: defineTable({
     chatId:    v.number(),                   // Telegram chat ID

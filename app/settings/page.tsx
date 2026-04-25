@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Bot,
   CalendarClock,
+  CalendarDays,
   CheckCircle2,
   Cloud,
   Database,
@@ -125,7 +126,8 @@ const toneClasses: Record<Tone, { border: string; surface: string; icon: string;
 
 const routeTiles: Array<{ href: string; label: string; meta: string; icon: LucideIcon; tone: Tone }> = [
   { href: "/lampen", label: "Verlichting", meta: "Lampen bedienen", icon: Lightbulb, tone: "amber" },
-  { href: "/rooster", label: "Rooster", meta: "Diensten en agenda", icon: CalendarClock, tone: "sky" },
+  { href: "/rooster", label: "Rooster", meta: "Diensten", icon: CalendarClock, tone: "sky" },
+  { href: "/agenda", label: "Agenda", meta: "Afspraken en sync", icon: CalendarDays, tone: "indigo" },
   { href: "/finance", label: "Finance", meta: "Transacties", icon: Database, tone: "green" },
   { href: "/notities", label: "Notities", meta: "Knowledge base", icon: StickyNote, tone: "indigo" },
   { href: "/habits", label: "Habits", meta: "Privacygevoelig", icon: Target, tone: "rose" },

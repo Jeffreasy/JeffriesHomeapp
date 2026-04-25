@@ -9,6 +9,7 @@
 
 import { action, internalAction, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
 import {
   sendMessage,
@@ -58,11 +59,14 @@ async function sendPlainText(chatId: number, text: string): Promise<void> {
 // ─── Commando → Agent mapping ────────────────────────────────────────────────
 
 const COMMAND_MAP: Record<string, { agentId: string; beschrijving: string }> = {
-  "/briefing":    { agentId: "dashboard",      beschrijving: "📊 Dagelijkse briefing" },
+  "/brain":       { agentId: "brain",          beschrijving: "🧠 Centrale assistent" },
+  "/briefing":    { agentId: "brain",          beschrijving: "🧠 Dagelijkse briefing" },
+  "/dashboard":   { agentId: "dashboard",      beschrijving: "📊 Dashboard snapshot" },
   "/lampen":      { agentId: "lampen",          beschrijving: "💡 Lamp status" },
   "/rooster":     { agentId: "rooster",         beschrijving: "📅 Weekplanning" },
-  "/afspraak":    { agentId: "rooster",         beschrijving: "📌 Afspraak beheren" },
-  "/agenda":      { agentId: "rooster",         beschrijving: "📌 Agenda overzicht" },
+  "/afspraak":    { agentId: "agenda",          beschrijving: "🗓️ Afspraak beheren" },
+  "/agenda":      { agentId: "agenda",          beschrijving: "🗓️ Agenda overzicht" },
+  "/calendar":    { agentId: "agenda",          beschrijving: "🗓️ Google Calendar" },
   "/finance":     { agentId: "finance",         beschrijving: "💰 Salaris & transacties" },
   "/email":       { agentId: "email",           beschrijving: "📧 Inbox overzicht" },
   "/inbox":       { agentId: "email",           beschrijving: "📊 Inbox analyse" },
@@ -144,53 +148,329 @@ function detectLampCommand(text: string): LampCommand | null {
   return null;
 }
 
-
-// ─── Keyword → Agent routing ─────────────────────────────────────────────────
-
-const KEYWORD_ROUTES: Array<{ keywords: string[]; agentId: string }> = [
-  { keywords: ["lamp", "lampen", "licht", "lichten", "scene", "kleur", "wiz", "smart home"], agentId: "lampen" },
-  { keywords: ["dienst", "rooster", "shift", "werk", "planning", "vrij", "weekend", "afspraak", "agenda", "morgen", "vandaag", "overmorgen", "schema"], agentId: "rooster" },
-  { keywords: ["salaris", "loon", "geld", "ort", "netto", "bruto", "transactie", "saldo", "bank", "uitgaven", "betaling", "kosten", "verdien"], agentId: "finance" },
-  { keywords: ["email", "mail", "inbox", "ongelezen", "bericht", "stuur", "reply", "gmail"], agentId: "email" },
-  { keywords: ["notitie", "notities", "noteer", "onthoud", "schrijf op", "opschrijven", "boodschappenlijst", "checklist", "to-do", "todo", "lijstje"], agentId: "notes" },
-  { keywords: ["habit", "habits", "gewoonte", "streak", "badge", "xp", "level", "gym", "meditatie", "water drinken", "checklist habit", "voltooid"], agentId: "habits" },
-  { keywords: ["automation", "automations", "cron", "sync", "systeem", "status", "health"], agentId: "automations" },
-];
-
-function detectAgent(text: string): string {
+function hasAgendaIntent(text: string): boolean {
   const lower = text.toLowerCase();
-  let best = { agentId: "dashboard", score: 0 };
-  for (const route of KEYWORD_ROUTES) {
-    const score = route.keywords.filter((kw) => lower.includes(kw)).length;
-    if (score > best.score) best = { agentId: route.agentId, score };
+  return [
+    "agenda", "afspraak", "afspraken", "calendar", "kalender",
+    "gepland", "planning", "wanneer had", "wanneer heb",
+  ].some((keyword) => lower.includes(keyword));
+}
+
+function hasSearchIntent(text: string): boolean {
+  const lower = text.toLowerCase();
+  return /\b(zoek|zoeken|vind|vinden|check|toon|laat zien)\b/.test(lower);
+}
+
+function routeFreeText(text: string): { agentId: string; vraag: string } {
+  if (hasAgendaIntent(text)) {
+    return {
+      agentId: "agenda",
+      vraag: hasSearchIntent(text)
+        ? `Zoek in mijn agenda inclusief historie. Gebruik afsprakenOpvragen met zoekterm en includeHistorie=true als er een naam, titel of projectterm genoemd wordt. Vraag: ${text}`
+        : text,
+    };
   }
-  return best.agentId;
+
+  if (hasSearchIntent(text)) {
+    return {
+      agentId: "brain",
+      vraag: `Voer een cross-domain zoekactie uit. Zoek naast email ook expliciet in agenda-afspraken met historie via afsprakenOpvragen met zoekterm/includeHistorie=true voordat je zegt dat er geen afspraken zijn. Vraag: ${text}`,
+    };
+  }
+
+  return { agentId: "brain", vraag: text };
 }
 
 // ─── Messages ────────────────────────────────────────────────────────────────
 
 function buildHelpText(): string {
   return [
-    "🏠 Jeffries HomeBot\n",
-    "Commando's:",
+    "🏠 Jeffries HomeBot",
+    "🧠 Vrije tekst gaat standaard naar Jeffries Brain.\n",
+    "Cockpit:",
+    "  /status — systeem, sync en bridge health",
+    "  /pending — open AI-acties met codes",
+    "  /confirm CODE — actie uitvoeren",
+    "  /cancel CODE — actie annuleren",
+    "  /prefs — Brain voorkeuren bekijken",
+    "  /pref detail kort|normaal|uitgebreid",
+    "  /pref toon direct|warm|coachend",
+    "  /pref proactief laag|normaal|hoog",
+    "  /pref focus planning,gezondheid,rust\n",
+    "Specialisten:",
     ...Object.entries(COMMAND_MAP).map(([cmd, { beschrijving }]) => `  ${cmd} — ${beschrijving}`),
     "\n💡 Lamp bediening: 'lampen uit', 'lampen 50%', 'dim'",
     "📝 Notities: 'noteer ...', 'zoek in notities'",
-    "🎙️ Spraakberichten worden automatisch herkend!",
-    "💬 Of stel gewoon een vrije vraag!",
+    "🎙️ Spraakberichten worden automatisch herkend.",
   ].join("\n");
 }
 
 function buildWelcomeText(): string {
   return [
     "👋 Welkom bij Jeffries HomeBot!\n",
-    "Ik bedien je Homeapp via Grok AI.",
-    "Typ of spreek — ik snap het allebei.\n",
+    "Jeffries Brain is je centrale cockpit voor Homeapp.",
+    "Typ of spreek — ik combineer planning, agenda, mail, notities, habits, lampen en systeemstatus.\n",
     "💡 'Lampen uit'  📅 'Wanneer werk ik?'",
     "💰 'Salaris'  📧 'Ongelezen emails'",
-    "📝 'Noteer: ...'  🔍 'Zoek in notities'\n",
+    "📝 'Noteer: ...'  ⚙️ '/status'\n",
     "Type /help voor alle commando's.",
   ].join("\n");
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) return "onbekend";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("nl-NL", {
+    timeZone: "Europe/Amsterdam",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function minutesUntil(value: string): number {
+  return Math.max(0, Math.ceil((new Date(value).getTime() - Date.now()) / 60_000));
+}
+
+function boolStatus(ok: boolean): string {
+  return ok ? "✅" : "⚠️";
+}
+
+async function getPendingActions(ctx: ActionCtx): Promise<PendingAction[]> {
+  return await ctx.runQuery(internal.ai.grok.pendingActions.listPending, {
+    userId: OWNER_USER_ID,
+  }) as PendingAction[];
+}
+
+function buildPendingText(actions: PendingAction[]): string {
+  if (!actions.length) {
+    return [
+      "✅ Geen open AI-acties.",
+      "",
+      "Alles wat bevestigd moest worden is afgerond, verlopen of geannuleerd.",
+    ].join("\n");
+  }
+
+  return [
+    "🧾 OPEN AI-ACTIES",
+    "━━━━━━━━━━━━━━━━",
+    `Totaal: ${actions.length}`,
+    "",
+    ...actions.slice(0, 10).map((action, index) => [
+      `${index + 1}. ${action.summary}`,
+      `   Code: ${action.code}`,
+      `   Agent: ${action.agentId} | Tool: ${action.toolName}`,
+      `   Vervalt over: ${minutesUntil(action.expiresAt)} min`,
+    ].join("\n")),
+    "",
+    "Uitvoeren: /confirm CODE",
+    "Annuleren: /cancel CODE",
+  ].join("\n");
+}
+
+function buildPreferencesText(preferences: BrainPreferences): string {
+  return [
+    "🧠 BRAIN VOORKEUREN",
+    "━━━━━━━━━━━━━━━━",
+    `Detail: ${preferences.detailLevel}`,
+    `Toon: ${preferences.tone}`,
+    `Proactief: ${preferences.proactiveLevel}`,
+    `Focus: ${preferences.focusAreas.join(", ") || "geen"}`,
+    `Briefing: ${preferences.briefingTime ?? "niet ingesteld"}`,
+    `Stille uren: ${preferences.quietHoursStart ?? "?"} - ${preferences.quietHoursEnd ?? "?"}`,
+    "",
+    "Aanpassen:",
+    "/pref detail kort|normaal|uitgebreid",
+    "/pref toon direct|warm|coachend",
+    "/pref proactief laag|normaal|hoog",
+    "/pref focus planning,gezondheid,rust",
+    "/pref briefing 08:00",
+    "/pref stil 23:00 07:00",
+  ].join("\n");
+}
+
+function normalizeCode(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+function isTime(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function normalizeAssistantText(text: string): string {
+  try {
+    const parsed = JSON.parse(text) as { telegramText?: unknown; antwoord?: unknown; summary?: unknown };
+    if (typeof parsed.telegramText === "string") return parsed.telegramText;
+    if (typeof parsed.antwoord === "string") return parsed.antwoord;
+    if (typeof parsed.summary === "string") return parsed.summary;
+  } catch {}
+  return text;
+}
+
+async function sendStatus(ctx: ActionCtx, chatId: number) {
+  const overview = await ctx.runQuery(internal.settings.getOverviewInternal, {
+    userId: OWNER_USER_ID,
+  }) as SystemOverview;
+
+  const syncEntries = Object.entries(overview.sync ?? {});
+  const failedSync = syncEntries.filter(([, status]) => status.status === "failed");
+  const bridgeOk = Boolean(overview.bridge?.online);
+  const pending = overview.confirmations?.pending ?? 0;
+  const failedCommands = overview.commands?.failed ?? 0;
+  const allGood = bridgeOk && failedSync.length === 0 && failedCommands === 0;
+
+  const syncLines = syncEntries.length
+    ? syncEntries.map(([source, status]) =>
+      `• ${source}: ${status.status === "success" ? "✅" : status.status === "running" ? "🔄" : "⚠️"} ${status.status} | laatste succes: ${formatDateTime(status.lastSuccessAt)}`
+    )
+    : ["• Nog geen sync-status records"];
+
+  const integrationLines = Object.entries(overview.integrations ?? {})
+    .map(([name, ok]) => `• ${name}: ${boolStatus(Boolean(ok))}`);
+
+  await sendPlainText(chatId, [
+    "⚙️ HOMEAPP STATUS",
+    "━━━━━━━━━━━━━━━━",
+    allGood ? "🟢 Alles operationeel" : "🟠 Aandacht nodig",
+    "",
+    `🧠 Brain confirmations: ${pending} open`,
+    `💡 Lampen: ${overview.devices?.on ?? 0}/${overview.devices?.total ?? 0} aan | ${overview.devices?.online ?? 0} online`,
+    `📧 Email: ${overview.email?.unread ?? 0} ongelezen | sync: ${formatDateTime(overview.email?.lastFullSync)}`,
+    `📅 Rooster: ${overview.schedule?.upcoming ?? 0} aankomend | import: ${formatDateTime(overview.schedule?.importedAt)}`,
+    `📝 Data: ${overview.data?.notes ?? 0} notities | ${overview.data?.activeHabits ?? 0} actieve habits`,
+    "",
+    "🌉 Bridge:",
+    overview.bridge
+      ? `• ${overview.bridge.status} | gezien: ${formatDateTime(overview.bridge.lastSeenAt)} | fouten: ${overview.bridge.commandsFailed}`
+      : "• Geen bridge heartbeat gevonden",
+    "",
+    "🔄 Sync:",
+    ...syncLines,
+    "",
+    "🔌 Integraties:",
+    ...integrationLines.slice(0, 12),
+  ].join("\n"));
+}
+
+async function sendPending(ctx: ActionCtx, chatId: number) {
+  const pending = await getPendingActions(ctx);
+  await sendPlainText(chatId, buildPendingText(pending));
+}
+
+async function cancelPending(ctx: ActionCtx, chatId: number, arg: string) {
+  const pending = await getPendingActions(ctx);
+  if (!pending.length) {
+    await sendPlainText(chatId, "✅ Geen open acties om te annuleren.");
+    return;
+  }
+
+  const target = normalizeCode(arg);
+  if (!target) {
+    if (pending.length === 1) {
+      await ctx.runMutation(internal.ai.grok.pendingActions.markStatus, {
+        id: pending[0]._id,
+        status: "cancelled",
+      });
+      await sendPlainText(chatId, `✅ Geannuleerd: ${pending[0].summary}`);
+      return;
+    }
+    await sendPlainText(chatId, `${buildPendingText(pending)}\n\nGeef een code mee: /cancel CODE`);
+    return;
+  }
+
+  if (["ALL", "ALLE", "ALLES"].includes(target)) {
+    for (const action of pending) {
+      await ctx.runMutation(internal.ai.grok.pendingActions.markStatus, {
+        id: action._id,
+        status: "cancelled",
+      });
+    }
+    await sendPlainText(chatId, `✅ ${pending.length} open acties geannuleerd.`);
+    return;
+  }
+
+  const action = pending.find((item) => item.code === target);
+  if (!action) {
+    await sendPlainText(chatId, `Ik zie geen open actie met code ${target}.\n\n${buildPendingText(pending)}`);
+    return;
+  }
+
+  await ctx.runMutation(internal.ai.grok.pendingActions.markStatus, {
+    id: action._id,
+    status: "cancelled",
+  });
+  await sendPlainText(chatId, `✅ Geannuleerd: ${action.summary}`);
+}
+
+async function sendPreferences(ctx: ActionCtx, chatId: number) {
+  const preferences = await ctx.runQuery(internal.brainPreferences.getInternal, {
+    userId: OWNER_USER_ID,
+  }) as BrainPreferences;
+  await sendPlainText(chatId, buildPreferencesText(preferences));
+}
+
+async function updatePreference(ctx: ActionCtx, chatId: number, arg: string) {
+  const [rawKey, ...rest] = arg.trim().split(/\s+/).filter(Boolean);
+  const key = rawKey?.toLowerCase();
+  const value = rest.join(" ").trim();
+
+  if (!key || !value) {
+    await sendPreferences(ctx, chatId);
+    return;
+  }
+
+  const update: Partial<BrainPreferences> = {};
+  if (["detail", "detailniveau"].includes(key)) {
+    if (!["kort", "normaal", "uitgebreid"].includes(value)) {
+      await sendPlainText(chatId, "Detailniveau moet zijn: kort, normaal of uitgebreid.");
+      return;
+    }
+    update.detailLevel = value as BrainPreferences["detailLevel"];
+  } else if (["toon", "tone"].includes(key)) {
+    if (!["direct", "warm", "coachend"].includes(value)) {
+      await sendPlainText(chatId, "Toon moet zijn: direct, warm of coachend.");
+      return;
+    }
+    update.tone = value as BrainPreferences["tone"];
+  } else if (["proactief", "proactive"].includes(key)) {
+    if (!["laag", "normaal", "hoog"].includes(value)) {
+      await sendPlainText(chatId, "Proactiviteit moet zijn: laag, normaal of hoog.");
+      return;
+    }
+    update.proactiveLevel = value as BrainPreferences["proactiveLevel"];
+  } else if (key === "focus") {
+    update.focusAreas = value.split(",").map((item) => item.trim()).filter(Boolean).slice(0, 10);
+  } else if (key === "briefing") {
+    if (!isTime(value)) {
+      await sendPlainText(chatId, "Gebruik HH:MM, bijvoorbeeld /pref briefing 08:00.");
+      return;
+    }
+    update.briefingTime = value;
+  } else if (["stil", "stilleuren", "quiet"].includes(key)) {
+    const [start, end] = rest;
+    if (!start || !end || !isTime(start) || !isTime(end)) {
+      await sendPlainText(chatId, "Gebruik: /pref stil 23:00 07:00.");
+      return;
+    }
+    update.quietHoursStart = start;
+    update.quietHoursEnd = end;
+  } else {
+    await sendPlainText(chatId, `Onbekende voorkeur: ${key}\n\n${buildPreferencesText(await ctx.runQuery(internal.brainPreferences.getInternal, { userId: OWNER_USER_ID }) as BrainPreferences)}`);
+    return;
+  }
+
+  const result = await ctx.runMutation(internal.brainPreferences.updateInternal, {
+    userId: OWNER_USER_ID,
+    ...update,
+  }) as { preferences: BrainPreferences };
+
+  await sendPlainText(chatId, [
+    "✅ Brain voorkeur bijgewerkt.",
+    "",
+    buildPreferencesText(result.preferences),
+  ].join("\n"));
 }
 
 // ─── Text Processing (shared by text + voice) ───────────────────────────────
@@ -222,12 +502,94 @@ type GrokChatResult = {
   error?: string;
 };
 
+type PendingAction = {
+  _id: Id<"aiPendingActions">;
+  agentId: string;
+  toolName: string;
+  summary: string;
+  code: string;
+  expiresAt: string;
+  createdAt: string;
+};
+
+type BrainPreferences = {
+  detailLevel: "kort" | "normaal" | "uitgebreid";
+  tone: "direct" | "warm" | "coachend";
+  proactiveLevel: "laag" | "normaal" | "hoog";
+  focusAreas: string[];
+  briefingTime?: string;
+  quietHoursStart?: string;
+  quietHoursEnd?: string;
+};
+
+type SyncOverview = {
+  status: string;
+  lastSuccessAt?: string | null;
+};
+
+type SystemOverview = {
+  sync?: Record<string, SyncOverview>;
+  bridge?: {
+    online?: boolean;
+    status?: string;
+    lastSeenAt?: string | null;
+    commandsFailed?: number;
+  } | null;
+  confirmations?: { pending?: number };
+  commands?: { failed?: number };
+  devices?: { on?: number; total?: number; online?: number };
+  email?: { unread?: number; lastFullSync?: string | null };
+  schedule?: { upcoming?: number; importedAt?: string | null };
+  data?: { notes?: number; activeHabits?: number };
+  integrations?: Record<string, boolean>;
+};
+
 async function processText(ctx: ActionCtx, chatId: number, text: string): Promise<void> {
   if (text === "/start") { await sendMessage(chatId, buildWelcomeText()); return; }
   if (text === "/help")  { await sendMessage(chatId, buildHelpText()); return; }
 
   // Sla user bericht op
   await ctx.runMutation(internal.chatMessages.save, { chatId, role: "user", content: text });
+
+  const cmd = text.split(" ")[0].toLowerCase().replace(/@\w+/, "");
+  const customVraag = text.slice(cmd.length).trim();
+
+  if (cmd === "/status" || cmd === "/health") {
+    await sendStatus(ctx, chatId);
+    return;
+  }
+
+  if (cmd === "/pending") {
+    await sendPending(ctx, chatId);
+    return;
+  }
+
+  if (cmd === "/cancel" || cmd === "/annuleer") {
+    await cancelPending(ctx, chatId, customVraag);
+    return;
+  }
+
+  if (cmd === "/confirm" || cmd === "/bevestig") {
+    await sendTyping(chatId);
+    const vraag = customVraag ? `bevestig ${customVraag}` : "bevestig";
+    const result = await ctx.runAction(internal.ai.grok.chat.chat, {
+      vraag,
+      agentId: "brain",
+      history: [],
+    }) as GrokChatResult;
+    await saveAndReply(ctx, chatId, result, "brain");
+    return;
+  }
+
+  if (cmd === "/prefs") {
+    await sendPreferences(ctx, chatId);
+    return;
+  }
+
+  if (cmd === "/pref") {
+    await updatePreference(ctx, chatId, customVraag);
+    return;
+  }
 
   // Lamp commando → direct uitvoeren
   const lampCmd = detectLampCommand(text);
@@ -246,8 +608,6 @@ async function processText(ctx: ActionCtx, chatId: number, text: string): Promis
   const grokHistory = history.slice(0, -1).map((m) => ({ role: m.role, content: m.content }));
 
   // Slash commando routing
-  const cmd = text.split(" ")[0].toLowerCase().replace(/@\w+/, "");
-  const customVraag = text.slice(cmd.length).trim();
   const mapping = COMMAND_MAP[cmd];
 
   if (mapping) {
@@ -265,13 +625,14 @@ async function processText(ctx: ActionCtx, chatId: number, text: string): Promis
     return;
   }
 
-  // Vrije tekst → smart routing
+  // Vrije tekst → centrale routing. Agenda-intenties gaan direct naar de
+  // Agenda specialist; brede zoekvragen krijgen een cross-domain guardrail.
   await sendTyping(chatId);
-  const detectedAgent = detectAgent(text);
+  const routed = routeFreeText(text);
   const result = await ctx.runAction(internal.ai.grok.chat.chat, {
-    vraag: text, agentId: detectedAgent, history: grokHistory,
+    vraag: routed.vraag, agentId: routed.agentId, history: grokHistory,
   }) as GrokChatResult;
-  await saveAndReply(ctx, chatId, result, detectedAgent);
+  await saveAndReply(ctx, chatId, result, routed.agentId);
 }
 
 // ─── Webhook Handler ─────────────────────────────────────────────────────────
@@ -384,9 +745,10 @@ async function saveAndReply(
   agentId?: string,
 ) {
   if (result.ok && result.antwoord) {
-    let antwoord = escapeHtml(result.antwoord);
+    const cleanAnswer = normalizeAssistantText(result.antwoord);
+    let antwoord = escapeHtml(cleanAnswer);
     if (antwoord.length > 4000) antwoord = antwoord.slice(0, 3997) + "...";
-    await ctx.runMutation(internal.chatMessages.save, { chatId, role: "assistant" as const, content: result.antwoord, agentId });
+    await ctx.runMutation(internal.chatMessages.save, { chatId, role: "assistant" as const, content: cleanAnswer, agentId });
     await sendMessage(chatId, antwoord);
   } else {
     const escaped = escapeHtml(result.error ?? "Kon geen antwoord genereren");

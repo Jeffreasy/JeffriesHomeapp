@@ -82,6 +82,20 @@ function toolResultSummary(result: string): string {
   return result.slice(0, 500);
 }
 
+function pendingConfirmationText(summary: string, code: string): string {
+  return [
+    "🧾 Bevestiging nodig",
+    "━━━━━━━━━━━━━━━━",
+    summary,
+    "",
+    `Code: ${code}`,
+    `Uitvoeren: bevestig ${code}`,
+    `Annuleren: annuleer ${code}`,
+    "",
+    "De actie is nog NIET uitgevoerd.",
+  ].join("\n");
+}
+
 async function handlePendingIntent(
   ctx: ActionCtx,
   userId: string,
@@ -102,11 +116,11 @@ async function handlePendingIntent(
   if (candidates.length > 1 && !intent.code) {
     const regels = candidates
       .slice(0, 5)
-      .map((action) => `${action.code}: ${action.summary}`)
+      .map((action) => `${action.code}: ${action.summary} (${Math.max(0, Math.ceil((new Date(action.expiresAt).getTime() - Date.now()) / 60_000))} min)`)
       .join("\n");
     return {
       ok: true,
-      antwoord: `Ik heb meerdere open acties. Bevestig met de code:\n${regels}`,
+      antwoord: `Ik heb meerdere open acties. Bevestig of annuleer met de code:\n${regels}`,
     };
   }
 
@@ -196,7 +210,8 @@ async function createPendingToolResult(
     confirmationRequired: true,
     code: pending.code,
     summary,
-    instructie: `Vraag de gebruiker expliciet om te bevestigen met: bevestig ${pending.code}. Zeg duidelijk dat de actie nog NIET is uitgevoerd.`,
+    telegramText: pendingConfirmationText(summary, pending.code),
+    instructie: `Stuur exact dit bevestigingsblok naar de gebruiker en zeg duidelijk dat de actie nog NIET is uitgevoerd:\n${pendingConfirmationText(summary, pending.code)}`,
   });
 }
 
@@ -223,7 +238,7 @@ export const chat = internalAction({
     }
 
     const userId = OWNER_USER_ID;
-    const targetId = agentId ?? "dashboard";
+    const targetId = agentId ?? "brain";
     const toolsUsed: string[] = [];
     let mutatingToolRequested = false;
 

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 
 const auditArgs = {
   userId:   v.optional(v.string()),
@@ -70,5 +70,28 @@ export const listForUser = query({
     return rows
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, limit ?? 40);
+  },
+});
+
+export const hasRecentInternal = internalQuery({
+  args: {
+    userId: v.optional(v.string()),
+    source: v.string(),
+    action: v.string(),
+    sinceIso: v.string(),
+  },
+  handler: async (ctx, { userId, source, action, sinceIso }) => {
+    const rows = userId
+      ? await ctx.db
+        .query("auditLogs")
+        .withIndex("by_user_created", (q) => q.eq("userId", userId))
+        .collect()
+      : await ctx.db.query("auditLogs").withIndex("by_created").collect();
+
+    return rows.some((row) =>
+      row.source === source &&
+      row.action === action &&
+      row.createdAt >= sinceIso
+    );
   },
 });

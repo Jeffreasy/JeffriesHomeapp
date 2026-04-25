@@ -65,6 +65,49 @@ export function formatDateRange(event: PersonalEvent, locale = "nl-NL"): string 
   return isMultiDay(event) ? `${start} \u2013 ${end}` : start;
 }
 
+function normalizeText(value?: string): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isShiftLikeTitle(title: string): boolean {
+  return /\b(vroeg|laat|dienst)\b/.test(normalizeText(title));
+}
+
+function isRosterShadowTitle(title: string): boolean {
+  return /^[ar]\s+(vroeg|laat|dienst)$/.test(normalizeText(title));
+}
+
+function isScheduleDuplicateEvent(event: PersonalEvent, diensten: DienstRow[]): boolean {
+  if (isRosterShadowTitle(event.titel)) return true;
+  if (event.heledag || !event.startTijd || !event.eindTijd) return false;
+  if (!isShiftLikeTitle(event.titel)) return false;
+
+  const title = normalizeText(event.titel);
+  return diensten.some((dienst) => {
+    const sameSlot =
+      dienst.startDatum === event.startDatum &&
+      dienst.startTijd === event.startTijd &&
+      dienst.eindTijd === event.eindTijd;
+    if (!sameSlot) return false;
+
+    const shift = normalizeText(dienst.shiftType);
+    const team = normalizeText(dienst.team);
+    const teamShift = normalizeText(`${dienst.team} ${dienst.shiftType}`);
+    const plainShiftTitles = new Set(["dienst", "vroeg", "laat"]);
+
+    return (
+      title === teamShift ||
+      title === normalizeText(`${team} ${shift}`) ||
+      title === shift ||
+      plainShiftTitles.has(title) ||
+      (Boolean(team) && title.includes(team) && title.includes(shift))
+    );
+  });
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
@@ -76,19 +119,24 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
     userId ? { userId } : "skip"
   ) as PersonalEvent[] | undefined;
 
+  const visibleEvents = useMemo(
+    () => (events ?? []).filter((e) => !isScheduleDuplicateEvent(e, options?.diensten ?? [])),
+    [events, options?.diensten]
+  );
+
   const upcoming = useMemo(
-    () => (events ?? []).filter((e) => e.status === "Aankomend"),
-    [events]
+    () => visibleEvents.filter((e) => e.status === "Aankomend"),
+    [visibleEvents]
   );
 
   const pending = useMemo(
-    () => (events ?? []).filter((e) => e.status === "PendingCreate"),
-    [events]
+    () => visibleEvents.filter((e) => e.status === "PendingCreate"),
+    [visibleEvents]
   );
 
   const history = useMemo(
-    () => (events ?? []).filter((e) => e.status === "Voorbij"),
-    [events]
+    () => visibleEvents.filter((e) => e.status === "Voorbij"),
+    [visibleEvents]
   );
 
   const conflictMap = useMemo(
@@ -116,7 +164,7 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
   const nextAppointment = upcoming[0] ?? null;
 
   return {
-    events:          events ?? [],
+    events:          visibleEvents,
     upcoming,
     pending,
     history,

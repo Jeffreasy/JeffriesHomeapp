@@ -20,7 +20,7 @@ crons.daily(
 crons.interval(
   "sync-personal-events-interval",
   { hours: 1 },
-  internal.actions.syncPersonalEvents.syncFromCalendar,
+  internal.actions.syncPersonalEvents.syncFromCalendarTracked,
   { userId: JEFFREY_USER_ID }
 );
 
@@ -53,6 +53,28 @@ crons.interval(
   "sync-gmail",
   { minutes: 5 },
   internal.actions.syncGmail.syncFromGmail,
+  { userId: JEFFREY_USER_ID }
+);
+
+/**
+ * Proactieve Telegram ochtendbriefing — checkt elke 15 minuten of de ingestelde
+ * Brain briefing-tijd is bereikt. Dedupe voorkomt dubbele meldingen.
+ */
+crons.interval(
+  "telegram-scheduled-briefing",
+  { minutes: 15 },
+  internal.telegram.notifications.sendScheduledBriefing,
+  { userId: JEFFREY_USER_ID }
+);
+
+/**
+ * Telegram health alerts — alleen bij bridge/sync/command problemen.
+ * Respecteert Brain proactiviteit en stille uren.
+ */
+crons.interval(
+  "telegram-health-alerts",
+  { hours: 1 },
+  internal.telegram.notifications.sendHealthAlert,
   { userId: JEFFREY_USER_ID }
 );
 

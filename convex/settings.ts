@@ -1,4 +1,5 @@
-import { query } from "./_generated/server";
+import { v } from "convex/values";
+import { internalQuery, query, type QueryCtx } from "./_generated/server";
 
 function hasEnv(name: string) {
   return Boolean(process.env[name]?.trim());
@@ -8,14 +9,11 @@ function hasAllEnv(names: string[]) {
   return names.every(hasEnv);
 }
 
-export const getOverview = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-
-    const userId = identity.subject;
-
+async function buildOverview(
+  ctx: QueryCtx,
+  userId: string,
+  account: { name: string; email: string | null },
+) {
     const [
       devices,
       rooms,
@@ -73,8 +71,8 @@ export const getOverview = query({
     return {
       account: {
         userId,
-        name: identity.name ?? identity.email ?? "Ingelogd",
-        email: identity.email ?? null,
+        name: account.name,
+        email: account.email,
       },
       devices: {
         total: devices.length,
@@ -181,5 +179,27 @@ export const getOverview = query({
         todoist: hasAllEnv(["TODOIST_API_TOKEN", "TODOIST_PROJECT_ID"]),
       },
     };
+}
+
+export const getOverview = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    return buildOverview(ctx, identity.subject, {
+      name: identity.name ?? identity.email ?? "Ingelogd",
+      email: identity.email ?? null,
+    });
+  },
+});
+
+export const getOverviewInternal = internalQuery({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    return buildOverview(ctx, userId, {
+      name: "Telegram / Brain",
+      email: null,
+    });
   },
 });

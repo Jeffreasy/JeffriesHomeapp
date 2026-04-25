@@ -17,7 +17,9 @@ import type * as actions_syncPersonalEvents from "../actions/syncPersonalEvents.
 import type * as actions_syncSchedule from "../actions/syncSchedule.js";
 import type * as actions_syncTodoist from "../actions/syncTodoist.js";
 import type * as actions_updatePersonalEvent from "../actions/updatePersonalEvent.js";
+import type * as ai_agents_agenda from "../ai/agents/agenda.js";
 import type * as ai_agents_automations from "../ai/agents/automations.js";
+import type * as ai_agents_brain from "../ai/agents/brain.js";
 import type * as ai_agents_dashboard from "../ai/agents/dashboard.js";
 import type * as ai_agents_email from "../ai/agents/email.js";
 import type * as ai_agents_finance from "../ai/agents/finance.js";
@@ -45,6 +47,7 @@ import type * as ai_router from "../ai/router.js";
 import type * as auditLogs from "../auditLogs.js";
 import type * as automations from "../automations.js";
 import type * as backup from "../backup.js";
+import type * as brainPreferences from "../brainPreferences.js";
 import type * as bridgeHealth from "../bridgeHealth.js";
 import type * as chatMessages from "../chatMessages.js";
 import type * as crons from "../crons.js";
@@ -70,6 +73,7 @@ import type * as settings from "../settings.js";
 import type * as syncStatus from "../syncStatus.js";
 import type * as telegram_api from "../telegram/api.js";
 import type * as telegram_bot from "../telegram/bot.js";
+import type * as telegram_notifications from "../telegram/notifications.js";
 import type * as transactions from "../transactions.js";
 
 import type {
@@ -88,7 +92,9 @@ declare const fullApi: ApiFromModules<{
   "actions/syncSchedule": typeof actions_syncSchedule;
   "actions/syncTodoist": typeof actions_syncTodoist;
   "actions/updatePersonalEvent": typeof actions_updatePersonalEvent;
+  "ai/agents/agenda": typeof ai_agents_agenda;
   "ai/agents/automations": typeof ai_agents_automations;
+  "ai/agents/brain": typeof ai_agents_brain;
   "ai/agents/dashboard": typeof ai_agents_dashboard;
   "ai/agents/email": typeof ai_agents_email;
   "ai/agents/finance": typeof ai_agents_finance;
@@ -116,6 +122,7 @@ declare const fullApi: ApiFromModules<{
   auditLogs: typeof auditLogs;
   automations: typeof automations;
   backup: typeof backup;
+  brainPreferences: typeof brainPreferences;
   bridgeHealth: typeof bridgeHealth;
   chatMessages: typeof chatMessages;
   crons: typeof crons;
@@ -141,6 +148,7 @@ declare const fullApi: ApiFromModules<{
   syncStatus: typeof syncStatus;
   "telegram/api": typeof telegram_api;
   "telegram/bot": typeof telegram_bot;
+  "telegram/notifications": typeof telegram_notifications;
   transactions: typeof transactions;
 }>;
 

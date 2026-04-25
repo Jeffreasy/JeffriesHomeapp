@@ -40,6 +40,7 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import {
   calcTotalHours,
   getHistory,
+  getUpcoming,
   shiftBreakdown,
   teamBreakdown,
   type DienstRow,
@@ -158,13 +159,15 @@ export default function RoosterPage() {
     };
   }, []);
 
+  const timelineDiensten = useMemo(() => getUpcoming(diensten, 90), [diensten]);
+
   const {
     upcoming: upcomingEvents,
     eventsByDate,
     conflictMap,
     withConflicts,
     pending: pendingEvents,
-  } = usePersonalEvents({ diensten: upcoming });
+  } = usePersonalEvents({ diensten: timelineDiensten });
 
   const syncSchedule = useAction(api.actions.syncSchedule.syncNow);
   const syncPersonal = useAction(api.actions.syncPersonalEvents.syncPersonalNow);
@@ -174,8 +177,8 @@ export default function RoosterPage() {
   const teams = teamBreakdown(upcoming);
   const history = getHistory(diensten);
   const unifiedWeeks = useMemo(
-    () => generateUnifiedTimeline(upcoming, upcomingEvents),
-    [upcoming, upcomingEvents]
+    () => generateUnifiedTimeline(timelineDiensten, upcomingEvents),
+    [timelineDiensten, upcomingEvents]
   );
   const hardConflicts = withConflicts.filter((event) => conflictMap.get(event.eventId)?.level === "hard").length;
   const todayEvents = todayIso ? (eventsByDate[todayIso] ?? []) : [];

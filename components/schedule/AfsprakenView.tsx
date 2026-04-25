@@ -2,15 +2,13 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
-import { Calendar, AlertTriangle, Clock, Plus, Zap } from "lucide-react";
+import { Calendar, Plus, Zap } from "lucide-react";
 import { useAction } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type DienstRow } from "@/lib/schedule";
 import { useToast } from "@/components/ui/Toast";
 import { PersonalEventItem } from "./PersonalEventItem";
-import { CreateEventModal } from "./CreateEventModal";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 import { api } from "@/convex/_generated/api";
 
 interface AfsprakenViewProps {
@@ -20,23 +18,22 @@ interface AfsprakenViewProps {
 }
 
 export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenViewProps) {
-  const { upcoming, history, withConflicts, nextAppointment, pending, isLoading, conflictMap } =
+  const { upcoming, history, withConflicts, pending, isLoading } =
     usePersonalEvents({ diensten });
 
   const { user } = useUser();
   const { success, error } = useToast();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const processPendingNow = useAction((api as any).actions.processPendingCalendar.processPendingNow);
+  const processPendingNow = useAction(api.actions.processPendingCalendar.processPendingNow);
   const [processing, setProcessing] = useState(false);
 
   const handleVerwerk = async () => {
     if (!user?.id) { error("Niet ingelogd"); return; }
     setProcessing(true);
     try {
-      const res = await processPendingNow({ userId: user.id }) as any;
+      const res = await processPendingNow({ userId: user.id });
       success(`${res.aangemaakt} afspraak(en) aangemaakt in Google Calendar`);
-    } catch (e: any) {
-      error(`Verwerken mislukt: ${e.message ?? "onbekende fout"}`);
+    } catch (err) {
+      error(`Verwerken mislukt: ${err instanceof Error ? err.message : "onbekende fout"}`);
     } finally {
       setProcessing(false);
     }
@@ -61,7 +58,7 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
         <Calendar size={36} className="text-slate-600 mx-auto mb-4" />
         <h3 className="text-base font-semibold text-slate-300 mb-1">Geen afspraken gevonden</h3>
         <p className="text-sm text-slate-500">
-          Voer een &quot;Sync Persoonlijke Afspraken&quot; uit via Google Sheets menu.
+          Gebruik Agenda om te synchroniseren of maak direct een nieuwe afspraak.
         </p>
       </div>
     );

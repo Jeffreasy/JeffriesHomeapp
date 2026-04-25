@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Home, Settings, Zap, LogIn, Calendar, Landmark, Lightbulb, StickyNote, Target } from "lucide-react";
+import { Home, Settings, Zap, LogIn, Calendar, CalendarClock, Landmark, Lightbulb, StickyNote, Target } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
@@ -12,6 +12,7 @@ const navItems = [
   { href: "/",             icon: Home,       label: "Dashboard"    },
   { href: "/lampen",      icon: Lightbulb,  label: "Lampen"       },
   { href: "/rooster",     icon: Calendar,   label: "Rooster"      },
+  { href: "/agenda",      icon: CalendarClock, label: "Agenda"    },
   { href: "/finance",     icon: Landmark,   label: "Finance"      },
   { href: "/notities",   icon: StickyNote, label: "Notities"     },
   { href: "/habits",      icon: Target,     label: "Habits"       },
@@ -24,10 +25,13 @@ function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
-    setIsDesktop(mq.matches);
     const h = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    const initial = window.setTimeout(() => setIsDesktop(mq.matches), 0);
     mq.addEventListener("change", h);
-    return () => mq.removeEventListener("change", h);
+    return () => {
+      window.clearTimeout(initial);
+      mq.removeEventListener("change", h);
+    };
   }, []);
   return isDesktop;
 }
@@ -39,7 +43,10 @@ export function Sidebar() {
   const [mounted, setMounted] = useState(false);
 
   // Wait for mount so isDesktop resolves correctly before rendering Clerk
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const initial = window.setTimeout(() => setMounted(true), 0);
+    return () => window.clearTimeout(initial);
+  }, []);
 
   // On mobile: don't render at all (CSS hidden is insufficient for Clerk portals)
   if (!mounted || !isDesktop) return null;

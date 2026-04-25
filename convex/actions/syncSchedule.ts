@@ -65,9 +65,18 @@ function getTeam(locatie: string) {
   return "?";
 }
 
+function amsterdamHour(d: Date) {
+  const hour = new Intl.DateTimeFormat("nl-NL", {
+    timeZone: "Europe/Amsterdam",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).format(d);
+  return Number(hour);
+}
+
 function getShiftType(start: Date, isAllDay: boolean) {
   if (isAllDay) return "Dienst";
-  const h = start.getHours();
+  const h = amsterdamHour(start);
   if (h < 10) return "Vroeg";
   if (h >= 13) return "Laat";
   return "Dienst";
@@ -84,6 +93,41 @@ function getStatus(start: Date, end: Date) {
   if (end < now) return "Gedraaid";
   if (start <= now && end > now) return "Bezig";
   return "Opkomend";
+}
+
+function dedupeDiensten<T extends {
+  startDatum: string;
+  startTijd: string;
+  eindDatum: string;
+  eindTijd: string;
+  locatie: string;
+  shiftType: string;
+  titel: string;
+}>(diensten: T[]): T[] {
+  const bySlot = new Map<string, T>();
+  const score = (dienst: T) => {
+    let value = 0;
+    if (dienst.shiftType !== "Dienst") value += 3;
+    if (dienst.titel.toLowerCase().includes(dienst.shiftType.toLowerCase())) value += 2;
+    if (dienst.locatie.trim()) value += 1;
+    return value;
+  };
+
+  for (const dienst of diensten) {
+    const key = [
+      dienst.startDatum,
+      dienst.startTijd,
+      dienst.eindDatum,
+      dienst.eindTijd,
+      dienst.locatie.trim().toLowerCase(),
+    ].join("|");
+    const existing = bySlot.get(key);
+    if (!existing || score(dienst) > score(existing)) {
+      bySlot.set(key, dienst);
+    }
+  }
+
+  return Array.from(bySlot.values());
 }
 
 
@@ -130,7 +174,7 @@ export const syncFromCalendar = internalAction({
     });
 
     // Zet om naar dienst-records
-    const diensten = gefilterd.map((ev) => {
+    const dienstenRaw = gefilterd.map((ev) => {
       const isAllDay = !!ev.start?.date && !ev.start?.dateTime;
       const startValue = isAllDay ? ev.start?.date : ev.start?.dateTime;
       const endValue = isAllDay ? ev.end?.date : ev.end?.dateTime;
@@ -167,6 +211,8 @@ export const syncFromCalendar = internalAction({
         heledag:     isAllDay,
       };
     }).filter((dienst): dienst is NonNullable<typeof dienst> => dienst !== null);
+
+    const diensten = dedupeDiensten(dienstenRaw);
 
     // Sla op via internalMutation
     const result = await ctx.runMutation(internal.schedule.bulkUpsertFromCalendar, {

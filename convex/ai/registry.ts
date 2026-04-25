@@ -67,9 +67,11 @@ export function toMeta(agent: AgentDefinition): AgentMeta {
 // ─── Agent Registry ─────────────────────────────────────────────────────────
 
 // Core agents
+import { brainAgent }       from "./agents/brain";
 import { dashboardAgent }   from "./agents/dashboard";
 import { lampenAgent }      from "./agents/lampen";
 import { roosterAgent }     from "./agents/rooster";
+import { agendaAgent }      from "./agents/agenda";
 import { financeAgent }     from "./agents/finance";
 import { automationsAgent } from "./agents/automations";
 
@@ -84,9 +86,11 @@ import { habitsAgent }          from "./agents/habits";
 
 export const AGENT_REGISTRY: AgentDefinition[] = [
   // ── Core ──────────────────────────
+  brainAgent,
   dashboardAgent,
   lampenAgent,
   roosterAgent,
+  agendaAgent,
   financeAgent,
   automationsAgent,
 

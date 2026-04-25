@@ -296,7 +296,7 @@ export default function DashboardPage() {
             sub={`${upcomingShifts.length} komende diensten`}
           />
           <MetricTile
-            href="/rooster"
+            href="/agenda"
             icon={Calendar}
             tone={hardConflicts > 0 ? "rose" : todayEvents.length > 0 ? "green" : "blue"}
             label="Agenda"
@@ -382,9 +382,10 @@ export default function DashboardPage() {
                 label="Navigatie"
                 title="Snel naar je belangrijkste modules"
               />
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 <RouteTile href="/lampen" icon={Lightbulb} label="Lampen" sub="Kamers en scenes" tone="amber" />
                 <RouteTile href="/rooster" icon={CalendarDays} label="Rooster" sub="Diensten en import" tone="indigo" />
+                <RouteTile href="/agenda" icon={Calendar} label="Agenda" sub="Afspraken en sync" tone="blue" />
                 <RouteTile href="/finance" icon={Landmark} label="Financien" sub="Salaris en uitgaven" tone="green" />
                 <RouteTile href="/notities" icon={NotebookPen} label="Notities" sub="Capture en lijsten" tone="blue" />
               </div>
