@@ -302,6 +302,19 @@ type CreateProjectInput = {
   samenvatting?: string;
 };
 
+type CreateActionInput = {
+  source?: string;
+  sourceId?: string;
+  title: string;
+  summary?: string;
+  actionType?: string;
+  status?: string;
+  priority?: string;
+  dueDate?: string;
+  linkedLeadId?: Id<"laventecareLeads">;
+  linkedProjectId?: Id<"laventecareProjects">;
+};
+
 async function createLeadRecord(ctx: MutationCtx, userId: string, args: CreateLeadInput) {
   const now = new Date().toISOString();
   let companyId: Id<"laventecareCompanies"> | undefined = undefined;
@@ -374,6 +387,63 @@ async function createProjectRecord(ctx: MutationCtx, userId: string, args: Creat
   });
 }
 
+async function createActionRecord(ctx: MutationCtx, userId: string, args: CreateActionInput) {
+  const now = new Date().toISOString();
+  const source = args.source?.trim() || "handmatig";
+  const sourceId = args.sourceId?.trim() || undefined;
+  const title = args.title.trim();
+  if (!title) throw new Error("Actietitel is verplicht");
+
+  if (args.linkedLeadId) {
+    const lead = await ctx.db.get(args.linkedLeadId);
+    if (!lead || lead.userId !== userId) throw new Error("Lead niet gevonden");
+  }
+
+  if (args.linkedProjectId) {
+    const project = await ctx.db.get(args.linkedProjectId);
+    if (!project || project.userId !== userId) throw new Error("Project niet gevonden");
+  }
+
+  if (sourceId) {
+    const existing = await ctx.db
+      .query("laventecareActionItems")
+      .withIndex("by_user_source", (q) => q.eq("userId", userId).eq("source", source).eq("sourceId", sourceId))
+      .collect();
+    const reusable = existing.find((action) => isOpenStatus(action.status)) ?? existing[0];
+
+    if (reusable) {
+      await ctx.db.patch(reusable._id, {
+        title,
+        summary:         args.summary,
+        actionType:      args.actionType ?? reusable.actionType,
+        status:          args.status ?? (isOpenStatus(reusable.status) ? reusable.status : "open"),
+        priority:        args.priority ?? reusable.priority,
+        dueDate:         args.dueDate,
+        linkedLeadId:    args.linkedLeadId ?? reusable.linkedLeadId,
+        linkedProjectId: args.linkedProjectId ?? reusable.linkedProjectId,
+        updatedAt:       now,
+      });
+      return reusable._id;
+    }
+  }
+
+  return ctx.db.insert("laventecareActionItems", {
+    userId,
+    source,
+    sourceId,
+    title,
+    summary:         args.summary,
+    actionType:      args.actionType ?? "opvolgen",
+    status:          args.status ?? "open",
+    priority:        args.priority ?? "normaal",
+    dueDate:         args.dueDate,
+    linkedLeadId:    args.linkedLeadId,
+    linkedProjectId: args.linkedProjectId,
+    createdAt:       now,
+    updatedAt:       now,
+  });
+}
+
 function knowledgeDocumentForDb(userId: string, document: (typeof LAVENTECARE_DOCUMENTS)[number], now: string) {
   return {
     userId,
@@ -396,7 +466,7 @@ export const getCockpit = query({
     const userId = await getCurrentUserId(ctx);
     if (!userId) return null;
 
-    const [companies, leads, projects, incidents, changes, decisions, documents, emails, events, notes] = await Promise.all([
+    const [companies, leads, projects, incidents, changes, decisions, documents, actions, emails, events, notes] = await Promise.all([
       ctx.db.query("laventecareCompanies").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareLeads").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareProjects").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
@@ -404,6 +474,7 @@ export const getCockpit = query({
       ctx.db.query("laventecareChangeRequests").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareDecisions").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareDocuments").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("laventecareActionItems").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("emails").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(80),
       ctx.db.query("personalEvents").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(120),
       ctx.db.query("notes").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(80),
@@ -417,6 +488,14 @@ export const getCockpit = query({
     const openIncidents = byChanged(incidents.filter((incident) => isOpenStatus(incident.status))).slice(0, 5);
     const openChanges = byChanged(changes.filter((change) => isOpenStatus(change.status))).slice(0, 5);
     const recentDecisions = [...decisions].sort((a, b) => b.datum.localeCompare(a.datum)).slice(0, 5);
+    const openActions = actions
+      .filter((action) => isOpenStatus(action.status))
+      .sort((a, b) => {
+        const byDue = (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31");
+        if (byDue !== 0) return byDue;
+        return b.updatedAt.localeCompare(a.updatedAt);
+      })
+      .slice(0, 8);
     const terms = businessTerms(companies, leads, projects);
     const businessSignals = buildBusinessSignals({ terms, emails, events, notes });
     const followUps = [...leadFollowUps(leads), ...projectFollowUps(projects)]
@@ -438,6 +517,7 @@ export const getCockpit = query({
         openChanges: openChanges.length,
         decisions: decisions.length,
         businessSignals: businessSignals.length,
+        actionItems: openActions.length,
         followUps: followUps.length,
       },
       activeLeads,
@@ -446,6 +526,7 @@ export const getCockpit = query({
       openChanges,
       recentDecisions,
       businessSignals,
+      actionItems: openActions,
       followUps,
       documentCatalog: documents.length > 0 ? documents : LAVENTECARE_DOCUMENTS.map((doc) => ({
         documentKey:  doc.key,
@@ -629,6 +710,120 @@ export const createLeadInternal = internalMutation({
   handler: async (ctx, { userId, ...args }) => createLeadRecord(ctx, userId, args),
 });
 
+export const createActionItem = mutation({
+  args: {
+    source:          v.optional(v.string()),
+    sourceId:        v.optional(v.string()),
+    title:           v.string(),
+    summary:         v.optional(v.string()),
+    actionType:      v.optional(v.string()),
+    status:          v.optional(v.string()),
+    priority:        v.optional(v.string()),
+    dueDate:         v.optional(v.string()),
+    linkedLeadId:    v.optional(v.id("laventecareLeads")),
+    linkedProjectId: v.optional(v.id("laventecareProjects")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
+    return createActionRecord(ctx, userId, args);
+  },
+});
+
+export const createActionInternal = internalMutation({
+  args: {
+    userId:          v.string(),
+    source:          v.optional(v.string()),
+    sourceId:        v.optional(v.string()),
+    title:           v.string(),
+    summary:         v.optional(v.string()),
+    actionType:      v.optional(v.string()),
+    status:          v.optional(v.string()),
+    priority:        v.optional(v.string()),
+    dueDate:         v.optional(v.string()),
+    linkedLeadId:    v.optional(v.id("laventecareLeads")),
+    linkedProjectId: v.optional(v.id("laventecareProjects")),
+  },
+  handler: async (ctx, { userId, ...args }) => createActionRecord(ctx, userId, args),
+});
+
+export const updateActionItemStatus = mutation({
+  args: {
+    id:     v.id("laventecareActionItems"),
+    status: v.string(),
+  },
+  handler: async (ctx, { id, status }) => {
+    const userId = await requireCurrentUserId(ctx);
+    const action = await ctx.db.get(id);
+    if (!action || action.userId !== userId) throw new Error("Actie niet gevonden");
+
+    await ctx.db.patch(id, {
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const convertSignalToLead = mutation({
+  args: {
+    source:      v.string(),
+    sourceId:    v.string(),
+    title:       v.string(),
+    subtitle:    v.optional(v.string()),
+    date:        v.optional(v.string()),
+    matchedTerm: v.optional(v.string()),
+    urgency:     v.optional(v.string()),
+    actionHint:  v.optional(v.string()),
+    companyName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
+    const source = args.source.trim();
+    const sourceId = args.sourceId.trim();
+
+    if (sourceId) {
+      const existing = await ctx.db
+        .query("laventecareActionItems")
+        .withIndex("by_user_source", (q) => q.eq("userId", userId).eq("source", source).eq("sourceId", sourceId))
+        .collect();
+      const linked = existing.find((action) => action.linkedLeadId);
+      if (linked?.linkedLeadId) {
+        const lead = await ctx.db.get(linked.linkedLeadId);
+        if (lead && lead.userId === userId) {
+          return { leadId: linked.linkedLeadId, actionId: linked._id, reused: true };
+        }
+      }
+    }
+
+    const priority = args.urgency === "hoog" ? "hoog" : "normaal";
+    const context = [
+      args.subtitle?.trim(),
+      args.matchedTerm ? `Match: ${args.matchedTerm}` : undefined,
+    ].filter(Boolean).join("\n\n");
+    const leadId = await createLeadRecord(ctx, userId, {
+      titel:              args.title,
+      companyName:        args.companyName,
+      bron:               source || "signaal",
+      pijnpunt:           context || undefined,
+      prioriteit:         priority,
+      volgendeStap:       args.actionHint ?? "Kwalificeer dit zakelijke signaal en bepaal de volgende stap.",
+      volgendeActieDatum: args.date,
+    });
+    const actionId = await createActionRecord(ctx, userId, {
+      source:          source || "signaal",
+      sourceId,
+      title:           `Lead opvolgen: ${args.title}`,
+      summary:         args.actionHint ?? (context || undefined),
+      actionType:      "lead_opvolgen",
+      status:          "open",
+      priority,
+      dueDate:         args.date,
+      linkedLeadId:    leadId,
+    });
+
+    return { leadId, actionId, reused: false };
+  },
+});
+
 export const updateLead = mutation({
   args: {
     id:                 v.id("laventecareLeads"),
@@ -693,12 +888,13 @@ export const createProjectInternal = internalMutation({
 export const getAgentContextInternal = internalQuery({
   args: { userId: v.string(), lite: v.optional(v.boolean()) },
   handler: async (ctx, { userId, lite }) => {
-    const [companies, leads, projects, incidents, documents, emails, events, notes] = await Promise.all([
+    const [companies, leads, projects, incidents, documents, actions, emails, events, notes] = await Promise.all([
       ctx.db.query("laventecareCompanies").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareLeads").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareProjects").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareSlaIncidents").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("laventecareDocuments").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
+      ctx.db.query("laventecareActionItems").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
       ctx.db.query("emails").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(50),
       ctx.db.query("personalEvents").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(80),
       ctx.db.query("notes").withIndex("by_user", (q) => q.eq("userId", userId)).order("desc").take(50),
@@ -707,6 +903,14 @@ export const getAgentContextInternal = internalQuery({
     const openLeads = leads.filter((lead) => isOpenStatus(lead.status));
     const activeProjects = projects.filter((project) => isOpenStatus(project.status));
     const openIncidents = incidents.filter((incident) => isOpenStatus(incident.status));
+    const openActions = actions
+      .filter((action) => isOpenStatus(action.status))
+      .sort((a, b) => {
+        const byDue = (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31");
+        if (byDue !== 0) return byDue;
+        return b.updatedAt.localeCompare(a.updatedAt);
+      })
+      .slice(0, 8);
     const terms = businessTerms(companies, leads, projects);
     const businessSignals = buildBusinessSignals({ terms, emails, events, notes });
     const followUps = [...leadFollowUps(leads), ...projectFollowUps(projects)]
@@ -720,6 +924,8 @@ export const getAgentContextInternal = internalQuery({
         documentatie: `${documents.length || LAVENTECARE_DOCUMENTS.length} documenten beschikbaar`,
         sla: `${openIncidents.length} open incidenten`,
         signalen: `${businessSignals.length} zakelijke signalen uit email/agenda/notities`,
+        acties: `${openActions.length} open LaventeCare acties`,
+        openActies: openActions.slice(0, 3),
         opvolging: followUps.slice(0, 3),
         proces: LAVENTECARE_PROCESS_STAGES.map((stage) => stage.title),
       };
@@ -739,8 +945,10 @@ export const getAgentContextInternal = internalQuery({
         projecten: projects.length,
         actieveProjecten: activeProjects.slice(0, 10),
         openIncidenten: openIncidents.slice(0, 10),
+        openActies: openActions,
         followUps,
       },
+      acties: openActions,
       signalen: businessSignals,
       documentatie: documents.length > 0 ? documents.slice(0, 24) : LAVENTECARE_DOCUMENTS,
     };

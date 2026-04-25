@@ -606,6 +606,28 @@ BELANGRIJK — Professioneel Template Protocol:
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareActieMaken",
+      description: "Maak een LaventeCare actie/follow-up aan voor zakelijke opvolging. Gebruik wanneer Jeffrey expliciet vraagt om iets rond LaventeCare te onthouden, op te volgen, klaar te zetten of als taak te bewaren. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          title:           { type: "string", description: "Korte actietitel" },
+          summary:         { type: "string", description: "Context of gewenste uitkomst" },
+          actionType:      { type: "string", enum: ["opvolgen", "lead_opvolgen", "discovery_plannen", "voorstel_maken", "besluit_nemen", "issue_oplossen"], description: "Soort zakelijke actie" },
+          priority:        { type: "string", enum: ["laag", "normaal", "hoog"], description: "Prioriteit" },
+          dueDate:         { type: "string", description: "Deadline of opvolgdatum YYYY-MM-DD" },
+          source:          { type: "string", description: "Bron, bijv. telegram, email, agenda, notitie" },
+          sourceId:        { type: "string", description: "Optionele bron-ID voor deduplicatie" },
+          linkedLeadId:    { type: "string", description: "Optioneel exact leadId uit de cockpit" },
+          linkedProjectId: { type: "string", description: "Optioneel exact projectId uit de cockpit" },
+        },
+        required: ["title"],
+      },
+    },
+  },
   // ──────────────── Habits tools ────────────────────────────────────────────
   {
     type: "function" as const,

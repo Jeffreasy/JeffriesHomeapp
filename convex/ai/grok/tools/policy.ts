@@ -76,6 +76,7 @@ const TOOL_POLICIES: Record<string, ToolPolicy> = {
   laventecareKennisZoeken: { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   laventecareLeadMaken:    { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   laventecareProjectMaken: { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareActieMaken:   { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
 
   // Habits
   habitAanmaken:   { agents: HABITS_WRITE_AGENTS, mutates: true, requiresConfirmation: false },
@@ -168,6 +169,8 @@ export function describePendingAction(toolName: string, args: Record<string, unk
       return `LaventeCare lead aanmaken: "${textArg(args, "titel")}"${args.companyName ? ` voor ${textArg(args, "companyName")}` : ""}`;
     case "laventecareProjectMaken":
       return `LaventeCare project aanmaken: "${textArg(args, "naam")}"`;
+    case "laventecareActieMaken":
+      return `LaventeCare actie klaarzetten: "${textArg(args, "title", textArg(args, "titel"))}"`;
     default:
       return `${toolName} uitvoeren`;
   }

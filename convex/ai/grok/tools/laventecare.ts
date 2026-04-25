@@ -98,6 +98,37 @@ export async function handleLaventeCareLeadMaken(
   });
 }
 
+export async function handleLaventeCareActieMaken(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const title = text(args, "title") ?? text(args, "titel");
+  if (!title) {
+    return JSON.stringify({ error: "Actietitel is verplicht." });
+  }
+
+  const id = await ctx.runMutation<string>(internal.laventecare.createActionInternal, {
+    userId,
+    source:          text(args, "source") ?? "telegram",
+    sourceId:        text(args, "sourceId"),
+    title,
+    summary:         text(args, "summary") ?? text(args, "samenvatting"),
+    actionType:      text(args, "actionType") ?? "opvolgen",
+    status:          text(args, "status") ?? "open",
+    priority:        text(args, "priority") ?? text(args, "prioriteit") ?? "normaal",
+    dueDate:         text(args, "dueDate") ?? text(args, "datum"),
+    linkedLeadId:    text(args, "linkedLeadId"),
+    linkedProjectId: text(args, "linkedProjectId"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    message: `LaventeCare actie klaargezet: ${title}.`,
+    actionId: id,
+  });
+}
+
 export async function handleLaventeCareProjectMaken(
   ctx: GrokToolCtx,
   args: Record<string, unknown>,

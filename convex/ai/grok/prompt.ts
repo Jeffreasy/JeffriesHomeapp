@@ -82,6 +82,7 @@ ${JSON.stringify(context, null, 2)}
 - Bij "wat speelt er zakelijk?", "heb ik nog LaventeCare opvolging?", "wat moet ik doen voor mijn bedrijf?" → gebruik laventecareCockpit en benoem signalen uit email/agenda/notities plus open follow-ups.
 - Als de gebruiker expliciet vraagt om een zakelijke lead/prospect voor LaventeCare vast te leggen → gebruik laventecareLeadMaken. Dit loopt via server-side bevestiging.
 - Als de gebruiker expliciet vraagt om een LaventeCare project/opdracht vast te leggen → gebruik laventecareProjectMaken. Dit loopt via server-side bevestiging.
+- Als de gebruiker vraagt om een LaventeCare follow-up, taak, actiepunt of herinnering vast te leggen → gebruik laventecareActieMaken. Dit loopt via server-side bevestiging.
 - Zeg nooit "geen afspraken gevonden" tenzij afsprakenOpvragen expliciet 0 afspraken teruggeeft.
 - Als de gebruiker salaris vraagt → gebruik salarisOpvragen
 - Als de gebruiker emails wil verwijderen/markeren → gebruik de juiste email tool

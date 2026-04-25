@@ -28,6 +28,7 @@ import {
 } from "./notes";
 import { handleHabitTool } from "./habits";
 import {
+  handleLaventeCareActieMaken,
   handleLaventeCareCockpit,
   handleLaventeCareKennisZoeken,
   handleLaventeCareLeadMaken,
@@ -98,6 +99,7 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
   laventecareKennisZoeken: handleLaventeCareKennisZoeken,
   laventecareLeadMaken:    handleLaventeCareLeadMaken,
   laventecareProjectMaken: handleLaventeCareProjectMaken,
+  laventecareActieMaken:   handleLaventeCareActieMaken,
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────

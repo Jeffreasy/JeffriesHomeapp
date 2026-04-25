@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 
@@ -88,6 +89,21 @@ type FollowUpSignal = {
   status: string;
   priority: "laag" | "normaal" | "hoog";
   actionHint: string;
+};
+
+type ActionItem = {
+  _id: Id<"laventecareActionItems">;
+  source: string;
+  sourceId?: string;
+  title: string;
+  summary?: string;
+  actionType: string;
+  status: string;
+  priority: string;
+  dueDate?: string;
+  linkedLeadId?: Id<"laventecareLeads">;
+  linkedProjectId?: Id<"laventecareProjects">;
+  updatedAt?: string;
 };
 
 type LeadForm = {
@@ -225,10 +241,23 @@ function signalMeta(source: BusinessSignal["source"]): { icon: LucideIcon; label
   return { icon: StickyNote, label: "Notitie", tone: "amber" };
 }
 
-function SignalCard({ signal }: { signal: BusinessSignal }) {
+function SignalCard({
+  signal,
+  busyAction,
+  busyLead,
+  onCreateAction,
+  onConvertToLead,
+}: {
+  signal: BusinessSignal;
+  busyAction: boolean;
+  busyLead: boolean;
+  onCreateAction: (signal: BusinessSignal) => void;
+  onConvertToLead: (signal: BusinessSignal) => void;
+}) {
   const meta = signalMeta(signal.source);
   const Icon = meta.icon;
   const tone = toneClasses[meta.tone];
+  const disabled = busyAction || busyLead;
   return (
     <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
       <div className="flex items-start gap-3">
@@ -253,6 +282,26 @@ function SignalCard({ signal }: { signal: BusinessSignal }) {
             {formatDate(signal.date)} - match: {signal.matchedTerm}
           </p>
           <p className="mt-2 text-sm leading-5 text-slate-400">{signal.actionHint}</p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => onCreateAction(signal)}
+              disabled={disabled}
+              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.045] px-3 text-xs font-bold text-slate-200 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busyAction ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              Actie
+            </button>
+            <button
+              type="button"
+              onClick={() => onConvertToLead(signal)}
+              disabled={disabled}
+              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/15 px-3 text-xs font-bold text-sky-100 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busyLead ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+              Lead
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -280,21 +329,72 @@ function FollowUpCard({ followUp }: { followUp: FollowUpSignal }) {
   );
 }
 
+function ActionItemCard({
+  action,
+  busy,
+  onComplete,
+}: {
+  action: ActionItem;
+  busy: boolean;
+  onComplete: (action: ActionItem) => void;
+}) {
+  const highPriority = action.priority === "hoog";
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-xs font-bold text-slate-300">
+              {label(action.actionType)}
+            </span>
+            <span className={cn(
+              "rounded-full border px-2 py-0.5 text-xs font-bold",
+              highPriority ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
+            )}>
+              {label(action.priority)}
+            </span>
+          </div>
+          <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-white">{action.title}</h3>
+          {action.summary && <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{action.summary}</p>}
+          <p className="mt-3 text-xs font-semibold text-slate-500">
+            {label(action.source)}{action.dueDate ? ` - ${formatDate(action.dueDate)}` : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onComplete(action)}
+          disabled={busy}
+          aria-label={`Rond actie af: ${action.title}`}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-200 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {busy ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={16} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function LaventeCarePage() {
   const cockpit = useQuery(api.laventecare.getCockpit);
   const createLead = useMutation(api.laventecare.createLead);
+  const createActionItem = useMutation(api.laventecare.createActionItem);
+  const convertSignalToLead = useMutation(api.laventecare.convertSignalToLead);
+  const updateActionItemStatus = useMutation(api.laventecare.updateActionItemStatus);
   const seedDocuments = useMutation(api.laventecare.seedDocuments);
   const { success, error: toastError } = useToast();
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [leadForm, setLeadForm] = useState<LeadForm>(emptyLeadForm);
   const [savingLead, setSavingLead] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [processingSignal, setProcessingSignal] = useState<string | null>(null);
+  const [processingAction, setProcessingAction] = useState<Id<"laventecareActionItems"> | null>(null);
   const [search, setSearch] = useState("");
 
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
   const activeLeads = useMemo(() => (cockpit?.activeLeads ?? []) as LeadItem[], [cockpit]);
   const activeProjects = useMemo(() => (cockpit?.activeProjects ?? []) as ProjectItem[], [cockpit]);
   const businessSignals = useMemo(() => (cockpit?.businessSignals ?? []) as BusinessSignal[], [cockpit]);
+  const actionItems = useMemo(() => (cockpit?.actionItems ?? []) as ActionItem[], [cockpit]);
   const followUps = useMemo(() => (cockpit?.followUps ?? []) as FollowUpSignal[], [cockpit]);
 
   const filteredDocuments = useMemo(() => {
@@ -354,6 +454,61 @@ export default function LaventeCarePage() {
       toastError("Documentbasis initialiseren is mislukt");
     } finally {
       setSeeding(false);
+    }
+  };
+
+  const signalKey = (kind: "action" | "lead", signal: BusinessSignal) => `${kind}:${signal.source}:${signal.id}`;
+
+  const handleCreateActionFromSignal = async (signal: BusinessSignal) => {
+    setProcessingSignal(signalKey("action", signal));
+    try {
+      await createActionItem({
+        source:     signal.source,
+        sourceId:   signal.id,
+        title:      signal.title,
+        summary:    [signal.subtitle, signal.actionHint, `Match: ${signal.matchedTerm}`].filter(Boolean).join("\n\n"),
+        actionType: "opvolgen",
+        priority:   signal.urgency === "hoog" ? "hoog" : "normaal",
+        dueDate:    signal.date,
+      });
+      success("LaventeCare actie klaargezet");
+    } catch {
+      toastError("Actie aanmaken is mislukt");
+    } finally {
+      setProcessingSignal(null);
+    }
+  };
+
+  const handleConvertSignalToLead = async (signal: BusinessSignal) => {
+    setProcessingSignal(signalKey("lead", signal));
+    try {
+      const result = await convertSignalToLead({
+        source:      signal.source,
+        sourceId:    signal.id,
+        title:       signal.title,
+        subtitle:    signal.subtitle,
+        date:        signal.date,
+        matchedTerm: signal.matchedTerm,
+        urgency:     signal.urgency,
+        actionHint:  signal.actionHint,
+      });
+      success(result.reused ? "Bestaande lead opnieuw gekoppeld" : "Signaal omgezet naar lead");
+    } catch {
+      toastError("Lead maken vanuit signaal is mislukt");
+    } finally {
+      setProcessingSignal(null);
+    }
+  };
+
+  const handleCompleteAction = async (action: ActionItem) => {
+    setProcessingAction(action._id);
+    try {
+      await updateActionItemStatus({ id: action._id, status: "afgerond" });
+      success("LaventeCare actie afgerond");
+    } catch {
+      toastError("Actie afronden is mislukt");
+    } finally {
+      setProcessingAction(null);
     }
   };
 
@@ -534,7 +689,7 @@ export default function LaventeCarePage() {
         <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <MetricCard icon={Handshake} label="Open leads" value={summary.activeLeads} detail={`${summary.leads} totaal in de funnel`} tone="sky" />
           <MetricCard icon={FolderKanban} label="Actieve projecten" value={summary.activeProjects} detail={`${summary.projects} projecten geregistreerd`} tone="emerald" />
-          <MetricCard icon={Sparkles} label="Signalen" value={summary.businessSignals} detail={`${summary.followUps} follow-ups klaar`} tone="violet" />
+          <MetricCard icon={Sparkles} label="Signalen" value={summary.businessSignals} detail={`${summary.actionItems ?? 0} acties open, ${summary.followUps} follow-ups`} tone="violet" />
           <MetricCard icon={FileText} label="Documentbasis" value={`${summary.documents || summary.knowledgeDocuments}/24`} detail={summary.documentsSeeded ? "Geindexeerd in Convex" : "Catalogus klaar om te initialiseren"} tone="amber" />
           <MetricCard icon={LifeBuoy} label="SLA signalen" value={summary.openIncidents} detail={`${summary.openChanges} open change requests`} tone={summary.openIncidents > 0 ? "rose" : "violet"} />
         </section>
@@ -555,7 +710,14 @@ export default function LaventeCarePage() {
                 </div>
               ) : (
                 businessSignals.slice(0, 6).map((signal) => (
-                  <SignalCard key={`${signal.source}-${signal.id}`} signal={signal} />
+                  <SignalCard
+                    key={`${signal.source}-${signal.id}`}
+                    signal={signal}
+                    busyAction={processingSignal === signalKey("action", signal)}
+                    busyLead={processingSignal === signalKey("lead", signal)}
+                    onCreateAction={handleCreateActionFromSignal}
+                    onConvertToLead={handleConvertSignalToLead}
+                  />
                 ))
               )}
             </div>
@@ -564,17 +726,32 @@ export default function LaventeCarePage() {
           <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
             <div className="flex items-center gap-2">
               <Clock3 size={18} className="text-amber-300" />
-              <h2 className="text-lg font-bold text-white">Opvolging</h2>
+              <h2 className="text-lg font-bold text-white">Acties</h2>
             </div>
             <div className="mt-4 space-y-3">
-              {followUps.length === 0 ? (
-                <EmptyState title="Geen open follow-ups" body="Zet bij leads een volgende actie of deadline, dan neemt Brain dit mee in Telegram." />
+              {actionItems.length === 0 ? (
+                <EmptyState title="Geen open acties" body="Maak vanuit zakelijke signalen een actie, dan neemt Brain dit mee in Telegram." />
               ) : (
-                followUps.slice(0, 5).map((followUp) => (
-                  <FollowUpCard key={`${followUp.source}-${followUp.id}`} followUp={followUp} />
+                actionItems.slice(0, 5).map((action) => (
+                  <ActionItemCard
+                    key={action._id}
+                    action={action}
+                    busy={processingAction === action._id}
+                    onComplete={handleCompleteAction}
+                  />
                 ))
               )}
             </div>
+            {followUps.length > 0 && (
+              <div className="mt-5 border-t border-white/10 pt-4">
+                <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Follow-ups uit funnel</p>
+                <div className="mt-3 space-y-3">
+                  {followUps.slice(0, 3).map((followUp) => (
+                    <FollowUpCard key={`${followUp.source}-${followUp.id}`} followUp={followUp} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 

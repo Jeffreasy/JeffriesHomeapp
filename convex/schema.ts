@@ -243,6 +243,27 @@ export default defineSchema({
     .index("by_user_fase", ["userId", "fase"])
     .index("by_company", ["companyId"]),
 
+  // ─── LaventeCare Action Items (triage en opvolging) ──────────────────────
+  laventecareActionItems: defineTable({
+    userId:          v.string(),
+    source:          v.string(),              // email | agenda | notitie | lead | project | telegram | handmatig
+    sourceId:        v.optional(v.string()),
+    title:           v.string(),
+    summary:         v.optional(v.string()),
+    actionType:      v.string(),              // opvolgen | lead_opvolgen | discovery_plannen | voorstel_maken | issue_oplossen
+    status:          v.string(),              // open | bezig | wacht_op_klant | afgerond | archived
+    priority:        v.string(),              // laag | normaal | hoog
+    dueDate:         v.optional(v.string()),  // YYYY-MM-DD
+    linkedLeadId:    v.optional(v.id("laventecareLeads")),
+    linkedProjectId: v.optional(v.id("laventecareProjects")),
+    createdAt:       v.string(),
+    updatedAt:       v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_user_due", ["userId", "dueDate"])
+    .index("by_user_source", ["userId", "source", "sourceId"]),
+
   // ─── LaventeCare Documents (geindexeerde bedrijfsdocumentatie) ────────────
   laventecareDocuments: defineTable({
     userId:      v.string(),
