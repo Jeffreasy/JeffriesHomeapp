@@ -75,7 +75,12 @@ const TOOL_POLICIES: Record<string, ToolPolicy> = {
   laventecareCockpit:      { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   laventecareKennisZoeken: { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   laventecareLeadMaken:    { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareLeadsOpvragen: { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
+  laventecareLeadBijwerken: { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareLeadNaarProject: { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   laventecareProjectMaken: { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
+  laventecareProjectenOpvragen: { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
+  laventecareProjectBijwerken: { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   laventecareActieMaken:   { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
   laventecareActiesOpvragen: { agents: ["laventecare", ...READ_DASHBOARD_AGENTS], mutates: false, requiresConfirmation: false },
   laventecareActieAfronden:  { agents: LAVENTECARE_WRITE_AGENTS, mutates: true, requiresConfirmation: true },
@@ -172,8 +177,14 @@ export function describePendingAction(toolName: string, args: Record<string, unk
       return `Incident loggen voor habit "${textArg(args, "habitNaam")}"`;
     case "laventecareLeadMaken":
       return `LaventeCare lead aanmaken: "${textArg(args, "titel")}"${args.companyName ? ` voor ${textArg(args, "companyName")}` : ""}`;
+    case "laventecareLeadBijwerken":
+      return `LaventeCare lead bijwerken: ${textArg(args, "leadId", textArg(args, "id"))}`;
+    case "laventecareLeadNaarProject":
+      return `LaventeCare lead naar project converteren: ${textArg(args, "leadId", textArg(args, "id"))}`;
     case "laventecareProjectMaken":
       return `LaventeCare project aanmaken: "${textArg(args, "naam")}"`;
+    case "laventecareProjectBijwerken":
+      return `LaventeCare project bijwerken: ${textArg(args, "projectId", textArg(args, "id"))}`;
     case "laventecareActieMaken":
       return `LaventeCare actie klaarzetten: "${textArg(args, "title", textArg(args, "titel"))}"`;
     case "laventecareActieAfronden":

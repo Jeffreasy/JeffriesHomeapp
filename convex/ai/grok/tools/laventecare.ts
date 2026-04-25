@@ -145,6 +145,83 @@ export async function handleLaventeCareLeadMaken(
   });
 }
 
+export async function handleLaventeCareLeadsOpvragen(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const leads = await ctx.runQuery<Record<string, unknown>[]>(internal.laventecare.listLeadsInternal, {
+    userId,
+    status:          text(args, "status"),
+    includeArchived: booleanArg(args, "includeArchived") ?? booleanArg(args, "includeGesloten"),
+    limit:           numberArg(args, "limit") ?? numberArg(args, "aantal"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    aantal: leads.length,
+    leads,
+  });
+}
+
+export async function handleLaventeCareLeadBijwerken(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const id = text(args, "leadId") ?? text(args, "id");
+  if (!id) {
+    return JSON.stringify({ error: "leadId is verplicht. Vraag eerst laventecareLeadsOpvragen als je het ID niet weet." });
+  }
+
+  await ctx.runMutation<string>(internal.laventecare.updateLeadInternal, {
+    userId,
+    id,
+    status:             text(args, "status"),
+    fitScore:           numberArg(args, "fitScore"),
+    pijnpunt:           text(args, "pijnpunt"),
+    prioriteit:         text(args, "prioriteit"),
+    volgendeStap:       text(args, "volgendeStap"),
+    volgendeActieDatum: text(args, "volgendeActieDatum"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    message: "LaventeCare lead bijgewerkt.",
+    leadId: id,
+  });
+}
+
+export async function handleLaventeCareLeadNaarProject(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const leadId = text(args, "leadId") ?? text(args, "id");
+  if (!leadId) {
+    return JSON.stringify({ error: "leadId is verplicht. Vraag eerst laventecareLeadsOpvragen als je het ID niet weet." });
+  }
+
+  const projectId = await ctx.runMutation<string>(internal.laventecare.convertLeadToProjectInternal, {
+    userId,
+    leadId,
+    naam:            text(args, "naam"),
+    fase:            text(args, "fase") ?? "intake",
+    status:          text(args, "status") ?? "actief",
+    waardeIndicatie: numberArg(args, "waardeIndicatie"),
+    startDatum:      text(args, "startDatum"),
+    deadline:        text(args, "deadline"),
+    samenvatting:    text(args, "samenvatting"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    message: "LaventeCare lead omgezet naar project.",
+    leadId,
+    projectId,
+  });
+}
+
 export async function handleLaventeCareActieMaken(
   ctx: GrokToolCtx,
   args: Record<string, unknown>,
@@ -289,6 +366,54 @@ export async function handleLaventeCareProjectMaken(
   return JSON.stringify({
     ok: true,
     message: `LaventeCare project aangemaakt: ${naam}.`,
+    projectId: id,
+  });
+}
+
+export async function handleLaventeCareProjectenOpvragen(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const projecten = await ctx.runQuery<Record<string, unknown>[]>(internal.laventecare.listProjectsInternal, {
+    userId,
+    status:          text(args, "status"),
+    fase:            text(args, "fase"),
+    includeArchived: booleanArg(args, "includeArchived") ?? booleanArg(args, "includeAfgerond"),
+    limit:           numberArg(args, "limit") ?? numberArg(args, "aantal"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    aantal: projecten.length,
+    projecten,
+  });
+}
+
+export async function handleLaventeCareProjectBijwerken(
+  ctx: GrokToolCtx,
+  args: Record<string, unknown>,
+  userId: string,
+): Promise<string> {
+  const id = text(args, "projectId") ?? text(args, "id");
+  if (!id) {
+    return JSON.stringify({ error: "projectId is verplicht. Vraag eerst laventecareProjectenOpvragen als je het ID niet weet." });
+  }
+
+  await ctx.runMutation<string>(internal.laventecare.updateProjectInternal, {
+    userId,
+    id,
+    fase:            text(args, "fase"),
+    status:          text(args, "status"),
+    waardeIndicatie: numberArg(args, "waardeIndicatie"),
+    startDatum:      text(args, "startDatum"),
+    deadline:        text(args, "deadline"),
+    samenvatting:    text(args, "samenvatting"),
+  });
+
+  return JSON.stringify({
+    ok: true,
+    message: "LaventeCare project bijgewerkt.",
     projectId: id,
   });
 }

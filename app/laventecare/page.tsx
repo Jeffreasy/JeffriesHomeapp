@@ -50,7 +50,7 @@ type DocumentItem = {
 };
 
 type LeadItem = {
-  _id?: string;
+  _id?: Id<"laventecareLeads">;
   titel: string;
   status: string;
   bron: string;
@@ -64,7 +64,7 @@ type LeadItem = {
 };
 
 type ProjectItem = {
-  _id?: string;
+  _id?: Id<"laventecareProjects">;
   naam: string;
   fase: string;
   status: string;
@@ -441,6 +441,9 @@ function OperationCard({
 export default function LaventeCarePage() {
   const cockpit = useQuery(api.laventecare.getCockpit);
   const createLead = useMutation(api.laventecare.createLead);
+  const updateLead = useMutation(api.laventecare.updateLead);
+  const convertLeadToProject = useMutation(api.laventecare.convertLeadToProject);
+  const updateProject = useMutation(api.laventecare.updateProject);
   const createActionItem = useMutation(api.laventecare.createActionItem);
   const convertSignalToLead = useMutation(api.laventecare.convertSignalToLead);
   const updateActionItemStatus = useMutation(api.laventecare.updateActionItemStatus);
@@ -452,6 +455,8 @@ export default function LaventeCarePage() {
   const [seeding, setSeeding] = useState(false);
   const [processingSignal, setProcessingSignal] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<Id<"laventecareActionItems"> | null>(null);
+  const [processingLead, setProcessingLead] = useState<string | null>(null);
+  const [processingProject, setProcessingProject] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
@@ -576,6 +581,52 @@ export default function LaventeCarePage() {
       toastError("Actie afronden is mislukt");
     } finally {
       setProcessingAction(null);
+    }
+  };
+
+  const handleLeadStatus = async (lead: LeadItem, status: string) => {
+    if (!lead._id) return;
+    setProcessingLead(`${lead._id}:${status}`);
+    try {
+      await updateLead({ id: lead._id, status });
+      success(`Lead naar ${label(status)} gezet`);
+    } catch {
+      toastError("Lead bijwerken is mislukt");
+    } finally {
+      setProcessingLead(null);
+    }
+  };
+
+  const handleLeadToProject = async (lead: LeadItem) => {
+    if (!lead._id) return;
+    setProcessingLead(`${lead._id}:project`);
+    try {
+      await convertLeadToProject({
+        leadId:       lead._id,
+        naam:         lead.titel,
+        fase:         "intake",
+        status:       "actief",
+        samenvatting: lead.pijnpunt,
+      });
+      success("Lead omgezet naar project");
+    } catch {
+      toastError("Lead converteren is mislukt");
+    } finally {
+      setProcessingLead(null);
+    }
+  };
+
+  const handleProjectStatus = async (project: ProjectItem, fields: { fase?: string; status?: string }) => {
+    if (!project._id) return;
+    const key = fields.fase ? `fase:${fields.fase}` : `status:${fields.status}`;
+    setProcessingProject(`${project._id}:${key}`);
+    try {
+      await updateProject({ id: project._id, ...fields });
+      success("Project bijgewerkt");
+    } catch {
+      toastError("Project bijwerken is mislukt");
+    } finally {
+      setProcessingProject(null);
     }
   };
 
@@ -907,6 +958,34 @@ export default function LaventeCarePage() {
                           {lead.volgendeStap}
                         </p>
                       )}
+                      {lead._id && (
+                        <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                          {["intake", "discovery", "voorstel"].map((status) => {
+                            const busy = processingLead === `${lead._id}:${status}`;
+                            return (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => handleLeadStatus(lead, status)}
+                                disabled={Boolean(processingLead)}
+                                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.045] px-2 text-xs font-bold text-slate-200 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {busy && <Loader2 size={13} className="animate-spin" />}
+                                {label(status)}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => handleLeadToProject(lead)}
+                            disabled={Boolean(processingLead)}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {processingLead === `${lead._id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
+                            Project
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -939,6 +1018,34 @@ export default function LaventeCarePage() {
                     </div>
                     {project.samenvatting && <p className="mt-3 text-sm leading-6 text-slate-400">{project.samenvatting}</p>}
                     {project.deadline && <p className="mt-3 text-xs font-semibold text-slate-500">Deadline: {formatDate(project.deadline)}</p>}
+                    {project._id && (
+                      <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                        {["discovery", "blueprint", "realisatie"].map((fase) => {
+                          const busy = processingProject === `${project._id}:fase:${fase}`;
+                          return (
+                            <button
+                              key={fase}
+                              type="button"
+                              onClick={() => handleProjectStatus(project, { fase })}
+                              disabled={Boolean(processingProject)}
+                              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.045] px-2 text-xs font-bold text-slate-200 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {busy && <Loader2 size={13} className="animate-spin" />}
+                              {label(fase)}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => handleProjectStatus(project, { status: project.status === "wacht_op_klant" ? "actief" : "wacht_op_klant" })}
+                          disabled={Boolean(processingProject)}
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {processingProject?.startsWith(`${project._id}:status`) ? <Loader2 size={13} className="animate-spin" /> : <Clock3 size={13} />}
+                          {project.status === "wacht_op_klant" ? "Actief" : "Wacht"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

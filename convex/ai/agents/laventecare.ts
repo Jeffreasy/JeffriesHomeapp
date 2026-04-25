@@ -27,6 +27,7 @@ export const laventecareAgent: AgentDefinition = {
   capabilities: [
     "LaventeCare-documentatie structureren en doorzoekbaar maken",
     "Leads kwalificeren op fit, urgentie, eigenaar, budget en proceswaarde",
+    "Leads door de funnel bewegen en converteren naar projectdelivery",
     "Discovery- en blueprint-trajecten voorbereiden",
     "Projectfases, scope, deliverables, change requests en besluiten bewaken",
     "SLA-incidenten en beheercontext samenvatten",
@@ -64,6 +65,32 @@ export const laventecareAgent: AgentDefinition = {
       ],
     },
     {
+      naam: "laventecareLeadsOpvragen",
+      type: "query",
+      beschrijving: "Haalt leads met IDs en funnelstatus op",
+      parameters: [
+        { naam: "status", type: "string", beschrijving: "Optionele statusfilter", verplicht: false },
+      ],
+    },
+    {
+      naam: "laventecareLeadBijwerken",
+      type: "mutation",
+      beschrijving: "Wijzigt leadstatus, fit-score of volgende stap na bevestiging",
+      parameters: [
+        { naam: "leadId", type: "string", beschrijving: "Exact leadId", verplicht: true },
+        { naam: "status", type: "string", beschrijving: "nieuw/intake/discovery/voorstel/gewonnen/verloren/no_match", verplicht: false },
+      ],
+    },
+    {
+      naam: "laventecareLeadNaarProject",
+      type: "mutation",
+      beschrijving: "Converteert een lead naar een project na bevestiging",
+      parameters: [
+        { naam: "leadId", type: "string", beschrijving: "Exact leadId", verplicht: true },
+        { naam: "naam", type: "string", beschrijving: "Optionele projectnaam", verplicht: false },
+      ],
+    },
+    {
       naam: "laventecareProjectMaken",
       type: "mutation",
       beschrijving: "Maakt een projectbasis aan vanuit een gewonnen lead of losse opdracht",
@@ -71,6 +98,23 @@ export const laventecareAgent: AgentDefinition = {
         { naam: "naam", type: "string", beschrijving: "Projectnaam", verplicht: true },
         { naam: "fase", type: "string", beschrijving: "intake/discovery/blueprint/realisatie/sla/evolution", verplicht: false },
         { naam: "samenvatting", type: "string", beschrijving: "Projectcontext", verplicht: false },
+      ],
+    },
+    {
+      naam: "laventecareProjectenOpvragen",
+      type: "query",
+      beschrijving: "Haalt projecten met IDs, fase en status op",
+      parameters: [
+        { naam: "fase", type: "string", beschrijving: "Optionele fasefilter", verplicht: false },
+      ],
+    },
+    {
+      naam: "laventecareProjectBijwerken",
+      type: "mutation",
+      beschrijving: "Wijzigt projectfase, status, waarde of planning na bevestiging",
+      parameters: [
+        { naam: "projectId", type: "string", beschrijving: "Exact projectId", verplicht: true },
+        { naam: "fase", type: "string", beschrijving: "intake/discovery/blueprint/realisatie/sla/evolution", verplicht: false },
       ],
     },
     {

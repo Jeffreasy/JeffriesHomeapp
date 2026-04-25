@@ -587,6 +587,63 @@ BELANGRIJK — Professioneel Template Protocol:
   {
     type: "function" as const,
     function: {
+      name: "laventecareLeadsOpvragen",
+      description: "Haal LaventeCare leads op met status, fit-score, volgende stap en IDs. Gebruik dit voor pipelinevragen of voordat je een lead bijwerkt/converteert.",
+      parameters: {
+        type: "object",
+        properties: {
+          status:          { type: "string", description: "Optionele statusfilter: nieuw, intake, discovery, voorstel, gewonnen, verloren, no_match" },
+          includeArchived: { type: "boolean", description: "Neem gesloten/verloren/no-fit leads mee" },
+          limit:           { type: "number", description: "Maximaal aantal leads, default 10" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareLeadBijwerken",
+      description: "Werk een LaventeCare lead bij: status, fit-score, prioriteit, pijnpunt of volgende stap. Gebruik eerst laventecareLeadsOpvragen als leadId niet bekend is. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          leadId:             { type: "string", description: "Exact leadId uit cockpit of laventecareLeadsOpvragen" },
+          status:             { type: "string", enum: ["nieuw", "intake", "discovery", "voorstel", "gewonnen", "verloren", "no_match"], description: "Nieuwe funnelstatus" },
+          fitScore:           { type: "number", description: "Fit-score 0-100" },
+          pijnpunt:           { type: "string", description: "Belangrijkste procespijn of businesscase" },
+          prioriteit:         { type: "string", enum: ["laag", "normaal", "hoog"], description: "Prioriteit" },
+          volgendeStap:       { type: "string", description: "Concrete volgende stap" },
+          volgendeActieDatum: { type: "string", description: "Opvolgdatum YYYY-MM-DD" },
+        },
+        required: ["leadId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareLeadNaarProject",
+      description: "Converteer een gewonnen of opdrachtwaardige LaventeCare lead naar een project en markeer de lead als gewonnen. Gebruik eerst laventecareLeadsOpvragen als leadId niet bekend is. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          leadId:          { type: "string", description: "Exact leadId uit cockpit of laventecareLeadsOpvragen" },
+          naam:            { type: "string", description: "Optionele projectnaam, default leadtitel" },
+          fase:            { type: "string", enum: ["intake", "discovery", "blueprint", "realisatie", "sla", "evolution", "afgerond"], description: "Startfase" },
+          status:          { type: "string", enum: ["actief", "wacht_op_klant", "geblokkeerd", "afgerond", "archived"], description: "Projectstatus" },
+          waardeIndicatie: { type: "number", description: "Indicatieve projectwaarde in EUR" },
+          startDatum:      { type: "string", description: "Startdatum YYYY-MM-DD" },
+          deadline:        { type: "string", description: "Deadline YYYY-MM-DD" },
+          samenvatting:    { type: "string", description: "Korte projectcontext" },
+        },
+        required: ["leadId"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "laventecareProjectMaken",
       description: "Maak een LaventeCare project aan vanuit een opdracht, gewonnen lead of intake. Gebruik alleen wanneer Jeffrey expliciet vraagt om een project vast te leggen. Deze tool vraagt server-side bevestiging.",
       parameters: {
@@ -603,6 +660,43 @@ BELANGRIJK — Professioneel Template Protocol:
           samenvatting:    { type: "string", description: "Korte projectcontext" },
         },
         required: ["naam"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareProjectenOpvragen",
+      description: "Haal LaventeCare projecten op met fase, status, deadlines en IDs. Gebruik dit voor deliveryvragen of voordat je een project bijwerkt.",
+      parameters: {
+        type: "object",
+        properties: {
+          status:          { type: "string", description: "Optionele projectstatus" },
+          fase:            { type: "string", description: "Optionele fasefilter" },
+          includeArchived: { type: "boolean", description: "Neem afgeronde/gearchiveerde projecten mee" },
+          limit:           { type: "number", description: "Maximaal aantal projecten, default 10" },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "laventecareProjectBijwerken",
+      description: "Werk een LaventeCare project bij: fase, status, waarde, planning, deadline of samenvatting. Gebruik eerst laventecareProjectenOpvragen als projectId niet bekend is. Deze tool vraagt server-side bevestiging.",
+      parameters: {
+        type: "object",
+        properties: {
+          projectId:       { type: "string", description: "Exact projectId uit cockpit of laventecareProjectenOpvragen" },
+          fase:            { type: "string", enum: ["intake", "discovery", "blueprint", "realisatie", "sla", "evolution", "afgerond"], description: "Projectfase" },
+          status:          { type: "string", enum: ["actief", "wacht_op_klant", "geblokkeerd", "afgerond", "archived"], description: "Projectstatus" },
+          waardeIndicatie: { type: "number", description: "Indicatieve projectwaarde in EUR" },
+          startDatum:      { type: "string", description: "Startdatum YYYY-MM-DD" },
+          deadline:        { type: "string", description: "Deadline YYYY-MM-DD" },
+          samenvatting:    { type: "string", description: "Korte projectcontext" },
+        },
+        required: ["projectId"],
       },
     },
   },

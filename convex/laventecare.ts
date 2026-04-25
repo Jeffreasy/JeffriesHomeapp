@@ -302,6 +302,35 @@ type CreateProjectInput = {
   samenvatting?: string;
 };
 
+type UpdateLeadInput = {
+  status?: string;
+  fitScore?: number;
+  pijnpunt?: string;
+  prioriteit?: string;
+  volgendeStap?: string;
+  volgendeActieDatum?: string;
+};
+
+type UpdateProjectInput = {
+  fase?: string;
+  status?: string;
+  waardeIndicatie?: number;
+  startDatum?: string;
+  deadline?: string;
+  samenvatting?: string;
+};
+
+type ConvertLeadToProjectInput = {
+  leadId: Id<"laventecareLeads">;
+  naam?: string;
+  fase?: string;
+  status?: string;
+  waardeIndicatie?: number;
+  startDatum?: string;
+  deadline?: string;
+  samenvatting?: string;
+};
+
 type CreateActionInput = {
   source?: string;
   sourceId?: string;
@@ -420,6 +449,55 @@ async function createProjectRecord(ctx: MutationCtx, userId: string, args: Creat
     samenvatting:    args.samenvatting,
     aangemaakt:      now,
     gewijzigd:       now,
+  });
+}
+
+async function updateLeadRecord(ctx: MutationCtx, userId: string, id: Id<"laventecareLeads">, fields: UpdateLeadInput) {
+  const lead = await ctx.db.get(id);
+  if (!lead || lead.userId !== userId) throw new Error("Lead niet gevonden");
+
+  const patch: Record<string, unknown> = { gewijzigd: new Date().toISOString() };
+  if (fields.status !== undefined) patch.status = fields.status;
+  if (fields.fitScore !== undefined) patch.fitScore = Math.max(0, Math.min(100, fields.fitScore));
+  if (fields.pijnpunt !== undefined) patch.pijnpunt = fields.pijnpunt;
+  if (fields.prioriteit !== undefined) patch.prioriteit = fields.prioriteit;
+  if (fields.volgendeStap !== undefined) patch.volgendeStap = fields.volgendeStap;
+  if (fields.volgendeActieDatum !== undefined) patch.volgendeActieDatum = fields.volgendeActieDatum;
+
+  await ctx.db.patch(id, patch);
+  return id;
+}
+
+async function updateProjectRecord(ctx: MutationCtx, userId: string, id: Id<"laventecareProjects">, fields: UpdateProjectInput) {
+  const project = await ctx.db.get(id);
+  if (!project || project.userId !== userId) throw new Error("Project niet gevonden");
+
+  const patch: Record<string, unknown> = { gewijzigd: new Date().toISOString() };
+  if (fields.fase !== undefined) patch.fase = fields.fase;
+  if (fields.status !== undefined) patch.status = fields.status;
+  if (fields.waardeIndicatie !== undefined) patch.waardeIndicatie = fields.waardeIndicatie;
+  if (fields.startDatum !== undefined) patch.startDatum = fields.startDatum;
+  if (fields.deadline !== undefined) patch.deadline = fields.deadline;
+  if (fields.samenvatting !== undefined) patch.samenvatting = fields.samenvatting;
+
+  await ctx.db.patch(id, patch);
+  return id;
+}
+
+async function convertLeadToProjectRecord(ctx: MutationCtx, userId: string, args: ConvertLeadToProjectInput) {
+  const lead = await ctx.db.get(args.leadId);
+  if (!lead || lead.userId !== userId) throw new Error("Lead niet gevonden");
+
+  return createProjectRecord(ctx, userId, {
+    naam:            args.naam?.trim() || lead.titel,
+    companyId:       lead.companyId,
+    leadId:          args.leadId,
+    fase:            args.fase ?? "intake",
+    status:          args.status ?? "actief",
+    waardeIndicatie: args.waardeIndicatie,
+    startDatum:      args.startDatum ?? amsterdamDate(),
+    deadline:        args.deadline,
+    samenvatting:    args.samenvatting ?? lead.pijnpunt,
   });
 }
 
@@ -799,6 +877,50 @@ export const createLeadInternal = internalMutation({
   handler: async (ctx, { userId, ...args }) => createLeadRecord(ctx, userId, args),
 });
 
+export const listLeadsInternal = internalQuery({
+  args: {
+    userId:          v.string(),
+    status:          v.optional(v.string()),
+    includeArchived: v.optional(v.boolean()),
+    limit:           v.optional(v.number()),
+  },
+  handler: async (ctx, { userId, status, includeArchived, limit }) => {
+    const max = Math.max(1, Math.min(limit ?? 10, 30));
+    const leads = status
+      ? await ctx.db.query("laventecareLeads").withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", status)).collect()
+      : await ctx.db.query("laventecareLeads").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
+
+    return leads
+      .filter((lead) => includeArchived || isOpenStatus(lead.status))
+      .sort((a, b) => (b.gewijzigd ?? b.aangemaakt).localeCompare(a.gewijzigd ?? a.aangemaakt))
+      .slice(0, max);
+  },
+});
+
+export const listProjectsInternal = internalQuery({
+  args: {
+    userId:          v.string(),
+    status:          v.optional(v.string()),
+    fase:            v.optional(v.string()),
+    includeArchived: v.optional(v.boolean()),
+    limit:           v.optional(v.number()),
+  },
+  handler: async (ctx, { userId, status, fase, includeArchived, limit }) => {
+    const max = Math.max(1, Math.min(limit ?? 10, 30));
+    const projects = await ctx.db
+      .query("laventecareProjects")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    return projects
+      .filter((project) => includeArchived || isOpenStatus(project.status))
+      .filter((project) => !status || project.status === status)
+      .filter((project) => !fase || project.fase === fase)
+      .sort((a, b) => b.gewijzigd.localeCompare(a.gewijzigd))
+      .slice(0, max);
+  },
+});
+
 export const createActionItem = mutation({
   args: {
     source:          v.optional(v.string()),
@@ -1058,19 +1180,54 @@ export const updateLead = mutation({
   },
   handler: async (ctx, { id, ...fields }) => {
     const userId = await requireCurrentUserId(ctx);
-    const lead = await ctx.db.get(id);
-    if (!lead || lead.userId !== userId) throw new Error("Lead niet gevonden");
-
-    const patch: Record<string, unknown> = { gewijzigd: new Date().toISOString() };
-    if (fields.status !== undefined) patch.status = fields.status;
-    if (fields.fitScore !== undefined) patch.fitScore = Math.max(0, Math.min(100, fields.fitScore));
-    if (fields.pijnpunt !== undefined) patch.pijnpunt = fields.pijnpunt;
-    if (fields.prioriteit !== undefined) patch.prioriteit = fields.prioriteit;
-    if (fields.volgendeStap !== undefined) patch.volgendeStap = fields.volgendeStap;
-    if (fields.volgendeActieDatum !== undefined) patch.volgendeActieDatum = fields.volgendeActieDatum;
-
-    await ctx.db.patch(id, patch);
+    return updateLeadRecord(ctx, userId, id, fields);
   },
+});
+
+export const updateLeadInternal = internalMutation({
+  args: {
+    userId:             v.string(),
+    id:                 v.id("laventecareLeads"),
+    status:             v.optional(v.string()),
+    fitScore:           v.optional(v.number()),
+    pijnpunt:           v.optional(v.string()),
+    prioriteit:         v.optional(v.string()),
+    volgendeStap:       v.optional(v.string()),
+    volgendeActieDatum: v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, id, ...fields }) => updateLeadRecord(ctx, userId, id, fields),
+});
+
+export const convertLeadToProject = mutation({
+  args: {
+    leadId:          v.id("laventecareLeads"),
+    naam:            v.optional(v.string()),
+    fase:            v.optional(v.string()),
+    status:          v.optional(v.string()),
+    waardeIndicatie: v.optional(v.number()),
+    startDatum:      v.optional(v.string()),
+    deadline:        v.optional(v.string()),
+    samenvatting:    v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireCurrentUserId(ctx);
+    return convertLeadToProjectRecord(ctx, userId, args);
+  },
+});
+
+export const convertLeadToProjectInternal = internalMutation({
+  args: {
+    userId:          v.string(),
+    leadId:          v.id("laventecareLeads"),
+    naam:            v.optional(v.string()),
+    fase:            v.optional(v.string()),
+    status:          v.optional(v.string()),
+    waardeIndicatie: v.optional(v.number()),
+    startDatum:      v.optional(v.string()),
+    deadline:        v.optional(v.string()),
+    samenvatting:    v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, ...args }) => convertLeadToProjectRecord(ctx, userId, args),
 });
 
 export const createProject = mutation({
@@ -1105,6 +1262,36 @@ export const createProjectInternal = internalMutation({
     samenvatting:    v.optional(v.string()),
   },
   handler: async (ctx, { userId, ...args }) => createProjectRecord(ctx, userId, args),
+});
+
+export const updateProject = mutation({
+  args: {
+    id:              v.id("laventecareProjects"),
+    fase:            v.optional(v.string()),
+    status:          v.optional(v.string()),
+    waardeIndicatie: v.optional(v.number()),
+    startDatum:      v.optional(v.string()),
+    deadline:        v.optional(v.string()),
+    samenvatting:    v.optional(v.string()),
+  },
+  handler: async (ctx, { id, ...fields }) => {
+    const userId = await requireCurrentUserId(ctx);
+    return updateProjectRecord(ctx, userId, id, fields);
+  },
+});
+
+export const updateProjectInternal = internalMutation({
+  args: {
+    userId:          v.string(),
+    id:              v.id("laventecareProjects"),
+    fase:            v.optional(v.string()),
+    status:          v.optional(v.string()),
+    waardeIndicatie: v.optional(v.number()),
+    startDatum:      v.optional(v.string()),
+    deadline:        v.optional(v.string()),
+    samenvatting:    v.optional(v.string()),
+  },
+  handler: async (ctx, { userId, id, ...fields }) => updateProjectRecord(ctx, userId, id, fields),
 });
 
 export const getAgentContextInternal = internalQuery({
