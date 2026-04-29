@@ -1,5 +1,5 @@
 // ─── Finance shared constants ─────────────────────────────────────────────────
-// Single source of truth for category options, code labels, and IBAN labels.
+// Single source of truth for category options and code labels.
 // Used by page.tsx, FilterPanel, TransactionList, and any future finance component.
 
 export const CATEGORIE_OPTIES = [
@@ -20,13 +20,10 @@ export const CODE_LABELS: Record<string, string> = {
   sb: "SEPA", ga: "Geldautomaat", gb: "Geldautomaat", kh: "Kascheque",
 };
 
-export const IBAN_LABELS: Record<string, string> = {
-  "NL41RABO0348147740": "Spaarrekening",
-  "NL20RABO0198574215": "Betaalrekening",
-};
-
 export function ibanLabel(iban: string): string {
-  return IBAN_LABELS[iban] ?? iban.slice(-8);
+  if (!iban) return "Onbekende rekening";
+  const suffix = iban.slice(-4);
+  return `Rekening ${suffix}`;
 }
 
 // ─── Category color palette ──────────────────────────────────────────────────

@@ -32,12 +32,10 @@ export interface ParseResult {
   aantalRijen:  number;
 }
 
-// ─── Eigen rekeningen (intern overboeking detectie) ──────────────────────────
-
-const EIGEN_REKENINGEN = new Set([
-  "NL41RABO0348147740",
-  "NL20RABO0198574215",
-]);
+// ─── Interne overboeking detectie ────────────────────────────────────────────
+// Geen rekeningnummers hardcoded in de clientbundle. De client kan alleen
+// interne boekingen herkennen als beide IBANs in hetzelfde CSV-bestand staan;
+// de server herberekent dit definitief op basis van de bekende rekeningen.
 
 // ─── Auto-categorisatie (centraal gedefinieerd) ──────────────────────────────
 
@@ -133,6 +131,12 @@ export async function parseRabobankCsv(file: File): Promise<ParseResult> {
   const { rows } = parseCsv(clean);
   if (rows.length === 0) throw new Error("Geen transacties gevonden in het CSV-bestand.");
 
+  const ibansInFile = new Set(
+    rows
+      .map((row) => row["IBAN/BBAN"] ?? "")
+      .filter(Boolean)
+  );
+
   const transactions: ParsedTransaction[] = rows.map((row) => {
     const iban      = row["IBAN/BBAN"] ?? "";
     const tegenIban = (row["Tegenrekening IBAN/BBAN"] ?? "") || undefined;
@@ -147,7 +151,7 @@ export async function parseRabobankCsv(file: File): Promise<ParseResult> {
     const referentie  = (row["Transactiereferentie"] || row["Betalingskenmerk"] || "") || undefined;
     const redenRetour = row["Reden retour"]?.trim() || undefined;
 
-    const isIntern = EIGEN_REKENINGEN.has(iban) && !!tegenIban && EIGEN_REKENINGEN.has(tegenIban);
+    const isIntern = !!tegenIban && iban !== tegenIban && ibansInFile.has(iban) && ibansInFile.has(tegenIban);
 
     const oorspRaw = parseNlBedrag(row["Oorspr bedrag"] ?? "");
 

@@ -112,7 +112,13 @@ export const financeAgent: AgentDefinition = {
         categorie: tx.categorie,
       }));
 
-    const laatsteTx = allTxs.sort((a, b) => b.datum.localeCompare(a.datum))[0];
+    const saldoPerIban = new Map<string, { datum: string; volgnr: string; saldo: number }>();
+    for (const tx of allTxs) {
+      const prev = saldoPerIban.get(tx.rekeningIban);
+      const isLater = !prev || tx.datum > prev.datum || (tx.datum === prev.datum && tx.volgnr > prev.volgnr);
+      if (isLater) saldoPerIban.set(tx.rekeningIban, { datum: tx.datum, volgnr: tx.volgnr, saldo: tx.saldoNaTrn });
+    }
+    const huidigSaldo = Array.from(saldoPerIban.values()).reduce((sum, tx) => sum + tx.saldo, 0);
 
     return {
       periode,
@@ -126,7 +132,7 @@ export const financeAgent: AgentDefinition = {
       transacties: {
         totaal: allTxs.length,
         periode: `Afgelopen 30 dagen (${recenteTxs.length} transacties)`,
-        huidigSaldo: laatsteTx?.saldoNaTrn ?? null,
+        huidigSaldo: saldoPerIban.size > 0 ? Math.round(huidigSaldo * 100) / 100 : null,
         dezeMaand: { inkomsten: Math.round(inkomsten * 100) / 100, uitgaven: Math.round(uitgaven * 100) / 100, netto: Math.round((inkomsten + uitgaven) * 100) / 100 },
         categorieen,
         topUitgaven,

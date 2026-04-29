@@ -959,7 +959,7 @@ export default function FinancePage() {
                 <p className="mt-1 text-sm text-slate-500">Importeer een Rabobank CSV om je finance cockpit te vullen.</p>
               </div>
             </div>
-          ) : transactions.length === 0 && !isLoading ? (
+          ) : transactions.length === 0 && !isLoading && isDone ? (
             <div className="mt-6 flex flex-col items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-12 text-center">
               <Filter size={34} className="text-slate-700" />
               <div>

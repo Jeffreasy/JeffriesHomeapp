@@ -32,22 +32,60 @@ export const importBatch = mutation({
 
     let toegevoegd = 0;
     let overgeslagen = 0;
+    let internAangepast = 0;
+
+    const bestaandeTxs = await ctx.db
+      .query("transactions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const bekendeIbans = new Set<string>([
+      ...bestaandeTxs.map((tx) => tx.rekeningIban),
+      ...transactions.map((tx) => tx.rekeningIban),
+    ].filter(Boolean));
+
+    const isEigenOverboeking = (tx: { rekeningIban: string; tegenrekeningIban?: string }) =>
+      !!tx.tegenrekeningIban &&
+      tx.rekeningIban !== tx.tegenrekeningIban &&
+      bekendeIbans.has(tx.rekeningIban) &&
+      bekendeIbans.has(tx.tegenrekeningIban);
 
     for (const tx of transactions) {
       const existing = await ctx.db
         .query("transactions")
-        .withIndex("by_rekening_volgnr", (q) =>
-          q.eq("rekeningIban", tx.rekeningIban).eq("volgnr", tx.volgnr)
+        .withIndex("by_user_rekening_volgnr", (q) =>
+          q.eq("userId", userId).eq("rekeningIban", tx.rekeningIban).eq("volgnr", tx.volgnr)
         )
         .first();
 
       if (existing) { overgeslagen++; continue; }
 
-      await ctx.db.insert("transactions", { ...tx, userId });
+      const isIntern = tx.isInterneOverboeking || isEigenOverboeking(tx);
+      await ctx.db.insert("transactions", {
+        ...tx,
+        userId,
+        isInterneOverboeking: isIntern,
+        categorie: isIntern ? "Interne Overboeking" : tx.categorie,
+      });
+      bekendeIbans.add(tx.rekeningIban);
       toegevoegd++;
     }
 
-    return { toegevoegd, overgeslagen };
+    const alleTxs = await ctx.db
+      .query("transactions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    for (const tx of alleTxs) {
+      if (!isEigenOverboeking(tx) || tx.isInterneOverboeking) continue;
+      await ctx.db.patch(tx._id, {
+        isInterneOverboeking: true,
+        categorie: "Interne Overboeking",
+      });
+      internAangepast++;
+    }
+
+    return { toegevoegd, overgeslagen, internAangepast };
   },
 });
 
@@ -107,17 +145,20 @@ export const listPaginated = query({
     const userId = identity.subject;
 
     // Gemeenschappelijke post-filter functie
-    const zoek = args.zoekterm?.toLowerCase().trim();
-    const postFilter = (t: {
+    type FilterableTx = {
       isInterneOverboeking: boolean;
       code: string;
       rekeningIban: string;
+      volgnr: string;
       tegenpartijNaam?: string;
       omschrijving: string;
       bedrag: number;
       categorie?: string;
       datum: string;
-    }) => {
+    };
+
+    const zoek = args.zoekterm?.toLowerCase().trim();
+    const postFilter = (t: FilterableTx) => {
       if (args.excludeIntern    && t.isInterneOverboeking)             return false;
       if (args.onlyStorneringen && t.code !== "st")                     return false;
       if (args.codeFilter       && t.code !== args.codeFilter)          return false;
@@ -137,6 +178,23 @@ export const listPaginated = query({
       return true;
     };
 
+    const sortDesc = <T extends { datum: string; volgnr: string }>(a: T, b: T) =>
+      b.datum.localeCompare(a.datum) || b.volgnr.localeCompare(a.volgnr);
+
+    const paginateFiltered = <T extends FilterableTx>(txs: T[]) => {
+      const offset = args.cursor ? Number.parseInt(args.cursor, 10) : 0;
+      const start = Number.isFinite(offset) && offset > 0 ? offset : 0;
+      const filtered = [...txs].sort(sortDesc).filter(postFilter);
+      const next = Math.min(start + args.numItems, filtered.length);
+      const page = filtered.slice(0, next);
+
+      return {
+        page,
+        isDone: next >= filtered.length,
+        continueCursor: next < filtered.length ? String(next) : null,
+      };
+    };
+
     // ─── Pad A: datumbereik of maandfilter actief ─────────────────────────────
     const effectiefVan = args.datumVan ?? (args.maandFilter ? args.maandFilter + "-01" : undefined);
     const effectiefTot = args.datumTot ?? (args.maandFilter ? args.maandFilter + "-31" : undefined);
@@ -153,22 +211,37 @@ export const listPaginated = query({
         .order("desc")
         .collect();
 
-      return {
-        page:           txs.filter(postFilter),
-        isDone:         true,
-        continueCursor: null,
-      };
+      return paginateFiltered(txs);
     }
 
-    // ─── Pad B: geen datumfilter → gepagineerd ───────────────────────────────
-    const hasHeavyFilter = zoek || args.onlyStorneringen || args.categorieFilter || args.richting;
-    const batchSize = hasHeavyFilter ? 200 : args.numItems;
+    // ─── Pad B: post-filters actief → collect + eigen offset-paginering ──────
+    const hasPostFilter = Boolean(
+      zoek ||
+      args.excludeIntern ||
+      args.onlyStorneringen ||
+      args.codeFilter ||
+      args.ibanFilter ||
+      args.categorieFilter ||
+      args.richting ||
+      args.minBedrag !== undefined ||
+      args.maxBedrag !== undefined
+    );
 
+    if (hasPostFilter) {
+      const txs = await ctx.db
+        .query("transactions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+
+      return paginateFiltered(txs);
+    }
+
+    // ─── Pad C: geen post-filter → native Convex-paginering ──────────────────
     const result = await ctx.db
       .query("transactions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
-      .paginate({ numItems: batchSize, cursor: args.cursor });
+      .paginate({ numItems: args.numItems, cursor: args.cursor });
 
     return {
       page:           result.page.filter(postFilter),
@@ -257,22 +330,33 @@ export const getStats = query({
         ) / 100;
 
     // ─── Saldo per maand (voor lijndiagram) ───────────────────────────────────
-    // Ook hier: hoogste volgnr binnen dezelfde datum wint.
-    const maandMap = new Map<string, { datum: string; volgnr: string; saldo: number }>();
-    for (const t of txs) {
-      const maand = t.datum.slice(0, 7);
-      const prev = maandMap.get(maand);
-      const isLater =
-        !prev ||
-        t.datum > prev.datum ||
-        (t.datum === prev.datum && t.volgnr > prev.volgnr);
-      if (isLater) {
-        maandMap.set(maand, { datum: t.datum, volgnr: t.volgnr, saldo: t.saldoNaTrn });
+    // Bij alle rekeningen is het maand-eindsaldo de som van de laatste bekende
+    // balans per IBAN. Rekeningen zonder transactie in die maand dragen hun
+    // laatst bekende balans door.
+    const maandenVoorSaldo = Array.from(new Set(txs.map((t) => t.datum.slice(0, 7)))).sort();
+    const saldoBron = (args.ibanFilter
+      ? alleTxs.filter((t) => t.rekeningIban === args.ibanFilter)
+      : alleTxs
+    ).sort((a, b) => a.datum.localeCompare(b.datum) || a.volgnr.localeCompare(b.volgnr));
+
+    const laatsteSaldoPerIban = new Map<string, { datum: string; volgnr: string; saldo: number }>();
+    let saldoCursor = 0;
+    const saldoPerMaand = maandenVoorSaldo.map((maand) => {
+      const maandEinde = `${maand}-31`;
+
+      while (saldoCursor < saldoBron.length && saldoBron[saldoCursor].datum <= maandEinde) {
+        const t = saldoBron[saldoCursor];
+        laatsteSaldoPerIban.set(t.rekeningIban, {
+          datum: t.datum,
+          volgnr: t.volgnr,
+          saldo: t.saldoNaTrn,
+        });
+        saldoCursor++;
       }
-    }
-    const saldoPerMaand = Array.from(maandMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([maand, { saldo }]) => ({ maand, saldo }));
+
+      const saldo = Array.from(laatsteSaldoPerIban.values()).reduce((sum, item) => sum + item.saldo, 0);
+      return { maand, saldo: Math.round(saldo * 100) / 100 };
+    });
 
     // ─── Uitgaven per categorie (with counts & percentage) ──────────────────────
     const categorieMap = new Map<string, { bedrag: number; count: number }>();

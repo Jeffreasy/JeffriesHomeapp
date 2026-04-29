@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useState, useDeferredValue, useEffect } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 
 export type TransactionFilter = {
@@ -24,27 +24,41 @@ export type TransactionFilter = {
 const PAGE_SIZE = 50;
 
 export function useTransactions(filter: TransactionFilter = {}) {
-  const [cursor, setCursor] = useState<string | null>(null);
   const deferredZoek = useDeferredValue(filter.zoekterm ?? "");
-
-  // Cursor reset bij elke filterwijziging
-  useEffect(() => {
-    setCursor(null);
-  }, [
-    filter.excludeIntern,
-    filter.onlyStorneringen,
-    filter.codeFilter,
-    filter.ibanFilter,
-    filter.maandFilter,
-    filter.categorieFilter,
-    filter.richting,
-    filter.minBedrag,
-    filter.maxBedrag,
-    filter.datumVan,
-    filter.datumTot,
-    filter.jaarFilter,
-    deferredZoek,
-  ]);
+  const filterKey = useMemo(
+    () => JSON.stringify({
+      excludeIntern: filter.excludeIntern,
+      onlyStorneringen: filter.onlyStorneringen,
+      codeFilter: filter.codeFilter,
+      ibanFilter: filter.ibanFilter,
+      maandFilter: filter.maandFilter,
+      categorieFilter: filter.categorieFilter,
+      richting: filter.richting,
+      minBedrag: filter.minBedrag,
+      maxBedrag: filter.maxBedrag,
+      datumVan: filter.datumVan,
+      datumTot: filter.datumTot,
+      jaarFilter: filter.jaarFilter,
+      zoekterm: deferredZoek,
+    }),
+    [
+      filter.excludeIntern,
+      filter.onlyStorneringen,
+      filter.codeFilter,
+      filter.ibanFilter,
+      filter.maandFilter,
+      filter.categorieFilter,
+      filter.richting,
+      filter.minBedrag,
+      filter.maxBedrag,
+      filter.datumVan,
+      filter.datumTot,
+      filter.jaarFilter,
+      deferredZoek,
+    ]
+  );
+  const [pagination, setPagination] = useState<{ key: string; cursor: string | null }>({ key: "", cursor: null });
+  const cursor = pagination.key === filterKey ? pagination.cursor : null;
 
   const result = useQuery(api.transactions.listPaginated, {
     numItems:         PAGE_SIZE,
@@ -73,7 +87,7 @@ export function useTransactions(filter: TransactionFilter = {}) {
 
   function loadMore() {
     if (result && !result.isDone && result.continueCursor) {
-      setCursor(result.continueCursor);
+      setPagination({ key: filterKey, cursor: result.continueCursor });
     }
   }
 
@@ -88,6 +102,6 @@ export function useTransactions(filter: TransactionFilter = {}) {
     updateCategorie: (id: Id<"transactions">, categorie: string | undefined) =>
       updateCatMut({ id, categorie }),
     loadMore,
-    resetPagination: () => setCursor(null),
+    resetPagination: () => setPagination({ key: filterKey, cursor: null }),
   };
 }

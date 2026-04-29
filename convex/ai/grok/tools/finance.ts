@@ -6,12 +6,21 @@
  */
 
 import { internal } from "../../../_generated/api";
-import { MAAND_NAMEN, IBAN_LABELS } from "../types";
+import { MAAND_NAMEN } from "../types";
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
 function labelIban(iban: string): string {
-  return IBAN_LABELS[iban] ?? iban.slice(-4);
+  return iban ? `Rekening ${iban.slice(-4)}` : "Onbekende rekening";
+}
+
+function rekeningMatches(iban: string, query: string): boolean {
+  const normalized = query.toLowerCase().trim();
+  return (
+    iban.toLowerCase().includes(normalized) ||
+    iban.slice(-4).includes(normalized) ||
+    labelIban(iban).toLowerCase().includes(normalized)
+  );
 }
 
 // ─── 1. Saldo Opvragen ───────────────────────────────────────────────────────
@@ -69,8 +78,7 @@ export async function handleTransactiesZoeken(ctx: any, args: Record<string, unk
 
     if (categorie) matches = matches.filter((tx: any) => tx.categorie === categorie);
     if (rekening) {
-      const iban = Object.entries(IBAN_LABELS).find(([, label]) => label.toLowerCase().includes(rekening.toLowerCase()))?.[0];
-      if (iban) matches = matches.filter((tx: any) => tx.rekeningIban === iban);
+      matches = matches.filter((tx: any) => rekeningMatches(tx.rekeningIban, rekening));
     }
 
     const results = matches
@@ -116,8 +124,7 @@ export async function handleUitgavenOverzicht(ctx: any, args: Record<string, unk
     let maandTxs = allTxs.filter((tx: any) => tx.datum?.startsWith(periode));
 
     if (rekening) {
-      const iban = Object.entries(IBAN_LABELS).find(([, label]) => label.toLowerCase().includes(rekening.toLowerCase()))?.[0];
-      if (iban) maandTxs = maandTxs.filter((tx: any) => tx.rekeningIban === iban);
+      maandTxs = maandTxs.filter((tx: any) => rekeningMatches(tx.rekeningIban, rekening));
     }
     if (categorie) maandTxs = maandTxs.filter((tx: any) => tx.categorie === categorie);
 
@@ -148,10 +155,18 @@ export async function handleUitgavenOverzicht(ctx: any, args: Record<string, unk
         rekening: labelIban(tx.rekeningIban),
       }));
 
-    // Eindsaldo van de maand
-    const maandEinde = maandTxs
-      .sort((a: any, b: any) => b.datum.localeCompare(a.datum) || b.volgnr.localeCompare(a.volgnr));
-    const eindSaldo = maandEinde[0]?.saldoNaTrn;
+    // Eindsaldo van de maand: som van laatste bekende balans per IBAN.
+    const laatstePerIban = new Map<string, { datum: string; volgnr: string; saldo: number }>();
+    const saldoBron = allTxs
+      .filter((tx: any) => tx.datum <= `${periode}-31`)
+      .filter((tx: any) => !rekening || rekeningMatches(tx.rekeningIban, rekening))
+      .sort((a: any, b: any) => a.datum.localeCompare(b.datum) || a.volgnr.localeCompare(b.volgnr));
+    for (const tx of saldoBron) {
+      laatstePerIban.set(tx.rekeningIban, { datum: tx.datum, volgnr: tx.volgnr, saldo: tx.saldoNaTrn });
+    }
+    const eindSaldo = laatstePerIban.size > 0
+      ? Array.from(laatstePerIban.values()).reduce((sum, tx) => sum + tx.saldo, 0)
+      : null;
 
     return JSON.stringify({
       titel: `${MAAND_NAMEN[maand]} ${jaar}`,

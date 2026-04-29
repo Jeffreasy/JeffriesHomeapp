@@ -88,6 +88,7 @@ interface TextLine {
   text: string;
   y: number;
   x: number;
+  items: SpatialTextItem[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -116,19 +117,117 @@ function groupByY(items: SpatialTextItem[]): TextLine[] {
 
   const sorted = [...items].sort((a: SpatialTextItem, b: SpatialTextItem) => b.y - a.y || a.x - b.x);
   const lines: TextLine[] = [];
-  let currentLine: TextLine = { text: sorted[0].text, y: sorted[0].y, x: sorted[0].x };
+  let currentLine: TextLine = { text: sorted[0].text, y: sorted[0].y, x: sorted[0].x, items: [sorted[0]] };
 
   for (let idx = 1; idx < sorted.length; idx++) {
     if (Math.abs(sorted[idx].y - currentLine.y) < 3) {
-      currentLine.text += " " + sorted[idx].text;
+      currentLine.items.push(sorted[idx]);
+      currentLine.items.sort((a, b) => a.x - b.x);
+      currentLine.text = currentLine.items.map((item) => item.text).join(" ");
     } else {
       lines.push(currentLine);
-      currentLine = { text: sorted[idx].text, y: sorted[idx].y, x: sorted[idx].x };
+      currentLine = { text: sorted[idx].text, y: sorted[idx].y, x: sorted[idx].x, items: [sorted[idx]] };
     }
   }
   lines.push(currentLine);
 
   return lines;
+}
+
+function normalizeText(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function looksLikeMoneyToken(text: string): boolean {
+  return /^-?[\d.]+,\d{2,3}$/.test(text.trim());
+}
+
+function numericItems(line: TextLine, minX = -Infinity, maxX = Infinity) {
+  return line.items
+    .filter((item) => item.x >= minX && item.x <= maxX && looksLikeMoneyToken(item.text))
+    .map((item) => ({ ...item, value: parseNL(item.text) }))
+    .sort((a, b) => a.x - b.x);
+}
+
+function amountNear(line: TextLine, targetX: number, maxDistance = 24): number | null {
+  const candidates = numericItems(line);
+  let best: { value: number; distance: number } | null = null;
+
+  for (const item of candidates) {
+    const distance = Math.abs(item.x - targetX);
+    if (distance <= maxDistance && (!best || distance < best.distance)) {
+      best = { value: item.value, distance };
+    }
+  }
+
+  return best?.value ?? null;
+}
+
+function firstAmountFrom(line: TextLine, minX: number, maxX = Infinity): number | null {
+  return numericItems(line, minX, maxX)[0]?.value ?? null;
+}
+
+function labelTextForLine(line: TextLine): string {
+  return normalizeText(
+    line.items
+      .filter((item) => item.x < 220)
+      .map((item) => item.text)
+      .join(" ")
+  );
+}
+
+function isLoonComponentLine(line: TextLine): boolean {
+  // De looncomponententabel staat in deze loonstroken ruim boven de totalen/meta.
+  // De y-band voorkomt dat lagere meta-regels zoals "Uurln ORT vrg mnd" als ORT
+  // component worden geteld.
+  if (line.y < 300 || line.y > 540) return false;
+
+  const label = labelTextForLine(line);
+  if (!label) return false;
+  if (/^(Perc\.?|Eenh\.?|Omschrijving|Medewerker|Werkgever|Loonstrook|Berekening)$/i.test(label)) {
+    return false;
+  }
+
+  const hasAmount = numericItems(line, 220).length > 0;
+  return hasAmount && (
+    /^-?[\d.,]+\s*(K|%|Uren)?\s+\S+/i.test(label) ||
+    /^(Totaal|Netto|Loonheffing)\b/i.test(label)
+  );
+}
+
+function parseComponentLine(line: TextLine): LoonComponent | null {
+  const label = labelTextForLine(line);
+  if (!label) return null;
+
+  const labelMatch = label.match(/^(-?[\d.,]+)\s*(K|%|Uren)?\s+(.+)$/i);
+  let omschrijving = label;
+  let aantal: number | null = null;
+  let eenheid = "";
+
+  if (labelMatch) {
+    aantal = tryParseNL(labelMatch[1]);
+    eenheid = labelMatch[2] || "";
+    omschrijving = labelMatch[3].trim();
+  }
+
+  let betaling: number | null = null;
+  let berekOver: number | null = null;
+
+  if (/^Totaal$/i.test(omschrijving)) {
+    betaling = amountNear(line, 282) ?? firstAmountFrom(line, 270);
+    berekOver = amountNear(line, 355) ?? firstAmountFrom(line, 330, 390);
+  } else if (/^Netto$/i.test(omschrijving)) {
+    betaling = amountNear(line, 282) ?? firstAmountFrom(line, 270);
+    berekOver = amountNear(line, 535) ?? firstAmountFrom(line, 500);
+  } else if (/^Loonheffing\b/i.test(omschrijving)) {
+    berekOver = amountNear(line, 228) ?? firstAmountFrom(line, 220, 270);
+    betaling = amountNear(line, 355) ?? firstAmountFrom(line, 320, 390);
+  } else {
+    berekOver = amountNear(line, 228) ?? firstAmountFrom(line, 220, 270);
+    betaling = amountNear(line, 282) ?? firstAmountFrom(line, 270);
+  }
+
+  return { omschrijving, aantal, eenheid, betaling, berekOver };
 }
 
 // ─── Component Categorizer ────────────────────────────────────────────────────
@@ -166,7 +265,7 @@ function categorizeComponents(components: LoonComponent[]): CategorizedComponent
     const o = c.omschrijving;
     const b = c.betaling || 0;
 
-    if (/ORT/.test(o)) {
+    if (/ORT/i.test(o)) {
       const pctMatch = o.match(/(\d+%|bij vakantie)/);
       result.ortItems.push({
         pct: pctMatch ? pctMatch[1] : o,
@@ -177,7 +276,7 @@ function categorizeComponents(components: LoonComponent[]): CategorizedComponent
       result.amtZeerintensief = b;
     } else if (/Premie\s*pensioen/i.test(o)) {
       result.pensioenpremie = b;
-    } else if (/^Loonheffing$/i.test(o.trim())) {
+    } else if (/^Loonheffing\b/i.test(o.trim())) {
       result.loonheffing = b;
     } else if (/Reisk/i.test(o)) {
       result.reiskosten = b;
@@ -185,7 +284,7 @@ function categorizeComponents(components: LoonComponent[]): CategorizedComponent
       result.vakantietoeslag = b;
     } else if (/EJU/i.test(o)) {
       result.ejuBedrag = b;
-    } else if (/Balansvl/i.test(o)) {
+    } else if (/Balansv/i.test(o)) {
       result.toeslagBalansvlf = b;
     } else if (/extra\s*uren/i.test(o)) {
       result.extraUrenBedrag = b;
@@ -208,8 +307,9 @@ function extractNetto(components: LoonComponent[], fullText: string): number {
     }
   }
 
-  // Fallback: regex from full text
-  const match = fullText.match(/(?:Netto|IBAN)[^0-9]*(\d[\d.,]+)/);
+  // Fallback: only trust a real Netto line. Never scan after "IBAN", because
+  // IBAN prefixes such as NL41 can look like amounts to a loose regex.
+  const match = fullText.match(/\bNetto\s+(-?[\d.]+,\d{2})\b/);
   return match ? parseNL(match[1]) : 0;
 }
 
@@ -248,65 +348,19 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
   const jaar = parseInt(jaarMatch[1]);
   const periodeLabel = `${jaar}-${String(periode).padStart(2, "0")}`;
 
-  // ── Group text items by spatial regions (columns) ──
-  // Left column (x < 280): labels  |  Middle (280-480): amounts  |  Right (≥480): meta
-  const leftItems = textItems.filter((t: SpatialTextItem) => t.x < 280);
-  const midItems = textItems.filter((t: SpatialTextItem) => t.x >= 280 && t.x < 480);
-  const rightItems = textItems.filter((t: SpatialTextItem) => t.x >= 480);
+  // ── Parse looncomponententabel uit volledige PDF-regels ──
+  const lines = groupByY(textItems);
+  const components = lines
+    .filter(isLoonComponentLine)
+    .map(parseComponentLine)
+    .filter((component): component is LoonComponent => component !== null);
 
-  // ── Parse labels + amounts by matching Y positions ──
-  const components: LoonComponent[] = [];
-  const leftLines = groupByY(leftItems);
-  const midLines = groupByY(midItems);
-
-  for (let idx = 0; idx < leftLines.length; idx++) {
-    const line = leftLines[idx].text;
-
-    // Parse label: "44,440 % Salaris" or "6,000 Uren ORT 22%" or "Loonheffing"
-    const labelMatch = line.match(/^([\d.,]+)\s*(K|%|Uren)?\s*(.+)$/);
-    let omschrijving: string;
-    let aantal: number | null = null;
-    let eenheid = "";
-
-    if (labelMatch) {
-      aantal = tryParseNL(labelMatch[1]);
-      eenheid = labelMatch[2] || "";
-      omschrijving = labelMatch[3].trim();
-    } else {
-      omschrijving = line.trim();
-    }
-
-    // Skip non-component lines
-    if (!omschrijving || /^(Perc|Totaal|Netto|Berekening)/.test(omschrijving)) continue;
-
-    // Find matching amount line at similar Y
-    const y = leftLines[idx].y;
-    const matchedMid = midLines.find((m: TextLine) => Math.abs(m.y - y) < 5);
-
-    let betaling: number | null = null;
-    let berekOver: number | null = null;
-
-    if (matchedMid) {
-      const nums = matchedMid.text.match(/[\d.,]+/g)?.map(parseNL) || [];
-      if (nums.length >= 2) {
-        berekOver = nums[0];
-        betaling = nums[1];
-      } else if (nums.length === 1) {
-        betaling = nums[0];
-      }
-    }
-
-    components.push({ omschrijving, aantal, eenheid, betaling, berekOver });
-  }
-
-  // ── Extract meta fields from right column ──
-  const rightText = rightItems.map((t: SpatialTextItem) => t.text).join(" ");
-
-  const salaris = tryParseNL(extractField(rightText, /Salaris\s+([\d.,]+)/));
-  const schaalnummer = extractField(rightText, /Schaalnummer\s+(\d+)/);
-  const trede = extractField(rightText, /Trede\s+(\d+)/);
-  const ptFactor = tryParseNL(extractField(rightText, /Parttime\s+factor\s+([\d.,]+)/));
-  const uurloon = tryParseNL(extractField(rightText, /Uurln\s+vorige\s+mnd\s+([\d.,]+)/));
+  // ── Extract meta fields uit full text ──
+  const salaris = components.find((c) => /^Salaris$/i.test(c.omschrijving.trim()))?.betaling ?? null;
+  const schaalnummer = extractField(fullText, /Schaalnummer\s+(\d+)/);
+  const trede = extractField(fullText, /Trede\s+(\d+)/);
+  const ptFactor = tryParseNL(extractField(fullText, /Parttime\s+factor\s+([\d.,]+)/));
+  const uurloon = tryParseNL(extractField(fullText, /Uurln\s+vorige\s+mnd\s+([\d.,]+)/));
 
   // ── Netto ──
   const netto = extractNetto(components, fullText);

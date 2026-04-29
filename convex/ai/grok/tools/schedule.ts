@@ -117,13 +117,13 @@ export async function handleSalarisOpvragen(ctx: any, args: Record<string, unkno
     }
 
     const berekend = await ctx.runQuery(internal.salary.computeFromScheduleInternal, { userId });
-    const maandData = berekend.find((s: any) => s.periode === periode);
+    const maandData = berekend.find((s: any) => (s.maandLabel ?? s.periode) === periode);
     if (maandData) {
       return JSON.stringify({
         bron: "berekend_uit_rooster", periode,
         bruto: maandData.brutoBetaling, netto: maandData.nettoPrognose,
         ort: maandData.ortTotaal, basisLoon: maandData.basisLoon,
-        diensten: maandData.aantalDiensten, ortDetails: maandData.ortDetails,
+        diensten: maandData.aantalDiensten, ortDetails: maandData.ortTotalen,
       });
     }
 

@@ -80,7 +80,16 @@ export function TransactionList({
   isLoading,
 }: Props) {
   if (transactions.length === 0 && !isLoading) {
-    return <div className="tx-empty"><p>Geen transacties gevonden voor deze filters.</p></div>;
+    return (
+      <div className="tx-empty">
+        <p>Geen transacties gevonden voor deze filters.</p>
+        {!isDone && (
+          <button className="btn btn--ghost btn--sm" onClick={onLoadMore}>
+            Verder zoeken
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (

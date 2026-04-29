@@ -458,7 +458,8 @@ export default defineSchema({
     .index("by_user_datum",     ["userId", "datum"])
     .index("by_user_categorie", ["userId", "categorie"])
     // Compound deduplicatie-index: zelfde CSV 2x uploaden = nul duplicaten
-    .index("by_rekening_volgnr", ["rekeningIban", "volgnr"]),
+    .index("by_rekening_volgnr", ["rekeningIban", "volgnr"])
+    .index("by_user_rekening_volgnr", ["userId", "rekeningIban", "volgnr"]),
 
   // ─── Personal Events (Persoonlijke Google Agenda) ──────────────────────────
   personalEvents: defineTable({
