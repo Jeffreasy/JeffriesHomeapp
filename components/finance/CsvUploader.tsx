@@ -13,6 +13,7 @@ interface ImportProgress {
   total:    number;
   toegevoegd:   number;
   overgeslagen: number;
+  bijgewerkt:    number;
 }
 
 export function CsvUploader() {
@@ -61,6 +62,7 @@ export function CsvUploader() {
     const total = Math.ceil(parseResult.transactions.length / CHUNK);
     let toegevoegd = 0;
     let overgeslagen = 0;
+    let bijgewerkt = 0;
 
     try {
       for (let i = 0, chunk = 0; i < parseResult.transactions.length; i += CHUNK, chunk++) {
@@ -70,8 +72,9 @@ export function CsvUploader() {
         const res = await importBatch({ transactions: slice });
         toegevoegd   += res.toegevoegd;
         overgeslagen += res.overgeslagen;
+        bijgewerkt    += res.bijgewerkt ?? 0;
 
-        setProgress({ chunk: chunk + 1, total, toegevoegd, overgeslagen });
+        setProgress({ chunk: chunk + 1, total, toegevoegd, overgeslagen, bijgewerkt });
       }
 
       resetPagination();
@@ -164,7 +167,9 @@ export function CsvUploader() {
               <div className="progress-bar__fill" style={{ width: `${progressPct}%` }} />
             </div>
             {progress && (
-              <p className="progress-sub">+{progress.toegevoegd} nieuw · {progress.overgeslagen} al bekend</p>
+              <p className="progress-sub">
+                +{progress.toegevoegd} nieuw · {progress.bijgewerkt} bijgewerkt · {progress.overgeslagen} al bekend
+              </p>
             )}
             <button className="btn btn--ghost btn--sm" onClick={reset}>Stoppen</button>
           </motion.div>
@@ -179,6 +184,10 @@ export function CsvUploader() {
               <div className="preview-stat preview-stat--success">
                 <span className="preview-stat__value">+{progress.toegevoegd.toLocaleString("nl")}</span>
                 <span className="preview-stat__label">nieuw</span>
+              </div>
+              <div className="preview-stat">
+                <span className="preview-stat__value">{progress.bijgewerkt.toLocaleString("nl")}</span>
+                <span className="preview-stat__label">bijgewerkt</span>
               </div>
               <div className="preview-stat">
                 <span className="preview-stat__value">{progress.overgeslagen.toLocaleString("nl")}</span>

@@ -40,6 +40,24 @@ function isLaterTransaction(current: TransactionOrder, previous?: TransactionOrd
   return !previous || compareTransactionOrder(current, previous) > 0;
 }
 
+function normalizeBankDate(raw: string): string {
+  const value = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const dutch = value.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (dutch) {
+    const [, dd, mm, yyyy] = dutch;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return value;
+}
+
+function withNormalizedDatum<T extends { datum: string }>(tx: T): T {
+  const datum = normalizeBankDate(tx.datum);
+  return datum === tx.datum ? tx : { ...tx, datum };
+}
+
 // ─── Mutations ──────────────────────────────────────────────────────────────
 
 export const importBatch = mutation({
@@ -51,6 +69,7 @@ export const importBatch = mutation({
 
     let toegevoegd = 0;
     let overgeslagen = 0;
+    let bijgewerkt = 0;
     let internAangepast = 0;
 
     const bestaandeTxs = await ctx.db
@@ -70,23 +89,41 @@ export const importBatch = mutation({
       bekendeIbans.has(tx.tegenrekeningIban);
 
     for (const tx of transactions) {
+      const normalizedTx = { ...tx, datum: normalizeBankDate(tx.datum) };
       const existing = await ctx.db
         .query("transactions")
         .withIndex("by_user_rekening_volgnr", (q) =>
-          q.eq("userId", userId).eq("rekeningIban", tx.rekeningIban).eq("volgnr", tx.volgnr)
+          q.eq("userId", userId).eq("rekeningIban", normalizedTx.rekeningIban).eq("volgnr", normalizedTx.volgnr)
         )
         .first();
 
-      if (existing) { overgeslagen++; continue; }
+      if (existing) {
+        const isIntern = normalizedTx.isInterneOverboeking || isEigenOverboeking(normalizedTx);
+        const patch: { datum?: string; isInterneOverboeking?: boolean; categorie?: string } = {};
 
-      const isIntern = tx.isInterneOverboeking || isEigenOverboeking(tx);
+        if (existing.datum !== normalizedTx.datum) patch.datum = normalizedTx.datum;
+        if (isIntern && !existing.isInterneOverboeking) {
+          patch.isInterneOverboeking = true;
+          patch.categorie = "Interne Overboeking";
+        }
+
+        if (Object.keys(patch).length > 0) {
+          await ctx.db.patch(existing._id, patch);
+          bijgewerkt++;
+        } else {
+          overgeslagen++;
+        }
+        continue;
+      }
+
+      const isIntern = normalizedTx.isInterneOverboeking || isEigenOverboeking(normalizedTx);
       await ctx.db.insert("transactions", {
-        ...tx,
+        ...normalizedTx,
         userId,
         isInterneOverboeking: isIntern,
-        categorie: isIntern ? "Interne Overboeking" : tx.categorie,
+        categorie: isIntern ? "Interne Overboeking" : normalizedTx.categorie,
       });
-      bekendeIbans.add(tx.rekeningIban);
+      bekendeIbans.add(normalizedTx.rekeningIban);
       toegevoegd++;
     }
 
@@ -104,7 +141,7 @@ export const importBatch = mutation({
       internAangepast++;
     }
 
-    return { toegevoegd, overgeslagen, internAangepast };
+    return { toegevoegd, overgeslagen, bijgewerkt, internAangepast };
   },
 });
 
@@ -175,6 +212,8 @@ export const listPaginated = query({
       datum: string;
     };
 
+    const effectiefVan = args.datumVan ?? (args.maandFilter ? args.maandFilter + "-01" : undefined);
+    const effectiefTot = args.datumTot ?? (args.maandFilter ? args.maandFilter + "-31" : undefined);
     const zoek = args.zoekterm?.toLowerCase().trim();
     const postFilter = (t: FilterableTx) => {
       if (args.excludeIntern    && t.isInterneOverboeking)             return false;
@@ -186,8 +225,8 @@ export const listPaginated = query({
       if (args.richting === "uit" && t.bedrag >= 0)                     return false;
       if (args.minBedrag !== undefined && Math.abs(t.bedrag) < args.minBedrag) return false;
       if (args.maxBedrag !== undefined && Math.abs(t.bedrag) > args.maxBedrag) return false;
-      if (args.datumVan && t.datum < args.datumVan)                     return false;
-      if (args.datumTot && t.datum > args.datumTot)                     return false;
+      if (effectiefVan && t.datum < effectiefVan)                       return false;
+      if (effectiefTot && t.datum > effectiefTot)                       return false;
       if (zoek) {
         const naam   = (t.tegenpartijNaam ?? "").toLowerCase();
         const omschr = t.omschrijving.toLowerCase();
@@ -213,54 +252,14 @@ export const listPaginated = query({
       };
     };
 
-    // ─── Pad A: datumbereik of maandfilter actief ─────────────────────────────
-    const effectiefVan = args.datumVan ?? (args.maandFilter ? args.maandFilter + "-01" : undefined);
-    const effectiefTot = args.datumTot ?? (args.maandFilter ? args.maandFilter + "-31" : undefined);
-
-    if (effectiefVan || effectiefTot) {
-      const vanDatum = effectiefVan ?? "0000-00-00";
-      const totDatum = effectiefTot ?? "9999-99-99";
-
-      const txs = await ctx.db
-        .query("transactions")
-        .withIndex("by_user_datum", (q) =>
-          q.eq("userId", userId).gte("datum", vanDatum).lte("datum", totDatum)
-        )
-        .order("desc")
-        .collect();
-
-      return paginateFiltered(txs);
-    }
-
-    // ─── Pad B: post-filters actief → collect + eigen offset-paginering ──────
-    const hasPostFilter = Boolean(
-      zoek ||
-      args.excludeIntern ||
-      args.onlyStorneringen ||
-      args.codeFilter ||
-      args.ibanFilter ||
-      args.categorieFilter ||
-      args.richting ||
-      args.minBedrag !== undefined ||
-      args.maxBedrag !== undefined
-    );
-
-    if (hasPostFilter) {
-      const txs = await ctx.db
-        .query("transactions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .collect();
-
-      return paginateFiltered(txs);
-    }
-
-    // ─── Pad C: geen post-filter → zelfde cumulatieve pad voor consistente UI ─
+    // Lees via by_user en normaliseer in-memory. Dat houdt oude imports met
+    // DD-MM-YYYY/omgekeerde ISO-datums ook bereikbaar voor maand- en jaarfilters.
     const txs = await ctx.db
       .query("transactions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
 
-    return paginateFiltered(txs);
+    return paginateFiltered(txs.map(withNormalizedDatum));
   },
 });
 
@@ -286,10 +285,11 @@ export const getStats = query({
     const userId = identity.subject;
 
     // Haal alle transacties 1x op
-    const alleTxs = await ctx.db
+    const alleTxsRaw = await ctx.db
       .query("transactions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
+    const alleTxs = alleTxsRaw.map(withNormalizedDatum);
     const jaren = Array.from(new Set(alleTxs.map((t) => t.datum.slice(0, 4)))).sort().reverse();
 
     // Filter op IBAN als geselecteerd
@@ -481,11 +481,14 @@ export const getStats = query({
 /** Interne query: alle transacties voor een user (voor AI actions). */
 export const listInternal = internalQuery({
   args: { userId: v.string() },
-  handler: async (ctx, { userId }) =>
-    ctx.db
+  handler: async (ctx, { userId }) => {
+    const txs = await ctx.db
       .query("transactions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect(),
+      .collect();
+
+    return txs.map(withNormalizedDatum);
+  },
 });
 
 /** Interne mutation: bulk categorie update (voor Grok AI). */

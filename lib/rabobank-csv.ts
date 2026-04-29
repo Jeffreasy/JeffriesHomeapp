@@ -51,19 +51,22 @@ function parseNlBedrag(raw: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// ─── Datum parser (Rabobank DD-MM-YYYY → ISO YYYY-MM-DD) ─────────────────────
-// Rabobank exporteert altijd DD-MM-YYYY. Als we dat raw opslaan dan geeft
-// string-vergelijking verkeerde resultaten bij cross-maand (bijv. "01-03-2025"
-// lijkt lexicografisch kleiner dan "16-02-2025" terwijl het later is).
-// ISO 8601 (YYYY-MM-DD) is correct sorteerbaar als string.
+// ─── Datum parser (Rabobank datum → ISO YYYY-MM-DD) ──────────────────────────
+// Rabobank exports can be YYYY-MM-DD or DD-MM-YYYY depending on the export flow.
+// ISO 8601 is correct sorteerbaar als string.
 
 function parseDatum(raw: string): string {
   if (!raw || raw.trim() === "") return "";
-  // Formaat: DD-MM-YYYY
-  const parts = raw.trim().split("-");
-  if (parts.length !== 3) return raw; // onverwacht formaat, bewaar as-is
-  const [dd, mm, yyyy] = parts;
-  return `${yyyy}-${mm}-${dd}`; // → YYYY-MM-DD
+  const value = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const dutch = value.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (dutch) {
+    const [, dd, mm, yyyy] = dutch;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return value; // onverwacht formaat, bewaar as-is
 }
 
 // ─── Native RFC 4180 CSV parser ──────────────────────────────────────────────

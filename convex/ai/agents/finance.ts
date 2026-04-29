@@ -20,6 +20,24 @@ function compareTxOrder(a: { datum: string; volgnr: string }, b: { datum: string
   return compareVolgnr(a.volgnr, b.volgnr);
 }
 
+function normalizeBankDate(raw: string): string {
+  const value = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const dutch = value.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (dutch) {
+    const [, dd, mm, yyyy] = dutch;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return value;
+}
+
+function withNormalizedDatum<T extends { datum: string }>(tx: T): T {
+  const datum = normalizeBankDate(tx.datum);
+  return datum === tx.datum ? tx : { ...tx, datum };
+}
+
 export const financeAgent: AgentDefinition = {
   id:           "finance",
   naam:         "Finance Agent",
@@ -89,7 +107,8 @@ export const financeAgent: AgentDefinition = {
 
     // Token-safe: alleen transacties van afgelopen 30 dagen
     const dertigDagenGeleden = new Date(now.getTime() - 30 * 86400000).toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
-    const allTxs = await ctx.db.query("transactions").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
+    const allTxsRaw = await ctx.db.query("transactions").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
+    const allTxs = allTxsRaw.map(withNormalizedDatum);
     const recenteTxs = allTxs.filter((tx) => tx.datum >= dertigDagenGeleden);
 
     // ── Salaris ───────────────────────────────────────────────────────────
