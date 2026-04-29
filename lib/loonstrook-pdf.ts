@@ -11,7 +11,10 @@ import type { TextItem } from "pdfjs-dist/types/src/display/api";
 
 // Worker setup voor Next.js
 if (typeof window !== "undefined") {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.mjs",
+    import.meta.url,
+  ).toString();
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
