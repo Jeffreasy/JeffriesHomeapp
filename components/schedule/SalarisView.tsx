@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { TrendingUp, Euro, Landmark, Briefcase, FileUp, ArrowRight } from "lucide-react";
+import { TrendingUp, Euro, Landmark, Briefcase, FileUp, ArrowRight, type LucideIcon } from "lucide-react";
 import { useSalary, type SalarisRecord } from "@/hooks/useSalary";
 import { useLoonstroken, type LoonstrookRecord } from "@/hooks/useLoonstroken";
 import { LoonstrookUploader } from "./LoonstrookUploader";
@@ -15,9 +15,59 @@ const fmt = (n: number) =>
 
 const MAANDEN = ["Jan","Feb","Mrt","Apr","Mei","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
 
+type SalarisDisplayRecord = SalarisRecord & {
+  bron: "werkelijk" | "prognose";
+  werkelijk?: LoonstrookRecord;
+};
+
+function eenmaligUitLoonstrook(w: LoonstrookRecord) {
+  return [
+    w.vakantietoeslag ? { label: "Vakantietoeslag", bedrag: w.vakantietoeslag } : null,
+    w.ejuBedrag ? { label: "Eindejaarsuitkering", bedrag: w.ejuBedrag } : null,
+  ].filter(Boolean) as { label: string; bedrag: number }[];
+}
+
+function displayRecordVanLoonstrook(w: LoonstrookRecord, basis?: SalarisRecord): SalarisDisplayRecord {
+  const eenmalig = eenmaligUitLoonstrook(w);
+  return {
+    _id:                basis?._id ?? w._id,
+    periode:            w.periodeLabel,
+    jaar:               w.jaar,
+    maand:              w.periode,
+    aantalDiensten:     basis?.aantalDiensten ?? 0,
+    uurloonORT:         w.uurloon ?? basis?.uurloonORT ?? 0,
+
+    basisLoon:          w.salarisBasis,
+    amtZeerintensief:   w.amtZeerintensief ?? basis?.amtZeerintensief ?? 0,
+    toeslagBalansvif:   w.toeslagBalansvlf ?? basis?.toeslagBalansvif ?? 0,
+    ortTotaal:          w.ortTotaal,
+    extraUrenBedrag:    w.extraUrenBedrag ?? basis?.extraUrenBedrag ?? 0,
+    toeslagVakatieUren: basis?.toeslagVakatieUren ?? 0,
+    reiskosten:         w.reiskosten ?? basis?.reiskosten ?? 0,
+    eenmaligTotaal:     eenmalig.reduce((sum, item) => sum + item.bedrag, 0),
+    brutoBetaling:      w.brutoBetaling,
+
+    pensioenpremie:    w.pensioenpremie ?? basis?.pensioenpremie ?? 0,
+    loonheffingSchat:  w.loonheffing ?? basis?.loonheffingSchat ?? 0,
+    nettoPrognose:     w.netto,
+
+    ortDetail:      w.ortDetail,
+    eenmaligDetail: eenmalig.length ? JSON.stringify(eenmalig) : basis?.eenmaligDetail,
+    berekendOp:     w.geimporteerdOp,
+    bron:           "werkelijk",
+    werkelijk:      w,
+  };
+}
+
+function displayRecord(r: SalarisRecord, werkelijkByPeriode: Map<string, LoonstrookRecord>): SalarisDisplayRecord {
+  const w = werkelijkByPeriode.get(r.periode);
+  return w ? displayRecordVanLoonstrook(w, r) : { ...r, bron: "prognose" };
+}
+
 // ─── Prognose kaart (huidige maand) ──────────────────────────────────────────
 
-function PrognoseCard({ record }: { record: SalarisRecord }) {
+function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
+  const isWerkelijk = record.bron === "werkelijk";
   const eenmalig: { label: string; bedrag: number }[] = useMemo(() => {
     try { return record.eenmaligDetail ? JSON.parse(record.eenmaligDetail) : []; } catch { return []; }
   }, [record.eenmaligDetail]);
@@ -30,7 +80,9 @@ function PrognoseCard({ record }: { record: SalarisRecord }) {
     <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] text-amber-400/70 uppercase tracking-wider">Lopende maand</p>
+          <p className="text-[10px] text-amber-400/70 uppercase tracking-wider">
+            {isWerkelijk ? "Werkelijke loonstrook" : "Lopende maand prognose"}
+          </p>
           <p className="text-lg font-bold text-amber-300">
             {MAANDEN[record.maand - 1]} {record.jaar}
           </p>
@@ -47,7 +99,7 @@ function PrognoseCard({ record }: { record: SalarisRecord }) {
           <p className="text-xl font-bold text-white">{fmt(record.brutoBetaling)}</p>
         </div>
         <div className="bg-emerald-500/8 rounded-xl p-3 border border-emerald-500/20">
-          <p className="text-[10px] text-emerald-400/70 mb-1">≈ Netto prognose</p>
+          <p className="text-[10px] text-emerald-400/70 mb-1">{isWerkelijk ? "Netto werkelijk" : "≈ Netto prognose"}</p>
           <p className="text-xl font-bold text-emerald-300">{fmt(record.nettoPrognose)}</p>
         </div>
       </div>
@@ -64,7 +116,7 @@ function PrognoseCard({ record }: { record: SalarisRecord }) {
         )}
         <div className="border-t border-white/5 pt-1.5 mt-1.5" />
         <BreakdownRow label="Pensioen PFZW (12,95%)" bedrag={-record.pensioenpremie} negatief />
-        <BreakdownRow label="≈ Loonheffing (schatting)" bedrag={-record.loonheffingSchat} negatief />
+        <BreakdownRow label={isWerkelijk ? "Loonheffing" : "≈ Loonheffing (schatting)"} bedrag={-record.loonheffingSchat} negatief />
       </div>
 
       {/* ORT Detail */}
@@ -101,12 +153,13 @@ function BreakdownRow({ label, bedrag, negatief, accent }: {
 
 // ─── Maand Bar Chart ──────────────────────────────────────────────────────────
 
-function MaandBalk({ record, maxNetto }: { record: SalarisRecord; maxNetto: number }) {
+function MaandBalk({ record, maxNetto }: { record: SalarisDisplayRecord; maxNetto: number }) {
   const pct    = maxNetto > 0 ? (record.nettoPrognose / maxNetto) * 100 : 0;
   const isEenm = record.eenmaligTotaal > 0;
+  const isWerkelijk = record.bron === "werkelijk";
 
   return (
-    <div className="flex items-end gap-1.5 group cursor-default" title={`${MAANDEN[record.maand - 1]}: ${fmt(record.nettoPrognose)}`}>
+    <div className="flex items-end gap-1.5 group cursor-default" title={`${MAANDEN[record.maand - 1]}: ${fmt(record.nettoPrognose)} (${isWerkelijk ? "werkelijk" : "prognose"})`}>
       <div className="flex flex-col items-center gap-0.5 w-full">
         {isEenm && (
           <span className="text-[8px] text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity">★</span>
@@ -114,7 +167,7 @@ function MaandBalk({ record, maxNetto }: { record: SalarisRecord; maxNetto: numb
         <div
           className={cn(
             "w-full rounded-t transition-all duration-300",
-            isEenm ? "bg-amber-400/60" : "bg-blue-500/40 group-hover:bg-blue-500/60"
+            isWerkelijk ? "bg-emerald-400/60" : isEenm ? "bg-amber-400/60" : "bg-blue-500/40 group-hover:bg-blue-500/60"
           )}
           style={{ height: `${Math.max(pct, 4)}%`, minHeight: "4px" }}
         />
@@ -128,11 +181,12 @@ function MaandBalk({ record, maxNetto }: { record: SalarisRecord; maxNetto: numb
 
 // ─── Jaar sectie ─────────────────────────────────────────────────────────────
 
-function JaarSectie({ jaar, records }: { jaar: number; records: SalarisRecord[] }) {
+function JaarSectie({ jaar, records }: { jaar: number; records: SalarisDisplayRecord[] }) {
   const sorted   = [...records].sort((a, b) => a.maand - b.maand);
   const maxNetto = Math.max(...sorted.map((r) => r.nettoPrognose));
   const totBruto = sorted.reduce((s, r) => s + r.brutoBetaling, 0);
   const totNetto = sorted.reduce((s, r) => s + r.nettoPrognose, 0);
+  const werkelijkAantal = sorted.filter((r) => r.bron === "werkelijk").length;
 
   return (
     <div className="glass rounded-2xl border border-white/5 overflow-hidden">
@@ -140,6 +194,7 @@ function JaarSectie({ jaar, records }: { jaar: number; records: SalarisRecord[] 
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/2">
         <span className="text-sm font-bold text-slate-200">📅 {jaar}</span>
         <div className="flex items-center gap-4 text-xs">
+          {werkelijkAantal > 0 && <span className="text-emerald-400">{werkelijkAantal} werkelijk</span>}
           <span className="text-slate-500">Bruto <span className="text-slate-300 font-medium">{fmt(totBruto)}</span></span>
           <span className="text-slate-500">Netto <span className="text-emerald-400 font-bold">{fmt(totNetto)}</span></span>
         </div>
@@ -165,16 +220,22 @@ function JaarSectie({ jaar, records }: { jaar: number; records: SalarisRecord[] 
   );
 }
 
-function MaandRij({ record: r }: { record: SalarisRecord }) {
+function MaandRij({ record: r }: { record: SalarisDisplayRecord }) {
   const eenmalig: { label: string }[] = useMemo(() => {
     try { return r.eenmaligDetail ? JSON.parse(r.eenmaligDetail) : []; } catch { return []; }
   }, [r.eenmaligDetail]);
+  const isWerkelijk = r.bron === "werkelijk";
 
   return (
     <div className="flex items-center justify-between px-4 py-2.5 hover:bg-white/2 transition-colors">
       <div className="flex items-center gap-3 min-w-0">
         <span className="text-xs font-medium text-slate-400 w-8">{MAANDEN[r.maand - 1]}</span>
         <span className="text-[10px] text-slate-600">{r.aantalDiensten} diensten</span>
+        {isWerkelijk && (
+          <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full">
+            werkelijk
+          </span>
+        )}
         {eenmalig.map((e) => (
           <span key={e.label} className="text-[9px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full">
             {e.label.replace(/^[^\s]+ /, "")}
@@ -193,14 +254,36 @@ function MaandRij({ record: r }: { record: SalarisRecord }) {
 // ─── Main SalarisView ─────────────────────────────────────────────────────────
 
 export function SalarisView() {
-  const { records, huidig, perJaar, totaalBruto, totaalNetto, isLoading } = useSalary();
+  const { records, isLoading } = useSalary();
   const loonstroken = useLoonstroken();
 
-  const jaren = Object.keys(perJaar)
+  const displayRecords = useMemo(() => {
+    const merged = records.map((r) => displayRecord(r, loonstroken.byPeriode));
+    const existing = new Set(merged.map((r) => r.periode));
+    const actualOnly = loonstroken.records
+      .filter((w) => !existing.has(w.periodeLabel))
+      .map((w) => displayRecordVanLoonstrook(w));
+    return [...merged, ...actualOnly].sort((a, b) => a.jaar - b.jaar || a.maand - b.maand);
+  }, [loonstroken.byPeriode, loonstroken.records, records]);
+
+  const displayPerJaar = useMemo(() => {
+    const map: Record<number, SalarisDisplayRecord[]> = {};
+    for (const r of displayRecords) (map[r.jaar] ??= []).push(r);
+    return map;
+  }, [displayRecords]);
+
+  const jaren = Object.keys(displayPerJaar)
     .map(Number)
     .sort((a, b) => b - a);
+  const nu = new Date();
+  const huidigKey = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, "0")}`;
+  const huidig = displayRecords.find((r) => r.periode === huidigKey) ?? null;
+  const totaalBruto = displayRecords.reduce((s, r) => s + r.brutoBetaling, 0);
+  const totaalNetto = displayRecords.reduce((s, r) => s + r.nettoPrognose, 0);
+  const totaalPensioen = displayRecords.reduce((s, r) => s + r.pensioenpremie, 0);
+  const isLoadingData = isLoading || loonstroken.isLoading;
 
-  if (isLoading) {
+  if (isLoadingData) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="w-5 h-5 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
@@ -208,7 +291,7 @@ export function SalarisView() {
     );
   }
 
-  if (records.length === 0) {
+  if (displayRecords.length === 0) {
     return (
       <div className="glass rounded-2xl p-12 text-center border border-dashed border-white/10">
         <Euro size={36} className="text-slate-600 mx-auto mb-4" />
@@ -227,8 +310,8 @@ export function SalarisView() {
       {/* Totalen banner */}
       <div className="grid grid-cols-3 gap-3">
         <TotaalCard icon={Briefcase} label="Totaal Bruto" value={fmt(totaalBruto)} accent="#f59e0b" />
-        <TotaalCard icon={Landmark}  label="Pensioen PFZW" value={fmt(records.reduce((s, r) => s + r.pensioenpremie, 0))} accent="#ef4444" />
-        <TotaalCard icon={TrendingUp} label={"\u2248 Totaal Netto"} value={fmt(totaalNetto)} accent="#34d399" />
+        <TotaalCard icon={Landmark}  label="Pensioen PFZW" value={fmt(totaalPensioen)} accent="#ef4444" />
+        <TotaalCard icon={TrendingUp} label="Netto totaal" value={fmt(totaalNetto)} accent="#34d399" />
       </div>
 
       {/* Huidige maand prognose */}
@@ -236,7 +319,7 @@ export function SalarisView() {
 
       {/* Per jaar */}
       {jaren.map((jaar) => (
-        <JaarSectie key={jaar} jaar={jaar} records={perJaar[jaar]} />
+        <JaarSectie key={jaar} jaar={jaar} records={displayPerJaar[jaar]} />
       ))}
 
       {/* Loonstroken Upload */}
@@ -255,6 +338,7 @@ export function SalarisView() {
 
       {/* Disclaimer + Finance link */}
       <p className="text-[10px] text-slate-700 text-center leading-relaxed">
+        Maanden met geimporteerde loonstrook gebruiken werkelijke bedragen; overige maanden blijven prognoses.
         {"\u2248"} Netto prognose is een schatting op basis van de 2026-loonheffingstabel.
         De exacte verrekening door {"'"}s Heeren Loo kan afwijken door tijdvakfactor en heffingskortingen.
       </p>
@@ -268,7 +352,7 @@ export function SalarisView() {
 }
 
 function TotaalCard({ icon: Icon, label, value, accent }: {
-  icon: any; label: string; value: string; accent: string;
+  icon: LucideIcon; label: string; value: string; accent: string;
 }) {
   return (
     <div className="glass rounded-xl p-3 border border-white/5" style={{ borderColor: accent + "20" }}>

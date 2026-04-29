@@ -84,6 +84,46 @@ const loonstrookFields = {
   cumulatieven:      v.optional(v.string()),
 };
 
+const loonstrookRepairFields = {
+  jaar:              v.number(),
+  periode:           v.number(),
+  netto:             v.number(),
+  brutoBetaling:     v.number(),
+  brutoInhouding:    v.number(),
+  salarisBasis:      v.number(),
+  ortTotaal:         v.number(),
+  ortDetail:         v.optional(v.string()),
+  amtZeerintensief:  v.optional(v.number()),
+  pensioenpremie:    v.optional(v.number()),
+  loonheffing:       v.optional(v.number()),
+  reiskosten:        v.optional(v.number()),
+  vakantietoeslag:   v.optional(v.number()),
+  ejuBedrag:         v.optional(v.number()),
+  toeslagBalansvlf:  v.optional(v.number()),
+  extraUrenBedrag:   v.optional(v.number()),
+  schaalnummer:      v.optional(v.string()),
+  trede:             v.optional(v.string()),
+  parttimeFactor:    v.optional(v.number()),
+  uurloon:           v.optional(v.number()),
+};
+
+function assertPlausibleLoonstrook(ls: {
+  type?: string;
+  periodeLabel?: string;
+  jaar: number;
+  periode: number;
+  netto: number;
+  brutoBetaling: number;
+  brutoInhouding: number;
+  salarisBasis: number;
+}) {
+  const label = ls.periodeLabel ?? `${ls.jaar}-${String(ls.periode).padStart(2, "0")}`;
+  if (ls.type && ls.type !== "loonstrook") return;
+  if (ls.netto <= 0 || ls.brutoBetaling <= 0 || ls.brutoInhouding < 0 || ls.salarisBasis <= 0) {
+    throw new Error(`Loonstrook ${label} bevat onbetrouwbare netto/bruto kernbedragen.`);
+  }
+}
+
 /** Bulk upsert — dedup op userId + jaar + periode. */
 export const bulkUpsert = mutation({
   args: {
@@ -96,6 +136,8 @@ export const bulkUpsert = mutation({
     let bijgewerkt = 0;
 
     for (const ls of args.loonstroken) {
+      assertPlausibleLoonstrook(ls);
+
       const existing = await ctx.db
         .query("loonstroken")
         .withIndex("by_user_periode", (q) =>
@@ -119,6 +161,43 @@ export const bulkUpsert = mutation({
     }
 
     return { toegevoegd, bijgewerkt, totaal: toegevoegd + bijgewerkt };
+  },
+});
+
+/** Reparatiepad voor bestaande legacy imports met foutief gelezen kernbedragen. */
+export const repairExisting = mutation({
+  args: {
+    userId:      v.optional(v.string()),
+    loonstroken: v.array(v.object(loonstrookRepairFields)),
+  },
+  handler: async (ctx, args) => {
+    const userId = await resolveUserId(ctx, args.userId);
+    let bijgewerkt = 0;
+    let gemist = 0;
+
+    for (const ls of args.loonstroken) {
+      assertPlausibleLoonstrook({ ...ls, type: "loonstrook" });
+
+      const existing = await ctx.db
+        .query("loonstroken")
+        .withIndex("by_user_periode", (q) =>
+          q.eq("userId", userId).eq("jaar", ls.jaar).eq("periode", ls.periode)
+        )
+        .first();
+
+      if (!existing) {
+        gemist++;
+        continue;
+      }
+
+      await ctx.db.patch(existing._id, {
+        ...ls,
+        geimporteerdOp: new Date().toISOString(),
+      });
+      bijgewerkt++;
+    }
+
+    return { bijgewerkt, gemist, totaal: bijgewerkt + gemist };
   },
 });
 

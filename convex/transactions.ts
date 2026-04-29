@@ -156,6 +156,43 @@ export const updateCategorie = mutation({
   },
 });
 
+/** Eenmalige datakwaliteit-repair voor oudere imports met DD-MM-YYYY datums. */
+export const repairStoredDates = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Niet ingelogd");
+    const userId = identity.subject;
+
+    const txs = await ctx.db
+      .query("transactions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    let bijgewerkt = 0;
+    let onveranderd = 0;
+    let ongeldig = 0;
+
+    for (const tx of txs) {
+      const datum = normalizeBankDate(tx.datum);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(datum)) {
+        ongeldig++;
+        continue;
+      }
+
+      if (datum === tx.datum) {
+        onveranderd++;
+        continue;
+      }
+
+      await ctx.db.patch(tx._id, { datum });
+      bijgewerkt++;
+    }
+
+    return { bijgewerkt, onveranderd, ongeldig, totaal: txs.length };
+  },
+});
+
 export const updateCategorieInternal = internalMutation({
   args: { userId: v.string(), id: v.id("transactions"), categorie: v.optional(v.string()) },
   handler: async (ctx, { userId, id, categorie }) => {
@@ -196,7 +233,7 @@ export const listPaginated = query({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return { page: [], isDone: true, continueCursor: null };
+    if (!identity) return { page: [], isDone: true, continueCursor: null, totalCount: 0 };
     const userId = identity.subject;
 
     // Gemeenschappelijke post-filter functie
@@ -249,6 +286,7 @@ export const listPaginated = query({
         page,
         isDone: next >= filtered.length,
         continueCursor: next < filtered.length ? String(next) : null,
+        totalCount: filtered.length,
       };
     };
 

@@ -95,12 +95,41 @@ export const financeAgent: AgentDefinition = {
     const periode = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" }).slice(0, 7);
 
     const allSalary = await ctx.db.query("salary").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
+    const allLoonstroken = await ctx.db.query("loonstroken").withIndex("by_user", (q) => q.eq("userId", userId)).collect();
+    const werkelijkeLoonstroken = allLoonstroken.filter((ls) => ls.type === "loonstrook");
+    const loonstrookByPeriode = new Map(werkelijkeLoonstroken.map((ls) => [ls.periodeLabel, ls]));
+
+    const salarisUitLoonstrook = (ls: (typeof werkelijkeLoonstroken)[number]) => ({
+      bron: "werkelijk" as const,
+      periode: ls.periodeLabel,
+      bruto: ls.brutoBetaling,
+      netto: ls.netto,
+      ort: ls.ortTotaal,
+      basis: ls.salarisBasis,
+      inhouding: ls.brutoInhouding,
+    });
+
+    const salarisUitPrognose = (s: (typeof allSalary)[number]) => ({
+      bron: "prognose" as const,
+      periode: s.periode,
+      bruto: s.brutoBetaling,
+      netto: s.nettoPrognose,
+      ort: s.ortTotaal,
+      diensten: s.aantalDiensten,
+      basis: s.basisLoon,
+    });
+
+    const salarisVoorPeriode = (periodeLabel: string) => {
+      const werkelijk = loonstrookByPeriode.get(periodeLabel);
+      if (werkelijk) return salarisUitLoonstrook(werkelijk);
+      const prognose = allSalary.find((s) => s.periode === periodeLabel);
+      return prognose ? salarisUitPrognose(prognose) : null;
+    };
 
     // ── Lite mode (voor dashboard) ────────────────────────────────────────
     if (opts?.lite) {
-      const huidigeMaand = allSalary.find((s) => s.periode === periode);
       return {
-        salaris: huidigeMaand ? { bruto: huidigeMaand.brutoBetaling, netto: huidigeMaand.nettoPrognose, ort: huidigeMaand.ortTotaal } : null,
+        salaris: salarisVoorPeriode(periode),
         periode,
       };
     }
@@ -112,11 +141,14 @@ export const financeAgent: AgentDefinition = {
     const recenteTxs = allTxs.filter((tx) => tx.datum >= dertigDagenGeleden);
 
     // ── Salaris ───────────────────────────────────────────────────────────
-    const huidigeMaand = allSalary.find((s) => s.periode === periode);
-    const salaryHistory = allSalary
+    const huidigeMaand = salarisVoorPeriode(periode);
+    const salaryHistory = [
+      ...werkelijkeLoonstroken.map(salarisUitLoonstrook),
+      ...allSalary.filter((s) => !loonstrookByPeriode.has(s.periode)).map(salarisUitPrognose),
+    ]
       .sort((a, b) => b.periode.localeCompare(a.periode))
       .slice(0, 6)
-      .map((s) => ({ periode: s.periode, bruto: s.brutoBetaling, netto: s.nettoPrognose, ort: s.ortTotaal, diensten: s.aantalDiensten }));
+      .map((s) => ({ ...s }));
 
     // ── Categorie verdeling (30 dagen) ────────────────────────────────────
     const categorieen: Record<string, { aantal: number; totaal: number }> = {};
@@ -155,10 +187,7 @@ export const financeAgent: AgentDefinition = {
     return {
       periode,
       salaris: {
-        huidigeMaand: huidigeMaand ? {
-          bruto: huidigeMaand.brutoBetaling, netto: huidigeMaand.nettoPrognose,
-          ort: huidigeMaand.ortTotaal, diensten: huidigeMaand.aantalDiensten, basis: huidigeMaand.basisLoon,
-        } : null,
+        huidigeMaand,
         historie: salaryHistory,
       },
       transacties: {
