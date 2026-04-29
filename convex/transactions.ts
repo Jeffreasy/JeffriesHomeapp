@@ -327,9 +327,15 @@ export const getStats = query({
 
     // Per IBAN huidig saldo (voor de tabbar-tooltip)
     const huidigSaldoPerIban: Record<string, number> = {};
-    for (const [iban, { saldo }] of ibanSaldoMap.entries()) {
+    const saldoPeildatumPerIban: Record<string, string> = {};
+    for (const [iban, { datum, saldo }] of ibanSaldoMap.entries()) {
       huidigSaldoPerIban[iban] = Math.round(saldo * 100) / 100;
+      saldoPeildatumPerIban[iban] = datum;
     }
+    const laatsteSaldoPeildatum = Array.from(ibanSaldoMap.values())
+      .map(({ datum }) => datum)
+      .sort()
+      .pop() ?? null;
 
     // Huidig totaal saldo: als IBAN-filter actief → 1 rekening, anders som van alle
     const huidigSaldo = args.ibanFilter
@@ -456,6 +462,8 @@ export const getStats = query({
       // Echte bankbalans
       huidigSaldo,
       huidigSaldoPerIban,
+      saldoPeildatumPerIban,
+      laatsteSaldoPeildatum,
 
       // Categorieën
       uitPerCategorie,

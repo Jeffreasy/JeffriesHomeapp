@@ -143,6 +143,14 @@ function formatMonth(month: string) {
   return date.toLocaleDateString("nl-NL", { month: "short", year: "numeric" });
 }
 
+function formatShortDate(dateString?: string | null) {
+  if (!dateString) return "geen peildatum";
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (Number.isNaN(date.getTime())) return dateString;
+  return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
+}
+
 function formatPercent(value: number) {
   return `${value >= 0 ? "+" : ""}${Math.round(value * 10) / 10}%`;
 }
@@ -514,10 +522,14 @@ export default function FinancePage() {
                         icon={CreditCard}
                         onClick={() => handleIbanTab(iban)}
                       >
-                        <span>{ibanLabel(iban)}</span>
-                        {stats.huidigSaldoPerIban[iban] !== undefined && (
-                          <span className="text-xs opacity-80">{formatPrivateEuro(stats.huidigSaldoPerIban[iban])}</span>
-                        )}
+                        <span className="flex flex-col items-start leading-tight">
+                          <span>{ibanLabel(iban)}</span>
+                          {stats.huidigSaldoPerIban[iban] !== undefined && (
+                            <span className="text-xs opacity-80">
+                              {formatPrivateEuro(stats.huidigSaldoPerIban[iban])} · {formatShortDate(stats.saldoPeildatumPerIban?.[iban])}
+                            </span>
+                          )}
+                        </span>
                       </SegmentedButton>
                     ))}
                   </div>
@@ -603,7 +615,9 @@ export default function FinancePage() {
             <MetricCard
               label="Saldo"
               value={formatPrivateEuro(stats.huidigSaldo)}
-              meta={saldoTrend === null ? "Huidige bankbalans" : `${formatPrivateSignedEuro(saldoTrend)} sinds eerste maand`}
+              meta={stats.laatsteSaldoPeildatum
+                ? `Laatste import t/m ${formatShortDate(stats.laatsteSaldoPeildatum)}`
+                : saldoTrend === null ? "Laatste geimporteerde bankbalans" : `${formatPrivateSignedEuro(saldoTrend)} sinds eerste maand`}
               icon={Landmark}
               tone={stats.huidigSaldo >= 0 ? "amber" : "rose"}
             />
