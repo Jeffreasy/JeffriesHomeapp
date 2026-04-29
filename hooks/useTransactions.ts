@@ -97,7 +97,7 @@ export function useTransactions(filter: TransactionFilter = {}) {
     isLoading:     result === undefined,
     isSearching:   (filter.zoekterm ?? "") !== deferredZoek,
     stats,
-    totalCount:    stats?.aantalTxs ?? 0,
+    totalCount:    stats?.aantalAlleTxs ?? stats?.aantalTxs ?? 0,
     importBatch,
     updateCategorie: (id: Id<"transactions">, categorie: string | undefined) =>
       updateCatMut({ id, categorie }),

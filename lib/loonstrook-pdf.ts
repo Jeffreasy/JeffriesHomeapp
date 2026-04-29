@@ -368,6 +368,10 @@ async function parseSinglePDF(file: File): Promise<ParsedLoonstrook | null> {
   // ── Categorize components ──
   const cat = categorizeComponents(components);
 
+  if (netto <= 0 || cat.brutoBetaling <= 0 || cat.brutoInhouding < 0) {
+    throw new Error("Loonstrook kon netto/bruto kernbedragen niet betrouwbaar lezen.");
+  }
+
   // ── Cumulatieven ──
   const cumulatieven: Record<string, string> = {};
   const cumMatch = fullText.match(/Totalen t\/m deze berekening([\s\S]*?)$/);

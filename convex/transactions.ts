@@ -21,6 +21,25 @@ const transactionInput = v.object({
   categorie:            v.optional(v.string()),
 });
 
+type TransactionOrder = { datum: string; volgnr: string };
+
+function compareVolgnr(a: string, b: string): number {
+  const na = Number.parseInt(a, 10);
+  const nb = Number.parseInt(b, 10);
+  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+function compareTransactionOrder(a: TransactionOrder, b: TransactionOrder): number {
+  const dateCompare = a.datum.localeCompare(b.datum);
+  if (dateCompare !== 0) return dateCompare;
+  return compareVolgnr(a.volgnr, b.volgnr);
+}
+
+function isLaterTransaction(current: TransactionOrder, previous?: TransactionOrder): boolean {
+  return !previous || compareTransactionOrder(current, previous) > 0;
+}
+
 // ─── Mutations ──────────────────────────────────────────────────────────────
 
 export const importBatch = mutation({
@@ -117,10 +136,9 @@ export const updateCategorieInternal = internalMutation({
  * PROBLEEM: `paginate(50)` haalt 50 willekeurige records op, dan pas filteren
  * → als die 50 geen overeenkomst hebben met de maand = lege pagina.
  *
- * OPLOSSING: Split in twee paden:
- *   A) Maandfilter actief → gebruik `by_user_datum` index met datumbereik,
- *      collect() alle resultaten voor die maand (~50-150 records), filter daarna.
- *   B) Geen maandfilter → paginate() over de volledige set.
+ * OPLOSSING: filter server-side over de volledige relevante set en retourneer
+ * cumulatief pagina 1..N. Zo blijven oudere zoekmatches bereikbaar en hoeft de
+ * client geen losse pagina's te stapelen.
  */
 export const listPaginated = query({
   args: {
@@ -178,8 +196,8 @@ export const listPaginated = query({
       return true;
     };
 
-    const sortDesc = <T extends { datum: string; volgnr: string }>(a: T, b: T) =>
-      b.datum.localeCompare(a.datum) || b.volgnr.localeCompare(a.volgnr);
+    const sortDesc = <T extends TransactionOrder>(a: T, b: T) =>
+      compareTransactionOrder(b, a);
 
     const paginateFiltered = <T extends FilterableTx>(txs: T[]) => {
       const offset = args.cursor ? Number.parseInt(args.cursor, 10) : 0;
@@ -236,18 +254,13 @@ export const listPaginated = query({
       return paginateFiltered(txs);
     }
 
-    // ─── Pad C: geen post-filter → native Convex-paginering ──────────────────
-    const result = await ctx.db
+    // ─── Pad C: geen post-filter → zelfde cumulatieve pad voor consistente UI ─
+    const txs = await ctx.db
       .query("transactions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .order("desc")
-      .paginate({ numItems: args.numItems, cursor: args.cursor });
+      .collect();
 
-    return {
-      page:           result.page.filter(postFilter),
-      isDone:         result.isDone,
-      continueCursor: result.continueCursor,
-    };
+    return paginateFiltered(txs);
   },
 });
 
@@ -304,11 +317,7 @@ export const getStats = query({
     const ibanSaldoMap = new Map<string, { datum: string; volgnr: string; saldo: number }>();
     for (const t of alleTxs) {
       const prev = ibanSaldoMap.get(t.rekeningIban);
-      const isLater =
-        !prev ||
-        t.datum > prev.datum ||
-        (t.datum === prev.datum && t.volgnr > prev.volgnr);
-      if (isLater) {
+      if (isLaterTransaction(t, prev)) {
         ibanSaldoMap.set(t.rekeningIban, { datum: t.datum, volgnr: t.volgnr, saldo: t.saldoNaTrn });
       }
     }
@@ -337,7 +346,7 @@ export const getStats = query({
     const saldoBron = (args.ibanFilter
       ? alleTxs.filter((t) => t.rekeningIban === args.ibanFilter)
       : alleTxs
-    ).sort((a, b) => a.datum.localeCompare(b.datum) || a.volgnr.localeCompare(b.volgnr));
+    ).sort(compareTransactionOrder);
 
     const laatsteSaldoPerIban = new Map<string, { datum: string; volgnr: string; saldo: number }>();
     let saldoCursor = 0;
@@ -460,6 +469,7 @@ export const getStats = query({
 
       // Overige
       storneringen,
+      aantalAlleTxs:   alleTxs.length,
       aantalTxs:      txs.length,
       maanden,
       jaren,

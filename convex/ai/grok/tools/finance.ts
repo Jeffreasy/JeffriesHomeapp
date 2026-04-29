@@ -23,6 +23,19 @@ function rekeningMatches(iban: string, query: string): boolean {
   );
 }
 
+function compareVolgnr(a: string, b: string): number {
+  const na = Number.parseInt(a, 10);
+  const nb = Number.parseInt(b, 10);
+  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+function compareTxOrder(a: { datum: string; volgnr: string }, b: { datum: string; volgnr: string }): number {
+  const dateCompare = a.datum.localeCompare(b.datum);
+  if (dateCompare !== 0) return dateCompare;
+  return compareVolgnr(a.volgnr, b.volgnr);
+}
+
 // ─── 1. Saldo Opvragen ───────────────────────────────────────────────────────
 
 export async function handleSaldoOpvragen(ctx: any, _args: Record<string, unknown>, userId: string): Promise<string> {
@@ -33,7 +46,7 @@ export async function handleSaldoOpvragen(ctx: any, _args: Record<string, unknow
     const ibanMap = new Map<string, { datum: string; volgnr: string; saldo: number }>();
     for (const tx of allTxs) {
       const prev = ibanMap.get(tx.rekeningIban);
-      const isLater = !prev || tx.datum > prev.datum || (tx.datum === prev.datum && tx.volgnr > prev.volgnr);
+      const isLater = !prev || compareTxOrder(tx, prev) > 0;
       if (isLater) ibanMap.set(tx.rekeningIban, { datum: tx.datum, volgnr: tx.volgnr, saldo: tx.saldoNaTrn });
     }
 
@@ -82,7 +95,7 @@ export async function handleTransactiesZoeken(ctx: any, args: Record<string, unk
     }
 
     const results = matches
-      .sort((a: any, b: any) => b.datum.localeCompare(a.datum))
+      .sort((a: any, b: any) => compareTxOrder(b, a))
       .slice(0, maxAantal)
       .map((tx: any) => ({
         id: tx._id,
@@ -160,7 +173,7 @@ export async function handleUitgavenOverzicht(ctx: any, args: Record<string, unk
     const saldoBron = allTxs
       .filter((tx: any) => tx.datum <= `${periode}-31`)
       .filter((tx: any) => !rekening || rekeningMatches(tx.rekeningIban, rekening))
-      .sort((a: any, b: any) => a.datum.localeCompare(b.datum) || a.volgnr.localeCompare(b.volgnr));
+      .sort((a: any, b: any) => compareTxOrder(a, b));
     for (const tx of saldoBron) {
       laatstePerIban.set(tx.rekeningIban, { datum: tx.datum, volgnr: tx.volgnr, saldo: tx.saldoNaTrn });
     }
@@ -301,7 +314,7 @@ export async function handleCategorieWijzigen(ctx: any, args: Record<string, unk
         return JSON.stringify({ error: "transactieId is verplicht. Gebruik eerst transactiesZoeken om de exacte transactie te kiezen." });
       }
       const opties = allTxs
-        .sort((a: any, b: any) => b.datum.localeCompare(a.datum))
+        .sort((a: any, b: any) => compareTxOrder(b, a))
         .filter((tx: any) =>
           tx.tegenpartijNaam?.toLowerCase().includes(zoekterm) ||
           tx.omschrijving?.toLowerCase().includes(zoekterm)
@@ -323,7 +336,7 @@ export async function handleCategorieWijzigen(ctx: any, args: Record<string, unk
     }
 
     const match = allTxs
-      .sort((a: any, b: any) => b.datum.localeCompare(a.datum))
+      .sort((a: any, b: any) => compareTxOrder(b, a))
       .find((tx: any) => String(tx._id) === transactieId);
 
     if (!match) {

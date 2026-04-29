@@ -7,6 +7,19 @@
 
 import type { AgentDefinition, ContextOptions } from "../registry";
 
+function compareVolgnr(a: string, b: string): number {
+  const na = Number.parseInt(a, 10);
+  const nb = Number.parseInt(b, 10);
+  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+function compareTxOrder(a: { datum: string; volgnr: string }, b: { datum: string; volgnr: string }): number {
+  const dateCompare = a.datum.localeCompare(b.datum);
+  if (dateCompare !== 0) return dateCompare;
+  return compareVolgnr(a.volgnr, b.volgnr);
+}
+
 export const financeAgent: AgentDefinition = {
   id:           "finance",
   naam:         "Finance Agent",
@@ -115,7 +128,7 @@ export const financeAgent: AgentDefinition = {
     const saldoPerIban = new Map<string, { datum: string; volgnr: string; saldo: number }>();
     for (const tx of allTxs) {
       const prev = saldoPerIban.get(tx.rekeningIban);
-      const isLater = !prev || tx.datum > prev.datum || (tx.datum === prev.datum && tx.volgnr > prev.volgnr);
+      const isLater = !prev || compareTxOrder(tx, prev) > 0;
       if (isLater) saldoPerIban.set(tx.rekeningIban, { datum: tx.datum, volgnr: tx.volgnr, saldo: tx.saldoNaTrn });
     }
     const huidigSaldo = Array.from(saldoPerIban.values()).reduce((sum, tx) => sum + tx.saldo, 0);

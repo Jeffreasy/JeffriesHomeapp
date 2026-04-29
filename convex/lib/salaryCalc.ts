@@ -151,14 +151,16 @@ function berekenDuur(startTijd: string, eindTijd: string): number {
   return r2(minuten / 60);
 }
 
-function contractUrenVoorMaand(jaar: number, maand: number): number {
-  const werkdagenMaand = telWerkdagen(jaar, maand);
+function contractUrenVoorMaand(): number {
   const contractUrenWeek = SALARIS_CONFIG.VOLTIJD_UREN_WEEK * SALARIS_CONFIG.DEELTIJDFACTOR;
-  return r2((werkdagenMaand / 5) * contractUrenWeek);
+  return r2((contractUrenWeek * 52) / 12);
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function addDays(date: Date, days: number): Date {
@@ -192,10 +194,14 @@ function isFeestdag(date: Date): boolean {
   const fixed = new Set([
     `${year}-01-01`,
     `${year}-04-27`,
+    `${year}-05-05`,
     `${year}-12-25`,
     `${year}-12-26`,
+    formatDate(addDays(pasen, 1)),
+    formatDate(addDays(pasen, 39)),
     formatDate(pasen),
     formatDate(addDays(pasen, 49)),
+    formatDate(addDays(pasen, 50)),
   ]);
 
   return fixed.has(iso);
@@ -307,8 +313,6 @@ export function berekenMaandloon(
   const { salaris100, uurloonORT, reiskostenKm } = tarieven;
 
   const basisLoon        = r2(salaris100 * SALARIS_CONFIG.DEELTIJDFACTOR);
-  const amtZeerintensief = r2(basisLoon  * SALARIS_CONFIG.AMT_ZEERINTENSIEF_PCT);
-  const toeslagBalansvif = r2(basisLoon  * SALARIS_CONFIG.TOESLAG_BALANSVIF_PCT);
 
   const werkdagenMaand = telWerkdagen(jaar, maand);
   const reisdagen      = telReisdagen(diensten);
@@ -335,10 +339,13 @@ export function berekenMaandloon(
     }
   }
 
-  const extraUren       = r2(Math.max(0, totaalDienstUren - contractUrenVoorMaand(jaar, maand)));
+  const extraUren       = r2(Math.max(0, totaalDienstUren - contractUrenVoorMaand()));
   const extraUrenBedrag = r2(extraUren * uurloonORT);
   const ortTotaalBedrag    = r2(Object.values(ortTotalen).reduce((s, v) => s + v, 0));
   const toeslagVakatieUren = r2(extraUrenBedrag * SALARIS_CONFIG.TOESLAG_VAKANTIEUREN_PCT);
+  const toeslagBalansvif = r2(extraUrenBedrag * SALARIS_CONFIG.TOESLAG_BALANSVIF_PCT);
+  const amtGrondslag = basisLoon + extraUrenBedrag + toeslagVakatieUren + toeslagBalansvif;
+  const amtZeerintensief = r2(amtGrondslag * SALARIS_CONFIG.AMT_ZEERINTENSIEF_PCT);
 
   // Eenmalige uitkeringen
   const eenmalig: EenmaligItem[] = [];
