@@ -331,6 +331,15 @@ export const bulkDeleteByGmailIds = internalMutation({
   },
 });
 
+function hasChanges(oldDoc: any, newDoc: any) {
+  for (const key of Object.keys(newDoc)) {
+    if (key === 'labelIds') {
+      if (oldDoc[key]?.join(',') !== newDoc[key]?.join(',')) return true;
+    } else if (oldDoc[key] !== newDoc[key]) return true;
+  }
+  return false;
+}
+
 /** Bulk upsert van gesyncte emails. Per gmailId: patch of insert. */
 export const bulkUpsertInternal = internalMutation({
   args: {
@@ -369,7 +378,9 @@ export const bulkUpsertInternal = internalMutation({
         .first();
 
       if (existing) {
-        await ctx.db.patch(existing._id, email);
+        if (hasChanges(existing, email)) {
+          await ctx.db.patch(existing._id, email);
+        }
       } else {
         await ctx.db.insert("emails", email);
       }

@@ -713,29 +713,15 @@ export const handleUpdatePublic = action({
   },
 });
 
-export const pollUpdates = action({
+export const getBotToken = action({
   args: {
     bridgeSecret: v.string(),
-    offset: v.optional(v.number()),
-    timeoutSeconds: v.optional(v.number()),
-    disableWebhook: v.optional(v.boolean()),
   },
-  handler: async (ctx, { bridgeSecret, offset, timeoutSeconds, disableWebhook }) => {
+  handler: async (ctx, { bridgeSecret }) => {
     requireBridgeSecret(bridgeSecret);
-    if (disableWebhook) await disableWebhookForPolling();
-    const updates = await getUpdates(offset, timeoutSeconds ?? 25) as TelegramUpdate[];
-    let nextOffset = offset;
-    let processed = 0;
-
-    for (const update of updates) {
-      await processUpdateSafe(ctx, update);
-      processed += 1;
-      if (typeof update.update_id === "number") {
-        nextOffset = update.update_id + 1;
-      }
-    }
-
-    return { ok: true, count: updates.length, processed, nextOffset };
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) throw new Error("TELEGRAM_BOT_TOKEN niet geconfigureerd in Convex");
+    return { ok: true, token };
   },
 });
 

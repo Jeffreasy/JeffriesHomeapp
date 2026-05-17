@@ -220,26 +220,11 @@ export const syncFromGmail = internalAction({
     }
 
     // ─── Reconciliatie: verwijder Convex emails die niet meer in Gmail staan ─
-    const gmailIdSet = new Set(messageIds);
-    const orphanGmailIds: string[] = [];
-
-    // Haal alle Convex emails op en vergelijk
-    const convexEmails = await ctx.runQuery(internal.emails.listAllGmailIds, { userId });
-    for (const ce of convexEmails) {
-      if (!gmailIdSet.has(ce.gmailId)) {
-        orphanGmailIds.push(ce.gmailId);
-      }
-    }
-
-    if (orphanGmailIds.length > 0) {
-      for (let i = 0; i < orphanGmailIds.length; i += 50) {
-        await ctx.runMutation(internal.emails.bulkDeleteByGmailIds, {
-          userId,
-          gmailIds: orphanGmailIds.slice(i, i + 50),
-        });
-      }
-      console.log(`[Gmail Sync] Reconciliatie: ${orphanGmailIds.length} orphan emails verwijderd`);
-    }
+    // UITGESCHAKELD: het ophalen van MAX_INITIAL_SYNC emails (bijv 200) en
+    // weggooien van alle overige emails veroorzaakt massaal dataverlies en
+    // tienduizenden onnodige Convex mutaties als de mailbox groter is dan 200.
+    // Deletions moeten puur op basis van incremental sync history verlopen.
+    console.log(`[Gmail Sync] Reconciliatie overgeslagen om dataverlies en limiet-overschrijding te voorkomen`);
 
     // Haal het huidige historyId op voor toekomstige incremental sync
     const profileRes = await gmail.users.getProfile({ userId: "me" });
@@ -252,7 +237,32 @@ export const syncFromGmail = internalAction({
       totalSynced: emails.length,
     });
 
-    return { synced: emails.length, mode: "full", reconciled: orphanGmailIds.length };
+    return { synced: emails.length, mode: "full", reconciled: 0 };
+  },
+});
+
+export const syncFromGmailTracked = internalAction({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, { userId }): Promise<{ synced: number; mode: string; reconciled?: number }> => {
+    await ctx.runMutation(internal.syncStatus.markRunning, { userId, source: "gmail" });
+    try {
+      const result = await ctx.runAction(internal.actions.syncGmail.syncFromGmail, { userId });
+      await ctx.runMutation(internal.syncStatus.markSuccess, {
+        userId,
+        source: "gmail",
+        result: JSON.stringify(result),
+      });
+      return result;
+    } catch (err) {
+      let message = err instanceof Error ? err.message : String(err);
+      if (message.includes("invalid_grant")) {
+        message = "Google Refresh Token is verlopen (invalid_grant). Genereer een nieuwe token.";
+      }
+      await ctx.runMutation(internal.syncStatus.markFailed, { userId, source: "gmail", error: message });
+      throw new Error(message);
+    }
   },
 });
 

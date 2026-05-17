@@ -61,32 +61,87 @@ function saveOffset(offset) {
 async function pollLoop() {
   let offset = loadOffset();
   let disableWebhook = true;
+  let botToken = null;
+
   console.log("Telegram poller gestart");
   console.log(`Convex: ${CONVEX_URL}`);
   console.log(`Offset: ${offset ?? "nieuw"}\n`);
 
   while (true) {
     try {
-      const result = await convex.action(api.telegram.bot.pollUpdates, {
-        bridgeSecret: BRIDGE_SECRET,
-        offset,
-        timeoutSeconds: POLL_TIMEOUT_SECONDS,
-        disableWebhook,
-      });
-      disableWebhook = false;
-
-      if (typeof result.nextOffset === "number") {
-        offset = result.nextOffset;
-        saveOffset(offset);
+      // 1. Haal de token veilig op via Convex als we die nog niet hebben
+      if (!botToken) {
+        console.log("Haal Telegram Bot Token op via Convex...");
+        const res = await convex.action(api.telegram.bot.getBotToken, {
+          bridgeSecret: BRIDGE_SECRET,
+        });
+        if (res.ok && res.token) {
+          botToken = res.token;
+          console.log("Token ontvangen. Start lokale polling.");
+        } else {
+          throw new Error("Kon bot token niet ophalen");
+        }
       }
 
-      if (result.count > 0) {
-        console.log(`${result.count} update(s) verwerkt, offset ${offset}`);
+      const tgBase = `https://api.telegram.org/bot${botToken}/`;
+
+      // 2. Schakel webhook uit als we lokaal gaan pollen
+      if (disableWebhook) {
+        await fetch(tgBase + "deleteWebhook", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ drop_pending_updates: false })
+        });
+        disableWebhook = false;
+      }
+
+      // 3. Poll lokaal naar de Telegram API
+      const tgRes = await fetch(tgBase + "getUpdates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          offset, 
+          timeout: POLL_TIMEOUT_SECONDS, 
+          allowed_updates: ["message"] 
+        })
+      });
+
+      const tgData = await tgRes.json();
+      if (!tgData.ok) {
+        throw new Error(`Telegram API fout: ${JSON.stringify(tgData)}`);
+      }
+
+      const updates = tgData.result;
+      let processed = 0;
+
+      // 4. Stuur updates één voor één naar Convex voor afhandeling
+      for (const update of updates) {
+        await convex.action(api.telegram.bot.handleUpdatePublic, {
+          bridgeSecret: BRIDGE_SECRET,
+          update
+        });
+        
+        processed += 1;
+        if (typeof update.update_id === "number") {
+          offset = update.update_id + 1;
+          saveOffset(offset);
+        }
+      }
+
+      if (processed > 0) {
+        console.log(`${processed} update(s) verwerkt, offset ${offset}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`Poll fout: ${message}`);
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      // Als de fout een Convex authenticatiefout is (of iets mis is met de token), probeer opnieuw op te halen
+      if (message.includes("token")) {
+        botToken = null;
+        console.error("Wacht 30 seconden voor we opnieuw een token proberen op te halen...");
+        await new Promise((resolve) => setTimeout(resolve, 30000));
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
     }
   }
 }

@@ -12,6 +12,13 @@ async function resolveUserId(
   return identity.subject;
 }
 
+function hasChanges(oldDoc: any, newDoc: any) {
+  for (const key of Object.keys(newDoc)) {
+    if (oldDoc[key] !== newDoc[key]) return true;
+  }
+  return false;
+}
+
 // ─── Smart upsert per eventId (gebruikt door syncSchedule action) ─────────────
 export const bulkUpsertFromCalendar = internalMutation({
   args: {
@@ -54,7 +61,7 @@ export const bulkUpsertFromCalendar = internalMutation({
     for (const dienst of diensten) {
       const ex = existingMap.get(dienst.eventId);
       if (ex) {
-        await ctx.db.patch(ex._id, dienst);
+        if (hasChanges(ex, dienst)) { await ctx.db.patch(ex._id, dienst); }
       } else {
         await ctx.db.insert("schedule", dienst);
       }
@@ -168,3 +175,4 @@ export const bulkImport = mutation({
     return { count: diensten.length };
   },
 });
+

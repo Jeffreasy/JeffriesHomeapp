@@ -52,7 +52,7 @@ crons.interval(
 crons.interval(
   "sync-gmail",
   { minutes: 5 },
-  internal.actions.syncGmail.syncFromGmail,
+  internal.actions.syncGmail.syncFromGmailTracked,
   { userId: JEFFREY_USER_ID }
 );
 

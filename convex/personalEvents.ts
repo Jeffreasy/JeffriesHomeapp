@@ -19,6 +19,13 @@ async function resolveUserId(
   return userId;
 }
 
+function hasChanges(oldDoc: any, newDoc: any) {
+  for (const key of Object.keys(newDoc)) {
+    if (oldDoc[key] !== newDoc[key]) return true;
+  }
+  return false;
+}
+
 async function listVisibleEvents(ctx: { db: any }, userId: string) {
   const rows = await ctx.db
     .query("personalEvents")
@@ -120,7 +127,9 @@ export const bulkUpsertInternal = internalMutation({
         .first();
 
       if (existing) {
-        await ctx.db.patch(existing._id, afspraak);
+        if (hasChanges(existing, afspraak)) {
+          await ctx.db.patch(existing._id, afspraak);
+        }
       } else {
         await ctx.db.insert("personalEvents", afspraak);
       }
@@ -187,14 +196,18 @@ export const bulkUpsertFromCalendar = internalMutation({
       const ex = existingMap.get(afspraak.eventId);
       if (ex) {
         // Known event → patch in place
-        await ctx.db.patch(ex._id, afspraak);
+        if (hasChanges(ex, afspraak)) {
+          await ctx.db.patch(ex._id, afspraak);
+        }
       } else {
         // Unknown eventId — check if this is a promoted version of a pending event
         const pendingKey = `${afspraak.titel}::${afspraak.startDatum}`;
         const pendingMatch = pendingMap.get(pendingKey);
         if (pendingMatch) {
           // Promote: replace the pending record with the real Google event data
-          await ctx.db.patch(pendingMatch._id, afspraak);
+          if (hasChanges(pendingMatch, afspraak)) {
+            await ctx.db.patch(pendingMatch._id, afspraak);
+          }
           pendingMap.delete(pendingKey); // prevent double-match
         } else {
           await ctx.db.insert("personalEvents", afspraak);

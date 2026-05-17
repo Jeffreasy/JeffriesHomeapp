@@ -181,6 +181,6 @@ console.log(`   API Key: ${API_KEY ? "✅ geladen" : "❌ ONTBREEKT"}`);
 console.log(`   Bridge Secret: ${BRIDGE_SECRET ? "✅ geladen" : "❌ ONTBREEKT"}`);
 console.log(`   Bridge ID: ${bridgeId}\n`);
 
-setInterval(() => heartbeat(stats.lastError ? "warning" : "online"), 60_000); // 1 min heartbeat ipv 30 sec
+setInterval(() => heartbeat(stats.lastError ? "warning" : "online"), 300_000); // 5 min heartbeat ipv 1 min
 heartbeat("online");
 startSubscription();
