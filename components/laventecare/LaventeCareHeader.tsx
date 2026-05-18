@@ -32,8 +32,8 @@ export function LaventeCareHeader({
 }) {
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#080a0f]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#080a0f]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10">
               <BriefcaseBusiness size={21} className="text-sky-300" />
@@ -68,35 +68,36 @@ export function LaventeCareHeader({
         </div>
       </header>
 
-      <section className="glass p-5">
-        <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr] lg:items-start">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-              <Sparkles size={14} />
-              Geintegreerde businesslaag actief
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <section className="glass p-5">
+          <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr] lg:items-start">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
+                <Sparkles size={14} />
+                Geintegreerde businesslaag actief
+              </div>
+              <h2 className="mt-4 max-w-3xl text-2xl font-bold text-white sm:text-3xl">
+                Van bedrijfsdocumentatie naar een werkbaar LaventeCare-systeem.
+              </h2>
+              <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
+                {LAVENTECARE_PROFILE.kernbelofte}
+              </p>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-bold text-white sm:text-3xl">
-              Van bedrijfsdocumentatie naar een werkbaar LaventeCare-systeem.
-            </h2>
-            <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
-              {LAVENTECARE_PROFILE.kernbelofte}
-            </p>
+            <div className="glass p-4 bg-[var(--color-surface)]">
+              <p className="text-sm font-semibold text-white">Integratieprincipe</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Leads, projecten, documenten, decisions, change requests en SLA-signalen staan nu als eigen domein klaar voor Brain, Telegram, Agenda, Email, Notities en Finance.
+              </p>
+            </div>
           </div>
-          <div className="glass p-4 bg-[var(--color-surface)]">
-            <p className="text-sm font-semibold text-white">Integratieprincipe</p>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
-              Leads, projecten, documenten, decisions, change requests en SLA-signalen staan nu als eigen domein klaar voor Brain, Telegram, Agenda, Email, Notities en Finance.
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      {showLeadForm && (
-        <motion.section
-          initial={{ opacity: 0, y: -8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-5 glass p-5 border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]"
-        >
+        {showLeadForm && (
+          <motion.section
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-5 glass p-5 border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]"
+          >
           <div className="mb-4 flex items-center gap-2">
             <Target size={18} className="text-sky-300" />
             <h2 className="text-lg font-bold text-white">Nieuwe lead kwalificeren</h2>
@@ -175,13 +176,14 @@ export function LaventeCareHeader({
         </motion.section>
       )}
 
-      <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard icon={Handshake} label="Open leads" value={summary.activeLeads} detail={`${summary.leads} totaal in de funnel`} tone="sky" />
-        <MetricCard icon={FolderKanban} label="Actieve projecten" value={summary.activeProjects} detail={`${summary.projects} projecten geregistreerd`} tone="emerald" />
-        <MetricCard icon={Sparkles} label="Signalen" value={businessSignals.length} detail={`${summary.actionItems ?? 0} acties open`} tone="violet" />
-        <MetricCard icon={FileText} label="Documentbasis" value={`${summary.documents}/24`} detail={summary.documentsSeeded ? "Geïndexeerd in PostgreSQL" : "Catalogus klaar om te initialiseren"} tone="amber" />
-        <MetricCard icon={LifeBuoy} label="SLA signalen" value={summary.openIncidents} detail={`${summary.openChanges} open change requests`} tone={summary.openIncidents > 0 ? "rose" : "violet"} />
-      </section>
+        <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <MetricCard icon={Handshake} label="Open leads" value={summary.activeLeads} detail={`${summary.leads} totaal in de funnel`} tone="sky" />
+          <MetricCard icon={FolderKanban} label="Actieve projecten" value={summary.activeProjects} detail={`${summary.projects} projecten geregistreerd`} tone="emerald" />
+          <MetricCard icon={Sparkles} label="Signalen" value={businessSignals.length} detail={`${summary.actionItems ?? 0} acties open`} tone="violet" />
+          <MetricCard icon={FileText} label="Documentbasis" value={`${summary.documents}/24`} detail={summary.documentsSeeded ? "Geïndexeerd in PostgreSQL" : "Catalogus klaar om te initialiseren"} tone="amber" />
+          <MetricCard icon={LifeBuoy} label="SLA signalen" value={summary.openIncidents} detail={`${summary.openChanges} open change requests`} tone={summary.openIncidents > 0 ? "rose" : "violet"} />
+        </section>
+      </div>
     </>
   );
 }
