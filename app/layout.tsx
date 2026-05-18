@@ -11,9 +11,19 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
+export const viewport = {
+  themeColor: "#0a0a0f",
+};
+
 export const metadata: Metadata = {
   title: "Homeapp — Smart Home Control",
   description: "Control your WiZ smart lights from anywhere on your local network.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Homeapp",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

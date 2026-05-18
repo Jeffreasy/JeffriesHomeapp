@@ -25,7 +25,13 @@ interface AutomationFormProps {
 export function AutomationForm({ initialData, onClose, onSave }: AutomationFormProps) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [time, setTime] = useState(initialData?.trigger.time ?? "07:00");
+  const [triggerType, setTriggerType] = useState<"time" | "schedule">(
+    initialData?.trigger.triggerType ?? "time"
+  );
   const [days, setDays] = useState<number[]>(initialData?.trigger.days ?? ALL_DAYS);
+  const [shiftType, setShiftType] = useState<ShiftType>(
+    initialData?.trigger.shiftType ?? "Vroeg"
+  );
   const [actionType, setActionType] = useState<ActionType>(initialData?.action.type ?? "scene");
   
   const [sceneId, setSceneId] = useState(initialData?.action.sceneId ?? "helder");
@@ -46,16 +52,27 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
   };
 
   const handleSave = () => {
-    if (!name || days.length === 0) return;
+    if (!name) return;
+    if (triggerType === "time" && days.length === 0) return;
+
     const action: AutomationAction = { type: actionType };
     if (actionType === "scene")      action.sceneId = sceneId as keyof typeof SCENE_DEFINITIONS;
     if (actionType === "brightness") action.brightness = brightness;
     if (actionType === "color")      action.colorHex = colorHex;
     if (actionType === "color_temp") action.colorTempMireds = colorTempMireds;
+
+    const trigger = {
+      time,
+      triggerType,
+      days: triggerType === "time" ? days : undefined,
+      shiftType: triggerType === "schedule" ? shiftType : undefined,
+      excludedShifts: excludedShifts.length > 0 ? excludedShifts : undefined,
+    };
+
     onSave({ 
       name, 
       enabled: initialData?.enabled ?? true, 
-      trigger: { time, days, excludedShifts: excludedShifts.length > 0 ? excludedShifts : undefined }, 
+      trigger,
       action,
       group: initialData?.group
     });
@@ -72,15 +89,26 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      className="glass rounded-2xl p-5 space-y-4 border border-amber-500/20"
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          {initialData ? null : <Plus size={14} className="text-amber-400" />}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+        className="relative w-full max-w-md glass rounded-2xl p-6 space-y-5 border border-amber-500/20 shadow-2xl max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-white flex items-center gap-2">
+            {initialData ? null : <Plus size={16} className="text-amber-400" />}
           {initialData ? "Automatisering bewerken" : "Nieuwe automatisering"}
         </h3>
         <button
@@ -115,40 +143,97 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
       </div>
 
       <fieldset>
-        <legend className="sr-only">Dagen</legend>
-        <div className="flex gap-2 mb-2 text-[10px]">
-          {[["Alle", ALL_DAYS], ["Doordeweeks", WEEKDAYS], ["Weekend", WEEKEND]].map(
-            ([label, d]) => (
-              <button
-                key={label as string}
-                type="button"
-                onClick={() => setDays(d as number[])}
-                className="text-slate-500 hover:text-amber-400"
-              >
-                {label as string}
-              </button>
-            )
-          )}
-        </div>
-        <div className="flex gap-1">
-          {DAY_LABELS.map((label, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-pressed={days.includes(i)}
-              onClick={() => toggleDay(i)}
-              className={cn(
-                "flex-1 py-1 rounded-lg text-xs font-medium transition-all",
-                days.includes(i)
-                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                  : "bg-[var(--color-surface)] text-slate-500 border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
-              )}
-            >
-              {label}
-            </button>
-          ))}
+        <legend className="sr-only">Type Trigger</legend>
+        <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] p-1 rounded-xl mb-4">
+          <button
+            type="button"
+            onClick={() => setTriggerType("time")}
+            className={cn(
+              "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
+              triggerType === "time"
+                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-sm"
+                : "text-slate-500 hover:text-slate-300 border border-transparent"
+            )}
+          >
+            Vaste Dagen
+          </button>
+          <button
+            type="button"
+            onClick={() => setTriggerType("schedule")}
+            className={cn(
+              "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
+              triggerType === "schedule"
+                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-sm"
+                : "text-slate-500 hover:text-slate-300 border border-transparent"
+            )}
+          >
+            Rooster (Smart)
+          </button>
         </div>
       </fieldset>
+
+      {triggerType === "time" ? (
+        <fieldset>
+          <legend className="sr-only">Dagen</legend>
+          <div className="flex gap-2 mb-2 text-[10px]">
+            {[["Alle", ALL_DAYS], ["Doordeweeks", WEEKDAYS], ["Weekend", WEEKEND]].map(
+              ([label, d]) => (
+                <button
+                  key={label as string}
+                  type="button"
+                  onClick={() => setDays(d as number[])}
+                  className="text-slate-500 hover:text-amber-400"
+                >
+                  {label as string}
+                </button>
+              )
+            )}
+          </div>
+          <div className="flex gap-1">
+            {DAY_LABELS.map((label, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-pressed={days.includes(i)}
+                onClick={() => toggleDay(i)}
+                className={cn(
+                  "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
+                  days.includes(i)
+                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                    : "bg-[var(--color-surface)] text-slate-500 border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ) : (
+        <fieldset>
+          <legend className="text-xs font-semibold text-slate-300 mb-2">Kies de Dienst</legend>
+          <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
+            De automatisering gaat alléén af als je op deze dag de geselecteerde dienst hebt.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(["Vroeg", "Laat", "Dienst"] as ShiftType[]).map((shift) => (
+              <button
+                key={shift}
+                type="button"
+                aria-pressed={shiftType === shift}
+                onClick={() => setShiftType(shift)}
+                className={cn(
+                  "py-2 rounded-lg text-xs font-medium border transition-all",
+                  shiftType === shift
+                    ? "bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.1)]"
+                    : "bg-[var(--color-surface)] text-slate-400 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+                )}
+              >
+                {shift}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       <fieldset>
         <legend className="sr-only">Actie type</legend>
@@ -264,12 +349,13 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
       <button
         type="button"
         onClick={handleSave}
-        disabled={!name || days.length === 0}
+        disabled={!name || (triggerType === "time" && days.length === 0)}
         className="w-full py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 disabled:opacity-40 flex items-center justify-center gap-2"
       >
         <Check size={13} />
         Opslaan
       </button>
-    </motion.div>
+      </motion.div>
+    </div>
   );
 }

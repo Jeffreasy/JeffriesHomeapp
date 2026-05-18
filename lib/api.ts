@@ -641,3 +641,45 @@ export const syncApi = {
 	calendar: (userId: string) => apiFetch<any>(`/sync/calendar?userId=${userId}`, { method: "POST" }),
 	gmail: (userId: string) => apiFetch<any>(`/sync/gmail?userId=${userId}`, { method: "POST" }),
 };
+
+// ─── Notes ────────────────────────────────────────────────────────────────────
+
+export interface NoteRow {
+  id: string;
+  user_id: string;
+  titel: string | null;
+  inhoud: string;
+  tags: string[];
+  kleur: string | null;
+  is_pinned: boolean;
+  is_archived: boolean;
+  deadline: string | null;
+  linked_event_id: string | null;
+  prioriteit: string | null;
+  triage_flag: boolean | null;
+  aangemaakt: string;
+  gewijzigd: string;
+}
+
+export const notesApi = {
+  list: (userId: string) =>
+    apiFetch<NoteRow[]>(`/notes?userId=${userId}`),
+  search: (userId: string, query: string) =>
+    apiFetch<NoteRow[]>(`/notes/search?userId=${userId}&q=${encodeURIComponent(query)}`),
+  tags: (userId: string) =>
+    apiFetch<string[]>(`/notes/tags?userId=${userId}`),
+  get: (id: string) =>
+    apiFetch<NoteRow>(`/notes/${id}`),
+  create: (userId: string, data: Partial<NoteRow>) =>
+    apiFetch<NoteRow>(`/notes?userId=${userId}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: Partial<NoteRow>) =>
+    apiFetch<NoteRow>(`/notes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  delete: (id: string) =>
+    apiFetch<{ status: string }>(`/notes/${id}`, { method: "DELETE" }),
+};
