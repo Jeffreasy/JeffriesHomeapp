@@ -24,7 +24,7 @@ export function LampCommandCenter({
 
   return (
     <Panel className="overflow-hidden p-0">
-      <div className="border-b border-white/6 px-5 py-4 sm:px-6">
+      <div className="border-b border-[var(--color-border)] px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -39,7 +39,7 @@ export function LampCommandCenter({
             type="button"
             onClick={onToggleAll}
             disabled={online === 0}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-white/[0.03] disabled:text-slate-600"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[rgba(255,255,255,0.03)] disabled:text-slate-600"
           >
             <Power size={16} />
             {allOn ? "Alles uit" : "Alles aan"}
@@ -47,7 +47,7 @@ export function LampCommandCenter({
         </div>
       </div>
 
-      <div className="grid gap-px bg-white/[0.06] sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 xl:grid-cols-4">
         <StatusMetric
           icon={Lightbulb}
           label="Totaal"

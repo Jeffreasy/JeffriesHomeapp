@@ -46,12 +46,12 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: 24 }}
         transition={{ type: "spring", stiffness: 380, damping: 32 }}
-        className="hidden md:flex flex-col w-80 flex-shrink-0 glass border-l border-white/5 h-full overflow-y-auto"
+        className="hidden md:flex flex-col w-80 flex-shrink-0 glass border-l border-[var(--color-border)] h-full overflow-y-auto"
         style={{ minHeight: 0 }}
       >
         {/* Panel header */}
         <div
-          className="p-4 border-b border-white/5 flex items-center gap-3"
+          className="p-4 border-b border-[var(--color-border)] flex items-center gap-3"
           style={{
             background: `linear-gradient(135deg, ${glowColor}18 0%, transparent 60%)`,
           }}
@@ -96,7 +96,7 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
               "w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 flex-shrink-0",
               isOn
                 ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30 active:scale-90"
-                : "bg-white/5 text-slate-500 border border-[var(--color-border)] hover:bg-white/10 active:scale-90",
+                : "bg-[rgba(255,255,255,0.05)] text-slate-500 border border-[var(--color-border)] hover:bg-[rgba(255,255,255,0.1)] active:scale-90",
               !isOnline && "opacity-40 cursor-not-allowed"
             )}
           >
@@ -106,7 +106,7 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
           {/* Close */}
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-300 hover:bg-[var(--color-surface-hover)] transition-colors"
             aria-label="Sluit detail paneel"
           >
             <X size={14} />
@@ -116,7 +116,7 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
         {/* Brightness bar */}
         {isOn && (
           <div className="px-4 pt-3">
-            <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-1 rounded-full bg-[rgba(255,255,255,0.05)] overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{ width: `${brightness}%`, background: glowColor }}

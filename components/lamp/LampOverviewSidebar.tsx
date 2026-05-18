@@ -14,7 +14,7 @@ export function LampOverviewSidebar({ groups, unassignedCount }: { groups: RoomG
         sub={`${groups.length + (unassignedCount > 0 ? 1 : 0)} groepen`}
       />
       {groups.length === 0 && unassignedCount === 0 ? (
-        <p className="rounded-xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-4 py-6 text-center text-sm text-slate-500">
+        <p className="rounded-xl border border-dashed border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-4 py-6 text-center text-sm text-slate-500">
           Nog geen kamerindeling.
         </p>
       ) : (
@@ -23,7 +23,7 @@ export function LampOverviewSidebar({ groups, unassignedCount }: { groups: RoomG
             <RoomOverviewRow key={group.room.id} group={group} />
           ))}
           {unassignedCount > 0 && (
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-white/6 bg-white/[0.025] px-3 py-3">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-200">Niet toegewezen</p>
                 <p className="mt-0.5 text-xs text-slate-500">{unassignedCount} lampen</p>
@@ -41,7 +41,7 @@ function RoomOverviewRow({ group }: { group: RoomGroup }) {
   const allOnline = group.onlineCount === group.devices.length && group.devices.length > 0;
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/6 bg-white/[0.025] px-3 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-slate-200">{group.room.name}</p>
         <p className="mt-0.5 text-xs text-slate-500">

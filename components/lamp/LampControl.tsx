@@ -144,14 +144,14 @@ export function LampControl({ device }: LampControlProps) {
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-2 rounded-xl p-1 bg-white/5">
+      <div className="flex gap-2 rounded-xl p-1 bg-[rgba(255,255,255,0.05)]">
         {(["white", "color"] as Mode[]).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg transition-all ${
               mode === m
-                ? "bg-white/10 text-white font-medium"
+                ? "bg-[rgba(255,255,255,0.1)] text-white font-medium"
                 : "text-slate-500 hover:text-slate-300"
             }`}
           >

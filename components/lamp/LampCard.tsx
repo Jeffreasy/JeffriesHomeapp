@@ -65,7 +65,7 @@ export function LampCard({ device, onSelect }: LampCardProps) {
         data-testid={`lamp-card-${device.id}`}
         className={cn(
           "glass rounded-2xl overflow-hidden select-none transition-all duration-200",
-          isOnline && "cursor-pointer hover:bg-white/[0.06] hover:border-white/14",
+          isOnline && "cursor-pointer hover:bg-[var(--color-surface-hover)] hover:border-[var(--color-border-hover)]",
           !isOnline && "opacity-60"
         )}
         style={{
@@ -126,7 +126,7 @@ export function LampCard({ device, onSelect }: LampCardProps) {
               "w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 flex-shrink-0",
               isOn
                 ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30 active:scale-90"
-                : "bg-white/5 text-slate-500 border border-[var(--color-border)] hover:bg-white/10 active:scale-90",
+                : "bg-[rgba(255,255,255,0.05)] text-slate-500 border border-[var(--color-border)] hover:bg-[rgba(255,255,255,0.1)] active:scale-90",
               !isOnline && "opacity-40 cursor-not-allowed"
             )}
           >
@@ -137,7 +137,7 @@ export function LampCard({ device, onSelect }: LampCardProps) {
         {/* Brightness bar — always shown when on */}
         {isOn && (
           <div className="px-4 pb-3">
-            <div className="h-1 rounded-full bg-white/5 overflow-hidden">
+            <div className="h-1 rounded-full bg-[rgba(255,255,255,0.05)] overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{

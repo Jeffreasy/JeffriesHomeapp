@@ -32,7 +32,7 @@ export const toneClasses: Record<Tone, { icon: string; surface: string; border: 
   },
   slate: {
     icon: "text-slate-300",
-    surface: "bg-white/5",
+    surface: "bg-[rgba(255,255,255,0.05)]",
     border: "border-[var(--color-border)]",
     text: "text-slate-200",
   },
@@ -43,7 +43,7 @@ export function Panel({ children, className = "" }: { children: React.ReactNode;
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5 ${className}`}
+      className={`glass p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] sm:p-5 ${className}`}
     >
       {children}
     </motion.div>
@@ -64,7 +64,7 @@ export function SectionHeader({
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)]">
           <Icon size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
@@ -118,7 +118,7 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/6 bg-white/[0.025] px-3 py-3">
+    <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${classes.surface}`}>
         <Icon size={15} className={classes.icon} />
       </div>
@@ -151,7 +151,7 @@ export function LoadingGrid() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: index * 0.05 }}
-          className="h-28 rounded-2xl border border-white/8 bg-white/[0.035] animate-pulse"
+          className="h-28 rounded-2xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] animate-pulse"
         />
       ))}
     </div>
@@ -160,8 +160,8 @@ export function LoadingGrid() {
 
 export function EmptyDevices() {
   return (
-    <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-6 py-12 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-white/5">
+    <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-6 py-12 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.05)]">
         <Lightbulb size={28} className="text-slate-600" />
       </div>
       <h3 className="mt-4 text-lg font-semibold text-slate-300">Geen lampen gevonden</h3>
@@ -183,7 +183,7 @@ export function NoResults({ search, filter, onReset }: { search: string; filter:
   const hasFilter = search.trim().length > 0 || filter !== "all";
 
   return (
-    <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-6 py-12 text-center">
+    <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-6 py-12 text-center">
       <Search size={28} className="text-slate-600" />
       <h3 className="mt-4 text-base font-semibold text-slate-300">Geen lampen in deze selectie</h3>
       <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
@@ -194,7 +194,7 @@ export function NoResults({ search, filter, onReset }: { search: string; filter:
       <button
         type="button"
         onClick={onReset}
-        className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.04] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07]"
+        className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
       >
         Filters resetten
       </button>
