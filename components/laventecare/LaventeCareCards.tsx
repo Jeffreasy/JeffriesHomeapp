@@ -108,7 +108,7 @@ export function SignalCard({
               type="button"
               onClick={() => onCreateAction(signal)}
               disabled={disabled}
-              className="btn btn--ghost flex-1 justify-center text-xs"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.045)] px-3 text-xs font-bold text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busyAction ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               Actie
@@ -117,7 +117,7 @@ export function SignalCard({
               type="button"
               onClick={() => onConvertToLead(signal)}
               disabled={disabled}
-              className="btn btn--primary flex-1 justify-center text-xs"
+              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] px-3 text-xs font-bold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary-hover)] shadow-[0_0_15px_rgba(245,158,11,0.1)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busyLead ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
               Lead

@@ -32,7 +32,7 @@ export function LaventeCareHeader({
 }) {
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#080a0f]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10">
@@ -50,7 +50,7 @@ export function LaventeCareHeader({
               type="button"
               onClick={handleSeedDocuments}
               disabled={seeding}
-              className="btn btn--ghost"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-4 text-sm font-semibold text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.07)] disabled:cursor-not-allowed disabled:opacity-60 whitespace-nowrap"
             >
               {seeding ? <Loader2 size={16} className="animate-spin" /> : <BookOpenText size={16} />}
               <span>{summary.documentsSeeded ? "Documentbasis bijwerken" : "Documentbasis initialiseren"}</span>
@@ -59,7 +59,7 @@ export function LaventeCareHeader({
               type="button"
               whileTap={{ scale: 0.96 }}
               onClick={() => setShowLeadForm((value) => !value)}
-              className="btn btn--primary"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-primary-foreground)] transition-colors hover:bg-[var(--color-primary-hover)] whitespace-nowrap shadow-[0_0_15px_rgba(245,158,11,0.2)]"
             >
               {showLeadForm ? <X size={16} /> : <Plus size={16} />}
               <span>Nieuwe lead</span>

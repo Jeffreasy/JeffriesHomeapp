@@ -121,7 +121,7 @@ export function LaventeCareFunnelView({
                               type="button"
                               onClick={() => handleLeadStatus(lead, status)}
                               disabled={Boolean(processingLead)}
-                              className="btn btn--ghost px-2 text-xs"
+                              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.045)] px-2 text-xs font-bold text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {busy && <Loader2 size={13} className="animate-spin" />}
                               {label(status)}
@@ -132,7 +132,7 @@ export function LaventeCareFunnelView({
                           type="button"
                           onClick={() => handleLeadToProject(lead)}
                           disabled={Boolean(processingLead)}
-                          className="btn px-2 text-xs border border-emerald-500/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {processingLead === `${lead._id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
                           Project
@@ -181,7 +181,7 @@ export function LaventeCareFunnelView({
                             type="button"
                             onClick={() => handleProjectStatus(project, { fase })}
                             disabled={Boolean(processingProject)}
-                            className="btn btn--ghost px-2 text-xs"
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.045)] px-2 text-xs font-bold text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {busy && <Loader2 size={13} className="animate-spin" />}
                             {label(fase)}
@@ -192,7 +192,7 @@ export function LaventeCareFunnelView({
                         type="button"
                         onClick={() => handleProjectStatus(project, { status: project.status === "wacht_op_klant" ? "actief" : "wacht_op_klant" })}
                         disabled={Boolean(processingProject)}
-                        className="btn px-2 text-xs border border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {processingProject?.startsWith(`${project._id}:status`) ? <Loader2 size={13} className="animate-spin" /> : <Clock3 size={13} />}
                         {project.status === "wacht_op_klant" ? "Actief" : "Wacht"}
