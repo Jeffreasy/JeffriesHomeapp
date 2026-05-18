@@ -91,6 +91,7 @@ export function LaventeCareHeader({
         </div>
       </section>
 
+      {showLeadForm && (
         <motion.section
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
