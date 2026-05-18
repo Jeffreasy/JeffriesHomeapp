@@ -220,12 +220,12 @@ export default function LaventeCarePage() {
 
   if (cockpitLoading) {
     return (
-      <div className="min-h-screen bg-[#080a0f] px-4 py-10 text-slate-100 sm:px-6">
+      <div className="min-h-screen px-4 py-10 sm:px-6">
         <div className="mx-auto max-w-7xl">
-          <div className="h-40 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
+          <div className="h-40 animate-pulse glass" />
           <div className="mt-4 grid gap-4 md:grid-cols-4">
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="h-28 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
+              <div key={item} className="h-28 animate-pulse glass" />
             ))}
           </div>
         </div>
@@ -234,7 +234,7 @@ export default function LaventeCarePage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#080a0f] text-slate-100">
+    <div className="min-h-screen">
       <LaventeCareHeader
         summary={summary}
         businessSignals={businessSignals}

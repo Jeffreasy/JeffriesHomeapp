@@ -32,7 +32,7 @@ export function LaventeCareHeader({
 }) {
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#080a0f]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10">
@@ -50,7 +50,7 @@ export function LaventeCareHeader({
               type="button"
               onClick={handleSeedDocuments}
               disabled={seeding}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn--ghost"
             >
               {seeding ? <Loader2 size={16} className="animate-spin" /> : <BookOpenText size={16} />}
               <span>{summary.documentsSeeded ? "Documentbasis bijwerken" : "Documentbasis initialiseren"}</span>
@@ -59,7 +59,7 @@ export function LaventeCareHeader({
               type="button"
               whileTap={{ scale: 0.96 }}
               onClick={() => setShowLeadForm((value) => !value)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/15 px-3 text-sm font-semibold text-sky-100 transition-colors hover:bg-sky-500/20"
+              className="btn btn--primary"
             >
               {showLeadForm ? <X size={16} /> : <Plus size={16} />}
               <span>Nieuwe lead</span>
@@ -68,7 +68,7 @@ export function LaventeCareHeader({
         </div>
       </header>
 
-      <section className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+      <section className="glass p-5">
         <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr] lg:items-start">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
@@ -82,7 +82,7 @@ export function LaventeCareHeader({
               {LAVENTECARE_PROFILE.kernbelofte}
             </p>
           </div>
-          <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+          <div className="glass p-4 bg-[var(--color-surface)]">
             <p className="text-sm font-semibold text-white">Integratieprincipe</p>
             <p className="mt-2 text-sm leading-6 text-slate-400">
               Leads, projecten, documenten, decisions, change requests en SLA-signalen staan nu als eigen domein klaar voor Brain, Telegram, Agenda, Email, Notities en Finance.
@@ -91,11 +91,10 @@ export function LaventeCareHeader({
         </div>
       </section>
 
-      {showLeadForm && (
         <motion.section
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-5 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] p-5"
+          className="mt-5 glass p-5 border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]"
         >
           <div className="mb-4 flex items-center gap-2">
             <Target size={18} className="text-sky-300" />
@@ -108,7 +107,7 @@ export function LaventeCareHeader({
                 value={leadForm.titel}
                 onChange={(event) => setLeadForm((form) => ({ ...form, titel: event.target.value }))}
                 placeholder="Bijv. automatisering klantintake"
-                className="mt-1 h-10 w-full rounded-lg border border-white/10 bg-[#0b0f16] px-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-400/50"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
               />
             </label>
             <label className="lg:col-span-2">
@@ -117,7 +116,7 @@ export function LaventeCareHeader({
                 value={leadForm.companyName}
                 onChange={(event) => setLeadForm((form) => ({ ...form, companyName: event.target.value }))}
                 placeholder="Bedrijfsnaam"
-                className="mt-1 h-10 w-full rounded-lg border border-white/10 bg-[#0b0f16] px-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-400/50"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
               />
             </label>
             <label className="lg:col-span-2">
@@ -126,7 +125,7 @@ export function LaventeCareHeader({
                 value={leadForm.website}
                 onChange={(event) => setLeadForm((form) => ({ ...form, website: event.target.value }))}
                 placeholder="https://..."
-                className="mt-1 h-10 w-full rounded-lg border border-white/10 bg-[#0b0f16] px-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-400/50"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
               />
             </label>
             <label className="lg:col-span-3">
@@ -136,7 +135,7 @@ export function LaventeCareHeader({
                 onChange={(event) => setLeadForm((form) => ({ ...form, pijnpunt: event.target.value }))}
                 placeholder="Welke workflow, foutkans of groeirem speelt er?"
                 rows={3}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-[#0b0f16] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-400/50"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
               />
             </label>
             <label className="lg:col-span-2">
@@ -146,7 +145,7 @@ export function LaventeCareHeader({
                 onChange={(event) => setLeadForm((form) => ({ ...form, volgendeStap: event.target.value }))}
                 placeholder="Bijv. discovery-call plannen"
                 rows={3}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-[#0b0f16] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-400/50"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
               />
             </label>
             <div>
@@ -155,7 +154,7 @@ export function LaventeCareHeader({
                 <select
                   value={leadForm.prioriteit}
                   onChange={(event) => setLeadForm((form) => ({ ...form, prioriteit: event.target.value as any }))}
-                  className="mt-1 h-10 w-full rounded-lg border border-white/10 bg-[#0b0f16] px-3 text-sm text-white outline-none transition-colors focus:border-sky-400/50"
+                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)]"
                 >
                   <option value="laag">Laag</option>
                   <option value="normaal">Normaal</option>
@@ -165,7 +164,7 @@ export function LaventeCareHeader({
               <button
                 type="submit"
                 disabled={savingLead}
-                className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/20 px-3 text-sm font-semibold text-sky-100 transition-colors hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-3 btn btn--primary w-full justify-center"
               >
                 {savingLead ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
                 Opslaan

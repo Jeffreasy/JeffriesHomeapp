@@ -16,7 +16,7 @@ export function LaventeCareKnowledgeView({
 }) {
   return (
     <section className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-      <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+      <div className="glass p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Kennisbasis</p>
@@ -28,7 +28,7 @@ export function LaventeCareKnowledgeView({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Zoek documentatie"
-              className="h-10 w-full rounded-lg border border-white/10 bg-[#0b0f16] pl-9 pr-3 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-400/50"
+              className="search-bar__input h-10 text-sm"
             />
           </label>
         </div>
@@ -45,7 +45,7 @@ export function LaventeCareKnowledgeView({
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {docs.map((doc) => (
-                  <div key={doc.documentKey ?? doc.titel} className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+                  <div key={doc.documentKey ?? doc.titel} className="glass p-4 bg-[var(--color-surface)]">
                     <div className="flex items-start gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
                         <FileText size={16} className="text-amber-300" />
@@ -65,14 +65,14 @@ export function LaventeCareKnowledgeView({
       </div>
 
       <div className="space-y-5">
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+        <div className="glass p-5">
           <div className="flex items-center gap-2">
             <BookOpenText size={18} className="text-amber-300" />
             <h2 className="text-lg font-bold text-white">Juridische stapel</h2>
           </div>
           <div className="mt-4 space-y-2">
             {LAVENTECARE_LEGAL_STACK.map((item, index) => (
-              <div key={item} className="flex items-center gap-3 rounded-lg border border-white/10 bg-[#0d1119] px-3 py-2">
+              <div key={item} className="flex items-center gap-3 glass px-3 py-2 bg-[var(--color-surface)]">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-xs font-bold text-slate-400">
                   {index + 1}
                 </span>
@@ -82,14 +82,14 @@ export function LaventeCareKnowledgeView({
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+        <div className="glass p-5">
           <div className="flex items-center gap-2">
             <Layers3 size={18} className="text-violet-300" />
             <h2 className="text-lg font-bold text-white">Prijsankers</h2>
           </div>
           <div className="mt-4 space-y-3">
             {LAVENTECARE_PRICING.map((price) => (
-              <div key={price.key} className="rounded-lg border border-white/10 bg-[#0d1119] p-3">
+              <div key={price.key} className="glass p-3 bg-[var(--color-surface)]">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm font-semibold text-white">{price.title}</p>
                   <p className="shrink-0 text-right text-xs font-bold text-violet-200">{price.price}</p>

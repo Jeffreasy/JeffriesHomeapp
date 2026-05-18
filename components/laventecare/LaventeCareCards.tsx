@@ -32,7 +32,7 @@ export function MetricCard({
 }) {
   const toneClass = toneClasses[tone];
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+    <div className="glass p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{metricLabel}</p>
@@ -49,7 +49,7 @@ export function MetricCard({
 
 export function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.025] p-5 text-sm text-slate-400">
+    <div className="glass border-dashed p-5 text-sm text-slate-400">
       <p className="font-semibold text-slate-200">{title}</p>
       <p className="mt-1">{body}</p>
     </div>
@@ -80,7 +80,7 @@ export function SignalCard({
   const tone = toneClasses[meta.tone];
   const disabled = busyAction || busyLead;
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+    <div className="glass p-4">
       <div className="flex items-start gap-3">
         <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", tone.border, tone.surface)}>
           <Icon size={16} className={tone.icon} />
@@ -108,7 +108,7 @@ export function SignalCard({
               type="button"
               onClick={() => onCreateAction(signal)}
               disabled={disabled}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.045] px-3 text-xs font-bold text-slate-200 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn--ghost flex-1 justify-center text-xs"
             >
               {busyAction ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               Actie
@@ -117,7 +117,7 @@ export function SignalCard({
               type="button"
               onClick={() => onConvertToLead(signal)}
               disabled={disabled}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/15 px-3 text-xs font-bold text-sky-100 transition-colors hover:bg-sky-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn--primary flex-1 justify-center text-xs"
             >
               {busyLead ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
               Lead
@@ -131,7 +131,7 @@ export function SignalCard({
 
 export function FollowUpCard({ followUp }: { followUp: FollowUpSignal }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+    <div className="glass p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{followUp.source}</p>
@@ -161,7 +161,7 @@ export function ActionItemCard({
 }) {
   const highPriority = action.priority === "hoog";
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+    <div className="glass p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -186,7 +186,7 @@ export function ActionItemCard({
           onClick={() => onComplete(action)}
           disabled={busy}
           aria-label={`Rond actie af: ${action.title}`}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-200 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-online)]/25 bg-[var(--color-online)]/10 text-[var(--color-online)] transition-colors hover:bg-[var(--color-online)]/20 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={16} />}
         </button>
@@ -210,7 +210,7 @@ export function OperationCard({
 }) {
   const toneClass = toneClasses[tone];
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+    <div className="glass p-4">
       <div className="flex items-start gap-3">
         <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", toneClass.border, toneClass.surface)}>
           <Icon size={16} className={toneClass.icon} />

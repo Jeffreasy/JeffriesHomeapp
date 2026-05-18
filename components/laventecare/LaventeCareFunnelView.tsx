@@ -27,7 +27,7 @@ export function LaventeCareFunnelView({
   return (
     <>
       <section className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_0.9fr]">
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+        <div className="glass p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Proces</p>
@@ -37,7 +37,7 @@ export function LaventeCareFunnelView({
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {LAVENTECARE_PROCESS_STAGES.map((stage, index) => (
-              <div key={stage.key} className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+              <div key={stage.key} className="glass p-4 bg-[var(--color-surface)]">
                 <div className="flex items-center gap-3">
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-sm font-bold text-slate-200">
                     {index + 1}
@@ -51,20 +51,20 @@ export function LaventeCareFunnelView({
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+        <div className="glass p-5">
           <div className="flex items-center gap-2">
             <ShieldCheck size={18} className="text-emerald-300" />
             <h2 className="text-lg font-bold text-white">Fit guardrails</h2>
           </div>
           <div className="mt-4 space-y-3">
             {LAVENTECARE_FIT_CRITERIA.slice(0, 5).map((item) => (
-              <div key={item} className="flex gap-3 rounded-lg border border-emerald-500/15 bg-emerald-500/[0.06] p-3">
+              <div key={item} className="flex gap-3 glass p-3 border-emerald-500/15 bg-emerald-500/[0.06]">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-300" />
                 <p className="text-sm leading-5 text-slate-300">{item}</p>
               </div>
             ))}
           </div>
-          <div className="mt-5 rounded-lg border border-rose-500/15 bg-rose-500/[0.06] p-4">
+          <div className="mt-5 glass p-4 border-rose-500/15 bg-rose-500/[0.06]">
             <p className="text-sm font-semibold text-rose-100">No-fit signalen</p>
             <ul className="mt-3 space-y-2">
               {LAVENTECARE_NO_FIT_SIGNALS.slice(0, 3).map((item) => (
@@ -79,7 +79,7 @@ export function LaventeCareFunnelView({
       </section>
 
       <section className="mt-5 grid gap-5 xl:grid-cols-2">
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+        <div className="glass p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Funnel</p>
@@ -94,7 +94,7 @@ export function LaventeCareFunnelView({
               activeLeads.map((lead) => {
                 const tone = toneClasses[fitTone(lead.fitScore)];
                 return (
-                  <div key={lead._id ?? lead.titel} className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+                  <div key={lead._id ?? lead.titel} className="glass p-4 bg-[var(--color-surface)]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="font-semibold text-white">{lead.titel}</h3>
@@ -121,7 +121,7 @@ export function LaventeCareFunnelView({
                               type="button"
                               onClick={() => handleLeadStatus(lead, status)}
                               disabled={Boolean(processingLead)}
-                              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.045] px-2 text-xs font-bold text-slate-200 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="btn btn--ghost px-2 text-xs"
                             >
                               {busy && <Loader2 size={13} className="animate-spin" />}
                               {label(status)}
@@ -132,7 +132,7 @@ export function LaventeCareFunnelView({
                           type="button"
                           onClick={() => handleLeadToProject(lead)}
                           disabled={Boolean(processingLead)}
-                          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="btn px-2 text-xs border border-emerald-500/25 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {processingLead === `${lead._id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
                           Project
@@ -146,7 +146,7 @@ export function LaventeCareFunnelView({
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-5">
+        <div className="glass p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Delivery</p>
@@ -159,7 +159,7 @@ export function LaventeCareFunnelView({
               <EmptyState title="Nog geen projecten" body="Zodra leads doorgaan naar delivery ontstaat hier de projectlaag met fase, status, waarde en deadlines." />
             ) : (
               activeProjects.map((project) => (
-                <div key={project._id ?? project.naam} className="rounded-lg border border-white/10 bg-[#0d1119] p-4">
+                <div key={project._id ?? project.naam} className="glass p-4 bg-[var(--color-surface)]">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="font-semibold text-white">{project.naam}</h3>
@@ -181,7 +181,7 @@ export function LaventeCareFunnelView({
                             type="button"
                             onClick={() => handleProjectStatus(project, { fase })}
                             disabled={Boolean(processingProject)}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.045] px-2 text-xs font-bold text-slate-200 transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="btn btn--ghost px-2 text-xs"
                           >
                             {busy && <Loader2 size={13} className="animate-spin" />}
                             {label(fase)}
@@ -192,7 +192,7 @@ export function LaventeCareFunnelView({
                         type="button"
                         onClick={() => handleProjectStatus(project, { status: project.status === "wacht_op_klant" ? "actief" : "wacht_op_klant" })}
                         disabled={Boolean(processingProject)}
-                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="btn px-2 text-xs border border-amber-500/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {processingProject?.startsWith(`${project._id}:status`) ? <Loader2 size={13} className="animate-spin" /> : <Clock3 size={13} />}
                         {project.status === "wacht_op_klant" ? "Actief" : "Wacht"}
