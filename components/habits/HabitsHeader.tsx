@@ -19,7 +19,7 @@ export function HabitsHeader({
   setShowForm: (show: boolean) => void;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#080a0f]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
+    <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#080a0f]/90 px-4 py-3 backdrop-blur-xl sm:px-6">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10">
@@ -44,7 +44,7 @@ export function HabitsHeader({
               "inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
               privacyOn
                 ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
+                : "border-[var(--color-border)] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
             )}
           >
             {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}

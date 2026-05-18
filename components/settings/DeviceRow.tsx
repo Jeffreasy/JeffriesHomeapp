@@ -72,7 +72,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
             onKeyDown={(e) => e.key === "Enter" && save()}
             placeholder="Naam"
             aria-label="Lamp naam"
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-amber-500/50"
+            className="w-full bg-white/5 border border-[var(--color-border)] rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-amber-500/50"
             autoFocus
           />
           <div className="flex gap-2">
@@ -81,13 +81,13 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
               onChange={(e) => setIp(e.target.value)}
               placeholder="IP-adres"
               aria-label="IP-adres"
-              className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-amber-500/50 font-mono"
+              className="flex-1 min-w-0 bg-white/5 border border-[var(--color-border)] rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-amber-500/50 font-mono"
             />
             <select
               value={roomId}
               onChange={(e) => setRoomId(e.target.value)}
               aria-label="Kamer toewijzen"
-              className="flex-1 min-w-0 bg-[#1a1a26] border border-white/10 rounded-lg px-3 py-1.5 text-sm text-slate-300 outline-none"
+              className="flex-1 min-w-0 bg-[#1a1a26] border border-[var(--color-border)] rounded-lg px-3 py-1.5 text-sm text-slate-300 outline-none"
             >
               <option value="">Geen kamer</option>
               {rooms.map((r) => (
@@ -124,7 +124,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
                 setIp(device.ip_address ?? "");
               }}
               aria-label="Annuleren"
-              className="w-8 h-8 rounded-lg bg-white/5 text-slate-400 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+              className="w-8 h-8 rounded-lg bg-white/5 text-slate-400 border border-[var(--color-border)] flex items-center justify-center hover:bg-white/10 transition-colors"
             >
               <X size={13} />
             </button>
@@ -134,7 +134,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
             <button
               onClick={() => setEditing(true)}
               aria-label={`${device.name} bewerken`}
-              className="w-8 h-8 rounded-lg bg-white/5 text-slate-400 border border-white/10 flex items-center justify-center hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+              className="w-8 h-8 rounded-lg bg-white/5 text-slate-400 border border-[var(--color-border)] flex items-center justify-center hover:text-amber-400 hover:border-amber-500/30 transition-colors"
             >
               <Pencil size={13} />
             </button>
@@ -142,7 +142,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
               onClick={remove}
               disabled={deleting}
               aria-label={`${device.name} verwijderen`}
-              className="w-8 h-8 rounded-lg bg-white/5 text-slate-400 border border-white/10 flex items-center justify-center hover:text-red-400 hover:border-red-500/30 transition-colors"
+              className="w-8 h-8 rounded-lg bg-white/5 text-slate-400 border border-[var(--color-border)] flex items-center justify-center hover:text-red-400 hover:border-red-500/30 transition-colors"
             >
               {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
             </button>

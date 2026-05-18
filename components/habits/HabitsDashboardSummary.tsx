@@ -36,7 +36,7 @@ export function HabitsDashboardSummary({
   return (
     <>
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+        <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Dagstatus</p>
@@ -46,7 +46,7 @@ export function HabitsDashboardSummary({
                   onClick={() => moveDate(-1)}
                   aria-label="Vorige dag"
                   title="Vorige dag"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-300 transition-colors hover:bg-white/[0.06]"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] text-slate-300 transition-colors hover:bg-white/[0.06]"
                 >
                   <ChevronLeft size={18} />
                 </button>
@@ -57,7 +57,7 @@ export function HabitsDashboardSummary({
                     "inline-flex h-10 min-w-36 items-center justify-center rounded-lg border px-4 text-sm font-semibold transition-colors",
                     isToday
                       ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
-                      : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
+                      : "border-[var(--color-border)] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
                   )}
                 >
                   {formatDateLabel(activeDate, currentToday)}
@@ -68,7 +68,7 @@ export function HabitsDashboardSummary({
                   disabled={disableNext}
                   aria-label="Volgende dag"
                   title="Volgende dag"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-35"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <ChevronRight size={18} />
                 </button>

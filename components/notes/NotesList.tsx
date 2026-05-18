@@ -44,7 +44,7 @@ export function NotesList({
   const activeSort = SORT_OPTIONS.find((option) => option.id === sortMode) ?? SORT_OPTIONS[0];
 
   return (
-    <section className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+    <section className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
       <SectionTitle
         icon={NotebookPen}
         title={viewMode === "active" ? "Actieve notities" : "Archief"}
@@ -70,7 +70,7 @@ export function NotesList({
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
         </div>
       ) : displayed.length === 0 ? (
-        <div className="mt-5 flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-4 py-12 text-center">
+        <div className="mt-5 flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-[var(--color-border)] bg-white/[0.02] px-4 py-12 text-center">
           <Sparkles size={34} className="text-slate-700" />
           <p className="mt-4 font-semibold text-slate-200">
             {search || tagFilter ? "Geen notities gevonden" : "Nog geen notities"}
@@ -84,7 +84,7 @@ export function NotesList({
             <button
               type="button"
               onClick={clearFilters}
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
             >
               <RotateCcw size={14} />
               Filters wissen

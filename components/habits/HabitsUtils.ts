@@ -41,7 +41,7 @@ export const toneClasses: Record<Tone, { border: string; surface: string; icon: 
     text: "text-indigo-200",
   },
   slate: {
-    border: "border-white/10",
+    border: "border-[var(--color-border)]",
     surface: "bg-white/[0.04]",
     icon: "text-slate-300",
     text: "text-slate-200",

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 function IntegrationRow({ icon: Icon, label, ok }: { icon: LucideIcon; label: string; ok?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-3">
       <div className="flex min-w-0 items-center gap-3">
         <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", ok ? "bg-emerald-500/10" : "bg-rose-500/10")}>
           <Icon size={15} className={ok ? "text-emerald-300" : "text-rose-300"} />
@@ -21,7 +21,7 @@ function IntegrationRow({ icon: Icon, label, ok }: { icon: LucideIcon; label: st
 
 function MiniInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 px-3 py-2">
+    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-2">
       <p className="truncate text-xs font-medium text-slate-500">{label}</p>
       <p className="mt-0.5 truncate text-sm font-semibold text-slate-200">{value}</p>
     </div>
@@ -52,7 +52,7 @@ export function SettingsIntegrations({
         <IntegrationRow icon={Cloud} label="Google OAuth" ok={overview?.integrations.googleOAuth} />
         <IntegrationRow icon={Activity} label="Todoist" ok={overview?.integrations.todoist} />
       </div>
-      <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+      <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-bold text-white">Telegram beheer</p>
@@ -81,11 +81,11 @@ export function SettingsIntegrations({
         )}
       </div>
       {grokCapabilities && (
-        <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+        <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4">
           <p className="text-sm font-bold text-white">Grok capabilities</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {grokCapabilities.agents.map((agent: any) => (
-              <div key={agent.id} className="rounded-lg border border-white/10 bg-black/10 px-3 py-3">
+              <div key={agent.id} className="rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
                 <p className="truncate text-sm font-semibold text-slate-200">
                   {agent.emoji} {agent.naam}
                 </p>

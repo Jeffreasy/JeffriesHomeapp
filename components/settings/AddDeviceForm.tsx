@@ -59,7 +59,7 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
             onChange={(e) => setIp(e.target.value)}
             placeholder="192.168.1.xxx"
             required
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+            className="w-full bg-white/5 border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
           />
         </div>
         <div>
@@ -72,7 +72,7 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
             onChange={(e) => setName(e.target.value)}
             placeholder="Woonkamer lamp 1"
             required
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+            className="w-full bg-white/5 border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
           />
         </div>
       </div>
@@ -84,7 +84,7 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
           id="device-room"
           value={roomId}
           onChange={(e) => setRoomId(e.target.value)}
-          className="w-full bg-[#1a1a26] border border-white/10 rounded-lg px-3 py-2 text-sm text-slate-300 outline-none"
+          className="w-full bg-[#1a1a26] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-slate-300 outline-none"
         >
           <option value="">Geen kamer</option>
           {rooms.map((r) => (
@@ -104,7 +104,7 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="px-4 py-2 rounded-lg bg-white/5 text-slate-400 border border-white/10 text-sm hover:bg-white/10 transition-colors"
+          className="px-4 py-2 rounded-lg bg-white/5 text-slate-400 border border-[var(--color-border)] text-sm hover:bg-white/10 transition-colors"
         >
           Annuleren
         </button>

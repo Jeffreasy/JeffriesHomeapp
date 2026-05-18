@@ -46,7 +46,7 @@ export function Sidebar() {
   if (!mounted || !isDesktop) return null;
 
   return (
-    <aside className="fixed left-0 top-0 z-40 hidden h-full w-64 flex-col overflow-hidden border-r border-white/10 bg-[#080a0f]/95 backdrop-blur-xl md:flex">
+    <aside className="fixed left-0 top-0 z-40 hidden h-full w-64 flex-col overflow-hidden border-r border-[var(--color-border)] bg-[#080a0f]/95 backdrop-blur-xl md:flex">
       <Link
         href="/"
         className="group flex items-center gap-3 border-b border-white/[0.08] px-4 py-5 transition-colors hover:bg-white/[0.03]"

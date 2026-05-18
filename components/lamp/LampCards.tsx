@@ -33,7 +33,7 @@ export const toneClasses: Record<Tone, { icon: string; surface: string; border: 
   slate: {
     icon: "text-slate-300",
     surface: "bg-white/5",
-    border: "border-white/10",
+    border: "border-[var(--color-border)]",
     text: "text-slate-200",
   },
 };
@@ -64,7 +64,7 @@ export function SectionHeader({
   return (
     <div className="mb-4 flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04]">
           <Icon size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
@@ -160,8 +160,8 @@ export function LoadingGrid() {
 
 export function EmptyDevices() {
   return (
-    <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+    <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-6 py-12 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-white/5">
         <Lightbulb size={28} className="text-slate-600" />
       </div>
       <h3 className="mt-4 text-lg font-semibold text-slate-300">Geen lampen gevonden</h3>
@@ -183,7 +183,7 @@ export function NoResults({ search, filter, onReset }: { search: string; filter:
   const hasFilter = search.trim().length > 0 || filter !== "all";
 
   return (
-    <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
+    <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-6 py-12 text-center">
       <Search size={28} className="text-slate-600" />
       <h3 className="mt-4 text-base font-semibold text-slate-300">Geen lampen in deze selectie</h3>
       <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
@@ -194,7 +194,7 @@ export function NoResults({ search, filter, onReset }: { search: string; filter:
       <button
         type="button"
         onClick={onReset}
-        className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07]"
+        className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.04] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07]"
       >
         Filters resetten
       </button>

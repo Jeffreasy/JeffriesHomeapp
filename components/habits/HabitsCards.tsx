@@ -36,7 +36,7 @@ export function SectionHeader({ title, meta }: { title: string; meta: string }) 
   return (
     <div className="flex items-center justify-between gap-3">
       <h2 className="text-sm font-bold uppercase text-slate-300">{title}</h2>
-      <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-xs font-semibold text-slate-500">
+      <span className="rounded-md border border-[var(--color-border)] bg-white/[0.03] px-2 py-1 text-xs font-semibold text-slate-500">
         {meta}
       </span>
     </div>
@@ -45,7 +45,7 @@ export function SectionHeader({ title, meta }: { title: string; meta: string }) 
 
 export function SidePanel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+    <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
       <h3 className="mb-3 text-xs font-bold uppercase text-slate-400">{title}</h3>
       {children}
     </div>
@@ -111,7 +111,7 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-4 py-10 text-center">
+    <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-white/[0.02] px-4 py-10 text-center">
       <Icon size={34} className="mx-auto text-slate-700" />
       <p className="mt-3 text-sm font-semibold text-slate-400">{title}</p>
       {actionLabel && onAction && (
@@ -133,7 +133,7 @@ export function HabitListSkeleton({ loading }: { loading: boolean }) {
   return (
     <div className="space-y-2">
       {[1, 2, 3].map((item) => (
-        <div key={item} className="h-24 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
+        <div key={item} className="h-24 animate-pulse rounded-lg border border-[var(--color-border)] bg-white/[0.04]" />
       ))}
     </div>
   );

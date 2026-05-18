@@ -81,7 +81,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Naam *"
-          className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+          className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
         />
       </div>
 
@@ -92,7 +92,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
-          className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50 [color-scheme:dark]"
+          className="bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50 [color-scheme:dark]"
         />
       </div>
 
@@ -123,7 +123,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
                 "flex-1 py-1 rounded-lg text-xs font-medium transition-all",
                 days.includes(i)
                   ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                  : "bg-white/5 text-slate-500 border border-white/10"
+                  : "bg-white/5 text-slate-500 border border-[var(--color-border)]"
               )}
             >
               {label}
@@ -165,7 +165,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
                   "py-1.5 rounded-lg text-xs border transition-all",
                   sceneId === id
                     ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                    : "bg-white/5 text-slate-400 border-white/10"
+                    : "bg-white/5 text-slate-400 border-[var(--color-border)]"
                 )}
               >
                 {label}
@@ -211,7 +211,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
               type="color"
               value={colorHex}
               onChange={(e) => setColorHex(e.target.value)}
-              className="w-12 h-10 rounded-lg border border-white/10 bg-transparent cursor-pointer"
+              className="w-12 h-10 rounded-lg border border-[var(--color-border)] bg-transparent cursor-pointer"
             />
             <span className="text-xs font-mono text-slate-400">{colorHex.toUpperCase()}</span>
           </div>

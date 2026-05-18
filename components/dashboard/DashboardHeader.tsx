@@ -40,7 +40,7 @@ export function DashboardHeader({
             type="button"
             onClick={togglePrivacy}
             title={privacyOn ? "Privacy mode uitzetten" : "Privacy mode aanzetten"}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06]"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06]"
           >
             {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}
             <span className="hidden sm:inline">{privacyOn ? "Privacy aan" : "Privacy uit"}</span>
@@ -51,7 +51,7 @@ export function DashboardHeader({
             onClick={toggleAll}
             disabled={onlineDevicesCount === 0}
             title={allOn ? "Alle online lampen uitzetten" : "Alle online lampen aanzetten"}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-white/[0.03] disabled:text-slate-600"
           >
             <Power size={16} />
             <span>{allOn ? "Alles uit" : "Alles aan"}</span>

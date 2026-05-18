@@ -71,7 +71,7 @@ export function OverviewPanel({
           </div>
           <Link
             href="/rooster"
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
           >
             Agenda openen
             <ArrowRight size={14} />

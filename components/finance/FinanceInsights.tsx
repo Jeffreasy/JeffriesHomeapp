@@ -38,7 +38,7 @@ export function FinanceInsights({
   return (
     <>
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+        <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
           <SectionTitle
             icon={ShoppingBag}
             title="Uitgaven per categorie"
@@ -60,7 +60,7 @@ export function FinanceInsights({
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+        <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
           <SectionTitle icon={Receipt} title="Top uitgaven" subtitle="Per tegenpartij" />
           <div className="mt-4">
             {stats.topMerchants?.length ? (
@@ -84,7 +84,7 @@ export function FinanceInsights({
                 ))}
               </div>
             ) : (
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-500">
+              <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4 text-sm text-slate-500">
                 Geen topuitgaven in deze selectie.
               </div>
             )}
@@ -92,7 +92,7 @@ export function FinanceInsights({
         </div>
       </section>
 
-      <section className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+      <section className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
         <SectionTitle icon={Wallet} title="Financiele signalen" subtitle="Korte checks op je huidige selectie" />
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <InsightRow

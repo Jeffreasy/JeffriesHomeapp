@@ -92,7 +92,7 @@ export function SignalCard({
             </span>
             <span className={cn(
               "rounded-full border px-2 py-0.5 text-xs font-bold",
-              signal.urgency === "hoog" ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-white/10 bg-white/[0.04] text-slate-400",
+              signal.urgency === "hoog" ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] text-slate-400",
             )}>
               {signal.urgency}
             </span>
@@ -108,7 +108,7 @@ export function SignalCard({
               type="button"
               onClick={() => onCreateAction(signal)}
               disabled={disabled}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.045)] px-3 text-xs font-bold text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn--ghost btn--sm flex-1 justify-center disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {busyAction ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               Actie
@@ -117,7 +117,7 @@ export function SignalCard({
               type="button"
               onClick={() => onConvertToLead(signal)}
               disabled={disabled}
-              className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] px-3 text-xs font-bold text-[var(--color-primary)] transition-colors hover:bg-[var(--color-primary-hover)] shadow-[0_0_15px_rgba(245,158,11,0.1)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn btn--primary btn--sm flex-1 justify-center disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {busyLead ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
               Lead
@@ -165,7 +165,7 @@ export function ActionItemCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-xs font-bold text-slate-300">
+            <span className="rounded-full border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-2 py-0.5 text-xs font-bold text-slate-300">
               {label(action.actionType)}
             </span>
             <span className={cn(

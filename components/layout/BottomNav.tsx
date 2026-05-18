@@ -59,7 +59,7 @@ export function BottomNav() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 18, scale: 0.98 }}
               transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              className="fixed inset-x-3 z-[59] rounded-2xl border border-white/10 bg-[#0f1219]/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl md:hidden"
+              className="fixed inset-x-3 z-[59] rounded-2xl border border-[var(--color-border)] bg-[#0f1219]/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl md:hidden"
               style={{ bottom: "calc(88px + env(safe-area-inset-bottom, 0px))" }}
             >
               <div className="mb-3 flex items-center justify-between gap-3 px-1">
@@ -73,7 +73,7 @@ export function BottomNav() {
                   type="button"
                   onClick={() => setMoreOpen(false)}
                   aria-label="Meer menu sluiten"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-400 transition-colors active:scale-95"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.04] text-slate-400 transition-colors active:scale-95"
                 >
                   <X size={17} />
                 </button>
@@ -91,7 +91,7 @@ export function BottomNav() {
 
       <nav
         aria-label="Mobiele hoofdnavigatie"
-        className="fixed bottom-0 left-0 right-0 z-[60] border-t border-white/10 bg-[#080a0f]/[0.92] px-2 pt-2 backdrop-blur-xl md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-[60] border-t border-[var(--color-border)] bg-[#080a0f]/[0.92] px-2 pt-2 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="grid grid-cols-5 gap-1">

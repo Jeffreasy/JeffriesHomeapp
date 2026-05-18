@@ -48,8 +48,8 @@ export function RoomRow({
   };
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.035] p-4">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.04]">
         <Router size={16} className="text-amber-300" />
       </div>
 
@@ -59,14 +59,14 @@ export function RoomRow({
             value={name}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && save()}
-            className="min-w-0 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+            className="min-w-0 rounded-lg border border-[var(--color-border)] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
             aria-label="Kamernaam"
           />
           <input
             value={floor}
             onChange={(event) => setFloor(event.target.value)}
             type="number"
-            className="min-w-0 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+            className="min-w-0 rounded-lg border border-[var(--color-border)] bg-white/[0.04] px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
             aria-label="Verdieping"
           />
         </div>
@@ -95,7 +95,7 @@ export function RoomRow({
               type="button"
               onClick={reset}
               aria-label="Kamer bewerken annuleren"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-500 transition-colors hover:text-slate-300"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] text-slate-500 transition-colors hover:text-slate-300"
             >
               <X size={14} />
             </button>
@@ -106,7 +106,7 @@ export function RoomRow({
               type="button"
               onClick={() => setEditing(true)}
               aria-label={`Kamer ${room.name} bewerken`}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-500 transition-colors hover:border-amber-500/30 hover:text-amber-300"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] text-slate-500 transition-colors hover:border-amber-500/30 hover:text-amber-300"
             >
               <Pencil size={14} />
             </button>
@@ -115,7 +115,7 @@ export function RoomRow({
               onClick={() => onDelete(room)}
               disabled={deleting}
               aria-label={`Kamer ${room.name} verwijderen`}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-500 transition-colors hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] text-slate-500 transition-colors hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
             >
               {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
             </button>

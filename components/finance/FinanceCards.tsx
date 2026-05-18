@@ -44,7 +44,7 @@ export const toneClasses: Record<Tone, { border: string; surface: string; icon: 
     glow: "shadow-[0_0_0_1px_rgba(99,102,241,0.04)]",
   },
   slate: {
-    border: "border-white/10",
+    border: "border-[var(--color-border)]",
     surface: "bg-white/[0.04]",
     icon: "text-slate-300",
     text: "text-slate-200",
@@ -139,7 +139,7 @@ export function SegmentedButton({
         "inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
         active
           ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-          : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+          : "border-[var(--color-border)] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
       )}
     >
       {Icon && <Icon size={15} />}

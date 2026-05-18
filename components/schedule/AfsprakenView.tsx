@@ -51,7 +51,7 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
 
   if (upcoming.length === 0 && history.length === 0 && pending.length === 0) {
     return (
-      <div className="glass rounded-2xl p-10 text-center border border-dashed border-white/10">
+      <div className="glass rounded-2xl p-10 text-center border border-dashed border-[var(--color-border)]">
         <Calendar size={36} className="text-slate-600 mx-auto mb-4" />
         <h3 className="text-base font-semibold text-slate-300 mb-1">Geen afspraken gevonden</h3>
         <p className="text-sm text-slate-500">

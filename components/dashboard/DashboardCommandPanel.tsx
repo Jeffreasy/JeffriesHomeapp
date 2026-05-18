@@ -62,7 +62,7 @@ export function CommandPanel({
           onClick={onToggleAll}
           disabled={onlineCount === 0}
           title={allOn ? "Alle online lampen uitzetten" : "Alle online lampen aanzetten"}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-white/[0.03] disabled:text-slate-600"
         >
           <Power size={18} />
         </button>

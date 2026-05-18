@@ -48,7 +48,7 @@ export function OverviewPanel({
           </div>
           <Link
             href="/finance"
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
           >
             Finance openen
             <ArrowRight size={14} />
@@ -148,14 +148,14 @@ export function OverviewTab({
               <button
                 type="button"
                 onClick={() => setAllWeeks(true)}
-                className="h-9 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
+                className="h-9 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
               >
                 Alles open
               </button>
               <button
                 type="button"
                 onClick={() => setAllWeeks(false)}
-                className="h-9 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
+                className="h-9 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
               >
                 Compact
               </button>

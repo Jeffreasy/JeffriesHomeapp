@@ -27,7 +27,7 @@ export function GlobalColorPicker() {
       <motion.button
         whileTap={{ scale: 0.93 }}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-xs font-medium hover:bg-white/10 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--color-border)] bg-white/5 text-slate-300 text-xs font-medium hover:bg-white/10 transition-colors"
       >
         <Palette size={13} />
         <span className="hidden sm:inline">Alles dezelfde kleur</span>
@@ -55,7 +55,7 @@ export function GlobalColorPicker() {
             </div>
             <HexColorPicker color={hex} onChange={setHex} style={{ width: "100%", height: 130 }} />
             <div
-              className="w-full h-6 rounded-lg mt-2 border border-white/10"
+              className="w-full h-6 rounded-lg mt-2 border border-[var(--color-border)]"
               style={{ background: hex, transition: "background 0.1s" }}
             />
             <p className="text-center text-[10px] font-mono text-slate-500 mt-1">{hex.toUpperCase()}</p>

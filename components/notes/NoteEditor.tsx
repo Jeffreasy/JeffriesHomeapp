@@ -192,7 +192,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
         exit={{ opacity: 0, y: 40 }}
         transition={{ type: "spring", damping: 28, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-white/10 overflow-hidden max-h-[92dvh] flex flex-col"
+        className="relative w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)] overflow-hidden max-h-[92dvh] flex flex-col"
         style={{
           background: kleur
             ? `linear-gradient(135deg, ${kleur}15 0%, #0f0f14 40%)`
@@ -267,7 +267,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="rounded-xl border border-white/10 bg-[#1a1a22] overflow-hidden max-h-[200px] overflow-y-auto"
+                className="rounded-xl border border-[var(--color-border)] bg-[#1a1a22] overflow-hidden max-h-[200px] overflow-y-auto"
               >
                 {linkResults.map((result) => (
                   <button
@@ -355,7 +355,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                   type="datetime-local"
                   value={deadline ? deadline.slice(0, 16) : ""}
                   onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value).toISOString() : "")}
-                  className="bg-transparent text-sm text-slate-300 outline-none border border-white/10 rounded-xl px-3 py-2.5 flex-1 min-h-[44px] scheme-dark"
+                  className="bg-transparent text-sm text-slate-300 outline-none border border-[var(--color-border)] rounded-xl px-3 py-2.5 flex-1 min-h-[44px] scheme-dark"
                 />
                 {deadline && (
                   <button
@@ -375,7 +375,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                   <select
                     value={prioriteit}
                     onChange={(e) => setPrioriteit(e.target.value)}
-                    className="w-full appearance-none bg-transparent text-sm text-slate-300 outline-none border border-white/10 rounded-xl pl-3 pr-8 py-2.5 cursor-pointer min-h-[44px] scheme-dark"
+                    className="w-full appearance-none bg-transparent text-sm text-slate-300 outline-none border border-[var(--color-border)] rounded-xl pl-3 pr-8 py-2.5 cursor-pointer min-h-[44px] scheme-dark"
                   >
                     {PRIORITEITEN.map((p) => (
                       <option key={p.value} value={p.value}>{p.label}</option>

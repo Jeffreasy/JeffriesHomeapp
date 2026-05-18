@@ -85,7 +85,7 @@ export function SettingsPendingActions({
           <EmptyState icon={CheckCircle2} title="Geen openstaande Grok-acties" />
         ) : (
           pendingActions.map((action) => (
-            <div key={action._id} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+            <div key={action._id} className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase text-amber-200">{action.code}</p>
@@ -99,7 +99,7 @@ export function SettingsPendingActions({
                     type="button"
                     onClick={() => handleCancelPending(action._id)}
                     disabled={pendingBusyId === action._id}
-                    className="h-9 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-slate-300 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+                    className="h-9 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-bold text-slate-300 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
                   >
                     Annuleer
                   </button>

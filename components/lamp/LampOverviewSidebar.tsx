@@ -14,7 +14,7 @@ export function LampOverviewSidebar({ groups, unassignedCount }: { groups: RoomG
         sub={`${groups.length + (unassignedCount > 0 ? 1 : 0)} groepen`}
       />
       {groups.length === 0 && unassignedCount === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-center text-sm text-slate-500">
+        <p className="rounded-xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-4 py-6 text-center text-sm text-slate-500">
           Nog geen kamerindeling.
         </p>
       ) : (

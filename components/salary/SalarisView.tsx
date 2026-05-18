@@ -54,7 +54,7 @@ export function SalarisView() {
 
   if (displayRecords.length === 0) {
     return (
-      <div className="glass rounded-2xl p-12 text-center border border-dashed border-white/10">
+      <div className="glass rounded-2xl p-12 text-center border border-dashed border-[var(--color-border)]">
         <Euro size={36} className="text-slate-600 mx-auto mb-4" />
         <h3 className="text-base font-semibold text-slate-300 mb-1">Geen salarisdata</h3>
         <p className="text-sm text-slate-500">

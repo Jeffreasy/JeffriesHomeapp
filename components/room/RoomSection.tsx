@@ -56,7 +56,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04]">
             {room.icon ? (
               <span className="text-lg" aria-hidden="true">
                 {room.icon}
@@ -103,7 +103,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
               "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
               showScenes
                 ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
-                : "border-white/10 bg-white/[0.035] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200",
+                : "border-[var(--color-border)] bg-white/[0.035] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200",
               !hasOnlineDevices && "cursor-not-allowed opacity-40"
             )}
           >

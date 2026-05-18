@@ -139,7 +139,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
             transition={{ duration: 0.2 }}
             className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-md mx-auto"
           >
-            <div className="glass rounded-2xl border border-white/10 shadow-2xl overflow-hidden">
+            <div className="glass rounded-2xl border border-[var(--color-border)] shadow-2xl overflow-hidden">
 
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
@@ -167,7 +167,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
                     onChange={e => setTitel(e.target.value)}
                     placeholder="bijv. Verjaardag Mama"
                     required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
                 </div>
 
@@ -192,7 +192,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
                     </label>
                     <input type="date" value={startDatum}
                       onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                   <div>
@@ -201,7 +201,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
                     </label>
                     <input type="date" value={eindDatum} min={startDatum}
                       onChange={e => setEindDatum(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                 </div>
@@ -215,7 +215,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
                         <Clock size={9} /> Van
                       </label>
                       <input type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                     <div>
@@ -223,7 +223,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
                         <Clock size={9} /> Tot
                       </label>
                       <input type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                   </motion.div>
@@ -236,7 +236,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
                   </label>
                   <input type="text" value={locatie} onChange={e => setLocatie(e.target.value)}
                     placeholder="bijv. Amsterdam"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
                 </div>
 
@@ -271,7 +271,7 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
                   </label>
                   <textarea value={beschrijving} onChange={e => setBeschrijving(e.target.value)}
                     rows={2} placeholder="Aantekeningen..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none"
+                    className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none"
                   />
                 </div>
 

@@ -39,7 +39,7 @@ export function LaventeCareFunnelView({
             {LAVENTECARE_PROCESS_STAGES.map((stage, index) => (
               <div key={stage.key} className="glass p-4 bg-[var(--color-surface)]">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-sm font-bold text-slate-200">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] text-sm font-bold text-slate-200">
                     {index + 1}
                   </span>
                   <h3 className="font-semibold text-white">{stage.title}</h3>
@@ -121,7 +121,7 @@ export function LaventeCareFunnelView({
                               type="button"
                               onClick={() => handleLeadStatus(lead, status)}
                               disabled={Boolean(processingLead)}
-                              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.045)] px-2 text-xs font-bold text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+                              className="btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                               {busy && <Loader2 size={13} className="animate-spin" />}
                               {label(status)}
@@ -181,7 +181,7 @@ export function LaventeCareFunnelView({
                             type="button"
                             onClick={() => handleProjectStatus(project, { fase })}
                             disabled={Boolean(processingProject)}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.045)] px-2 text-xs font-bold text-slate-200 transition-colors hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {busy && <Loader2 size={13} className="animate-spin" />}
                             {label(fase)}

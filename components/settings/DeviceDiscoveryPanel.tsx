@@ -46,7 +46,7 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
   };
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+    <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white">Device discovery</p>
@@ -71,7 +71,7 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
             </div>
           ) : (
             candidates.map((device) => (
-              <div key={`${device.id}-${device.ip_address}`} className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/10 px-3 py-3">
+              <div key={`${device.id}-${device.ip_address}`} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
                 <Wifi size={15} className="shrink-0 text-sky-300" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-200">{device.name}</p>

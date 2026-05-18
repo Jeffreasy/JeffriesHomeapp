@@ -12,7 +12,7 @@ export function Panel({ children, className = "" }: { children: ReactNode; class
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("rounded-lg border border-white/10 bg-white/[0.035] p-4 backdrop-blur-xl sm:p-5", className)}
+      className={cn("rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4 backdrop-blur-xl sm:p-5", className)}
     >
       {children}
     </motion.div>
@@ -35,7 +35,7 @@ export function SectionHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.04]">
           <Icon size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
@@ -121,7 +121,7 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-3">
       <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         <Icon size={15} className={classes.icon} />
       </div>
@@ -155,7 +155,7 @@ export function RouteTile({ href, label, meta, icon: Icon, tone }: { href: strin
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 transition-colors hover:bg-white/[0.06]"
+      className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-3 transition-colors hover:bg-white/[0.06]"
     >
       <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         <Icon size={16} className={classes.icon} />
@@ -171,7 +171,7 @@ export function RouteTile({ href, label, meta, icon: Icon, tone }: { href: strin
 
 export function EmptyState({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center">
+    <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-white/[0.02] px-4 py-8 text-center">
       <Icon size={28} className="mx-auto text-slate-700" />
       <p className="mt-3 text-sm font-semibold text-slate-400">{title}</p>
     </div>

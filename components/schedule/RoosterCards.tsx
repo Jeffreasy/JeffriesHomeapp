@@ -29,7 +29,7 @@ export function SectionHeader({
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04]">
           <Icon size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
@@ -55,7 +55,7 @@ export function SectionTitle({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04]">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04]">
         <Icon size={16} className="text-amber-300" />
       </div>
       <div className="min-w-0">
@@ -140,8 +140,8 @@ export function EmptyRoster({
   onUpload: () => void;
 }) {
   return (
-    <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-12 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+    <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-6 py-12 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-white/5">
         <Calendar size={28} className="text-slate-600" />
       </div>
       <h3 className="mt-4 text-lg font-semibold text-slate-300">Rooster ophalen</h3>
@@ -161,7 +161,7 @@ export function EmptyRoster({
         <button
           type="button"
           onClick={onUpload}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07]"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.04] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07]"
         >
           <Upload size={15} />
           CSV uploaden
@@ -173,7 +173,7 @@ export function EmptyRoster({
 
 export function EmptyInline({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
   return (
-    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-6 text-center">
+    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-4 py-6 text-center">
       <Icon size={22} className="text-slate-600" />
       <p className="mt-3 text-sm font-semibold text-slate-300">{title}</p>
       <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{text}</p>

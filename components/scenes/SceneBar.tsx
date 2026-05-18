@@ -78,7 +78,7 @@ function ColorPill({ devices }: { devices: Device[] }) {
           "flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all min-h-[44px]",
           open
             ? "bg-white/10 text-white border-white/20"
-            : "bg-white/5 text-slate-400 border-white/10 hover:text-slate-200 hover:border-white/20"
+            : "bg-white/5 text-slate-400 border-[var(--color-border)] hover:text-slate-200 hover:border-white/20"
         )}
         aria-expanded={open}
         aria-label="Kleur instellen voor alle lampen"
@@ -113,7 +113,7 @@ function ColorPill({ devices }: { devices: Device[] }) {
             </div>
             <HexColorPicker color={hex} onChange={setHex} style={{ width: "100%", height: 130 }} />
             <div
-              className="w-full h-6 rounded-lg mt-2 border border-white/10"
+              className="w-full h-6 rounded-lg mt-2 border border-[var(--color-border)]"
               style={{ background: hex, transition: "background 0.1s" }}
             />
             <p className="text-center text-[10px] font-mono text-slate-500 mt-1">{hex.toUpperCase()}</p>
@@ -217,7 +217,7 @@ export function SceneBar() {
             "flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all min-h-[44px] flex-shrink-0",
             showWiz
               ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-              : "bg-white/5 text-slate-500 border-white/10 hover:text-amber-400 hover:border-amber-500/20"
+              : "bg-white/5 text-slate-500 border-[var(--color-border)] hover:text-amber-400 hover:border-amber-500/20"
           )}
         >
           <Sparkles size={12} aria-hidden="true" />

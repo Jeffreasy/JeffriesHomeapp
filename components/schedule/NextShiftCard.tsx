@@ -91,7 +91,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
       <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        className={cn("rounded-xl px-4 py-3 border border-white/10", colors.bg)}
+        className={cn("rounded-xl px-4 py-3 border border-[var(--color-border)]", colors.bg)}
       >
         <div className="flex items-center justify-between">
           <div>

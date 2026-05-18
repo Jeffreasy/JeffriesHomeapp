@@ -217,7 +217,7 @@ export function LampControl({ device }: LampControlProps) {
             style={{ width: "100%", height: 130 }}
           />
           <div
-            className="w-full h-7 rounded-xl border border-white/10"
+            className="w-full h-7 rounded-xl border border-[var(--color-border)]"
             style={{ background: localHex, transition: "background 0.1s" }}
           />
           <p className="text-center text-xs font-mono text-slate-500">{localHex.toUpperCase()}</p>

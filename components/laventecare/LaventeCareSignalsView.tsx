@@ -75,7 +75,7 @@ export function LaventeCareSignalsView({
           )}
         </div>
         {followUps.length > 0 && (
-          <div className="mt-5 border-t border-white/10 pt-4">
+          <div className="mt-5 border-t border-[var(--color-border)] pt-4">
             <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Follow-ups uit funnel</p>
             <div className="mt-3 space-y-3">
               {followUps.slice(0, 3).map((followUp) => (
