@@ -53,13 +53,13 @@ export function FinanceCharts({
 }) {
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+      <div className="glass p-4">
         <SectionTitle
           icon={BarChart3}
           title={chartView === "saldo" ? "Saldo verloop" : "Inkomsten versus uitgaven"}
           subtitle={ibanFilter ? ibanLabel(ibanFilter) : "Alle rekeningen"}
           action={
-            <div className="flex rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-1">
+            <div className="flex glass p-1">
               <button
                 type="button"
                 onClick={() => setChartView("saldo")}
@@ -137,7 +137,7 @@ export function FinanceCharts({
         </div>
       </div>
 
-      <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+      <div className="glass p-4">
         <SectionTitle
           icon={PieChartIcon}
           title="Verdeling"
@@ -186,7 +186,7 @@ export function FinanceCharts({
               onClick={() => toggleCategoryFilter(entry.categorie)}
               className={cn(
                 "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors",
-                filters.categorieFilter === entry.categorie ? "bg-amber-500/10" : "hover:bg-white/[0.04]"
+                filters.categorieFilter === entry.categorie ? "bg-amber-500/10" : "hover:bg-[rgba(255,255,255,0.04)]"
               )}
             >
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: getCatColor(entry.categorie) }} />

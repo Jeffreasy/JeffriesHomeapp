@@ -38,7 +38,7 @@ export function FinanceInsights({
   return (
     <>
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+        <div className="glass p-4">
           <SectionTitle
             icon={ShoppingBag}
             title="Uitgaven per categorie"
@@ -60,7 +60,7 @@ export function FinanceInsights({
           </div>
         </div>
 
-        <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+        <div className="glass p-4">
           <SectionTitle icon={Receipt} title="Top uitgaven" subtitle="Per tegenpartij" />
           <div className="mt-4">
             {stats.topMerchants?.length ? (
@@ -70,7 +70,7 @@ export function FinanceInsights({
                     key={merchant.naam}
                     type="button"
                     onClick={() => setZoekterm(merchant.naam)}
-                    className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/[0.04]"
+                    className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[rgba(255,255,255,0.04)]"
                   >
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-xs font-bold text-amber-200">
                       {index + 1}
@@ -84,7 +84,7 @@ export function FinanceInsights({
                 ))}
               </div>
             ) : (
-              <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4 text-sm text-slate-500">
+              <div className="glass p-4 text-sm text-slate-500">
                 Geen topuitgaven in deze selectie.
               </div>
             )}
@@ -92,7 +92,7 @@ export function FinanceInsights({
         </div>
       </section>
 
-      <section className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+      <section className="glass p-4">
         <SectionTitle icon={Wallet} title="Financiele signalen" subtitle="Korte checks op je huidige selectie" />
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <InsightRow

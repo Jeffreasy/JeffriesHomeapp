@@ -45,7 +45,7 @@ export const toneClasses: Record<Tone, { border: string; surface: string; icon: 
   },
   slate: {
     border: "border-[var(--color-border)]",
-    surface: "bg-white/[0.04]",
+    surface: "bg-[rgba(255,255,255,0.04)]",
     icon: "text-slate-300",
     text: "text-slate-200",
     glow: "shadow-none",
@@ -72,7 +72,7 @@ export function MetricCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn(
-        "min-h-[116px] rounded-lg border bg-white/[0.035] p-4 transition-colors hover:bg-white/[0.055]",
+        "min-h-[116px] glass p-4 transition-colors hover:bg-[var(--color-surface-hover)]",
         toneClass.border,
         toneClass.glow
       )}
@@ -139,7 +139,7 @@ export function SegmentedButton({
         "inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
         active
           ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-          : "border-[var(--color-border)] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+          : "border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
       )}
     >
       {Icon && <Icon size={15} />}
@@ -162,7 +162,7 @@ export function InsightRow({
   const toneClass = toneClasses[tone];
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-white/5 py-3 last:border-b-0">
+    <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] py-3 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
         <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneClass.surface)}>
           <Icon size={15} className={toneClass.icon} />
