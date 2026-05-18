@@ -18,10 +18,10 @@ export function DailyChecklist() {
   if (isLoading) {
     return (
       <div className="glass rounded-2xl p-4 animate-pulse">
-        <div className="h-5 w-32 bg-white/5 rounded mb-3" />
+        <div className="h-5 w-32 bg-[rgba(255,255,255,0.05)] rounded mb-3" />
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-14 bg-white/5 rounded-xl" />
+            <div key={i} className="h-14 bg-[rgba(255,255,255,0.05)] rounded-xl" />
           ))}
         </div>
       </div>
@@ -31,7 +31,7 @@ export function DailyChecklist() {
   if (todayHabits.length === 0) {
     return (
       <Link href="/habits">
-        <div className="glass rounded-2xl p-5 hover:bg-white/3 transition-colors">
+        <div className="glass rounded-2xl p-5 hover:bg-[rgba(255,255,255,0.03)] transition-colors">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-orange-500/15 border border-orange-500/20 flex items-center justify-center">
               <Target size={18} className="text-orange-400" />
@@ -79,7 +79,7 @@ export function DailyChecklist() {
             {progressPercent}%
           </span>
         </div>
-        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden">
           <motion.div
             className="h-full rounded-full"
             style={{ background: progressPercent === 100 ? "#22c55e" : "#f97316" }}

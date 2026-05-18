@@ -148,17 +148,17 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
           >
             {/* Drag handle (mobile) */}
             <div className="flex shrink-0 justify-center pb-1 pt-3 md:hidden">
-              <div className="w-10 h-1 rounded-full bg-white/10" />
+              <div className="w-10 h-1 rounded-full bg-[rgba(255,255,255,0.1)]" />
             </div>
 
             {/* Header */}
-            <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-5 pb-4 pt-2 md:pt-4">
+            <div className="flex shrink-0 items-center justify-between border-b border-[var(--color-border)] px-5 pb-4 pt-2 md:pt-4">
               <h2 className="text-lg font-bold text-slate-200">
                 {initial ? "Habit bewerken" : "Nieuwe Habit"}
               </h2>
               <button
                 onClick={onClose}
-                className="w-11 h-11 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-90"
+                className="w-11 h-11 rounded-full bg-[rgba(255,255,255,0.05)] flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-90"
               >
                 <X size={18} />
               </button>
@@ -174,7 +174,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
               <div className="flex gap-3 mb-4">
                 <button
                   onClick={() => setShowEmojis(!showEmojis)}
-                  className="w-14 h-14 rounded-2xl bg-white/5 border border-white/8 flex items-center justify-center text-2xl shrink-0 active:scale-95 transition-transform"
+                  className="w-14 h-14 rounded-2xl bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] flex items-center justify-center text-2xl shrink-0 active:scale-95 transition-transform"
                   style={{ borderColor: kleur + "30" }}
                 >
                   {emoji}
@@ -185,7 +185,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                   value={naam}
                   onChange={(e) => setNaam(e.target.value)}
                   placeholder="Naam van habit..."
-                  className="flex-1 bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 min-h-[56px]"
+                  className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 min-h-[56px]"
                 />
               </div>
 
@@ -198,12 +198,12 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden mb-4"
                   >
-                    <div className="grid grid-cols-8 gap-1.5 p-3 bg-white/3 rounded-xl">
+                    <div className="grid grid-cols-8 gap-1.5 p-3 bg-[rgba(255,255,255,0.03)] rounded-xl">
                       {HABIT_EMOJIS.map((e) => (
                         <button
                           key={e}
                           onClick={() => { setEmoji(e); setShowEmojis(false); }}
-                          className="text-xl p-1.5 rounded-lg hover:bg-white/5 active:scale-90 transition-all min-h-[44px] flex items-center justify-center"
+                          className="text-xl p-1.5 rounded-lg hover:bg-[var(--color-surface-hover)] active:scale-90 transition-all min-h-[44px] flex items-center justify-center"
                           style={{ background: emoji === e ? "rgba(249,115,22,0.12)" : undefined }}
                         >
                           {e}
@@ -220,7 +220,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 value={beschrijving}
                 onChange={(e) => setBeschrijving(e.target.value)}
                 placeholder="Optionele beschrijving..."
-                className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 mb-4 min-h-[48px]"
+                className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 mb-4 min-h-[48px]"
               />
 
               {/* Type toggle */}
@@ -372,7 +372,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                       value={doelWaarde ?? ""}
                       onChange={(e) => setDoelWaarde(e.target.value ? Number(e.target.value) : undefined)}
                       placeholder="Doel"
-                      className="flex-1 bg-white/5 border border-white/8 rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500/30 min-h-[44px]"
+                      className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500/30 min-h-[44px]"
                       inputMode="numeric"
                     />
                     <div className="flex gap-1">
@@ -404,7 +404,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                   type="time"
                   value={doelTijd}
                   onChange={(e) => setDoelTijd(e.target.value)}
-                  className="w-full bg-white/5 border border-white/8 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-orange-500/30 min-h-[48px] scheme-dark"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-orange-500/30 min-h-[48px] scheme-dark"
                 />
                 {doelTijd && (
                   <button
@@ -465,7 +465,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
 
             {/* Submit button — above mobile nav, outside the scroll area */}
             <div
-              className="shrink-0 border-t border-white/5 bg-[rgba(15,15,20,0.98)] p-4"
+              className="shrink-0 border-t border-[var(--color-border)] bg-[rgba(15,15,20,0.98)] p-4"
               style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))" }}
             >
               {submitError && (

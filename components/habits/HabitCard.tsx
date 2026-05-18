@@ -200,7 +200,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
         {/* More menu */}
         <button
           onClick={() => setShowMenu(!showMenu)}
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 hover:bg-white/5 transition-colors cursor-pointer"
+          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer"
         >
           <MoreVertical size={16} className="text-slate-500" />
         </button>
@@ -210,7 +210,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
       {isQuantitative && (
         <div className="px-3.5 pb-3">
           {/* Progress bar */}
-          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-2">
+          <div className="h-1.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden mb-2">
             <motion.div
               className="h-full rounded-full"
               style={{ background: color }}
@@ -269,7 +269,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className="px-3.5 pb-3 border-t border-white/5 pt-3">
+            <div className="px-3.5 pb-3 border-t border-[var(--color-border)] pt-3">
               {/* Beschrijving */}
               {habit.beschrijving && !masked && (
                 <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
@@ -318,7 +318,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                         )}
                       </span>
                     </div>
-                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-1 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden">
                       <motion.div
                         className="h-full rounded-full"
                         style={{ background: color }}
@@ -387,14 +387,14 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                   value={triggerNotitie}
                   onChange={(e) => setTriggerNotitie(e.target.value)}
                   placeholder={selectedTrigger === "anders" ? "Beschrijf de trigger..." : "Optionele notitie..."}
-                  className="w-full bg-white/5 border border-white/8 rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500/30 min-h-[44px] mb-3"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500/30 min-h-[44px] mb-3"
                 />
               )}
 
               <div className="flex gap-2">
                 <button
                   onClick={() => { setShowTriggerModal(false); setSelectedTrigger(undefined); setTriggerNotitie(""); }}
-                  className="flex-1 py-2.5 rounded-xl text-xs font-medium text-slate-400 bg-white/3 border border-white/5 min-h-[44px] cursor-pointer active:scale-95 transition-transform"
+                  className="flex-1 py-2.5 rounded-xl text-xs font-medium text-slate-400 bg-[rgba(255,255,255,0.03)] border border-[var(--color-border)] min-h-[44px] cursor-pointer active:scale-95 transition-transform"
                 >
                   Annuleren
                 </button>
@@ -417,7 +417,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
         <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: "auto", opacity: 1 }}
-          className="border-t border-white/5 overflow-hidden"
+          className="border-t border-[var(--color-border)] overflow-hidden"
         >
           <div className="p-2.5 flex gap-2">
             <MenuBtn icon={<Edit3 size={15} />} label="Bewerken" onClick={() => { onEdit(); setShowMenu(false); }} />

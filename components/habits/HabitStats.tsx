@@ -15,10 +15,10 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
   if (!stats) {
     return (
       <div className="glass rounded-2xl p-4 animate-pulse">
-        <div className="h-5 w-24 bg-white/5 rounded mb-4" />
+        <div className="h-5 w-24 bg-[rgba(255,255,255,0.05)] rounded mb-4" />
         <div className="grid grid-cols-2 gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 bg-white/5 rounded-xl" />
+            <div key={i} className="h-20 bg-[rgba(255,255,255,0.05)] rounded-xl" />
           ))}
         </div>
       </div>
@@ -49,7 +49,7 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
 
         {/* XP Progress bar */}
         <div className="mb-2">
-          <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
+          <div className="h-2.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden">
             <motion.div
               className="h-full rounded-full"
               style={{ background: "linear-gradient(90deg, #f97316, #f59e0b)" }}

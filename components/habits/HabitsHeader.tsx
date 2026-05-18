@@ -44,7 +44,7 @@ export function HabitsHeader({
               "inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
               privacyOn
                 ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                : "border-[var(--color-border)] bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
+                : "border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 hover:bg-[rgba(255,255,255,0.06)]",
             )}
           >
             {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}

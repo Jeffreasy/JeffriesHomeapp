@@ -55,8 +55,8 @@ export function HabitHeatmap() {
   if (!data) {
     return (
       <div className="glass rounded-2xl p-4 animate-pulse">
-        <div className="h-5 w-28 bg-white/5 rounded mb-4" />
-        <div className="h-[120px] bg-white/5 rounded-xl" />
+        <div className="h-5 w-28 bg-[rgba(255,255,255,0.05)] rounded mb-4" />
+        <div className="h-[120px] bg-[rgba(255,255,255,0.05)] rounded-xl" />
       </div>
     );
   }
