@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, Clock3, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck, Plus } from "lucide-react";
 import { LAVENTECARE_FIT_CRITERIA, LAVENTECARE_NO_FIT_SIGNALS, LAVENTECARE_PROCESS_STAGES } from "@/lib/laventecareData";
 import { cn } from "@/lib/utils";
 import { fitTone, formatDate, formatMoney, label, toneClasses } from "./LaventeCareUtils";
@@ -15,6 +15,7 @@ export function LaventeCareFunnelView({
   handleLeadStatus,
   handleLeadToProject,
   handleProjectStatus,
+  onShowProjectForm,
 }: {
   activeLeads: LeadItem[];
   activeProjects: ProjectItem[];
@@ -23,10 +24,11 @@ export function LaventeCareFunnelView({
   handleLeadStatus: (lead: LeadItem, status: string) => Promise<void>;
   handleLeadToProject: (lead: LeadItem) => Promise<void>;
   handleProjectStatus: (project: ProjectItem, fields: { fase?: string; status?: string }) => Promise<void>;
+  onShowProjectForm?: () => void;
 }) {
   return (
     <>
-      <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.4fr_0.9fr]">
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.4fr_0.9fr]">
         <div className="glass min-w-0 p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -78,7 +80,7 @@ export function LaventeCareFunnelView({
         </div>
       </section>
 
-      <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <div className="glass min-w-0 p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -152,7 +154,18 @@ export function LaventeCareFunnelView({
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Delivery</p>
               <h2 className="mt-1 text-lg font-bold text-white">Actieve projecten</h2>
             </div>
-            <FolderKanban size={20} className="text-emerald-300" />
+            <div className="flex items-center gap-3">
+              {onShowProjectForm && (
+                <button
+                  type="button"
+                  onClick={onShowProjectForm}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 transition-colors hover:bg-emerald-500/20"
+                >
+                  <Plus size={16} />
+                </button>
+              )}
+              <FolderKanban size={20} className="text-emerald-300" />
+            </div>
           </div>
           <div className="mt-4 space-y-3">
             {activeProjects.length === 0 ? (

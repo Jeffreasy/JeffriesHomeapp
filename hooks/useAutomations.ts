@@ -61,6 +61,20 @@ export function useAutomations() {
     [userId, fetchAutomations]
   );
 
+  const update = useCallback(
+    async (id: string, data: Partial<Automation>) => {
+      await automationsApi.update(id, {
+        name:           data.name,
+        enabled:        data.enabled,
+        group_name:     data.group ?? null,
+        trigger_config: data.trigger as unknown as Record<string, unknown>,
+        action_config:  data.action as unknown as Record<string, unknown>,
+      });
+      fetchAutomations();
+    },
+    [fetchAutomations]
+  );
+
   const toggle = useCallback(
     async (id: string) => {
       await automationsApi.toggle(id);
@@ -101,5 +115,5 @@ export function useAutomations() {
     [userId, fetchAutomations]
   );
 
-  return { automations, add, addDienstWekkerPack, toggle, remove, lastCheck: null };
+  return { automations, add, update, addDienstWekkerPack, toggle, remove, lastCheck: null };
 }

@@ -15,7 +15,7 @@ export function LaventeCareKnowledgeView({
   documentGroups: [string, any[]][];
 }) {
   return (
-    <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+    <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.8fr]">
       <div className="glass min-w-0 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>

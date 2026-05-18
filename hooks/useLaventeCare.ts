@@ -40,6 +40,11 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const createProjectMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createProject>[0]) => laventecareApi.createProject(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const updateProjectMut = useMutation({
     mutationFn: ({ id, ...data }: { id: string; fase?: string; status?: string }) =>
       laventecareApi.updateProject(id, data),
@@ -171,6 +176,7 @@ export function useLaventeCare() {
     createLeadMut,
     updateLeadMut,
     convertLeadMut,
+    createProjectMut,
     updateProjectMut,
     createActionMut,
     convertSignalMut,

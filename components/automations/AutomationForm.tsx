@@ -12,26 +12,38 @@ import {
   WEEKDAYS,
   WEEKEND,
   SCENE_DEFINITIONS,
+  type ShiftType,
 } from "@/lib/automations";
 import { cn } from "@/lib/utils";
 
 interface AutomationFormProps {
+  initialData?: Automation;
   onClose: () => void;
   onSave: (a: Omit<Automation, "id" | "createdAt" | "lastFiredAt">) => void;
 }
 
-export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
-  const [name, setName] = useState("");
-  const [time, setTime] = useState("07:00");
-  const [days, setDays] = useState<number[]>(ALL_DAYS);
-  const [actionType, setActionType] = useState<ActionType>("scene");
-  const [sceneId, setSceneId] = useState("helder");
-  const [brightness, setBrightness] = useState(80);
-  const [colorHex, setColorHex] = useState("#ff8800");
-  const [colorTempMireds, setColorTempMireds] = useState(370);
+export function AutomationForm({ initialData, onClose, onSave }: AutomationFormProps) {
+  const [name, setName] = useState(initialData?.name ?? "");
+  const [time, setTime] = useState(initialData?.trigger.time ?? "07:00");
+  const [days, setDays] = useState<number[]>(initialData?.trigger.days ?? ALL_DAYS);
+  const [actionType, setActionType] = useState<ActionType>(initialData?.action.type ?? "scene");
+  
+  const [sceneId, setSceneId] = useState(initialData?.action.sceneId ?? "helder");
+  const [brightness, setBrightness] = useState(initialData?.action.brightness ?? 80);
+  const [colorHex, setColorHex] = useState(initialData?.action.colorHex ?? "#ff8800");
+  const [colorTempMireds, setColorTempMireds] = useState(initialData?.action.colorTempMireds ?? 370);
+
+  // Smart Exclusions
+  const [excludedShifts, setExcludedShifts] = useState<ShiftType[]>(initialData?.trigger.excludedShifts ?? []);
 
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+
+  const toggleExcludedShift = (shift: ShiftType) => {
+    setExcludedShifts((prev) =>
+      prev.includes(shift) ? prev.filter((s) => s !== shift) : [...prev, shift]
+    );
+  };
 
   const handleSave = () => {
     if (!name || days.length === 0) return;
@@ -40,7 +52,13 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
     if (actionType === "brightness") action.brightness = brightness;
     if (actionType === "color")      action.colorHex = colorHex;
     if (actionType === "color_temp") action.colorTempMireds = colorTempMireds;
-    onSave({ name, enabled: true, trigger: { time, days }, action });
+    onSave({ 
+      name, 
+      enabled: initialData?.enabled ?? true, 
+      trigger: { time, days, excludedShifts: excludedShifts.length > 0 ? excludedShifts : undefined }, 
+      action,
+      group: initialData?.group
+    });
     onClose();
   };
 
@@ -62,8 +80,8 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
     >
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <Plus size={14} className="text-amber-400" />
-          Nieuwe automatisering
+          {initialData ? null : <Plus size={14} className="text-amber-400" />}
+          {initialData ? "Automatisering bewerken" : "Nieuwe automatisering"}
         </h3>
         <button
           onClick={onClose}
@@ -217,6 +235,31 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
           </div>
         )}
       </div>
+
+      <fieldset>
+        <legend className="text-xs font-semibold text-slate-300 mb-2">Slimme Uitsluitingen</legend>
+        <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
+          Sla deze automatisering automatisch over als je één van deze diensten hebt op die dag.
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {(["Vroeg", "Laat", "Dienst"] as ShiftType[]).map((shift) => (
+            <button
+              key={shift}
+              type="button"
+              aria-pressed={excludedShifts.includes(shift)}
+              onClick={() => toggleExcludedShift(shift)}
+              className={cn(
+                "py-1.5 rounded-lg text-xs font-medium border transition-all",
+                excludedShifts.includes(shift)
+                  ? "bg-purple-500/15 text-purple-400 border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.1)]"
+                  : "bg-[var(--color-surface)] text-slate-400 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+              )}
+            >
+              {shift}
+            </button>
+          ))}
+        </div>
+      </fieldset>
 
       <button
         type="button"

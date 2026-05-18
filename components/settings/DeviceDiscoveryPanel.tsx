@@ -5,6 +5,7 @@ import { Loader2, Radar, Wifi } from "lucide-react";
 import { devicesApi, type Device } from "@/lib/api";
 import { useCreateDevice } from "@/hooks/useDevices";
 import { useToast } from "@/components/ui/Toast";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 
 export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Device[] }) {
   const [found, setFound] = useState<Device[]>([]);
@@ -46,10 +47,17 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
   };
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 min-w-0">
+    <CollapsibleSection
+      title="Device discovery"
+      subtitle="Lokale WiZ lampen zoeken"
+      icon={<Radar size={18} />}
+      theme="sky"
+      defaultOpen={false}
+      className="mt-4"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-bold text-white">Device discovery</p>
+          <p className="text-sm font-bold text-white">Scanner</p>
           <p className="mt-1 text-xs text-slate-500">Leest de lokale WiZ API en toont ontbrekende lampen.</p>
         </div>
         <button
@@ -90,6 +98,6 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
           )}
         </div>
       )}
-    </div>
+    </CollapsibleSection>
   );
 }

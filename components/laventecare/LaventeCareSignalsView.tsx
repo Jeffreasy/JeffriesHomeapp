@@ -26,7 +26,7 @@ export function LaventeCareSignalsView({
   const signalKey = (kind: "action" | "lead", signal: BusinessSignal) => `${kind}:${signal.source}:${signal.id}`;
 
   return (
-    <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+    <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.3fr_0.7fr]">
       <div className="glass min-w-0 p-5">
         <div className="flex items-center justify-between gap-3">
           <div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Sunrise, Moon, Briefcase } from "lucide-react";
+import { Sunrise, Moon, Briefcase, Loader2 } from "lucide-react";
 import { type ShiftType } from "@/lib/automations";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,7 @@ interface WekkerPack {
 interface DienstWekkerSectionProps {
   packs: WekkerPack[];
   onInstall: (type: ShiftType) => void;
+  installingType?: ShiftType | null;
 }
 
 const PACK_ICONS: Record<string, React.ReactNode> = {
@@ -24,7 +25,7 @@ const PACK_ICONS: Record<string, React.ReactNode> = {
   Dienst: <Briefcase size={16} />,
 };
 
-export function DienstWekkerSection({ packs, onInstall }: DienstWekkerSectionProps) {
+export function DienstWekkerSection({ packs, onInstall, installingType }: DienstWekkerSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-2 mb-3">
@@ -39,8 +40,9 @@ export function DienstWekkerSection({ packs, onInstall }: DienstWekkerSectionPro
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => onInstall(type)}
+            disabled={installingType === type}
             aria-label={`${label} routine ${hasIt ? "opnieuw instellen" : "installeren"}`}
-            className="relative flex flex-col items-start gap-2 p-3 rounded-xl border text-left transition-all"
+            className="relative flex flex-col items-start gap-2 p-3 rounded-xl border text-left transition-all disabled:opacity-50"
             style={{
               background: accent + "10",
               borderColor: hasIt ? accent + "60" : accent + "25",
@@ -60,9 +62,18 @@ export function DienstWekkerSection({ packs, onInstall }: DienstWekkerSectionPro
               <p className="text-xs font-semibold text-slate-200">{label}</p>
               <p className="text-[10px] text-slate-500 mt-0.5">{sub}</p>
             </div>
-            <p className="text-[10px]" style={{ color: accent }}>
-              {hasIt ? "Opnieuw instellen" : "Installeren →"}
-            </p>
+            <div className="flex items-center gap-1 text-[10px]" style={{ color: accent }}>
+              {installingType === type ? (
+                <>
+                  <Loader2 size={10} className="animate-spin" />
+                  <span>Bezig...</span>
+                </>
+              ) : hasIt ? (
+                "Opnieuw instellen"
+              ) : (
+                "Installeren →"
+              )}
+            </div>
           </motion.button>
         ))}
       </div>

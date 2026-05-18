@@ -10,6 +10,8 @@ import { NotesHeader } from "@/components/notes/NotesHeader";
 import { NotesFilters } from "@/components/notes/NotesFilters";
 import { NotesMetricsRow, NotesSignals } from "@/components/notes/NotesMetrics";
 import { NotesList } from "@/components/notes/NotesList";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { Search } from "lucide-react";
 
 export default function NotitiesPage() {
   const {
@@ -193,7 +195,7 @@ export default function NotitiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] pb-28 text-slate-100">
+    <div className="text-slate-100">
       <NotesHeader
         count={count}
         archivedCount={archived.length}
@@ -206,24 +208,33 @@ export default function NotitiesPage() {
 
       <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <NotesFilters
-            activeFilters={activeFilters}
-            search={search}
-            setSearch={setSearch}
-            searchRef={searchRef}
-            clearFilters={clearFilters}
-            viewMode={viewMode}
-            setViewMode={setViewMode}
-            sortMode={sortMode}
-            setSortMode={setSortMode}
-            activeCount={notes.length}
-            archivedCount={archived.length}
-            allTags={allTags}
-            tagCounts={tagCounts}
-            tagFilter={tagFilter}
-            setTagFilter={setTagFilter}
-            privacyOn={privacyOn}
-          />
+          <CollapsibleSection
+            title="Geavanceerd Zoeken & Filters"
+            subtitle={`${activeFilters} actieve filters`}
+            icon={<Search size={18} />}
+            theme="primary"
+            defaultOpen={false}
+            keepMounted={true}
+          >
+            <NotesFilters
+              activeFilters={activeFilters}
+              search={search}
+              setSearch={setSearch}
+              searchRef={searchRef}
+              clearFilters={clearFilters}
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              sortMode={sortMode}
+              setSortMode={setSortMode}
+              activeCount={notes.length}
+              archivedCount={archived.length}
+              allTags={allTags}
+              tagCounts={tagCounts}
+              tagFilter={tagFilter}
+              setTagFilter={setTagFilter}
+              privacyOn={privacyOn}
+            />
+          </CollapsibleSection>
 
           <NotesSignals
             pinnedCount={pinned.length}

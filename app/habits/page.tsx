@@ -110,7 +110,7 @@ export default function HabitsPage() {
   const resetDate = () => setSelectedDate(todayStr());
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#080a0f] text-slate-100">
+    <div className="text-slate-100">
       <HabitsHeader
         level={level}
         stats={stats}

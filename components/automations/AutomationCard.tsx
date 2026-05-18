@@ -9,6 +9,7 @@ import {
   DAY_LABELS,
 } from "@/lib/automations";
 import { cn } from "@/lib/utils";
+import { Pencil } from "lucide-react";
 
 function actionLabel(action: AutomationAction): string {
   switch (action.type) {
@@ -33,10 +34,11 @@ function daysLabel(days?: number[]): string {
 interface AutomationCardProps {
   automation: Automation;
   onToggle: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }
 
-export function AutomationCard({ automation, onToggle, onDelete }: AutomationCardProps) {
+export function AutomationCard({ automation, onToggle, onEdit, onDelete }: AutomationCardProps) {
   const lastFired = automation.lastFiredAt
     ? new Date(automation.lastFiredAt).toLocaleTimeString("nl", {
         hour: "2-digit",
@@ -79,6 +81,11 @@ export function AutomationCard({ automation, onToggle, onDelete }: AutomationCar
           )}
           {" · "}{actionLabel(automation.action)}
         </p>
+        {automation.trigger.excludedShifts && automation.trigger.excludedShifts.length > 0 && (
+          <p className="text-[10px] text-purple-400/90 font-medium mt-1">
+            Behalve bij: {automation.trigger.excludedShifts.join(", ")} dienst
+          </p>
+        )}
         {lastFired && (
           <p className="text-[10px] text-slate-600 mt-1">Laatste uitvoering: {lastFired}</p>
         )}
@@ -96,6 +103,13 @@ export function AutomationCard({ automation, onToggle, onDelete }: AutomationCar
           )}
         >
           {automation.enabled ? <Play size={12} /> : <PauseCircle size={12} />}
+        </button>
+        <button
+          onClick={onEdit}
+          aria-label={`${automation.name} bewerken`}
+          className="w-8 h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 flex items-center justify-center hover:text-amber-400 hover:border-amber-500/30 hover:bg-[var(--color-surface-hover)] transition-all"
+        >
+          <Pencil size={12} />
         </button>
         <button
           onClick={onDelete}

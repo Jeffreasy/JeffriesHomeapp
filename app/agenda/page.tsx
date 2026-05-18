@@ -32,7 +32,24 @@ import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 
-type Tone = "amber" | "blue" | "green" | "indigo" | "rose" | "slate";
+import {
+  getAmsterdamTodayIso,
+  addDaysIso,
+  formatDateLabel,
+  formatDateTime,
+  eventCoversDate,
+  errorMessage,
+  parseCategory,
+} from "@/components/schedule/AgendaUtils";
+import {
+  Panel,
+  MetricTile,
+  SectionHeader,
+  EmptyState,
+  StatusPill,
+  ToolbarButton,
+  DayBlock,
+} from "@/components/schedule/AgendaCards";
 
 type SyncStatus = {
   source: string;
@@ -44,222 +61,6 @@ type SyncStatus = {
   lastError?: string;
   updatedAt: string;
 };
-
-const toneClasses: Record<Tone, { icon: string; surface: string; border: string; text: string }> = {
-  amber:  { icon: "text-amber-300",  surface: "bg-amber-500/10",  border: "border-amber-500/20",  text: "text-amber-200" },
-  blue:   { icon: "text-sky-300",    surface: "bg-sky-500/10",    border: "border-sky-500/20",    text: "text-sky-200" },
-  green:  { icon: "text-emerald-300", surface: "bg-emerald-500/10", border: "border-emerald-500/20", text: "text-emerald-200" },
-  indigo: { icon: "text-indigo-300",  surface: "bg-indigo-500/10",  border: "border-indigo-500/20",  text: "text-indigo-200" },
-  rose:   { icon: "text-rose-300",    surface: "bg-rose-500/10",    border: "border-rose-500/20",    text: "text-rose-200" },
-  slate:  { icon: "text-slate-300",   surface: "bg-white/5",        border: "border-white/10",       text: "text-slate-200" },
-};
-
-function getAmsterdamTodayIso() {
-  return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
-}
-
-function addDaysIso(baseIso: string, days: number) {
-  const date = new Date(`${baseIso}T12:00:00`);
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function formatDateLabel(iso: string) {
-  const date = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return "Nog niet";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Onbekend";
-  return date.toLocaleString("nl-NL", {
-    timeZone: "Europe/Amsterdam",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function eventCoversDate(event: PersonalEvent, datum: string) {
-  return event.startDatum <= datum && getDisplayEndDate(event) >= datum;
-}
-
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Onbekende fout";
-}
-
-function parseCategory(event: PersonalEvent) {
-  const match = event.beschrijving?.match(/\[categorie:(\w+)\]/);
-  return match?.[1] ?? "overig";
-}
-
-function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <section className={cn("glass rounded-2xl border border-white/8 p-4 sm:p-5", className)}>
-      {children}
-    </section>
-  );
-}
-
-function MetricTile({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  sub: string;
-  tone: Tone;
-}) {
-  const toneClass = toneClasses[tone];
-  return (
-    <div className="glass rounded-2xl border border-white/8 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p>
-          <p className="mt-2 truncate text-xl font-bold text-white">{value}</p>
-          <p className="mt-1 truncate text-xs text-slate-500">{sub}</p>
-        </div>
-        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", toneClass.surface, toneClass.border)}>
-          <Icon size={17} className={toneClass.icon} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({
-  icon: Icon,
-  label,
-  title,
-  action,
-}: {
-  icon: LucideIcon;
-  label: string;
-  title: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-          <Icon size={17} className="text-slate-300" />
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p>
-          <h2 className="mt-0.5 text-lg font-bold text-white">{title}</h2>
-        </div>
-      </div>
-      {action}
-    </div>
-  );
-}
-
-function EmptyState({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-4 py-8 text-center">
-      <Icon size={28} className="mx-auto text-slate-600" />
-      <p className="mt-3 text-sm font-semibold text-slate-300">{title}</p>
-      <p className="mt-1 text-xs text-slate-500">{text}</p>
-    </div>
-  );
-}
-
-function StatusPill({ status }: { status?: string }) {
-  const isRunning = status === "running";
-  const isSuccess = status === "success";
-  return (
-    <span
-      className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-wider",
-        isRunning
-          ? "border-blue-500/25 bg-blue-500/10 text-blue-200"
-          : isSuccess
-            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-            : "border-amber-500/25 bg-amber-500/10 text-amber-200",
-      )}
-    >
-      {isRunning ? <Loader2 size={12} className="animate-spin" /> : isSuccess ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
-      {status ?? "unknown"}
-    </span>
-  );
-}
-
-function ToolbarButton({
-  icon: Icon,
-  label,
-  onClick,
-  loading,
-  tone = "slate",
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-  loading?: boolean;
-  tone?: Tone;
-}) {
-  const toneClass = toneClasses[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={loading}
-      className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-        toneClass.surface,
-        toneClass.border,
-        toneClass.text,
-      )}
-    >
-      {loading ? <Loader2 size={15} className="animate-spin" /> : <Icon size={15} />}
-      {label}
-    </button>
-  );
-}
-
-function DayBlock({
-  label,
-  events,
-  onEdit,
-  todayIso,
-  conflictMap,
-}: {
-  label: string;
-  events: PersonalEvent[];
-  onEdit: (event: PersonalEvent) => void;
-  todayIso: string;
-  conflictMap: ReturnType<typeof usePersonalEvents>["conflictMap"];
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-        <span className="text-[10px] text-slate-600">{events.length}</span>
-      </div>
-      {events.length > 0 ? (
-        <div className="space-y-2">
-          {events.map((event) => (
-            <PersonalEventItem
-              key={event.eventId}
-              event={event}
-              isToday={eventCoversDate(event, todayIso)}
-              onEdit={onEdit}
-              conflictInfo={conflictMap.get(event.eventId)}
-            />
-          ))}
-        </div>
-      ) : (
-        <EmptyState icon={CalendarDays} title="Geen afspraken" text="Geen items voor dit blok." />
-      )}
-    </div>
-  );
-}
 
 export default function AgendaPage() {
   const { user } = useUser();
@@ -365,28 +166,37 @@ export default function AgendaPage() {
   };
 
   return (
-    <main className="min-h-screen px-4 py-5 pb-28 md:ml-56 md:px-8 md:py-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-indigo-200">
-              <Sparkles size={12} />
-              Agenda
+    <div className="text-slate-100">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#0a0a0f]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-indigo-500/20 bg-indigo-500/10">
+                <Sparkles size={20} className="text-indigo-300" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Agenda
+                </p>
+                <h1 className="mt-1 truncate text-2xl font-bold text-white">Persoonlijke agenda</h1>
+                <p className="mt-1 truncate text-sm text-slate-500">
+                  {formatDateLabel(todayIso)} - {monthEvents.length} afspraken in de komende 30 dagen.
+                </p>
+              </div>
             </div>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">Persoonlijke agenda</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-              {formatDateLabel(todayIso)} - {monthEvents.length} afspraken in de komende 30 dagen.
-            </p>
-          </div>
 
-          <div className="flex flex-wrap gap-2">
-            <ToolbarButton icon={RefreshCw} label="Sync agenda" onClick={handleSync} loading={syncing} tone="blue" />
-            <ToolbarButton icon={Zap} label="Verwerk wachtrij" onClick={handleProcessPending} loading={processing} tone="indigo" />
-            <ToolbarButton icon={Plus} label="Nieuwe afspraak" onClick={openNewEvent} tone="green" />
+            <div className="flex flex-wrap items-center gap-2">
+              <ToolbarButton icon={RefreshCw} label="Sync agenda" onClick={handleSync} loading={syncing} tone="blue" />
+              <ToolbarButton icon={Zap} label="Verwerk wachtrij" onClick={handleProcessPending} loading={processing} tone="indigo" />
+              <ToolbarButton icon={Plus} label="Nieuwe afspraak" onClick={openNewEvent} tone="green" />
+            </div>
           </div>
-        </section>
+        </div>
+      </header>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricTile
             icon={CalendarClock}
             label="Vandaag"
@@ -417,7 +227,7 @@ export default function AgendaPage() {
           />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="space-y-6">
             <Panel>
               <SectionHeader icon={Clock3} label="Vandaag en morgen" title="Directe planning" />
@@ -428,7 +238,7 @@ export default function AgendaPage() {
                   ))}
                 </div>
               ) : (
-                <div className="grid gap-5 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                   <DayBlock
                     label={`Vandaag - ${formatDateLabel(todayIso)}`}
                     events={todayEvents}
@@ -544,7 +354,7 @@ export default function AgendaPage() {
               {categoryStats.length > 0 ? (
                 <div className="space-y-2">
                   {categoryStats.map(([category, count]) => (
-                    <div key={category} className="flex items-center justify-between rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                    <div key={category} className="flex items-center justify-between rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
                       <span className="text-sm font-medium capitalize text-slate-300">{category}</span>
                       <span className="text-xs text-slate-500">{count}</span>
                     </div>
@@ -567,7 +377,7 @@ export default function AgendaPage() {
             )}
           </aside>
         </section>
-      </div>
+      </main>
 
       <CreateEventModal
         open={modalOpen}
@@ -577,6 +387,6 @@ export default function AgendaPage() {
           setEditEvent(null);
         }}
       />
-    </main>
+    </div>
   );
 }

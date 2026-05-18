@@ -100,7 +100,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-slate-100">
+    <div className="text-slate-100">
       <DashboardHeader
         greeting={greeting}
         today={today}

@@ -1,11 +1,10 @@
 "use client";
 
-import { BookOpenText, BriefcaseBusiness, FileText, FolderKanban, Handshake, LifeBuoy, Loader2, Plus, Sparkles, Target, X } from "lucide-react";
+import { BookOpenText, BriefcaseBusiness, Loader2, Plus, X } from "lucide-react";
 import { motion } from "framer-motion";
 import type { FormEvent, Dispatch, SetStateAction } from "react";
 import { LAVENTECARE_PROFILE } from "@/lib/laventecareData";
-import { MetricCard } from "./LaventeCareCards";
-import type { LeadForm, BusinessSignal, ActionItem } from "./LaventeCareTypes";
+import type { LeadForm, BusinessSignal } from "./LaventeCareTypes";
 
 export function LaventeCareHeader({
   summary,
@@ -13,6 +12,8 @@ export function LaventeCareHeader({
   seeding,
   showLeadForm,
   setShowLeadForm,
+  showProjectForm,
+  setShowProjectForm,
   leadForm,
   setLeadForm,
   savingLead,
@@ -24,6 +25,8 @@ export function LaventeCareHeader({
   seeding: boolean;
   showLeadForm: boolean;
   setShowLeadForm: Dispatch<SetStateAction<boolean>>;
+  showProjectForm: boolean;
+  setShowProjectForm: Dispatch<SetStateAction<boolean>>;
   leadForm: LeadForm;
   setLeadForm: Dispatch<SetStateAction<LeadForm>>;
   savingLead: boolean;
@@ -32,158 +35,56 @@ export function LaventeCareHeader({
 }) {
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#080a0f]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-sky-500/25 bg-sky-500/10">
-              <BriefcaseBusiness size={21} className="text-sky-300" />
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sky-500/25 bg-sky-500/10">
+                <BriefcaseBusiness size={20} className="text-sky-300" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Bedrijfsbrein
+                </p>
+                <h1 className="mt-1 truncate text-2xl font-bold text-white">LaventeCare Cockpit</h1>
+                <p className="mt-1 line-clamp-1 text-sm text-slate-500">
+                  {LAVENTECARE_PROFILE.rol}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Bedrijfsbrein</p>
-              <h1 className="mt-0.5 truncate text-2xl font-bold text-white">LaventeCare Cockpit</h1>
-              <p className="mt-0.5 line-clamp-1 text-sm text-slate-500">{LAVENTECARE_PROFILE.rol}</p>
-            </div>
-          </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <button
-              type="button"
-              onClick={handleSeedDocuments}
-              disabled={seeding}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-slate-200 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-60 whitespace-nowrap"
-            >
-              {seeding ? <Loader2 size={16} className="animate-spin" /> : <BookOpenText size={16} />}
-              <span>{summary.documentsSeeded ? "Documentbasis bijwerken" : "Documentbasis initialiseren"}</span>
-            </button>
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.96 }}
-              onClick={() => setShowLeadForm((value) => !value)}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-primary-foreground)] transition-colors hover:bg-[var(--color-primary-hover)] whitespace-nowrap shadow-[0_0_15px_rgba(245,158,11,0.2)]"
-            >
-              {showLeadForm ? <X size={16} /> : <Plus size={16} />}
-              <span>Nieuwe lead</span>
-            </motion.button>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSeedDocuments}
+                disabled={seeding}
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {seeding ? <Loader2 size={16} className="animate-spin" /> : <BookOpenText size={16} />}
+                <span className="hidden sm:inline">{summary.documentsSeeded ? "Docs updaten" : "Docs initialiseren"}</span>
+              </button>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                onClick={() => setShowProjectForm((value) => !value)}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-500/15 px-4 text-sm font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/25 border border-emerald-500/30"
+              >
+                {showProjectForm ? <X size={16} /> : <Plus size={16} />}
+                <span>Project starten</span>
+              </motion.button>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                onClick={() => setShowLeadForm((value) => !value)}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-500/15 px-4 text-sm font-semibold text-sky-300 transition-colors hover:bg-sky-500/25 border border-sky-500/30"
+              >
+                {showLeadForm ? <X size={16} /> : <Plus size={16} />}
+                <span>Nieuwe lead</span>
+              </motion.button>
+            </div>
           </div>
         </div>
       </header>
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <section className="glass p-5">
-          <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr] lg:items-start">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-                <Sparkles size={14} />
-                Geintegreerde businesslaag actief
-              </div>
-              <h2 className="mt-4 max-w-3xl text-2xl font-bold text-white sm:text-3xl">
-                Van bedrijfsdocumentatie naar een werkbaar LaventeCare-systeem.
-              </h2>
-              <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
-                {LAVENTECARE_PROFILE.kernbelofte}
-              </p>
-            </div>
-            <div className="glass p-4 bg-[var(--color-surface)]">
-              <p className="text-sm font-semibold text-white">Integratieprincipe</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
-                Leads, projecten, documenten, decisions, change requests en SLA-signalen staan nu als eigen domein klaar voor Brain, Telegram, Agenda, Email, Notities en Finance.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {showLeadForm && (
-          <motion.section
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-5 glass p-5 border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]"
-          >
-          <div className="mb-4 flex items-center gap-2">
-            <Target size={18} className="text-sky-300" />
-            <h2 className="text-lg font-bold text-white">Nieuwe lead kwalificeren</h2>
-          </div>
-          <form onSubmit={handleLeadSubmit} className="grid gap-3 lg:grid-cols-6">
-            <label className="lg:col-span-2">
-              <span className="text-xs font-semibold text-slate-400">Titel</span>
-              <input
-                value={leadForm.titel}
-                onChange={(event) => setLeadForm((form) => ({ ...form, titel: event.target.value }))}
-                placeholder="Bijv. automatisering klantintake"
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
-              />
-            </label>
-            <label className="lg:col-span-2">
-              <span className="text-xs font-semibold text-slate-400">Bedrijf</span>
-              <input
-                value={leadForm.companyName}
-                onChange={(event) => setLeadForm((form) => ({ ...form, companyName: event.target.value }))}
-                placeholder="Bedrijfsnaam"
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
-              />
-            </label>
-            <label className="lg:col-span-2">
-              <span className="text-xs font-semibold text-slate-400">Website</span>
-              <input
-                value={leadForm.website}
-                onChange={(event) => setLeadForm((form) => ({ ...form, website: event.target.value }))}
-                placeholder="https://..."
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
-              />
-            </label>
-            <label className="lg:col-span-3">
-              <span className="text-xs font-semibold text-slate-400">Pijnpunt</span>
-              <textarea
-                value={leadForm.pijnpunt}
-                onChange={(event) => setLeadForm((form) => ({ ...form, pijnpunt: event.target.value }))}
-                placeholder="Welke workflow, foutkans of groeirem speelt er?"
-                rows={3}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
-              />
-            </label>
-            <label className="lg:col-span-2">
-              <span className="text-xs font-semibold text-slate-400">Volgende stap</span>
-              <textarea
-                value={leadForm.volgendeStap}
-                onChange={(event) => setLeadForm((form) => ({ ...form, volgendeStap: event.target.value }))}
-                placeholder="Bijv. discovery-call plannen"
-                rows={3}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
-              />
-            </label>
-            <div>
-              <label>
-                <span className="text-xs font-semibold text-slate-400">Prioriteit</span>
-                <select
-                  value={leadForm.prioriteit}
-                  onChange={(event) => setLeadForm((form) => ({ ...form, prioriteit: event.target.value as any }))}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)]"
-                >
-                  <option value="laag">Laag</option>
-                  <option value="normaal">Normaal</option>
-                  <option value="hoog">Hoog</option>
-                </select>
-              </label>
-              <button
-                type="submit"
-                disabled={savingLead}
-                className="mt-3 btn btn--primary w-full justify-center"
-              >
-                {savingLead ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                Opslaan
-              </button>
-            </div>
-          </form>
-        </motion.section>
-      )}
-
-        <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard icon={Handshake} label="Open leads" value={summary.activeLeads} detail={`${summary.leads} totaal in de funnel`} tone="sky" />
-          <MetricCard icon={FolderKanban} label="Actieve projecten" value={summary.activeProjects} detail={`${summary.projects} projecten geregistreerd`} tone="emerald" />
-          <MetricCard icon={Sparkles} label="Signalen" value={businessSignals.length} detail={`${summary.actionItems ?? 0} acties open`} tone="violet" />
-          <MetricCard icon={FileText} label="Documentbasis" value={`${summary.documents}/24`} detail={summary.documentsSeeded ? "Geïndexeerd in PostgreSQL" : "Catalogus klaar om te initialiseren"} tone="amber" />
-          <MetricCard icon={LifeBuoy} label="SLA signalen" value={summary.openIncidents} detail={`${summary.openChanges} open change requests`} tone={summary.openIncidents > 0 ? "rose" : "violet"} />
-        </section>
-      </div>
     </>
   );
 }

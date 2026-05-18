@@ -14,15 +14,22 @@ import { type Automation, type ShiftType } from "@/lib/automations";
 import { cn } from "@/lib/utils";
 
 export default function AutomationsPage() {
-  const { automations, add, addDienstWekkerPack, toggle, remove, lastCheck } =
+  const { automations, add, update, addDienstWekkerPack, toggle, remove, lastCheck } =
     useAutomations();
-  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | "new" | null>(null);
+  const [installing, setInstalling] = useState<ShiftType | null>(null);
   const { openConfirm } = useConfirm();
   const { success } = useToast();
 
-  const handleAdd = (data: Parameters<typeof add>[0]) => {
-    add(data);
-    success(`Automatisering '${data.name}' aangemaakt`);
+  const handleSave = (data: Parameters<typeof add>[0]) => {
+    if (editingId === "new") {
+      add(data);
+      success(`Automatisering '${data.name}' aangemaakt`);
+    } else if (editingId) {
+      update(editingId, data);
+      success(`Automatisering '${data.name}' bijgewerkt`);
+    }
+    setEditingId(null);
   };
 
   const handleDelete = async (a: Automation) => {
@@ -37,9 +44,14 @@ export default function AutomationsPage() {
     success("Automatisering verwijderd");
   };
 
-  const handleAddWekkerPack = (shiftType: ShiftType) => {
-    const count = addDienstWekkerPack(shiftType);
-    success(`${count} ${shiftType}-dienst automations aangemaakt`);
+  const handleAddWekkerPack = async (shiftType: ShiftType) => {
+    setInstalling(shiftType);
+    try {
+      const count = await addDienstWekkerPack(shiftType);
+      success(`${count} ${shiftType}-dienst automations aangemaakt`);
+    } finally {
+      setInstalling(null);
+    }
   };
 
   const enabled = automations.filter((a) => a.enabled);
@@ -56,36 +68,49 @@ export default function AutomationsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-md px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-white">Automatisering</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              {enabled.length} actief · Engine elke 15s
-              {lastCheck && <span className="ml-1 text-slate-600">· {lastCheck}</span>}
-            </p>
+    <div className="text-slate-100">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
+                <Activity size={20} className="text-amber-300" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Smart Home
+                </p>
+                <h1 className="mt-1 truncate text-2xl font-bold text-white">Automatisering</h1>
+                <p className="mt-1 text-sm text-slate-500">
+                  {enabled.length} actief · Engine elke 15s
+                  {lastCheck && <span className="ml-1 text-slate-600">· {lastCheck}</span>}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                onClick={() => setEditingId((v) => (v ? null : "new"))}
+                aria-expanded={!!editingId}
+                aria-label={editingId ? "Formulier sluiten" : "Nieuwe automatisering toevoegen"}
+                className={cn(
+                  "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors",
+                  editingId
+                    ? "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                    : "border-amber-500/30 bg-amber-500/15 text-amber-200 hover:bg-amber-500/20"
+                )}
+              >
+                {editingId ? <X size={16} /> : <Plus size={16} />}
+                <span className="hidden sm:inline">{editingId ? "Annuleren" : "Toevoegen"}</span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            aria-expanded={showForm}
-            aria-label={showForm ? "Formulier sluiten" : "Nieuwe automatisering toevoegen"}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-medium transition-all",
-              showForm
-                ? "bg-white/5 text-slate-300 border-white/10"
-                : "bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25"
-            )}
-          >
-            {showForm ? <X size={14} /> : <Plus size={14} />}
-            {showForm ? "Annuleren" : "Toevoegen"}
-          </button>
         </div>
       </header>
 
-      <main className="px-6 py-6 max-w-3xl mx-auto space-y-5">
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
         <ErrorBoundary>
-          <DienstWekkerSection packs={wekkerPacks} onInstall={handleAddWekkerPack} />
+          <DienstWekkerSection packs={wekkerPacks} onInstall={handleAddWekkerPack} installingType={installing} />
         </ErrorBoundary>
 
           {/* Engine status */}
@@ -101,8 +126,12 @@ export default function AutomationsPage() {
           </div>
 
           <AnimatePresence>
-            {showForm && (
-              <AutomationForm onClose={() => setShowForm(false)} onSave={handleAdd} />
+            {editingId && (
+              <AutomationForm 
+                initialData={editingId !== "new" ? automations.find(a => a.id === editingId) : undefined} 
+                onClose={() => setEditingId(null)} 
+                onSave={handleSave} 
+              />
             )}
           </AnimatePresence>
 
@@ -118,6 +147,7 @@ export default function AutomationsPage() {
                       key={a.id}
                       automation={a}
                       onToggle={() => toggle(a.id)}
+                      onEdit={() => setEditingId(a.id)}
                       onDelete={() => handleDelete(a)}
                     />
                   ))}
@@ -138,6 +168,7 @@ export default function AutomationsPage() {
                       key={a.id}
                       automation={a}
                       onToggle={() => toggle(a.id)}
+                      onEdit={() => setEditingId(a.id)}
                       onDelete={() => handleDelete(a)}
                     />
                   ))}
@@ -146,7 +177,7 @@ export default function AutomationsPage() {
             </section>
           )}
 
-          {automations.length === 0 && !showForm && (
+          {automations.length === 0 && !editingId && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
                 <Activity size={24} className="text-slate-600" />
@@ -156,7 +187,7 @@ export default function AutomationsPage() {
                 Voeg een tijdschema toe om lampen automatisch te bedienen.
               </p>
               <button
-                onClick={() => setShowForm(true)}
+                onClick={() => setEditingId("new")}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-colors"
               >
                 <Plus size={13} />

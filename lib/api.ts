@@ -393,6 +393,11 @@ export const automationsApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  update: (id: string, data: Partial<AutomationRow>) =>
+    apiFetch<AutomationRow>(`/automations/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   toggle: (id: string) =>
     apiFetch<{ status: string }>(`/automations/${id}/toggle`, { method: "POST" }),
   delete: (id: string) =>
@@ -570,6 +575,8 @@ export const laventecareApi = {
     apiFetch<LCProject>(`/laventecare/leads/${id}/convert`, { method: "POST", body: JSON.stringify(data) }),
   listProjects: () =>
     apiFetch<LCProject[]>("/laventecare/projects"),
+  createProject: (data: Partial<LCProject>) =>
+    apiFetch<LCProject>("/laventecare/projects", { method: "POST", body: JSON.stringify(data) }),
   updateProject: (id: string, data: { fase?: string; status?: string }) =>
     apiFetch<{ status: string }>(`/laventecare/projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   listActions: () =>

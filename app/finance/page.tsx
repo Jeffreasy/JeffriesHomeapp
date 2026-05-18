@@ -36,6 +36,7 @@ import { SegmentedButton, SectionTitle } from "@/components/finance/FinanceCards
 import { FinanceMetricsGrid } from "@/components/finance/FinanceMetricsGrid";
 import { FinanceCharts } from "@/components/finance/FinanceCharts";
 import { FinanceInsights } from "@/components/finance/FinanceInsights";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 
 type ChartView = "saldo" | "inuit";
 
@@ -154,7 +155,7 @@ export default function FinancePage() {
   const hasData = Boolean(stats && totalCount > 0);
 
   return (
-    <div className="finance-dashboard-shell min-h-screen bg-[#0a0a0f] pb-28 text-slate-100">
+    <div className="finance-dashboard-shell text-slate-100">
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-start gap-3">
@@ -365,34 +366,50 @@ export default function FinancePage() {
         )}
 
         {stats && hasData && (
-          <FinanceCharts
-            stats={stats}
-            chartView={chartView}
-            setChartView={setChartView}
-            ibanFilter={ibanFilter}
-            privacyOn={privacyOn}
-            inUitMetSalaris={inUitMetSalaris}
-            loonstrokenCount={loonstroken.count}
-            filters={filters}
-            toggleCategoryFilter={toggleCategoryFilter}
-            formatPrivateEuro={formatPrivateEuro}
-            formatPrivateEuroExact={formatPrivateEuroExact}
-          />
+          <CollapsibleSection
+            title="Maandelijks Verloop & Cashflow"
+            subtitle={`${stats.maanden.length} maanden geanalyseerd`}
+            icon={<Landmark size={18} />}
+            theme="emerald"
+            defaultOpen={true}
+          >
+            <FinanceCharts
+              stats={stats}
+              chartView={chartView}
+              setChartView={setChartView}
+              ibanFilter={ibanFilter}
+              privacyOn={privacyOn}
+              inUitMetSalaris={inUitMetSalaris}
+              loonstrokenCount={loonstroken.count}
+              filters={filters}
+              toggleCategoryFilter={toggleCategoryFilter}
+              formatPrivateEuro={formatPrivateEuro}
+              formatPrivateEuroExact={formatPrivateEuroExact}
+            />
+          </CollapsibleSection>
         )}
 
         {stats && hasData && (
-          <FinanceInsights
-            stats={stats}
-            latestCashflow={latestCashflow}
-            topCategory={topCategory}
-            topMerchant={topMerchant}
-            filters={filters}
-            setZoekterm={setZoekterm}
-            toggleCategoryFilter={toggleCategoryFilter}
-            formatPrivateEuro={formatPrivateEuro}
-            formatPrivateEuroExact={formatPrivateEuroExact}
-            formatPrivateSignedEuro={formatPrivateSignedEuro}
-          />
+          <CollapsibleSection
+            title="Abonnementen & Inzichten"
+            subtitle="Grootste uitgavenposten"
+            icon={<Eye size={18} />}
+            theme="amber"
+            defaultOpen={false}
+          >
+            <FinanceInsights
+              stats={stats}
+              latestCashflow={latestCashflow}
+              topCategory={topCategory}
+              topMerchant={topMerchant}
+              filters={filters}
+              setZoekterm={setZoekterm}
+              toggleCategoryFilter={toggleCategoryFilter}
+              formatPrivateEuro={formatPrivateEuro}
+              formatPrivateEuroExact={formatPrivateEuroExact}
+              formatPrivateSignedEuro={formatPrivateSignedEuro}
+            />
+          </CollapsibleSection>
         )}
 
         <section className="rounded-lg border border-white/10 bg-white/[0.035] p-4">

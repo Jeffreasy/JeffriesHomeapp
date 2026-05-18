@@ -14,7 +14,7 @@ export function LaventeCareOperationsView({
   openIncidents: any[];
 }) {
   return (
-    <section className="mt-5 glass min-w-0 p-5">
+    <section className="glass min-w-0 p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Operatie</p>

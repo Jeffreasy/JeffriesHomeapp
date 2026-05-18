@@ -32,6 +32,7 @@ import { usePrivacy } from "@/hooks/usePrivacy";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { DeviceRow } from "@/components/settings/DeviceRow";
 import { AddDeviceForm } from "@/components/settings/AddDeviceForm";
 import { AddRoomForm } from "@/components/settings/AddRoomForm";
@@ -246,7 +247,7 @@ export default function SettingsPage() {
 
   if (overview === null) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] px-4 py-12 text-slate-100">
+      <div className="px-4 py-12 text-slate-100">
         <div className="mx-auto max-w-lg rounded-lg border border-white/10 bg-white/[0.035] p-6 text-center">
           <ShieldCheck size={34} className="mx-auto text-amber-300" />
           <h1 className="mt-4 text-xl font-bold text-white">Instellingen vergrendeld</h1>
@@ -257,7 +258,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] pb-28 text-slate-100">
+    <div className="text-slate-100">
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-start gap-3">
@@ -410,152 +411,176 @@ export default function SettingsPage() {
           <SettingsBridge overview={overview} />
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <ErrorBoundary>
-            <Panel>
-              <SectionHeader
-                icon={Lightbulb}
-                label="Smart home"
-                title="Lampen beheren"
-                sub={devicesLoading ? "laden" : plural(devices.length, "lamp", "lampen")}
-                action={
-                  <Link
-                    href="/lampen"
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
-                  >
-                    Openen
-                    <ArrowRight size={14} />
-                  </Link>
-                }
-              />
-              <div className="mt-4 space-y-2">
-                {devicesLoading ? (
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="h-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
-                  ))
-                ) : devices.length > 0 ? (
-                  devices.map((device) => <DeviceRow key={device.id} device={device} rooms={rooms} />)
-                ) : (
-                  <EmptyState icon={Lightbulb} title="Geen lampen gekoppeld" />
-                )}
-                <AddDeviceForm rooms={rooms} />
-                <DeviceDiscoveryPanel existingDevices={devices} />
-              </div>
-            </Panel>
-          </ErrorBoundary>
-
-          <ErrorBoundary>
-            <Panel>
-              <SectionHeader
-                icon={Home}
-                label="Indeling"
-                title="Kamers"
-                sub={roomsLoading ? "laden" : plural(rooms.length, "kamer", "kamers")}
-              />
-              <div className="mt-4 space-y-2">
-                {roomsLoading ? (
-                  Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="h-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
-                  ))
-                ) : roomRows.length > 0 ? (
-                  roomRows.map(({ room, devices: roomDevices }) => (
-                    <RoomRow
-                      key={room.id}
-                      room={room}
-                      devices={roomDevices}
-                      deleting={deletingRoom}
-                      onDelete={handleDeleteRoom}
-                    />
-                  ))
-                ) : (
-                  <EmptyState icon={Home} title="Nog geen kamers" />
-                )}
-                <AddRoomForm />
-              </div>
-            </Panel>
-          </ErrorBoundary>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <SettingsIntegrations
-            overview={overview}
-            telegramStatus={telegramStatus}
-            telegramChecking={telegramChecking}
-            handleTelegramCheck={handleTelegramCheck}
-            grokCapabilities={grokCapabilities}
-          />
-
-          <Panel>
-            <SectionHeader icon={ArrowRight} label="Navigatie" title="Werkgebieden" />
-            <div className="mt-4 space-y-2">
-              {routeTiles.map((tile) => (
-                <RouteTile key={tile.href} {...tile} />
-              ))}
-            </div>
-          </Panel>
-        </section>
-
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <Panel>
-            <SectionHeader icon={ShieldCheck} label="Privacy" title="Privacy center" sub="centrale voorkeuren" />
-            <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-              {(["finance", "habits", "notes", "email", "account"] as const satisfies readonly PrivacyScope[]).map((scope) => (
-                <button
-                  key={scope}
-                  type="button"
-                  onClick={() => togglePrivacyScope(scope)}
-                  className={cn(
-                    "rounded-lg border px-3 py-3 text-left transition-colors",
-                    privacySettings?.[scope] ?? true
-                      ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-100"
-                      : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
+        <CollapsibleSection
+          title="Apparaat & Kamerbeheer"
+          subtitle={`${devices.length} lampen en ${rooms.length} kamers`}
+          icon={<Lightbulb size={18} />}
+          theme="sky"
+          defaultOpen={true}
+        >
+          <div className="grid gap-6 xl:grid-cols-2">
+            <ErrorBoundary>
+              <Panel>
+                <SectionHeader
+                  icon={Lightbulb}
+                  label="Smart home"
+                  title="Lampen beheren"
+                  sub={devicesLoading ? "laden" : plural(devices.length, "lamp", "lampen")}
+                  action={
+                    <Link
+                      href="/lampen"
+                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+                    >
+                      Openen
+                      <ArrowRight size={14} />
+                    </Link>
+                  }
+                />
+                <div className="mt-4 space-y-2">
+                  {devicesLoading ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="h-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
+                    ))
+                  ) : devices.length > 0 ? (
+                    devices.map((device) => <DeviceRow key={device.id} device={device} rooms={rooms} />)
+                  ) : (
+                    <EmptyState icon={Lightbulb} title="Geen lampen gekoppeld" />
                   )}
-                >
-                  <span className="block text-xs font-bold uppercase">{scope}</span>
-                  <span className="mt-1 block text-sm font-semibold">
-                    {(privacySettings?.[scope] ?? true) ? "Maskeren" : "Zichtbaar"}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-sm font-bold text-white">Backup/export</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Exporteert je eigen data als JSON: kamers, lampen, automations, rooster, notities, habits en finance.
-              </p>
-              <button
-                type="button"
-                onClick={() => setBackupRequested(true)}
-                disabled={backupRequested}
-                className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50"
-              >
-                {backupRequested ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
-                JSON export
-              </button>
-            </div>
-          </Panel>
+                  <AddDeviceForm rooms={rooms} />
+                  <DeviceDiscoveryPanel existingDevices={devices} />
+                </div>
+              </Panel>
+            </ErrorBoundary>
 
-          <Panel>
-            <SectionHeader icon={FileJson} label="Audit" title="Laatste acties" sub={`${auditLogs.length} zichtbaar`} />
-            <div className="mt-4 space-y-2">
-              {auditLogs.length === 0 ? (
-                <EmptyState icon={FileJson} title="Nog geen auditregels" />
-              ) : (
-                auditLogs.map((log) => (
-                  <div key={log._id} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="min-w-0 truncate text-sm font-semibold text-slate-200">{log.summary}</p>
-                      <StatusPill ok={log.status === "success" || log.status === "confirmed"} label={log.status} />
+            <ErrorBoundary>
+              <Panel>
+                <SectionHeader
+                  icon={Home}
+                  label="Indeling"
+                  title="Kamers"
+                  sub={roomsLoading ? "laden" : plural(rooms.length, "kamer", "kamers")}
+                />
+                <div className="mt-4 space-y-2">
+                  {roomsLoading ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="h-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
+                    ))
+                  ) : roomRows.length > 0 ? (
+                    roomRows.map(({ room, devices: roomDevices }) => (
+                      <RoomRow
+                        key={room.id}
+                        room={room}
+                        devices={roomDevices}
+                        deleting={deletingRoom}
+                        onDelete={handleDeleteRoom}
+                      />
+                    ))
+                  ) : (
+                    <EmptyState icon={Home} title="Nog geen kamers" />
+                  )}
+                  <AddRoomForm />
+                </div>
+              </Panel>
+            </ErrorBoundary>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Integraties & Systeem"
+          subtitle="Telegram, Sync en Navigatie"
+          icon={<Server size={18} />}
+          theme="violet"
+          defaultOpen={false}
+        >
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <SettingsIntegrations
+              overview={overview}
+              telegramStatus={telegramStatus}
+              telegramChecking={telegramChecking}
+              handleTelegramCheck={handleTelegramCheck}
+              grokCapabilities={grokCapabilities}
+            />
+
+            <Panel>
+              <SectionHeader icon={ArrowRight} label="Navigatie" title="Werkgebieden" />
+              <div className="mt-4 space-y-2">
+                {routeTiles.map((tile) => (
+                  <RouteTile key={tile.href} {...tile} />
+                ))}
+              </div>
+            </Panel>
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Privacy & Beveiliging"
+          subtitle="Privacy center, Backups en Laatste acties"
+          icon={<ShieldCheck size={18} />}
+          theme="rose"
+          defaultOpen={false}
+        >
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <Panel>
+              <SectionHeader icon={ShieldCheck} label="Privacy" title="Privacy center" sub="centrale voorkeuren" />
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                {(["finance", "habits", "notes", "email", "account"] as const satisfies readonly PrivacyScope[]).map((scope) => (
+                  <button
+                    key={scope}
+                    type="button"
+                    onClick={() => togglePrivacyScope(scope)}
+                    className={cn(
+                      "rounded-lg border px-3 py-3 text-left transition-colors",
+                      privacySettings?.[scope] ?? true
+                        ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-100"
+                        : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
+                    )}
+                  >
+                    <span className="block text-xs font-bold uppercase">{scope}</span>
+                    <span className="mt-1 block text-sm font-semibold">
+                      {(privacySettings?.[scope] ?? true) ? "Maskeren" : "Zichtbaar"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-sm font-bold text-white">Backup/export</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Exporteert je eigen data als JSON: kamers, lampen, automations, rooster, notities, habits en finance.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setBackupRequested(true)}
+                  disabled={backupRequested}
+                  className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50"
+                >
+                  {backupRequested ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                  JSON export
+                </button>
+              </div>
+            </Panel>
+
+            <Panel>
+              <SectionHeader icon={FileJson} label="Audit" title="Laatste acties" sub={`${auditLogs.length} zichtbaar`} />
+              <div className="mt-4 space-y-2">
+                {auditLogs.length === 0 ? (
+                  <EmptyState icon={FileJson} title="Nog geen auditregels" />
+                ) : (
+                  auditLogs.map((log) => (
+                    <div key={log._id} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="min-w-0 truncate text-sm font-semibold text-slate-200">{log.summary}</p>
+                        <StatusPill ok={log.status === "success" || log.status === "confirmed"} label={log.status} />
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {log.actor} - {log.action} - {formatDateTime(log.createdAt)}
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {log.actor} - {log.action} - {formatDateTime(log.createdAt)}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </Panel>
-        </section>
+                  ))
+                )}
+              </div>
+            </Panel>
+          </div>
+        </CollapsibleSection>
 
         {(overview?.integrations.telegramBot && !overview.integrations.telegramOwner) ||
         (overview?.integrations.telegramBot && !overview.integrations.telegramWebhookSecret) ? (

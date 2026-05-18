@@ -104,3 +104,21 @@ export const emptyLeadForm: LeadForm = {
   volgendeStap: "",
   prioriteit: "normaal",
 };
+
+export type ProjectForm = {
+  naam: string;
+  fase: string;
+  status: string;
+  waardeIndicatie: number | "";
+  deadline: string;
+  samenvatting: string;
+};
+
+export const emptyProjectForm: ProjectForm = {
+  naam: "",
+  fase: "intake",
+  status: "actief",
+  waardeIndicatie: "",
+  deadline: "",
+  samenvatting: "",
+};

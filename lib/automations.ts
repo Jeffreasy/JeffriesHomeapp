@@ -24,6 +24,10 @@ export interface AutomationTrigger {
   /** When set to "schedule", fires only on days with a matching dienst */
   triggerType?: "time" | "schedule";
   shiftType?: ShiftType; // "Vroeg" | "Laat" | "Dienst" | "any"
+
+  // ── Smart Exclusions ──────────────────────────────────────────────────────
+  /** If today matches any of these shifts, do NOT fire the automation */
+  excludedShifts?: ShiftType[];
 }
 
 export interface AutomationAction {
