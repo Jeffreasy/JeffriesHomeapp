@@ -19,7 +19,7 @@ export function SceneButton({
       onClick={onClick}
       disabled={disabled}
       title={`Scene ${scene.label} toepassen`}
-      className="flex min-h-[72px] min-w-0 flex-col items-start justify-between rounded-xl border border-white/8 bg-white/[0.035] p-3 text-left transition-colors hover:border-white/14 hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex min-h-[72px] min-w-0 flex-col items-start justify-between rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] p-3 text-left transition-colors hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
     >
       <span
         className="h-3 w-8 rounded-full border border-white/20"
@@ -62,7 +62,7 @@ export function CommandPanel({
           onClick={onToggleAll}
           disabled={onlineCount === 0}
           title={allOn ? "Alle online lampen uitzetten" : "Alle online lampen aanzetten"}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-white/[0.03] disabled:text-slate-600"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[rgba(255,255,255,0.03)] disabled:text-slate-600"
         >
           <Power size={18} />
         </button>
