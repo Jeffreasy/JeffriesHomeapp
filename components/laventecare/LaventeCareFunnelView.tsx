@@ -26,8 +26,8 @@ export function LaventeCareFunnelView({
 }) {
   return (
     <>
-      <section className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_0.9fr]">
-        <div className="glass p-5">
+      <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.4fr_0.9fr]">
+        <div className="glass min-w-0 p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Proces</p>
@@ -37,9 +37,9 @@ export function LaventeCareFunnelView({
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {LAVENTECARE_PROCESS_STAGES.map((stage, index) => (
-              <div key={stage.key} className="glass p-4 bg-[var(--color-surface)]">
+              <div key={stage.key} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] text-sm font-bold text-slate-200">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm font-bold text-slate-200">
                     {index + 1}
                   </span>
                   <h3 className="font-semibold text-white">{stage.title}</h3>
@@ -51,20 +51,20 @@ export function LaventeCareFunnelView({
           </div>
         </div>
 
-        <div className="glass p-5">
+        <div className="glass min-w-0 p-5">
           <div className="flex items-center gap-2">
             <ShieldCheck size={18} className="text-emerald-300" />
             <h2 className="text-lg font-bold text-white">Fit guardrails</h2>
           </div>
           <div className="mt-4 space-y-3">
             {LAVENTECARE_FIT_CRITERIA.slice(0, 5).map((item) => (
-              <div key={item} className="flex gap-3 glass p-3 border-emerald-500/15 bg-emerald-500/[0.06]">
+              <div key={item} className="flex gap-3 glass min-w-0 p-3 border-emerald-500/15 bg-emerald-500/[0.06]">
                 <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-300" />
                 <p className="text-sm leading-5 text-slate-300">{item}</p>
               </div>
             ))}
           </div>
-          <div className="mt-5 glass p-4 border-rose-500/15 bg-rose-500/[0.06]">
+          <div className="mt-5 glass min-w-0 p-4 border-rose-500/15 bg-rose-500/[0.06]">
             <p className="text-sm font-semibold text-rose-100">No-fit signalen</p>
             <ul className="mt-3 space-y-2">
               {LAVENTECARE_NO_FIT_SIGNALS.slice(0, 3).map((item) => (
@@ -78,8 +78,8 @@ export function LaventeCareFunnelView({
         </div>
       </section>
 
-      <section className="mt-5 grid gap-5 xl:grid-cols-2">
-        <div className="glass p-5">
+      <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="glass min-w-0 p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Funnel</p>
@@ -94,7 +94,7 @@ export function LaventeCareFunnelView({
               activeLeads.map((lead) => {
                 const tone = toneClasses[fitTone(lead.fitScore)];
                 return (
-                  <div key={lead._id ?? lead.titel} className="glass p-4 bg-[var(--color-surface)]">
+                  <div key={lead._id ?? lead.titel} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="font-semibold text-white">{lead.titel}</h3>
@@ -146,7 +146,7 @@ export function LaventeCareFunnelView({
           </div>
         </div>
 
-        <div className="glass p-5">
+        <div className="glass min-w-0 p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Delivery</p>
@@ -159,7 +159,7 @@ export function LaventeCareFunnelView({
               <EmptyState title="Nog geen projecten" body="Zodra leads doorgaan naar delivery ontstaat hier de projectlaag met fase, status, waarde en deadlines." />
             ) : (
               activeProjects.map((project) => (
-                <div key={project._id ?? project.naam} className="glass p-4 bg-[var(--color-surface)]">
+                <div key={project._id ?? project.naam} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="font-semibold text-white">{project.naam}</h3>

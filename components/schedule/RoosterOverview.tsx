@@ -38,7 +38,7 @@ export function OverviewPanel({
 }) {
   return (
     <Panel className="overflow-hidden p-0">
-      <div className="border-b border-white/6 px-5 py-4 sm:px-6">
+      <div className="border-b border-[var(--color-border)] px-5 py-4 sm:px-6 min-w-0">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -48,7 +48,7 @@ export function OverviewPanel({
           </div>
           <Link
             href="/finance"
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+            className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
           >
             Finance openen
             <ArrowRight size={14} />
@@ -56,7 +56,7 @@ export function OverviewPanel({
         </div>
       </div>
 
-      <div className="grid gap-px bg-white/[0.06] sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 xl:grid-cols-4 min-w-0">
         <StatusMetric
           icon={Clock3}
           label="Komende uren"
@@ -148,14 +148,14 @@ export function OverviewTab({
               <button
                 type="button"
                 onClick={() => setAllWeeks(true)}
-                className="h-9 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
+                className="h-9 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
               >
                 Alles open
               </button>
               <button
                 type="button"
                 onClick={() => setAllWeeks(false)}
-                className="h-9 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-slate-200"
+                className="h-9 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
               >
                 Compact
               </button>

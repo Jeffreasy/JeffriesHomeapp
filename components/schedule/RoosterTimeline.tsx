@@ -31,14 +31,14 @@ export function WeekBlock({
   const appointmentCount = week.items.filter((item) => item.type === "afspraak").length;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/8 bg-white/[0.025]">
+    <div className="glass overflow-hidden rounded-2xl border border-[var(--color-border)] min-w-0">
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full flex-col gap-3 px-4 py-4 text-left transition-colors hover:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between"
+        className="flex w-full flex-col gap-3 px-4 py-4 text-left transition-colors hover:bg-[var(--color-surface-hover)] sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
             <span className="text-xs font-bold text-slate-300">{index + 1}</span>
           </div>
           <div className="min-w-0">
@@ -68,7 +68,7 @@ export function WeekBlock({
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
-            <div className="space-y-2 border-t border-white/6 p-3">
+            <div className="space-y-2 border-t border-[var(--color-border)] p-3">
               {week.items.map((item) => (
                 item.type === "dienst" ? (
                   <DienstItem

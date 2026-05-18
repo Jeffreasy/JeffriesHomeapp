@@ -32,7 +32,7 @@ export function MetricCard({
 }) {
   const toneClass = toneClasses[tone];
   return (
-    <div className="glass p-4">
+    <div className="glass min-w-0 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{metricLabel}</p>
@@ -49,7 +49,7 @@ export function MetricCard({
 
 export function EmptyState({ title, body }: { title: string; body: string }) {
   return (
-    <div className="glass border-dashed p-5 text-sm text-slate-400">
+    <div className="glass min-w-0 border-dashed p-5 text-sm text-slate-400">
       <p className="font-semibold text-slate-200">{title}</p>
       <p className="mt-1">{body}</p>
     </div>
@@ -80,7 +80,7 @@ export function SignalCard({
   const tone = toneClasses[meta.tone];
   const disabled = busyAction || busyLead;
   return (
-    <div className="glass p-4">
+    <div className="glass min-w-0 p-4">
       <div className="flex items-start gap-3">
         <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", tone.border, tone.surface)}>
           <Icon size={16} className={tone.icon} />
@@ -92,7 +92,7 @@ export function SignalCard({
             </span>
             <span className={cn(
               "rounded-full border px-2 py-0.5 text-xs font-bold",
-              signal.urgency === "hoog" ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] text-slate-400",
+              signal.urgency === "hoog" ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400",
             )}>
               {signal.urgency}
             </span>
@@ -131,7 +131,7 @@ export function SignalCard({
 
 export function FollowUpCard({ followUp }: { followUp: FollowUpSignal }) {
   return (
-    <div className="glass p-4">
+    <div className="glass min-w-0 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{followUp.source}</p>
@@ -161,11 +161,11 @@ export function ActionItemCard({
 }) {
   const highPriority = action.priority === "hoog";
   return (
-    <div className="glass p-4">
+    <div className="glass min-w-0 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-2 py-0.5 text-xs font-bold text-slate-300">
+            <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-bold text-slate-300">
               {label(action.actionType)}
             </span>
             <span className={cn(
@@ -210,7 +210,7 @@ export function OperationCard({
 }) {
   const toneClass = toneClasses[tone];
   return (
-    <div className="glass p-4">
+    <div className="glass min-w-0 p-4">
       <div className="flex items-start gap-3">
         <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", toneClass.border, toneClass.surface)}>
           <Icon size={16} className={toneClass.icon} />

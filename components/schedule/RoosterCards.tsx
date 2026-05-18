@@ -8,7 +8,7 @@ export function Panel({ children, className = "" }: { children: React.ReactNode;
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5 ${className}`}
+      className={`glass rounded-2xl border border-[var(--color-border)] p-4 sm:p-5 min-w-0 ${className}`}
     >
       {children}
     </motion.div>
@@ -29,7 +29,7 @@ export function SectionHeader({
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
           <Icon size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
@@ -55,7 +55,7 @@ export function SectionTitle({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-white/[0.04]">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
         <Icon size={16} className="text-amber-300" />
       </div>
       <div className="min-w-0">
@@ -83,7 +83,7 @@ export function StatusMetric({
   const classes = toneClasses[tone];
 
   return (
-    <div className="min-h-[132px] min-w-0 bg-[#0f0f16]/95 p-4 sm:p-5">
+    <div className="min-h-[132px] min-w-0 bg-[var(--color-surface)] p-4 sm:p-5">
       <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${classes.border} ${classes.surface}`}>
         <Icon size={16} className={classes.icon} />
       </div>
@@ -96,7 +96,7 @@ export function StatusMetric({
 
 export function MiniBreakdown({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="rounded-xl border border-white/6 bg-white/[0.025] px-3 py-3">
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
       <p className="mt-1 text-base font-bold text-white">{value}</p>
       <p className="mt-0.5 text-xs text-slate-500">{sub}</p>
@@ -118,7 +118,7 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/6 bg-white/[0.025] px-3 py-3">
+    <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${classes.surface}`}>
         <Icon size={15} className={classes.icon} />
       </div>
@@ -140,8 +140,8 @@ export function EmptyRoster({
   onUpload: () => void;
 }) {
   return (
-    <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-6 py-12 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-white/5">
+    <div className="flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-12 text-center min-w-0">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
         <Calendar size={28} className="text-slate-600" />
       </div>
       <h3 className="mt-4 text-lg font-semibold text-slate-300">Rooster ophalen</h3>
@@ -161,7 +161,7 @@ export function EmptyRoster({
         <button
           type="button"
           onClick={onUpload}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.04] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07]"
+          className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
         >
           <Upload size={15} />
           CSV uploaden
@@ -173,7 +173,7 @@ export function EmptyRoster({
 
 export function EmptyInline({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
   return (
-    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-white/[0.02] px-4 py-6 text-center">
+    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-6 text-center min-w-0">
       <Icon size={22} className="text-slate-600" />
       <p className="mt-3 text-sm font-semibold text-slate-300">{title}</p>
       <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{text}</p>

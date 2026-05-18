@@ -31,7 +31,7 @@ function SyncStatusRow({ label, status }: { label: string; status?: SyncStatusVi
         : "Geen run";
 
   return (
-    <div className="flex min-h-20 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-3">
+    <div className="flex min-h-20 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 min-w-0">
       <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         {status?.status === "running" ? (
           <Loader2 size={14} className={cn("animate-spin", classes.icon)} />
@@ -70,7 +70,7 @@ function SyncButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex min-h-24 items-start gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4 text-left transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-55"
+      className="flex min-h-24 items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-55 min-w-0"
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-300">
         {loading ? <Loader2 size={17} className="animate-spin" /> : <Icon size={17} />}

@@ -59,7 +59,7 @@ export function BottomNav() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 18, scale: 0.98 }}
               transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              className="fixed inset-x-3 z-[59] rounded-2xl border border-[var(--color-border)] bg-[#0f1219]/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl md:hidden"
+              className="fixed inset-x-3 z-[59] glass p-3 shadow-2xl shadow-black/40 md:hidden"
               style={{ bottom: "calc(88px + env(safe-area-inset-bottom, 0px))" }}
             >
               <div className="mb-3 flex items-center justify-between gap-3 px-1">
@@ -73,7 +73,7 @@ export function BottomNav() {
                   type="button"
                   onClick={() => setMoreOpen(false)}
                   aria-label="Meer menu sluiten"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.04] text-slate-400 transition-colors active:scale-95"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors active:scale-95 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
                 >
                   <X size={17} />
                 </button>
@@ -91,7 +91,7 @@ export function BottomNav() {
 
       <nav
         aria-label="Mobiele hoofdnavigatie"
-        className="fixed bottom-0 left-0 right-0 z-[60] border-t border-[var(--color-border)] bg-[#080a0f]/[0.92] px-2 pt-2 backdrop-blur-xl md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-[60] border-t border-[var(--color-border)] bg-[#0a0a0f]/[0.92] px-2 pt-2 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="grid grid-cols-5 gap-1">
@@ -109,7 +109,7 @@ export function BottomNav() {
               "relative flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-xl border px-1 transition-colors",
               moreActive || moreOpen
                 ? "border-amber-500/25 bg-amber-500/[0.12] text-amber-300"
-                : "border-transparent text-slate-500 active:bg-white/[0.05]",
+                : "border-transparent text-slate-500 active:bg-[var(--color-surface-hover)]",
             )}
           >
             {(moreActive || moreOpen) && (
@@ -152,7 +152,7 @@ function BottomNavLink({
           "relative flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-xl border px-1 transition-colors",
           active
             ? "border-amber-500/25 bg-amber-500/[0.12] text-amber-300"
-            : "border-transparent text-slate-500 active:bg-white/[0.05]",
+            : "border-transparent text-slate-500 active:bg-[var(--color-surface-hover)]",
         )}
       >
         {active && (
@@ -194,7 +194,7 @@ function MoreNavLink({
         "flex min-h-16 items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors",
         active
           ? "border-amber-500/25 bg-amber-500/[0.12] text-amber-100"
-          : "border-white/[0.08] bg-white/[0.03] text-slate-300 active:bg-white/[0.06]",
+          : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-300 hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)]",
       )}
     >
       <span
@@ -202,7 +202,7 @@ function MoreNavLink({
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
           active
             ? "border-amber-500/25 bg-amber-500/15 text-amber-300"
-            : "border-white/[0.08] bg-white/[0.03] text-slate-500",
+            : "border-[var(--color-border)] bg-[var(--color-surface-hover)] text-slate-500",
         )}
       >
         <Icon size={18} />

@@ -19,7 +19,7 @@ export function MetricTile({
   const toneClass = toneClasses[tone];
 
   return (
-    <div className={cn("rounded-lg border bg-white/[0.035] p-4", toneClass.border)}>
+    <div className={cn("glass p-4", toneClass.border)}>
       <div className="flex items-start gap-3">
         <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", toneClass.surface)}>
           <Icon size={18} className={toneClass.icon} />
@@ -80,7 +80,7 @@ export function SegmentedButton({
         "inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
         active
           ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-          : "border-[var(--color-border)] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+          : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
       )}
     >
       <Icon size={15} />

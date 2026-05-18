@@ -77,8 +77,8 @@ function ColorPill({ devices }: { devices: Device[] }) {
         className={cn(
           "flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all min-h-[44px]",
           open
-            ? "bg-white/10 text-white border-white/20"
-            : "bg-white/5 text-slate-400 border-[var(--color-border)] hover:text-slate-200 hover:border-white/20"
+            ? "bg-[var(--color-surface-hover)] text-white border-[var(--color-border-hover)]"
+            : "bg-[var(--color-surface)] text-slate-400 border-[var(--color-border)] hover:text-slate-200 hover:border-[var(--color-border-hover)]"
         )}
         aria-expanded={open}
         aria-label="Kleur instellen voor alle lampen"
@@ -86,7 +86,7 @@ function ColorPill({ devices }: { devices: Device[] }) {
         <Palette size={13} aria-hidden="true" />
         Kleur
         <div
-          className="w-3 h-3 rounded-full border border-white/20 flex-shrink-0"
+          className="w-3 h-3 rounded-full border border-[var(--color-border)] flex-shrink-0"
           style={{ background: hex }}
         />
       </motion.button>
@@ -205,7 +205,7 @@ export function SceneBar() {
         {CUSTOM_SCENES.map((s) => renderSceneBtn(s))}
 
         {/* Divider */}
-        <div className="w-px h-5 bg-white/10 mx-0.5 flex-shrink-0" aria-hidden="true" />
+        <div className="w-px h-5 bg-[var(--color-border)] mx-0.5 flex-shrink-0" aria-hidden="true" />
 
         {/* WiZ toggle */}
         <button
@@ -217,7 +217,7 @@ export function SceneBar() {
             "flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all min-h-[44px] flex-shrink-0",
             showWiz
               ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-              : "bg-white/5 text-slate-500 border-[var(--color-border)] hover:text-amber-400 hover:border-amber-500/20"
+              : "bg-[var(--color-surface)] text-slate-500 border-[var(--color-border)] hover:text-amber-400 hover:border-amber-500/20"
           )}
         >
           <Sparkles size={12} aria-hidden="true" />
@@ -233,7 +233,7 @@ export function SceneBar() {
         {renderSceneBtn(OFF_SCENE)}
 
         {/* Divider */}
-        <div className="w-px h-5 bg-white/10 mx-0.5 flex-shrink-0" aria-hidden="true" />
+        <div className="w-px h-5 bg-[var(--color-border)] mx-0.5 flex-shrink-0" aria-hidden="true" />
 
         {/* Color picker pill — replaces GlobalColorPicker from header */}
         <ColorPill devices={onlineDevices} />

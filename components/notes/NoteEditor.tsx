@@ -205,12 +205,12 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/8 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[var(--color-border)] shrink-0">
           <h3 className="text-sm font-semibold text-slate-200">
             {note ? "Notitie bewerken" : "Nieuwe notitie"}
           </h3>
           <div className="flex items-center gap-1">
-            <button onClick={onClose} className="p-2 -mr-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <button onClick={onClose} className="p-2 -mr-1 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center">
               <X size={18} className="text-slate-400" />
             </button>
           </div>
@@ -267,14 +267,14 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="rounded-xl border border-[var(--color-border)] bg-[#1a1a22] overflow-hidden max-h-[200px] overflow-y-auto"
+                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden max-h-[200px] overflow-y-auto"
               >
                 {linkResults.map((result) => (
                   <button
                     key={result.id}
                     type="button"
                     onClick={(e) => { e.stopPropagation(); insertLink(result.titel); }}
-                    className="flex items-center gap-2 w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-white/8 transition-colors cursor-pointer min-h-[40px]"
+                    className="flex items-center gap-2 w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-h-[40px]"
                   >
                     <Link2 size={14} className="text-amber-400/70 shrink-0" />
                     <span className="truncate">{result.titel}</span>
@@ -288,7 +288,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
           <div className="flex items-center gap-1">
             <button
               onClick={insertChecklist}
-              className="p-2.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2.5 rounded-xl hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               title="Checklist toevoegen"
             >
               <ListChecks size={16} className="text-slate-500" />
@@ -296,7 +296,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
 
             <button
               onClick={() => setShowColors(!showColors)}
-              className="p-2.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2.5 rounded-xl hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               title="Kleur kiezen"
             >
               <Palette size={16} className={showColors ? "text-amber-400" : "text-slate-500"} />
@@ -304,7 +304,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
 
             <button
               onClick={() => setShowMeta(!showMeta)}
-              className="p-2.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2.5 rounded-xl hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               title="Deadline & prioriteit"
             >
               <CalendarDays size={16} className={showMeta ? "text-amber-400" : "text-slate-500"} />
@@ -346,7 +346,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
-              className="flex flex-col gap-3 p-3 rounded-xl bg-white/3 border border-white/5"
+              className="flex flex-col gap-3 p-3 rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)]"
             >
               {/* Deadline picker */}
               <div className="flex items-center gap-2">
@@ -360,7 +360,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
                 {deadline && (
                   <button
                     onClick={() => setDeadline("")}
-                    className="p-2 hover:bg-white/10 rounded-lg cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    className="p-2 hover:bg-[var(--color-surface-hover)] rounded-lg cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                     aria-label="Deadline verwijderen"
                   >
                     <X size={14} className="text-slate-500" />
@@ -392,7 +392,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 text-xs text-slate-300 bg-white/8 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/20 transition-colors min-h-[36px]"
+                className="inline-flex items-center gap-1 text-xs text-slate-300 bg-[var(--color-surface)] px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/20 transition-colors min-h-[36px]"
                 onClick={() => removeTag(tag)}
               >
                 <Tag size={10} /> {tag} <X size={10} />
@@ -415,7 +415,7 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
         </div>
 
         {/* Footer — fixed at bottom */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-white/8 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--color-border)] shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
           <button
             onClick={onClose}
             className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer min-h-[44px] rounded-xl"

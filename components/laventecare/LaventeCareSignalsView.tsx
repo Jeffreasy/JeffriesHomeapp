@@ -26,8 +26,8 @@ export function LaventeCareSignalsView({
   const signalKey = (kind: "action" | "lead", signal: BusinessSignal) => `${kind}:${signal.source}:${signal.id}`;
 
   return (
-    <section className="mt-5 grid gap-5 xl:grid-cols-[1.3fr_0.7fr]">
-      <div className="glass p-5">
+    <section className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[1.3fr_0.7fr]">
+      <div className="glass min-w-0 p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Live koppelingen</p>
@@ -55,7 +55,7 @@ export function LaventeCareSignalsView({
         </div>
       </div>
 
-      <div className="glass p-5">
+      <div className="glass min-w-0 p-5">
         <div className="flex items-center gap-2">
           <Clock3 size={18} className="text-amber-300" />
           <h2 className="text-lg font-bold text-white">Acties</h2>

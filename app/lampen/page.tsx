@@ -92,9 +92,9 @@ export default function LampenPage() {
   useGlobalShortcuts({ devices: onlineDevices, allOn: allOnlineOn, sendCommand });
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0f] text-slate-100">
+    <div className="flex min-h-screen bg-[var(--color-background)] text-slate-100">
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 shrink-0 border-b border-white/5 bg-[#0a0a0f]/90 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 shrink-0 border-b border-[var(--color-border)] bg-[var(--color-background)]/90 backdrop-blur-xl">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
@@ -114,7 +114,7 @@ export default function LampenPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Link
                 href="/settings"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06]"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
               >
                 <Settings size={16} />
                 <span className="hidden sm:inline">Instellingen</span>
@@ -124,7 +124,7 @@ export default function LampenPage() {
                 onClick={toggleAll}
                 disabled={onlineDevices.length === 0}
                 title="Alle online lampen aan/uit"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.03] disabled:text-slate-600"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface)] disabled:text-slate-600"
               >
                 <Power size={16} />
                 <span>{allOnlineOn ? "Alles uit" : "Alles aan"}</span>
@@ -134,7 +134,7 @@ export default function LampenPage() {
         </header>
 
         <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_420px]">
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_420px]">
             <LampCommandCenter
               devices={devices.length}
               online={onlineDevices.length}
@@ -177,8 +177,8 @@ export default function LampenPage() {
             </div>
           )}
 
-          <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="space-y-5">
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="min-w-0 space-y-5">
               <LampToolbar
                 search={search}
                 filter={filter}

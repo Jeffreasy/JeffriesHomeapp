@@ -43,7 +43,7 @@ export function NotesFilters({
 }) {
   return (
     <>
-      <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+      <div className="glass p-4">
         <SectionTitle
           icon={Search}
           title="Zoeken en ordenen"
@@ -57,7 +57,7 @@ export function NotesFilters({
               <button
                 type="button"
                 onClick={clearFilters}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
               >
                 <RotateCcw size={14} />
                 Reset
@@ -67,7 +67,7 @@ export function NotesFilters({
         />
 
         <div className="mt-5 grid gap-4">
-          <div className="flex min-h-11 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.04] px-3">
+          <div className="flex min-h-11 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3">
             <Search size={16} className="shrink-0 text-slate-500" />
             <input
               ref={searchRef}
@@ -82,7 +82,7 @@ export function NotesFilters({
                 type="button"
                 onClick={() => setSearch("")}
                 aria-label="Zoekterm wissen"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-300"
               >
                 <X size={14} />
               </button>
@@ -114,7 +114,7 @@ export function NotesFilters({
       </div>
 
       {allTags.length > 0 && (
-        <section className="col-span-full rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+        <section className="col-span-full glass p-4">
           <SectionTitle
             icon={Tag}
             title="Tags"
@@ -124,7 +124,7 @@ export function NotesFilters({
                 <button
                   type="button"
                   onClick={() => setTagFilter(null)}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
                 >
                   <X size={14} />
                   Wissen
@@ -140,7 +140,7 @@ export function NotesFilters({
                 "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
                 !tagFilter
                   ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-                  : "border-[var(--color-border)] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                  : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
               )}
             >
               <FolderOpen size={14} />
@@ -155,7 +155,7 @@ export function NotesFilters({
                   "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
                   tagFilter === tag
                     ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-                    : "border-[var(--color-border)] bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
+                    : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
                 )}
               >
                 <Tag size={13} />

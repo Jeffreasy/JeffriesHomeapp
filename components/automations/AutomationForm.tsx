@@ -81,7 +81,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Naam *"
-          className="w-full bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+          className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
         />
       </div>
 
@@ -92,7 +92,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
-          className="bg-white/5 border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50 [color-scheme:dark]"
+          className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50 [color-scheme:dark]"
         />
       </div>
 
@@ -123,7 +123,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
                 "flex-1 py-1 rounded-lg text-xs font-medium transition-all",
                 days.includes(i)
                   ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                  : "bg-white/5 text-slate-500 border border-[var(--color-border)]"
+                  : "bg-[var(--color-surface)] text-slate-500 border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
               )}
             >
               {label}
@@ -134,7 +134,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
 
       <fieldset>
         <legend className="sr-only">Actie type</legend>
-        <div className="grid grid-cols-3 gap-1 rounded-xl bg-white/5 p-1">
+        <div className="grid grid-cols-3 gap-1 rounded-xl bg-[var(--color-surface)] p-1 border border-[var(--color-border)]">
           {(Object.keys(actionLabels) as ActionType[]).map((t) => (
             <button
               key={t}
@@ -143,7 +143,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
               onClick={() => setActionType(t)}
               className={cn(
                 "py-1 rounded-lg text-xs transition-all",
-                actionType === t ? "bg-white/10 text-white font-medium" : "text-slate-500"
+                actionType === t ? "bg-[var(--color-surface-hover)] text-white font-medium" : "text-slate-500 hover:bg-[var(--color-surface-hover)]"
               )}
             >
               {actionLabels[t]}
@@ -165,7 +165,7 @@ export function AutomationForm({ onClose, onSave }: AutomationFormProps) {
                   "py-1.5 rounded-lg text-xs border transition-all",
                   sceneId === id
                     ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                    : "bg-white/5 text-slate-400 border-[var(--color-border)]"
+                    : "bg-[var(--color-surface)] text-slate-400 border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
                 )}
               >
                 {label}

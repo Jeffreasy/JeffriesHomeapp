@@ -40,7 +40,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
   if (!dienst) {
     return (
       <div className={cn(
-        "glass rounded-xl border border-white/5 flex items-center justify-center",
+        "glass rounded-xl border border-[var(--color-border)] flex items-center justify-center min-w-0",
         compact ? "px-4 py-3" : "px-6 py-8"
       )}>
         <div className="text-center">

@@ -60,7 +60,7 @@ export function AutomationCard({ automation, onToggle, onDelete }: AutomationCar
           "w-14 h-14 rounded-xl flex flex-col items-center justify-center border flex-shrink-0",
           automation.enabled
             ? "bg-amber-500/10 border-amber-500/25 text-amber-400"
-            : "bg-white/5 border-[var(--color-border)] text-slate-500"
+            : "bg-[var(--color-surface)] border-[var(--color-border)] text-slate-500"
         )}
       >
         <Clock size={13} className="mb-0.5" />
@@ -92,7 +92,7 @@ export function AutomationCard({ automation, onToggle, onDelete }: AutomationCar
             "w-8 h-8 rounded-lg border flex items-center justify-center transition-all",
             automation.enabled
               ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
-              : "bg-white/5 border-[var(--color-border)] text-slate-500 hover:bg-white/10"
+              : "bg-[var(--color-surface)] border-[var(--color-border)] text-slate-500 hover:bg-[var(--color-surface-hover)]"
           )}
         >
           {automation.enabled ? <Play size={12} /> : <PauseCircle size={12} />}
@@ -100,7 +100,7 @@ export function AutomationCard({ automation, onToggle, onDelete }: AutomationCar
         <button
           onClick={onDelete}
           aria-label={`${automation.name} verwijderen`}
-          className="w-8 h-8 rounded-lg border border-[var(--color-border)] bg-white/5 text-slate-500 flex items-center justify-center hover:text-red-400 hover:border-red-500/30 transition-all"
+          className="w-8 h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 flex items-center justify-center hover:text-red-400 hover:border-red-500/30 hover:bg-[var(--color-surface-hover)] transition-all"
         >
           <Trash2 size={12} />
         </button>

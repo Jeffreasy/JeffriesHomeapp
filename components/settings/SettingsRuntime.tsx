@@ -17,7 +17,7 @@ export function SettingsRuntime({
 }) {
   return (
     <Panel className="overflow-hidden p-0">
-      <div className="border-b border-white/6 px-5 py-4 sm:px-6">
+      <div className="border-b border-[var(--color-border)] px-5 py-4 sm:px-6 min-w-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase text-slate-500">Overzicht</p>
@@ -27,7 +27,7 @@ export function SettingsRuntime({
           <StatusPill ok={Boolean(overview?.integrations.backend ?? overview?.integrations.convex)} label="Backend" />
         </div>
       </div>
-      <div className="grid gap-px bg-white/[0.06] sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 xl:grid-cols-4 min-w-0">
         <StatusMetric
           icon={Lightbulb}
           label="Lampen"
@@ -85,7 +85,7 @@ export function SettingsPendingActions({
           <EmptyState icon={CheckCircle2} title="Geen openstaande Grok-acties" />
         ) : (
           pendingActions.map((action) => (
-            <div key={action._id} className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4">
+            <div key={action._id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 min-w-0">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase text-amber-200">{action.code}</p>
@@ -99,7 +99,7 @@ export function SettingsPendingActions({
                     type="button"
                     onClick={() => handleCancelPending(action._id)}
                     disabled={pendingBusyId === action._id}
-                    className="h-9 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 text-xs font-bold text-slate-300 transition-colors hover:bg-white/[0.06] disabled:opacity-50"
+                    className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-bold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
                   >
                     Annuleer
                   </button>

@@ -13,7 +13,7 @@ export function NotesSignals({
   highPriorityCount: number;
 }) {
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4">
+    <div className="glass p-4">
       <SectionTitle icon={ShieldCheck} title="Signalen" subtitle="Context voor je huidige notities" />
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
         <MetricTile

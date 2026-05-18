@@ -43,7 +43,7 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
     return (
       <div className="space-y-3">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-14 rounded-xl bg-white/3 animate-pulse" />
+          <div key={i} className="h-14 rounded-xl bg-[var(--color-surface)] animate-pulse" />
         ))}
       </div>
     );
@@ -67,11 +67,11 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
       {/* ── Stats bar ────────────────────────────────────────────────────── */}
       {upcoming.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          <div className="glass rounded-xl px-4 py-3 border border-white/5">
+          <div className="glass rounded-xl px-4 py-3 border border-[var(--color-border)] min-w-0">
             <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Aankomend</p>
             <p className="text-xl font-bold text-indigo-400">{upcoming.length}</p>
           </div>
-          <div className="glass rounded-xl px-4 py-3 border border-white/5">
+          <div className="glass rounded-xl px-4 py-3 border border-[var(--color-border)] min-w-0">
             <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Deze maand</p>
             <p className="text-xl font-bold text-slate-200">
               {upcoming.filter(e => e.startDatum.slice(0, 7) === today.slice(0, 7)).length}
@@ -150,7 +150,7 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
                 transition={{ duration: 0.2 }}
                 className="overflow-hidden"
               >
-                <div className="glass rounded-xl border border-white/5 divide-y divide-white/5 overflow-hidden opacity-60">
+                <div className="glass rounded-xl border border-[var(--color-border)] divide-y divide-[var(--color-border)] overflow-hidden opacity-60 min-w-0">
                   {history.map(e => (
                     <div key={e.eventId} className="px-4 py-0.5">
                       <PersonalEventItem event={e} onEdit={onEditEvent} />

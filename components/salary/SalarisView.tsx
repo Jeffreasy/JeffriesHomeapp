@@ -83,7 +83,7 @@ export function SalarisView() {
       ))}
 
       {/* Loonstroken Upload */}
-      <div className="glass rounded-2xl p-5 border border-white/5">
+      <div className="glass rounded-2xl p-5 border border-[var(--color-border)] min-w-0">
         <div className="flex items-center gap-2 mb-4">
           <FileUp size={14} className="text-indigo-400" />
           <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-bold">Loonstroken uploaden</p>

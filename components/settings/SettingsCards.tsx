@@ -12,7 +12,7 @@ export function Panel({ children, className = "" }: { children: ReactNode; class
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("rounded-lg border border-[var(--color-border)] bg-white/[0.035] p-4 backdrop-blur-xl sm:p-5", className)}
+      className={cn("rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 backdrop-blur-xl sm:p-5 min-w-0", className)}
     >
       {children}
     </motion.div>
@@ -35,7 +35,7 @@ export function SectionHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.04]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
           <Icon size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
@@ -65,7 +65,7 @@ export function StatusMetric({
   const classes = toneClasses[tone];
 
   return (
-    <div className="min-h-[128px] min-w-0 bg-[#0f0f16]/95 p-4">
+    <div className="min-h-[128px] min-w-0 bg-[var(--color-surface)] p-4">
       <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg border", classes.border, classes.surface)}>
         <Icon size={16} className={classes.icon} />
       </div>
@@ -92,7 +92,7 @@ export function MetricCard({
   const classes = toneClasses[tone];
 
   return (
-    <div className={cn("rounded-lg border bg-white/[0.035] p-4", classes.border)}>
+    <div className={cn("rounded-lg border bg-[var(--color-surface)] p-4 min-w-0", classes.border)}>
       <div className="flex items-start gap-3">
         <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
           <Icon size={18} className={classes.icon} />
@@ -121,7 +121,7 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-3">
+    <div className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 min-w-0">
       <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         <Icon size={15} className={classes.icon} />
       </div>
@@ -155,7 +155,7 @@ export function RouteTile({ href, label, meta, icon: Icon, tone }: { href: strin
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-3 transition-colors hover:bg-white/[0.06]"
+      className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 transition-colors hover:bg-[var(--color-surface-hover)] min-w-0"
     >
       <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         <Icon size={16} className={classes.icon} />
@@ -171,7 +171,7 @@ export function RouteTile({ href, label, meta, icon: Icon, tone }: { href: strin
 
 export function EmptyState({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-white/[0.02] px-4 py-8 text-center">
+    <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-8 text-center min-w-0">
       <Icon size={28} className="mx-auto text-slate-700" />
       <p className="mt-3 text-sm font-semibold text-slate-400">{title}</p>
     </div>

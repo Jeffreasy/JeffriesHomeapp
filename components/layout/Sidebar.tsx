@@ -46,10 +46,10 @@ export function Sidebar() {
   if (!mounted || !isDesktop) return null;
 
   return (
-    <aside className="fixed left-0 top-0 z-40 hidden h-full w-64 flex-col overflow-hidden border-r border-[var(--color-border)] bg-[#080a0f]/95 backdrop-blur-xl md:flex">
+    <aside className="fixed left-0 top-0 z-40 hidden h-full w-64 flex-col overflow-hidden border-r border-[var(--color-border)] bg-[#0a0a0f]/95 backdrop-blur-xl md:flex">
       <Link
         href="/"
-        className="group flex items-center gap-3 border-b border-white/[0.08] px-4 py-5 transition-colors hover:bg-white/[0.03]"
+        className="group flex items-center gap-3 border-b border-[var(--color-border)] px-4 py-5 transition-colors hover:bg-[var(--color-surface-hover)]"
       >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/[0.12] text-amber-300 transition-colors group-hover:bg-amber-500/[0.18]">
           <Home size={18} />
@@ -86,7 +86,7 @@ export function Sidebar() {
                             "relative flex min-h-12 items-center gap-3 overflow-hidden rounded-lg border px-3 py-2.5 transition-colors",
                             active
                               ? "border-amber-500/25 text-amber-100"
-                              : "border-transparent text-slate-400 hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-slate-100",
+                              : "border-transparent text-slate-400 hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] hover:text-slate-100",
                           )}
                         >
                           {active && (
@@ -101,7 +101,7 @@ export function Sidebar() {
                               "relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border transition-colors",
                               active
                                 ? "border-amber-500/25 bg-amber-500/15 text-amber-300"
-                                : "border-white/[0.08] bg-white/[0.03] text-slate-500",
+                                : "border-[var(--color-border)] bg-[var(--color-surface-hover)] text-slate-500",
                             )}
                           >
                             <Icon size={17} />
@@ -123,17 +123,17 @@ export function Sidebar() {
         </div>
       </nav>
 
-      <div className="border-t border-white/[0.08] px-3 py-3">
+      <div className="border-t border-[var(--color-border)] px-3 py-3">
         {!isLoaded ? (
-          <div className="flex items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
-            <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-white/[0.06]" />
+          <div className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
+            <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[var(--color-border)]" />
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <div className="h-2.5 w-24 animate-pulse rounded bg-white/[0.06]" />
-              <div className="h-2 w-32 animate-pulse rounded bg-white/[0.06]" />
+              <div className="h-2.5 w-24 animate-pulse rounded bg-[var(--color-border)]" />
+              <div className="h-2 w-32 animate-pulse rounded bg-[var(--color-border)]" />
             </div>
           </div>
         ) : isSignedIn ? (
-          <div className="flex min-w-0 items-center gap-3 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+          <div className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
             <UserButton
               appearance={{
                 elements: {

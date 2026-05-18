@@ -27,12 +27,12 @@ export function GlobalColorPicker() {
       <motion.button
         whileTap={{ scale: 0.93 }}
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--color-border)] bg-white/5 text-slate-300 text-xs font-medium hover:bg-white/10 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-300 text-xs font-medium hover:bg-[var(--color-surface-hover)] transition-colors"
       >
         <Palette size={13} />
         <span className="hidden sm:inline">Alles dezelfde kleur</span>
         <div
-          className="w-3 h-3 rounded-full border border-white/20"
+          className="w-3 h-3 rounded-full border border-[var(--color-border)]"
           style={{ background: hex }}
         />
       </motion.button>

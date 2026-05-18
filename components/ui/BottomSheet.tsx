@@ -87,12 +87,8 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[81] flex flex-col"
+            className="fixed bottom-0 left-0 right-0 z-[81] flex flex-col bg-[var(--color-surface)] border-t border-[var(--color-border)] rounded-t-[20px] max-h-[85vh]"
             style={{
-              background: "#12121a",
-              borderTop: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "20px 20px 0 0",
-              maxHeight: "85vh",
               paddingBottom: "env(safe-area-inset-bottom, 16px)",
             }}
             onTouchStart={onTouchStart}
@@ -113,15 +109,13 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
               {/* Title bar */}
               {title && (
                 <div
-                  className="flex items-center justify-between px-5 pb-3"
-                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                  className="flex items-center justify-between px-5 pb-3 border-b border-[var(--color-border)]"
                 >
                   <h2 className="text-base font-semibold text-white">{title}</h2>
                   <button
                     onClick={onClose}
                     aria-label="Sheet sluiten"
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors"
-                    style={{ background: "rgba(255,255,255,0.05)" }}
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors bg-[var(--color-surface-hover)]"
                   >
                     <X size={16} />
                   </button>

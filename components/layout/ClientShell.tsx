@@ -20,7 +20,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   if (isAuthPage) return <>{children}</>;
 
   return (
-    <div className="flex min-h-screen w-full overflow-x-hidden bg-[#080a0f]">
+    <div className="flex min-h-screen w-full overflow-x-hidden bg-[var(--color-background)]">
       {/* Desktop sidebar — hidden on mobile */}
       <Sidebar />
 

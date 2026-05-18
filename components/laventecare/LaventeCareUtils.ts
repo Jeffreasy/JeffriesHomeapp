@@ -33,7 +33,7 @@ export const toneClasses: Record<Tone, { border: string; surface: string; text: 
   },
   slate: {
     border: "border-[var(--color-border)]",
-    surface: "bg-white/[0.04]",
+    surface: "bg-[var(--color-surface)]",
     text: "text-slate-200",
     icon: "text-slate-300",
   },

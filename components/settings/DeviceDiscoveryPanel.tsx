@@ -46,7 +46,7 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
   };
 
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4">
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 min-w-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white">Device discovery</p>

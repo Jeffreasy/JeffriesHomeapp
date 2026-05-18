@@ -18,7 +18,7 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
   }, [record.ortDetail]);
 
   return (
-    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4">
+    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4 min-w-0">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] text-amber-400/70 uppercase tracking-wider">
@@ -28,13 +28,13 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
             {MAANDEN[record.maand - 1]} {record.jaar}
           </p>
         </div>
-        <span className="text-[10px] text-slate-600 bg-white/5 px-2 py-1 rounded-lg">
+        <span className="text-[10px] text-slate-600 bg-[var(--color-surface)] px-2 py-1 rounded-lg">
           uurloon ORT €{record.uurloonORT.toFixed(2)}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white/4 rounded-xl p-3 border border-white/5">
+        <div className="bg-[var(--color-surface)] rounded-xl p-3 border border-[var(--color-border)]">
           <p className="text-[10px] text-slate-500 mb-1">▶ Bruto</p>
           <p className="text-xl font-bold text-white">{fmt(record.brutoBetaling)}</p>
         </div>
@@ -53,13 +53,13 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
         {record.eenmaligTotaal > 0 && (
           <BreakdownRow label={eenmalig.map((e) => e.label).join(" + ") || "Eenmalig"} bedrag={record.eenmaligTotaal} accent />
         )}
-        <div className="border-t border-white/5 pt-1.5 mt-1.5" />
+        <div className="border-t border-[var(--color-border)] pt-1.5 mt-1.5" />
         <BreakdownRow label="Pensioen PFZW (12,95%)" bedrag={-record.pensioenpremie} negatief />
         <BreakdownRow label={isWerkelijk ? "Loonheffing" : "≈ Loonheffing (schatting)"} bedrag={-record.loonheffingSchat} negatief />
       </div>
 
       {Object.keys(ort).length > 0 && (
-        <div className="bg-white/2 rounded-lg p-3 border border-white/5 space-y-1">
+        <div className="bg-[var(--color-surface)] rounded-lg p-3 border border-[var(--color-border)] space-y-1">
           <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-2">ORT detail</p>
           {Object.entries(ort).map(([k, v]) => (
             <div key={k} className="flex justify-between text-[11px]">
@@ -123,8 +123,8 @@ export function JaarSectie({ jaar, records }: { jaar: number; records: SalarisDi
   const werkelijkAantal = sorted.filter((r) => r.bron === "werkelijk").length;
 
   return (
-    <div className="glass rounded-2xl border border-white/5 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/2">
+    <div className="glass rounded-2xl border border-[var(--color-border)] overflow-hidden min-w-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <span className="text-sm font-bold text-slate-200">📅 {jaar}</span>
         <div className="flex items-center gap-4 text-xs">
           {werkelijkAantal > 0 && <span className="text-emerald-400">{werkelijkAantal} werkelijk</span>}
@@ -142,7 +142,7 @@ export function JaarSectie({ jaar, records }: { jaar: number; records: SalarisDi
         ))}
       </div>
 
-      <div className="divide-y divide-white/3">
+      <div className="divide-y divide-[var(--color-border)]">
         {sorted.map((r) => (
           <MaandRij key={r.periode} record={r} />
         ))}
@@ -158,7 +158,7 @@ export function MaandRij({ record: r }: { record: SalarisDisplayRecord }) {
   const isWerkelijk = r.bron === "werkelijk";
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 hover:bg-white/2 transition-colors">
+    <div className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--color-surface-hover)] transition-colors">
       <div className="flex items-center gap-3 min-w-0">
         <span className="text-xs font-medium text-slate-400 w-8">{MAANDEN[r.maand - 1]}</span>
         <span className="text-[10px] text-slate-600">{r.aantalDiensten} diensten</span>
@@ -186,7 +186,7 @@ export function TotaalCard({ icon: Icon, label, value, accent }: {
   icon: any; label: string; value: string; accent: string;
 }) {
   return (
-    <div className="glass rounded-xl p-3 border border-white/5" style={{ borderColor: accent + "20" }}>
+    <div className="glass rounded-xl p-3 border border-[var(--color-border)] min-w-0" style={{ borderColor: accent + "20" }}>
       <div className="flex items-center gap-1.5 mb-1.5">
         <Icon size={11} style={{ color: accent }} />
         <p className="text-[9px] text-slate-500 uppercase tracking-wider">{label}</p>
@@ -228,14 +228,14 @@ export function VergelijkingSectie({
   };
 
   return (
-    <div className="glass rounded-2xl p-5 border border-white/5">
+    <div className="glass rounded-2xl p-5 border border-[var(--color-border)] min-w-0">
       <p className="text-[10px] text-teal-400/70 uppercase tracking-wider font-bold mb-3">
         Berekend vs Werkelijk
       </p>
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", fontSize: "0.75rem", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
               <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-muted, #64748b)" }}>Periode</th>
               <th style={{ textAlign: "right", padding: "6px 8px", color: "#f59e0b" }}>Berekend</th>
               <th style={{ textAlign: "right", padding: "6px 8px", color: "#34d399" }}>Werkelijk</th>
@@ -244,7 +244,7 @@ export function VergelijkingSectie({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.periode} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              <tr key={r.periode} style={{ borderBottom: "1px solid var(--color-border)" }}>
                 <td style={{ padding: "6px 8px", fontWeight: 600 }}>{MAANDEN[r.maand - 1]} {r.jaar}</td>
                 <td style={{ padding: "6px 8px", textAlign: "right", color: "#f59e0b" }}>{fmt(r.berekend.nettoPrognose)}</td>
                 <td style={{ padding: "6px 8px", textAlign: "right", color: "#34d399" }}>{fmt(r.werkelijk.netto)}</td>

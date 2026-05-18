@@ -75,8 +75,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               aria-modal="true"
               aria-labelledby="confirm-title"
               aria-describedby="confirm-message"
-              className="fixed z-[101] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm glass rounded-2xl p-6 shadow-2xl"
-              style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+              className="fixed z-[101] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm glass rounded-2xl p-6 shadow-2xl border border-[var(--color-border)]"
             >
               <button
                 onClick={() => handleClose(false)}
@@ -113,7 +112,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => handleClose(false)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-slate-300 border border-[var(--color-border)] text-sm hover:bg-white/10 transition-colors"
+                  className="px-4 py-2 rounded-xl bg-[var(--color-surface)] text-slate-300 border border-[var(--color-border)] text-sm hover:bg-[var(--color-surface-hover)] transition-colors"
                 >
                   Annuleren
                 </button>

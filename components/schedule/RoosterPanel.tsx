@@ -56,7 +56,7 @@ export function RoosterPanel() {
             disabled={isLoading}
             aria-label="Handmatig .csv uploaden"
             title="Handmatig .csv uploaden"
-            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-[var(--color-border)] text-xs text-slate-600 hover:text-slate-400 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] text-xs text-slate-600 hover:text-slate-400 transition-all"
           >
             <Upload size={10} /> CSV
           </button>
@@ -91,7 +91,7 @@ export function RoosterPanel() {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={isLoading}
-            className="px-4 py-2 rounded-xl bg-white/5 text-slate-400 border border-[var(--color-border)] text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2 mx-auto"
+            className="px-4 py-2 rounded-xl bg-[var(--color-surface)] text-slate-400 border border-[var(--color-border)] text-sm font-medium hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-2 mx-auto"
           >
             <Upload size={13} />
             CSV uploaden

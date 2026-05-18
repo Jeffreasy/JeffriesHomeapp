@@ -26,7 +26,7 @@ function shiftColor(type: string) { return SHIFT_COLORS[type] ?? "#94a3b8"; }
 
 /** Horizontal stacked shift bar */
 function ShiftBar({ shifts, total }: { shifts: Record<string, number>; total: number }) {
-  if (!total) return <div className="h-1.5 rounded-full bg-white/5 w-full" />;
+  if (!total) return <div className="h-1.5 rounded-full bg-[var(--color-surface)] w-full" />;
   const types = Object.entries(shifts).filter(([, n]) => n > 0);
   return (
     <div className="flex h-1.5 rounded-full overflow-hidden w-full gap-px">
@@ -192,7 +192,7 @@ function DienstregelItem({ dienst }: { dienst: DienstRow }) {
   const teamColor = teamStr?.startsWith("R") ? "#60a5fa" : teamStr?.startsWith("A") ? "#34d399" : "#94a3b8";
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5">
+    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] min-w-0">
       {/* Date */}
       <div className="w-8 text-center flex-shrink-0">
         <p className="text-xs font-bold text-slate-300">{dienst.startDatum.slice(8)}</p>
@@ -247,7 +247,7 @@ function YearSummary({ year }: { year: YearStats }) {
       <div>
         <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Team verdeling</p>
         <div className="flex items-center gap-2">
-          <div className="w-24 h-2 rounded-full overflow-hidden bg-white/5 flex">
+          <div className="w-24 h-2 rounded-full overflow-hidden bg-[var(--color-surface)] flex">
             <div style={{ width: `${rPct}%`, background: "#60a5fa" }} />
             <div style={{ width: `${100 - rPct}%`, background: "#34d399" }} />
           </div>
@@ -329,7 +329,7 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
 
       {/* ── Year summary ───────────────────────────────────────────────────── */}
       {yearData && (
-        <div className="glass rounded-2xl p-5 border border-white/5">
+        <div className="glass rounded-2xl p-5 border border-[var(--color-border)] min-w-0">
           <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-4">{activeYear} — Jaaroverzicht</p>
           <YearSummary year={yearData} />
         </div>

@@ -54,11 +54,11 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="group relative rounded-xl border border-white/8 hover:border-white/15 transition-all cursor-pointer"
+      className="glass group relative rounded-xl border border-[var(--color-border)] hover:border-[var(--color-border-hover)] transition-all cursor-pointer"
       style={{
         background: note.kleur
           ? `linear-gradient(135deg, ${note.kleur}${KLEUR_OPACITY} 0%, rgba(15,15,20,0.85) 100%)`
-          : "rgba(255,255,255,0.03)",
+          : "var(--color-surface)",
       }}
       onClick={() => onEdit(note)}
     >
@@ -116,7 +116,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
         {!masked && checklistInfo.total > 0 && (
           <div className="flex items-center gap-2 mb-2">
             <ListChecks size={10} className="text-slate-600 shrink-0" aria-hidden="true" />
-            <div className="flex-1 h-1 rounded-full bg-white/5 overflow-hidden" role="progressbar" aria-valuenow={checklistInfo.pct} aria-valuemin={0} aria-valuemax={100}>
+            <div className="flex-1 h-1 rounded-full bg-[var(--color-surface)] overflow-hidden" role="progressbar" aria-valuenow={checklistInfo.pct} aria-valuemin={0} aria-valuemax={100}>
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
@@ -139,7 +139,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {masked ? (
-              <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 bg-white/5 px-1.5 py-0.5 rounded-md">
+              <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 bg-[var(--color-surface)] px-1.5 py-0.5 rounded-md">
                 <Tag size={8} aria-hidden="true" />
                 ••••
               </span>
@@ -148,7 +148,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
                 {(note.tags ?? []).slice(0, 2).map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 bg-white/5 px-1.5 py-0.5 rounded-md"
+                    className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 bg-[var(--color-surface)] px-1.5 py-0.5 rounded-md"
                   >
                     <Tag size={8} aria-hidden="true" />
                     {tag}
@@ -166,14 +166,14 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
           <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => { e.stopPropagation(); onTogglePin(note.id); }}
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+              className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label={note.isPinned ? "Losmaken" : "Vastpinnen"}
             >
               <Pin size={14} className={note.isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onArchive(note.id); }}
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+              className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label={note.isArchived ? "Terugzetten" : "Archiveren"}
             >
               <Archive size={14} className="text-slate-500" />
@@ -236,7 +236,7 @@ function getDeadlineInfo(deadline: string): { label: string; style: string; over
   if (days <= 7) return { label: `Over ${days}d`, style: "text-sky-400 bg-sky-500/10", overdue: false };
   return {
     label: new Date(deadline).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }),
-    style: "text-slate-400 bg-white/5",
+    style: "text-slate-400 bg-[var(--color-surface)]",
     overdue: false,
   };
 }
@@ -265,7 +265,7 @@ function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) 
             aria-checked="false"
             aria-label={unchecked[1]}
             onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(originalIdx); } : undefined}
-            className={`mt-0.5 w-3 h-3 rounded-[3px] border border-white/20 shrink-0 ${onToggle ? "cursor-pointer hover:border-amber-400/50" : ""}`}
+            className={`mt-0.5 w-3 h-3 rounded-[3px] border border-[var(--color-border)] shrink-0 ${onToggle ? "cursor-pointer hover:border-amber-400/50" : ""}`}
           />
           <span>{renderLineWithLinks(unchecked[1], onNavigateToNote)}</span>
         </div>
