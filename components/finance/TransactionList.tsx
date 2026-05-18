@@ -3,21 +3,11 @@
 import { useState } from "react";
 import { TrendingDown, TrendingUp, AlertTriangle, ChevronDown } from "lucide-react";
 import { CATEGORIE_OPTIES, CODE_LABELS } from "@/lib/finance-constants";
-import type { Id } from "@/convex/_generated/dataModel";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export interface TransactionRow {
-  _id:                  Id<"transactions">;
-  datum:                string;
-  bedrag:               number;
-  code:                 string;
-  tegenpartijNaam?:     string;
-  omschrijving:         string;
-  redenRetour?:         string;
-  isInterneOverboeking: boolean;
-  categorie?:           string;
-}
+import type { TransactionRow } from "@/hooks/useTransactions";
+export type { TransactionRow };
 
 // ─── Inline categorie-editor ─────────────────────────────────────────────────
 
@@ -26,7 +16,7 @@ function CategorieEditor({
   onSave,
 }: {
   tx: TransactionRow;
-  onSave: (id: Id<"transactions">, cat: string | undefined) => void;
+  onSave: (id: string, cat: string | undefined) => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -42,12 +32,12 @@ function CategorieEditor({
             <button
               key={cat}
               className={`cat-option ${tx.categorie === cat ? "cat-option--active" : ""}`}
-              onClick={() => { onSave(tx._id, cat); setOpen(false); }}
+              onClick={() => { onSave(tx._id || tx.id || "", cat); setOpen(false); }}
             >
               {cat}
             </button>
           ))}
-          <button className="cat-option cat-option--clear" onClick={() => { onSave(tx._id, undefined); setOpen(false); }}>
+          <button className="cat-option cat-option--clear" onClick={() => { onSave(tx._id || tx.id || "", undefined); setOpen(false); }}>
             ↩ Auto-detect
           </button>
         </div>
@@ -60,7 +50,7 @@ function CategorieEditor({
 
 interface Props {
   transactions: TransactionRow[];
-  onCategorie: (id: Id<"transactions">, cat: string | undefined) => void;
+  onCategorie: (id: string, cat: string | undefined) => void;
   formatAmount?: (amount: number) => string;
   isDone: boolean;
   onLoadMore: () => void;
@@ -99,7 +89,7 @@ export function TransactionList({
         const showDateHeader = !previous || tx.datum !== previous.datum;
 
         return (
-          <div key={tx._id}>
+          <div key={tx._id || tx.id}>
             {showDateHeader && (
               <div className="tx-date-header">
                 {(() => {
@@ -116,19 +106,19 @@ export function TransactionList({
                 tx.bedrag > 0       && "tx-row--credit",
                 tx.bedrag < 0       && "tx-row--debit",
                 tx.code === "st"    && "tx-row--stornering",
-                tx.isInterneOverboeking && "tx-row--intern",
+                (tx.isInterneOverboeking || tx.is_interne_overboeking) && "tx-row--intern",
               ].filter(Boolean).join(" ")}
             >
               {/* Partij + omschrijving */}
               <div className="tx-info">
                 <span className="tx-naam">
-                  {tx.isInterneOverboeking ? "↔ Interne overboeking" : (tx.tegenpartijNaam || "Onbekend")}
+                  {(tx.isInterneOverboeking || tx.is_interne_overboeking) ? "↔ Interne overboeking" : (tx.tegenpartijNaam || tx.tegenpartij_naam || "Onbekend")}
                 </span>
                 {tx.omschrijving && (
                   <span className="tx-omschrijving">{tx.omschrijving.slice(0, 90)}</span>
                 )}
-                {tx.redenRetour && (
-                  <span className="tx-retour"><AlertTriangle size={11} />{tx.redenRetour}</span>
+                {(tx.redenRetour || tx.reden_retour) && (
+                  <span className="tx-retour"><AlertTriangle size={11} />{tx.redenRetour || tx.reden_retour}</span>
                 )}
               </div>
 

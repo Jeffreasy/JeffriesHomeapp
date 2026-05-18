@@ -25,7 +25,7 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
       setFound(devices);
       success(`${devices.length} lokale device(s) gevonden`);
     } catch (err) {
-      error(err instanceof Error ? err.message : "Lokale scan mislukt");
+      error(err instanceof Error ? err.message : "Go backend niet bereikbaar — draait de server op localhost:8000?");
     } finally {
       setScanning(false);
     }

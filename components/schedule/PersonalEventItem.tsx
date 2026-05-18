@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useAction } from "convex/react";
+import { personalEventsApi } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Clock, CalendarDays, AlertTriangle, Info, Trash2, Loader2, X, Check, Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { api } from "@/convex/_generated/api";
 import { type ConflictInfo } from "@/lib/conflictDetection";
 import {
   type PersonalEvent,
@@ -39,7 +38,6 @@ export function PersonalEventItem({ event, isToday, onEdit, conflictInfo }: Pers
   const relTag = getRelativeTag();
 
   const { success, error } = useToast();
-  const deleteAction = useAction(api.actions.deletePersonalEvent.deleteEvent);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -53,12 +51,8 @@ export function PersonalEventItem({ event, isToday, onEdit, conflictInfo }: Pers
 
     setIsDeleting(true);
     try {
-      const res = await deleteAction({ userId: event.userId, eventId: event.eventId });
-      if (res.ok) {
-        success("Afspraak verwijderd");
-      } else {
-        error(`Fout bij verwijderen: ${res.message}`);
-      }
+      await personalEventsApi.updateStatus(event.userId, event.eventId, "cancelled");
+      success("Afspraak verwijderd");
     } catch (e: any) {
       error(`Mislukt: ${e.message}`);
       setConfirmDelete(false);

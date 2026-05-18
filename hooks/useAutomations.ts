@@ -1,28 +1,26 @@
 "use client";
 
-import { useCallback } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useCallback, useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
-import { type Id } from "@/convex/_generated/dataModel";
+import { automationsApi, type AutomationRow } from "@/lib/api";
 import {
   type Automation,
   type ShiftType,
   createDienstWekkerPack,
 } from "@/lib/automations";
 
-// ─── Map Convex doc → Automation type ────────────────────────────────────────
+// ─── Map PG row → Automation type ────────────────────────────────────────────
 
-function fromDoc(doc: any): Automation {
+function fromRow(row: AutomationRow): Automation {
   return {
-    id:          doc._id,
-    name:        doc.name,
-    enabled:     doc.enabled,
-    createdAt:   doc.createdAt,
-    lastFiredAt: doc.lastFiredAt,
-    group:       doc.group,
-    trigger:     doc.trigger,
-    action:      doc.action,
+    id:          row.id,
+    name:        row.name,
+    enabled:     row.enabled,
+    createdAt:   row.created_at,
+    lastFiredAt: row.last_fired_at ?? undefined,
+    group:       row.group_name ?? undefined,
+    trigger:     row.trigger_config as unknown as Automation["trigger"],
+    action:      row.action_config as unknown as Automation["action"],
   };
 }
 
@@ -32,77 +30,76 @@ export function useAutomations() {
   const { user } = useUser();
   const userId = user?.id ?? "";
 
-  // ── Convex queries ────────────────────────────────────────────────────────
-  const docs = useQuery(api.automations.list, userId ? { userId } : "skip");
-  const automations: Automation[] = (docs ?? []).map(fromDoc);
+  const [docs, setDocs] = useState<AutomationRow[]>([]);
+  const automations: Automation[] = docs.map(fromRow);
 
-  // ── Convex mutations ──────────────────────────────────────────────────────
-  const createMutation        = useMutation(api.automations.create);
-  const toggleMutation        = useMutation(api.automations.toggle);
-  const removeMutation        = useMutation(api.automations.remove);
-  const removeByGroupMutation = useMutation(api.automations.removeByGroup);
+  const fetchAutomations = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const result = await automationsApi.list(userId);
+      setDocs(result);
+    } catch {
+      setDocs([]);
+    }
+  }, [userId]);
 
-  // ── CRUD ─────────────────────────────────────────────────────────────────
+  useEffect(() => { fetchAutomations(); }, [fetchAutomations]);
 
   const add = useCallback(
     async (data: Omit<Automation, "id" | "createdAt" | "lastFiredAt">) => {
       if (!userId) return;
-      await createMutation({
-        userId,
-        name:      data.name,
-        enabled:   data.enabled,
-        createdAt: new Date().toISOString(),
-        group:     data.group,
-        trigger:   data.trigger,
-        action:    data.action,
+      await automationsApi.create(userId, {
+        name:           data.name,
+        enabled:        data.enabled,
+        created_at:     new Date().toISOString(),
+        group_name:     data.group ?? null,
+        trigger_config: data.trigger as unknown as Record<string, unknown>,
+        action_config:  data.action as unknown as Record<string, unknown>,
       });
+      fetchAutomations();
     },
-    [userId, createMutation]
+    [userId, fetchAutomations]
   );
 
   const toggle = useCallback(
     async (id: string) => {
-      await toggleMutation({ id: id as Id<"automations"> });
+      await automationsApi.toggle(id);
+      fetchAutomations();
     },
-    [toggleMutation]
+    [fetchAutomations]
   );
 
   const remove = useCallback(
     async (id: string) => {
-      await removeMutation({ id: id as Id<"automations"> });
+      await automationsApi.delete(id);
+      fetchAutomations();
     },
-    [removeMutation]
+    [fetchAutomations]
   );
 
   const addDienstWekkerPack = useCallback(
     async (shiftType: ShiftType) => {
       if (!userId) return 0;
       const groupTag = `dienst-wekker-${shiftType.toLowerCase()}`;
-      // Remove existing pack first
-      await removeByGroupMutation({ userId, group: groupTag });
-      // Create new pack
+      await automationsApi.deleteByGroup(userId, groupTag);
       const pack = createDienstWekkerPack(shiftType);
       await Promise.all(
         pack.map((a) =>
-          createMutation({
-            userId,
-            name:      a.name,
-            enabled:   a.enabled,
-            createdAt: a.createdAt,
-            group:     a.group,
-            trigger:   a.trigger,
-            action:    a.action,
+          automationsApi.create(userId, {
+            name:           a.name,
+            enabled:        a.enabled,
+            created_at:     a.createdAt,
+            group_name:     a.group ?? null,
+            trigger_config: a.trigger as unknown as Record<string, unknown>,
+            action_config:  a.action as unknown as Record<string, unknown>,
           })
         )
       );
+      fetchAutomations();
       return pack.length;
     },
-    [userId, createMutation, removeByGroupMutation]
+    [userId, fetchAutomations]
   );
-
-  // NOTE: Automations worden uitgevoerd door de Python backend engine (24/7 Docker).
-  // De browser is NOOIT verantwoordelijk voor het vuren van automations.
-  // lastCheck is null — de engine status is niet beschikbaar in de browser.
 
   return { automations, add, addDienstWekkerPack, toggle, remove, lastCheck: null };
 }

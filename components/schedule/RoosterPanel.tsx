@@ -14,7 +14,7 @@ export function RoosterPanel() {
     upcoming,
     meta,
     isLoading,
-    importXlsx,
+    importCsv,
     clear,
   } = useSchedule();
   const { success, error } = useToast();
@@ -24,7 +24,7 @@ export function RoosterPanel() {
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const result = await importXlsx(file);
+    const result = await importCsv(file);
     if (result.ok) success(`${result.count} diensten geïmporteerd`);
     else error(`Import mislukt: ${result.error}`);
     e.target.value = "";
@@ -54,16 +54,16 @@ export function RoosterPanel() {
           <button
             onClick={() => fileRef.current?.click()}
             disabled={isLoading}
-            aria-label="Handmatig .xlsx uploaden"
-            title="Handmatig .xlsx uploaden"
+            aria-label="Handmatig .csv uploaden"
+            title="Handmatig .csv uploaden"
             className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-slate-600 hover:text-slate-400 transition-all"
           >
-            <Upload size={10} /> XLSX
+            <Upload size={10} /> CSV
           </button>
           <input
             ref={fileRef}
             type="file"
-            accept=".xlsx,.xls"
+            accept=".csv"
             onChange={handleFile}
             className="hidden"
             aria-label="Roosterbestand uploaden"
@@ -86,7 +86,7 @@ export function RoosterPanel() {
           <Upload size={28} className="text-slate-600 mx-auto mb-3" />
           <p className="text-sm text-slate-400 font-medium">Rooster ophalen</p>
           <p className="text-xs text-slate-600 mt-1 mb-4">
-            Upload een .xlsx bestand of gebruik &ldquo;Sync Agenda&rdquo; op de Rooster pagina
+            Upload een .csv bestand of gebruik &ldquo;Sync Agenda&rdquo; op de Rooster pagina
           </p>
           <button
             onClick={() => fileRef.current?.click()}
@@ -94,7 +94,7 @@ export function RoosterPanel() {
             className="px-4 py-2 rounded-xl bg-white/5 text-slate-400 border border-white/10 text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2 mx-auto"
           >
             <Upload size={13} />
-            XLSX uploaden
+            CSV uploaden
           </button>
         </div>
       )}

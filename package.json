@@ -7,8 +7,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "telegram": "node scripts/telegramPoller.mjs",
-    "bridge": "node scripts/commandBridge.mjs",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
     "lint": "eslint"
@@ -19,7 +17,6 @@
     "@tanstack/react-query-devtools": "^5.91.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "convex": "^1.33.1",
     "framer-motion": "^12.36.0",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.577.0",
@@ -31,7 +28,6 @@
     "recharts": "^3.8.0",
     "tailwind-merge": "^3.5.0",
     "ws": "^8.20.1",
-    "xlsx": "^0.18.5",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
@@ -41,6 +37,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "orval": "^8.10.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

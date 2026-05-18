@@ -10,7 +10,7 @@ import { formatXP, formatStreak, formatLevel } from "@/lib/habit-constants";
  * Mobile-first: stacked cards, XP progress bar, streak leaderboard.
  */
 export function HabitStats({ masked = false }: { masked?: boolean }) {
-  const { stats, level } = useHabits();
+  const { stats, level, habits, badges } = useHabits();
 
   if (!stats) {
     return (
@@ -24,6 +24,14 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
       </div>
     );
   }
+
+  const topStreaks = habits
+    .filter(h => h.huidigeStreak > 0)
+    .sort((a, b) => b.huidigeStreak - a.huidigeStreak)
+    .slice(0, 5)
+    .map(h => ({ naam: h.naam, emoji: h.emoji, streak: h.huidigeStreak, type: h.type }));
+
+  const langsteStreakOoit = Math.max(0, ...habits.map(h => h.langsteStreak));
 
   return (
     <div className="space-y-3">
@@ -64,37 +72,37 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
         <StatMiniCard
           icon={<Target size={14} className="text-blue-400" />}
           label="Totaal Habits"
-          value={stats.totaalHabits.toString()}
+          value={(stats.activeHabits ?? 0).toString()}
           accent="blue"
         />
         <StatMiniCard
           icon={<TrendingUp size={14} className="text-green-400" />}
           label="Totaal Voltooid"
-          value={stats.totaalVoltooid.toString()}
+          value={(stats.totaalVoltooid ?? 0).toString()}
           accent="green"
         />
         <StatMiniCard
           icon={<Flame size={14} className="text-orange-400" />}
           label="Langste Streak"
-          value={`${stats.langsteStreakOoit}d`}
+          value={`${langsteStreakOoit}d`}
           accent="orange"
         />
         <StatMiniCard
           icon={<Award size={14} className="text-amber-400" />}
           label="Badges"
-          value={stats.badgeCount.toString()}
+          value={badges.length.toString()}
           accent="amber"
         />
       </div>
 
       {/* Top Streaks leaderboard */}
-      {stats.topStreaks.length > 0 && (
+      {topStreaks.length > 0 && (
         <div className="glass rounded-2xl p-4">
           <h4 className="text-xs font-bold text-slate-300 mb-3 flex items-center gap-1.5">
             <Flame size={13} className="text-orange-400" /> Actieve Streaks
           </h4>
           <div className="space-y-2">
-          {stats.topStreaks.map((s: { naam: string; emoji: string; streak: number; type?: string }, i: number) => (
+          {topStreaks.map((s, i) => (
               <div key={i} className="flex items-center justify-between py-1.5">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-500 w-4">#{i + 1}</span>

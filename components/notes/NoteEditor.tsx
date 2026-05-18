@@ -3,8 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, ChevronDown, Link2 } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { getNotesSearch } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 
 const KLEUREN = [
@@ -40,12 +39,22 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
   const [linkActive, setLinkActive]     = useState(false);
   const [linkCursorPos, setLinkCursorPos] = useState(0);
 
-  const linkResults = useQuery(
-    api.notes.searchTitles,
-    linkActive && linkSearch.length > 0
-      ? { term: linkSearch }
-      : "skip"
-  );
+  const [linkResults, setLinkResults]  = useState<{ id: string; titel: string }[]>([]);
+
+  useEffect(() => {
+    if (!linkActive || !linkSearch || !note?.user_id) {
+      setLinkResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const results = await getNotesSearch({ userId: note.user_id, q: linkSearch, limit: 5 });
+        const items = Array.isArray(results) ? results : Array.isArray((results as any).data) ? (results as any).data : [];
+        setLinkResults(items.map((r: any) => ({ id: r.id, titel: r.titel ?? "Zonder titel" })));
+      } catch { setLinkResults([]); }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [linkActive, linkSearch, note?.user_id]);
 
   const textRef = useRef<HTMLTextAreaElement>(null);
 

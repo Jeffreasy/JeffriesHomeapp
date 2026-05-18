@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
 import { useHabits, type HabitBadgeRecord } from "@/hooks/useHabits";
-import { BADGE_DEFINITIONS } from "@/convex/lib/habitConstants";
+import { BADGE_DEFINITIONS } from "@/lib/habit-constants";
 
 /**
  * BadgeShowcase — Grid of badges with locked/unlocked states.

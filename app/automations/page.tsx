@@ -92,7 +92,7 @@ export default function AutomationsPage() {
           <div className="glass rounded-xl p-4 flex items-center gap-3 border border-green-500/15">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true" />
             <div className="flex-1">
-              <p className="text-xs font-medium text-green-400">Automation Engine actief (Docker)</p>
+              <p className="text-xs font-medium text-green-400">Automation Engine actief (Go)</p>
               <p className="text-[10px] text-slate-500 mt-0.5">
                 Draait 24/7 op je lokale server · ook zonder open browser
               </p>

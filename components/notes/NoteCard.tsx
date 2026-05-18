@@ -2,17 +2,16 @@
 
 import { motion } from "framer-motion";
 import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2 } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useGetNotesIdBacklinks } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord } from "@/hooks/useNotes";
 
 interface NoteCardProps {
   note: NoteRecord;
   onEdit:      (note: NoteRecord) => void;
-  onTogglePin: (id: NoteRecord["_id"]) => void;
-  onArchive:   (id: NoteRecord["_id"]) => void;
-  onDelete:    (id: NoteRecord["_id"]) => void;
-  onUpdateContent?: (id: NoteRecord["_id"], inhoud: string) => void;
+  onTogglePin: (id: string) => void;
+  onArchive:   (id: string) => void;
+  onDelete:    (id: string) => void;
+  onUpdateContent?: (id: string, inhoud: string) => void;
   onNavigateToNote?: (title: string) => void;
   masked?:     boolean;
 }
@@ -32,7 +31,9 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
   const allLines = note.inhoud.split("\n");
   const deadlineInfo = note.deadline ? getDeadlineInfo(note.deadline) : null;
   const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
-  const backlinks = useQuery(api.notes.getBacklinks, masked ? "skip" : { noteId: note._id });
+  
+  const { data: backlinksRaw } = useGetNotesIdBacklinks(note.id, { query: { enabled: !masked } });
+  const backlinks = Array.isArray(backlinksRaw?.data) ? backlinksRaw.data : [];
 
   const toggleCheckbox = (originalLineIndex: number) => {
     if (!onUpdateContent) return;
@@ -44,7 +45,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
     } else if (CHECKED.test(line)) {
       lines[originalLineIndex] = line.replace(/- \[x\]/i, "- [ ]");
     }
-    onUpdateContent(note._id, lines.join("\n"));
+    onUpdateContent(note.id, lines.join("\n"));
   };
 
   return (
@@ -164,21 +165,21 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
           {/* Action buttons — always visible on mobile, hover on desktop */}
           <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
             <button
-              onClick={(e) => { e.stopPropagation(); onTogglePin(note._id); }}
+              onClick={(e) => { e.stopPropagation(); onTogglePin(note.id); }}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label={note.isPinned ? "Losmaken" : "Vastpinnen"}
             >
               <Pin size={14} className={note.isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onArchive(note._id); }}
+              onClick={(e) => { e.stopPropagation(); onArchive(note.id); }}
               className="p-2 rounded-lg hover:bg-white/10 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label={note.isArchived ? "Terugzetten" : "Archiveren"}
             >
               <Archive size={14} className="text-slate-500" />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onDelete(note._id); }}
+              onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
               className="p-2 rounded-lg hover:bg-red-500/20 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
               aria-label="Verwijderen"
             >
@@ -194,7 +195,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
             {backlinks.slice(0, 3).map((bl) => (
               <span
                 key={bl.id}
-                onClick={(e) => { e.stopPropagation(); onNavigateToNote?.(bl.titel); }}
+                onClick={(e) => { e.stopPropagation(); onNavigateToNote?.(bl.titel || "Naamloos"); }}
                 className="text-[10px] text-amber-400/70 bg-amber-400/8 px-1.5 py-0.5 rounded-md cursor-pointer hover:bg-amber-400/15 transition-colors"
               >
                 {bl.titel}

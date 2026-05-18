@@ -3,9 +3,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Calendar, Clock, MapPin, FileText, Plus, Save } from "lucide-react";
-import { useMutation, useAction } from "convex/react";
+import { personalEventsApi } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 
 const CATEGORIES = [
@@ -39,8 +38,6 @@ interface CreateEventModalProps {
 
 export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalProps) {
   const { user }  = useUser();
-  const createFn  = useMutation(api.personalEvents.create);
-  const updateFn  = useAction(api.actions.updatePersonalEvent.updateEvent);
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -97,26 +94,24 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
         ? `${rawDesc} [categorie:${categorie}]`
         : `[categorie:${categorie}]`;
 
-      const payload = {
-        userId:       user.id,
+      const row = {
+        user_id:      user.id,
+        event_id:     editEvent?.eventId ?? crypto.randomUUID(),
         titel:        titel.trim(),
-        startDatum,
-        eindDatum,
+        start_datum:  startDatum,
+        eind_datum:   eindDatum,
         heledag,
-        startTijd:    heledag ? undefined : startTijd || undefined,
-        eindTijd:     heledag ? undefined : eindTijd  || undefined,
-        locatie:      locatie.trim()      || undefined,
-        beschrijving: fullDesc || undefined,
+        start_tijd:   heledag ? null : startTijd || null,
+        eind_tijd:    heledag ? null : eindTijd  || null,
+        locatie:      locatie.trim() || null,
+        beschrijving: fullDesc || null,
+        status:       "active",
+        bron:         "manual",
+        google_event_id: null,
+        created_at:   editEvent ? undefined : new Date().toISOString(),
       };
 
-      if (editEvent) {
-        // Edit flow
-        const res = await updateFn({ eventId: editEvent.eventId, ...payload });
-        if (!res.ok) throw new Error(res.message);
-      } else {
-        // Create flow
-        await createFn(payload);
-      }
+      await personalEventsApi.upsert(row as any);
       handleClose();
     } catch (err: any) {
       setError(err.message ?? "Opslaan mislukt");

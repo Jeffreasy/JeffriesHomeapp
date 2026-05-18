@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, AlertTriangle, Pause, MoreVertical, Trash2, Archive, Edit3, Plus, Minus, ChevronDown, Trophy, Calendar, Target, Zap, TrendingUp } from "lucide-react";
 import { formatStreak, formatXP, MOEILIJKHEID_LABELS, FREQUENTIE_LABELS } from "@/lib/habit-constants";
-import { getLevel } from "@/convex/lib/habitConstants";
-import { DEFAULT_STAP, INCIDENT_TRIGGERS } from "@/convex/lib/habitConstants";
+import { getLevel } from "@/lib/habit-constants";
+import { DEFAULT_STAP, INCIDENT_TRIGGERS } from "@/lib/habit-constants";
 import type { HabitWithLog } from "@/hooks/useHabits";
 
 /**
@@ -178,7 +178,7 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
               <span className="text-[10px] text-green-400/60">+{habit.log.xpVerdiend} XP</span>
             ) : null}
             <span className="text-[10px] text-slate-600">
-              {MOEILIJKHEID_LABELS[habit.moeilijkheid]}
+              {MOEILIJKHEID_LABELS[habit.moeilijkheid as string]}
             </span>
             {habit.doelTijd && !masked && (
               <span className="text-[10px] text-sky-400/60">⏰ {habit.doelTijd}</span>

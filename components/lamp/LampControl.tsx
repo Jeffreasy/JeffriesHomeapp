@@ -36,7 +36,7 @@ export function LampControl({ device }: LampControlProps) {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      const fresh = await devicesApi.get(device.id.toString());
+      const fresh = await devicesApi.get(device.id);
       queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
         old?.map((d) => (d.id === device.id ? fresh : d))
       );

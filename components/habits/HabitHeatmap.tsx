@@ -3,8 +3,7 @@
 import { useMemo } from "react";
 import { Activity } from "lucide-react";
 import { HEATMAP_COLORS, getHeatmapLevel } from "@/lib/habit-constants";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useGetHabitsHeatmap } from "@/lib/api/generated/habits/habits";
 import { useUser } from "@clerk/nextjs";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"];
@@ -18,10 +17,14 @@ export function HabitHeatmap() {
   const { user } = useUser();
   const userId = user?.id ?? "";
 
-  const data = useQuery(
-    api.habits.getHeatmapData,
-    userId ? {} : "skip",
+  const { data: heatmapRaw } = useGetHabitsHeatmap(
+    { userId, days: 365 },
+    { query: { enabled: !!userId } }
   );
+
+  const data = useMemo(() => {
+    return { days: Array.isArray(heatmapRaw?.data) ? (heatmapRaw?.data as any[]) : undefined };
+  }, [heatmapRaw]);
 
   const { weeks, monthLabels } = useMemo(() => {
     if (!data?.days) return { weeks: [], monthLabels: [] };

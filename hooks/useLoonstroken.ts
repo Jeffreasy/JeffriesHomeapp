@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
+import { useGetLoonstroken } from "@/lib/api/generated/loonstroken/loonstroken";
+import type { ModelLoonstrook } from "@/lib/api/model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,42 +35,74 @@ export interface LoonstrookRecord {
   geimporteerdOp:   string;
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+function fromRow(r: ModelLoonstrook): LoonstrookRecord {
+  return {
+    _id:              r.id ?? "",
+    jaar:             r.jaar ?? 0,
+    periode:          r.periode ?? 0,
+    periodeLabel:     r.periode_label ?? "",
+    type:             r.type ?? "",
+    netto:            r.netto ?? 0,
+    brutoBetaling:    r.bruto_betaling ?? 0,
+    brutoInhouding:   r.bruto_inhouding ?? 0,
+    salarisBasis:     r.salaris_basis ?? 0,
+    ortTotaal:        r.ort_totaal ?? 0,
+    ortDetail:        r.ort_detail ? JSON.stringify(r.ort_detail) : "",
+    amtZeerintensief: r.amt_zeerintensief,
+    pensioenpremie:   r.pensioenpremie,
+    loonheffing:      r.loonheffing,
+    reiskosten:       r.reiskosten,
+    vakantietoeslag:  r.vakantietoeslag,
+    ejuBedrag:        r.eju_bedrag,
+    toeslagBalansvlf: r.toeslag_balansvlf,
+    extraUrenBedrag:  r.extra_uren_bedrag,
+    schaalnummer:     r.schaalnummer ?? "",
+    trede:            r.trede ?? "",
+    parttimeFactor:   r.parttime_factor ?? 0,
+    uurloon:          r.uurloon,
+    componenten:      r.componenten ? JSON.stringify(r.componenten) : "",
+    geimporteerdOp:   r.geimporteerd_op ?? "",
+  };
+}
+
+// ─── Hook (Orval React Query) ───────────────────────────────────────────────────────────
 
 export function useLoonstroken() {
   const { user } = useUser();
   const userId = user?.id ?? "";
 
-  const raw = useQuery(
-    api.loonstroken.list,
-    userId ? { userId } : "skip"
-  ) as LoonstrookRecord[] | undefined;
-
-  const records = useMemo(
-    () =>
-      (raw ?? [])
-        .filter((r) => r.type === "loonstrook")
-        .sort((a, b) => a.jaar - b.jaar || a.periode - b.periode),
-    [raw]
+  const { data: queryData, isLoading } = useGetLoonstroken(
+    { userId },
+    { query: { enabled: !!userId } }
   );
 
-  // Per-jaar groepering
+  const raw = queryData?.data;
+
+  const records = useMemo(() => {
+    if (!raw || !Array.isArray(raw)) return [];
+    return raw
+      .map(fromRow)
+      .filter((r) => r.type === "loonstrook")
+      .sort((a, b) => a.jaar - b.jaar || a.periode - b.periode);
+  }, [raw]);
+
   const perJaar = useMemo(() => {
     const map: Record<number, LoonstrookRecord[]> = {};
     for (const r of records) {
+      if (!r.jaar) continue;
       (map[r.jaar] ??= []).push(r);
     }
     return map;
   }, [records]);
 
-  // Lookup by periodeLabel ("2026-03")
   const byPeriode = useMemo(() => {
     const map = new Map<string, LoonstrookRecord>();
-    for (const r of records) map.set(r.periodeLabel, r);
+    for (const r of records) {
+      if (r.periodeLabel) map.set(r.periodeLabel, r);
+    }
     return map;
   }, [records]);
 
-  // Totalen
   const totaalNetto = records.reduce((s, r) => s + r.netto, 0);
   const totaalBruto = records.reduce((s, r) => s + r.brutoBetaling, 0);
 
@@ -80,7 +112,7 @@ export function useLoonstroken() {
     byPeriode,
     totaalNetto,
     totaalBruto,
-    isLoading: raw === undefined,
+    isLoading,
     count: records.length,
   };
 }

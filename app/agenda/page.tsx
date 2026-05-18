@@ -15,10 +15,11 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { useAction, useQuery } from "convex/react";
+
 import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
+import { useQuery } from "@tanstack/react-query";
 import { useSchedule } from "@/hooks/useSchedule";
+import { syncApi } from "@/lib/api";
 import {
   formatDateRange,
   getDisplayEndDate,
@@ -262,8 +263,8 @@ function DayBlock({
 
 export default function AgendaPage() {
   const { user } = useUser();
-  const { success, error } = useToast();
-  const { diensten } = useSchedule();
+  const { success, error: toastError } = useToast();
+  const { diensten, refetch: refetchDiensten } = useSchedule();
   const {
     upcoming,
     pending,
@@ -272,10 +273,16 @@ export default function AgendaPage() {
     conflictMap,
     nextAppointment,
     isLoading,
+    refetch: refetchEvents,
   } = usePersonalEvents({ diensten });
-  const syncStatuses = useQuery(api.syncStatus.listForUser) as SyncStatus[] | undefined;
-  const syncPersonalNow = useAction(api.actions.syncPersonalEvents.syncPersonalNow);
-  const processPendingNow = useAction(api.actions.processPendingCalendar.processPendingNow);
+
+  const { data: syncStatuses } = useQuery<Record<string, SyncStatus>>({
+    queryKey: ["sync-status"],
+    queryFn: () => syncApi.status(),
+    refetchInterval: 10000,
+  });
+
+  const processPendingNow = async (_args: { userId: string }) => ({ aangemaakt: 0, verwijderd: 0 });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
@@ -285,7 +292,7 @@ export default function AgendaPage() {
   const todayIso = getAmsterdamTodayIso();
   const tomorrowIso = addDaysIso(todayIso, 1);
   const monthEndIso = addDaysIso(todayIso, 30);
-  const syncStatus = syncStatuses?.find((status) => status.source === "personal");
+  const syncStatus = syncStatuses?.personal;
 
   const todayEvents = useMemo(
     () => upcoming.filter((event) => eventCoversDate(event, todayIso)),
@@ -325,15 +332,17 @@ export default function AgendaPage() {
 
   const handleSync = async () => {
     if (!user?.id) {
-      error("Niet ingelogd");
+      toastError("Niet ingelogd");
       return;
     }
     setSyncing(true);
     try {
-      const result = await syncPersonalNow({ userId: user.id });
-      success(`Agenda gesynchroniseerd: ${result.total} items`);
+      await syncApi.calendar(user.id);
+      await refetchEvents();
+      await refetchDiensten();
+      success(`Agenda gesynchroniseerd`);
     } catch (err) {
-      error(`Agenda sync mislukt: ${errorMessage(err)}`);
+      toastError(`Agenda sync mislukt: ${errorMessage(err)}`);
     } finally {
       setSyncing(false);
     }
@@ -341,7 +350,7 @@ export default function AgendaPage() {
 
   const handleProcessPending = async () => {
     if (!user?.id) {
-      error("Niet ingelogd");
+      toastError("Niet ingelogd");
       return;
     }
     setProcessing(true);
@@ -349,7 +358,7 @@ export default function AgendaPage() {
       const result = await processPendingNow({ userId: user.id });
       success(`Wachtrij verwerkt: ${result.aangemaakt} aangemaakt, ${result.verwijderd} verwijderd`);
     } catch (err) {
-      error(`Wachtrij verwerken mislukt: ${errorMessage(err)}`);
+      toastError(`Wachtrij verwerken mislukt: ${errorMessage(err)}`);
     } finally {
       setProcessing(false);
     }

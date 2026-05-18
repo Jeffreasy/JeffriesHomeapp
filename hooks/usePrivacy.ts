@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useUser } from "@clerk/nextjs";
+import { privacyApi, type PrivacySettings } from "@/lib/api";
 
 const STORAGE_KEY = "jeffries-privacy-mode";
 const STORAGE_EVENT = "jeffries-privacy-mode-change";
@@ -34,9 +34,18 @@ function subscribeToPrivacyChanges(callback: () => void) {
 /**
  * Global privacy toggle — hides sensitive financial values.
  * Persisted in localStorage so it survives page reloads.
+ * Server-side settings fetched from Go API.
  */
 export function usePrivacy(scope?: PrivacyScope) {
-  const settings = useQuery(api.privacySettings.getForUser);
+  const { user } = useUser();
+  const userId = user?.id ?? "";
+  const [settings, setSettings] = useState<PrivacySettings | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    privacyApi.get(userId).then(setSettings).catch(() => {});
+  }, [userId]);
+
   const scopedKey = scope ? `${STORAGE_KEY}:${scope}` : STORAGE_KEY;
   const localOverride = useSyncExternalStore(
     subscribeToPrivacyChanges,

@@ -1,57 +1,45 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useCallback, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
 import {
-  type DienstRow, type ScheduleMeta,
-  parseXlsxRow, getUpcoming, getNextDienst, getThisWeek,
+  useGetSchedule,
+  useGetScheduleMeta,
+  postScheduleImport,
+} from "@/lib/api/generated/schedule/schedule";
+import {
+  type DienstRow,
+  type ScheduleMeta,
+  getUpcoming,
+  getNextDienst,
+  getThisWeek,
+  parseCsv,
+  parseCsvRow,
 } from "@/lib/schedule";
+import type { ModelSchedule, ModelScheduleMeta } from "@/lib/api/model";
 
-// ─── Convex doc shape (spiegelt convex/schema.ts schedule tabel) ──────────────
+// ─── Map API Model → DienstRow ────────────────────────────────────────────────
 
-interface ScheduleDoc {
-  eventId:      string;
-  titel:        string;
-  startDatum:   string;
-  startTijd:    string;
-  eindDatum:    string;
-  eindTijd:     string;
-  werktijd:     string;
-  locatie:      string;
-  team:         string;
-  shiftType:    string;
-  prioriteit:   number;
-  duur:         number;
-  weeknr:       string;
-  dag:          string;
-  status:       string;
-  beschrijving: string;
-  heledag:      boolean;
-}
-
-// ─── Map Convex doc → DienstRow ───────────────────────────────────────────────
-
-function fromDoc(doc: ScheduleDoc): DienstRow {
+function fromRow(doc: ModelSchedule): DienstRow {
   return {
-    eventId:     doc.eventId,
-    titel:       doc.titel,
-    startDatum:  doc.startDatum,
-    startTijd:   doc.startTijd,
-    eindDatum:   doc.eindDatum,
-    eindTijd:    doc.eindTijd,
-    werktijd:    doc.werktijd,
-    locatie:     doc.locatie,
-    team:        doc.team,
-    shiftType:   doc.shiftType,
-    prioriteit:  doc.prioriteit,
-    duur:        doc.duur,
-    weeknr:      doc.weeknr,
-    dag:         doc.dag,
-    status:      doc.status,
-    beschrijving: doc.beschrijving,
-    heledag:     doc.heledag,
+    eventId:     doc.event_id ?? "",
+    titel:       doc.titel ?? "",
+    startDatum:  doc.start_datum ?? "",
+    startTijd:   doc.start_tijd ?? "",
+    eindDatum:   doc.eind_datum ?? "",
+    eindTijd:    doc.eind_tijd ?? "",
+    werktijd:    doc.werktijd ?? "",
+    locatie:     doc.locatie ?? "",
+    team:        doc.team ?? "",
+    shiftType:   doc.shift_type ?? "",
+    prioriteit:  doc.prioriteit ?? 0,
+    duur:        doc.duur ?? 0,
+    weeknr:      doc.weeknr ?? "",
+    dag:         doc.dag ?? "",
+    status:      doc.status ?? "",
+    beschrijving: doc.beschrijving ?? "",
+    heledag:     doc.heledag ?? false,
   };
 }
 
@@ -60,88 +48,107 @@ function fromDoc(doc: ScheduleDoc): DienstRow {
 export function useSchedule() {
   const { user } = useUser();
   const userId = user?.id ?? "";
+  const queryClient = useQueryClient();
 
-  const docs    = useQuery(api.schedule.list, userId ? { userId } : "skip");
-  const metaDoc = useQuery(api.schedule.getMeta, userId ? { userId } : "skip");
+  // Force refetch trigger
+  const [version, setVersion] = useState(0);
+
+  const { data: scheduleRaw, isLoading: loadingSchedule, refetch: refetchSchedule } = useGetSchedule(
+    { userId },
+    { query: { enabled: !!userId } }
+  );
+  
+  const { data: metaRaw, isLoading: loadingMeta, refetch: refetchMeta } = useGetScheduleMeta(
+    { userId },
+    { query: { enabled: !!userId } }
+  );
+
+  const rawDocs = Array.isArray(scheduleRaw?.data) ? scheduleRaw.data : [];
 
   const diensten: DienstRow[] = useMemo(() => {
-    if (!docs) return [];
-    // Server filtert al VERWIJDERD records — hier alleen deduplicatie
-    // 1. Dedupliceer op eventId (laatste doc wint)
-    const deduped = new Map<string, typeof docs[0]>();
-    for (const doc of docs) {
-      deduped.set(doc.eventId, doc);
+    if (!rawDocs || rawDocs.length === 0) return [];
+    
+    // 1. Dedupliceer op eventId
+    const deduped = new Map<string, ModelSchedule>();
+    for (const doc of rawDocs as ModelSchedule[]) {
+      if (doc.event_id) deduped.set(doc.event_id, doc);
     }
-    // 2. Deduplicate op startDatum+startTijd (zelfde dienst, ander eventId)
+    // 2. Deduplicate op startDatum+startTijd
     const byKey = new Map<string, DienstRow>();
     for (const doc of deduped.values()) {
-      const key = `${doc.startDatum}|${doc.startTijd}|${doc.eindTijd}`;
+      const key = `${doc.start_datum}|${doc.start_tijd}|${doc.eind_tijd}`;
       if (!byKey.has(key)) {
-        byKey.set(key, fromDoc(doc));
+        byKey.set(key, fromRow(doc));
       }
     }
     return Array.from(byKey.values());
-  }, [docs]);
-  const meta: ScheduleMeta | null = metaDoc
-    ? { importedAt: metaDoc.importedAt, fileName: metaDoc.fileName, totalRows: metaDoc.totalRows }
+  }, [rawDocs]);
+
+  const metaDoc = metaRaw?.data as ModelScheduleMeta | undefined;
+  
+  const meta: ScheduleMeta | null = metaDoc && metaDoc.imported_at
+    ? { 
+        importedAt: metaDoc.imported_at, 
+        fileName: metaDoc.file_name ?? "", 
+        totalRows: metaDoc.total_rows ?? 0 
+      }
     : null;
 
-  const bulkImportMutation = useMutation(api.schedule.bulkImport);
+  const isLoading = loadingSchedule || loadingMeta;
 
-  const isLoading = docs === undefined;
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["/schedule"] });
+  };
 
+  const refetch = useCallback(() => {
+    refetchSchedule();
+    refetchMeta();
+  }, [refetchSchedule, refetchMeta]);
 
-  // ── Import from xlsx file ─────────────────────────────────────────────────
-  const importXlsx = useCallback(async (file: File) => {
+  const clear = useCallback(async () => {
+    if (!userId) return;
+    await postScheduleImport({ userId, fileName: "", rows: [] } as unknown as Parameters<typeof postScheduleImport>[0]);
+    invalidateAll();
+    setVersion(v => v + 1);
+  }, [userId]);
+
+  const importCsv = useCallback(async (file: File) => {
     if (!userId) return { ok: false, count: 0, error: "Niet ingelogd" };
     try {
-      const XLSX = await import("xlsx");
-      const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "array", cellDates: false });
+      const text = await file.text();
+      const { headers, rows } = parseCsv(text);
+      if (rows.length === 0) throw new Error("Geen data of ongeldig CSV formaat");
 
-      const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes("diensten")) ?? wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      if (!ws) throw new Error(`Sheet "${sheetName}" niet gevonden`);
-
-      const rawData = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: true, defval: "" });
-      if (rawData.length < 2) throw new Error("Geen data gevonden");
-
-      const headers: string[] = rawData[0].map((h) => String(h).trim());
-      const rows: DienstRow[] = [];
-      for (let i = 1; i < rawData.length; i++) {
-        const row = rawData[i];
+      const items: DienstRow[] = [];
+      for (const row of rows) {
         if (!row || row.every((c) => c === "" || c === null || c === undefined)) continue;
-        const parsed = parseXlsxRow(row, headers);
-        if (parsed) rows.push(parsed);
+        const parsed = parseCsvRow(row, headers);
+        if (parsed) items.push(parsed);
       }
 
-      if (rows.length === 0) throw new Error("Geen geldige diensten gevonden");
+      if (items.length === 0) throw new Error("Geen geldige diensten gevonden in de CSV");
 
-      const dienstenPayload = rows.map(d => ({ ...d, userId }));
-
-      await bulkImportMutation({
+      const payload = {
         userId,
-        diensten: dienstenPayload,
-        importedAt: new Date().toISOString(),
         fileName: file.name,
-      });
+        rows: items,
+      };
+      await postScheduleImport(payload as unknown as Parameters<typeof postScheduleImport>[0]);
+      invalidateAll();
+      setVersion(v => v + 1);
 
-      return { ok: true, count: rows.length };
+      return { ok: true, count: items.length };
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Onbekende fout";
       return { ok: false, count: 0, error: message };
     }
-  }, [userId, bulkImportMutation]);
+  }, [userId]);
 
-  const clear = useCallback(async () => {
-    if (!userId) return;
-    await bulkImportMutation({
-      userId,
-      diensten: [],
-      importedAt: new Date().toISOString(),
-      fileName: "",
-    });
-  }, [userId, bulkImportMutation]);
+  const toggleStatus = async (event_id: string, status: string) => {
+    setVersion((v) => v + 1);
+    await postScheduleImport({ userId, fileName: "status-update", rows: [{ event_id, status }] } as unknown as Parameters<typeof postScheduleImport>[0]);
+    invalidateAll();
+  };
 
   const dienstenByDate = useMemo(() => {
     const map: Record<string, DienstRow[]> = {};
@@ -159,7 +166,10 @@ export function useSchedule() {
     thisWeek:   getThisWeek(diensten),
     upcoming:   getUpcoming(diensten, 30),
     isLoading,
-    importXlsx,
+    importCsv,
     clear,
+    toggleStatus,
+    refetch,
+    version,
   };
 }

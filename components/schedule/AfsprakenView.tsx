@@ -3,13 +3,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import { Calendar, Plus, Zap } from "lucide-react";
-import { useAction } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type DienstRow } from "@/lib/schedule";
 import { useToast } from "@/components/ui/Toast";
 import { PersonalEventItem } from "./PersonalEventItem";
-import { api } from "@/convex/_generated/api";
 
 interface AfsprakenViewProps {
   diensten?:    DienstRow[];
@@ -23,15 +21,14 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
 
   const { user } = useUser();
   const { success, error } = useToast();
-  const processPendingNow = useAction(api.actions.processPendingCalendar.processPendingNow);
   const [processing, setProcessing] = useState(false);
 
   const handleVerwerk = async () => {
     if (!user?.id) { error("Niet ingelogd"); return; }
     setProcessing(true);
     try {
-      const res = await processPendingNow({ userId: user.id });
-      success(`${res.aangemaakt} afspraak(en) aangemaakt in Google Calendar`);
+      // TODO: Implement calendar sync via Go API when available
+      success("Calendar sync wordt binnenkort via de Go API ondersteund");
     } catch (err) {
       error(`Verwerken mislukt: ${err instanceof Error ? err.message : "onbekende fout"}`);
     } finally {

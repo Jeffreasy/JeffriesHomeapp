@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Zap, Clock, CalendarDays, Timer, Hash, Ruler } from "lucide-react";
-import { HABIT_EMOJIS, ROOSTER_FILTER_OPTIONS } from "@/convex/lib/habitConstants";
+import { HABIT_EMOJIS, ROOSTER_FILTER_OPTIONS } from "@/lib/habit-constants";
 import { HABIT_COLORS, FREQUENTIE_LABELS, MOEILIJKHEID_LABELS, DAG_LABELS } from "@/lib/habit-constants";
 import type { HabitCreateData } from "@/hooks/useHabits";
 

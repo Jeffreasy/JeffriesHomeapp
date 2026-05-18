@@ -39,7 +39,7 @@ export interface ParseResult {
 
 // ─── Auto-categorisatie (centraal gedefinieerd) ──────────────────────────────
 
-import { autoCategorie } from "@/convex/lib/autoCategorie";
+import { autoCategorie } from "@/lib/autoCategorie";
 
 // ─── Bedrag parser ("+1.453,80" → 1453.80, "-25,00" → -25) ─────────────────
 

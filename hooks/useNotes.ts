@@ -1,28 +1,37 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
 import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useGetNotes,
+  useGetNotesTags,
+  postNotes,
+  patchNotesId,
+  deleteNotesId,
+} from "@/lib/api/generated/notes/notes";
+import type { ModelNote } from "@/lib/api/model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface NoteRecord {
-  _id:            Id<"notes">;
-  _creationTime:  number;
-  userId:         string;
-  titel?:         string;
-  inhoud:         string;
-  tags?:          string[];
-  kleur?:         string;
-  isPinned:       boolean;
-  isArchived:     boolean;
-  deadline?:      string;        // ISO timestamp
-  linkedEventId?: string;        // personalEvents eventId
-  prioriteit?:    string;        // "hoog" | "normaal" | "laag"
-  aangemaakt:     string;
-  gewijzigd:      string;
+  id:              string;
+  _id?:            string;
+  user_id:         string;
+  titel?:          string | null;
+  inhoud:          string;
+  tags?:           string[];
+  kleur?:          string | null;
+  isPinned:        boolean;
+  isArchived:      boolean;
+  is_pinned:       boolean;
+  is_archived:     boolean;
+  deadline?:       string | null;
+  linkedEventId?:  string | null;
+  linked_event_id?: string | null;
+  prioriteit?:     string | null;
+  aangemaakt:      string;
+  gewijzigd:       string;
 }
 
 export type NoteCreateData = {
@@ -43,69 +52,108 @@ export type NoteUpdateData = {
   deadline?: string;
   linkedEventId?: string;
   prioriteit?: string;
+  isPinned?: boolean;
+  isArchived?: boolean;
+  is_pinned?: boolean;
+  is_archived?: boolean;
 };
+
+function toRecord(row: ModelNote): NoteRecord {
+  return {
+    ...row,
+    id: row.id ?? "",
+    _id: row.id,
+    user_id: row.user_id ?? "",
+    titel: row.titel,
+    inhoud: row.inhoud ?? "",
+    tags: row.tags ?? [],
+    kleur: row.kleur,
+    isPinned: row.is_pinned ?? false,
+    isArchived: row.is_archived ?? false,
+    is_pinned: row.is_pinned ?? false,
+    is_archived: row.is_archived ?? false,
+    deadline: row.deadline,
+    linkedEventId: row.linked_event_id,
+    linked_event_id: row.linked_event_id,
+    prioriteit: row.prioriteit,
+    aangemaakt: row.aangemaakt ?? new Date().toISOString(),
+    gewijzigd: row.gewijzigd ?? new Date().toISOString(),
+  };
+}
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useNotes() {
   const { user } = useUser();
   const userId = user?.id ?? "";
+  const queryClient = useQueryClient();
 
-  const raw = useQuery(
-    api.notes.list,
-    userId ? {} : "skip"
-  ) as NoteRecord[] | undefined;
+  const { data: notesRaw, isLoading: loadingNotes } = useGetNotes({ userId }, { query: { enabled: !!userId } });
+  const { data: tagsRaw, isLoading: loadingTags } = useGetNotesTags({ userId }, { query: { enabled: !!userId } });
 
-  const createNote  = useMutation(api.notes.create);
-  const updateNote  = useMutation(api.notes.update);
-  const togglePin   = useMutation(api.notes.togglePin);
-  const archiveNote = useMutation(api.notes.archive);
-  const removeNote  = useMutation(api.notes.remove);
+  const raw = useMemo<NoteRecord[]>(() => {
+    if (!notesRaw?.data) return [];
+    const arr = Array.isArray(notesRaw.data) ? notesRaw.data : [];
+    return arr.map(toRecord);
+  }, [notesRaw]);
 
-  // Split into active + archived
+  const allTags = useMemo<string[]>(() => {
+    if (!tagsRaw?.data) return [];
+    return Array.isArray(tagsRaw.data) ? (tagsRaw.data as string[]) : [];
+  }, [tagsRaw]);
+
   const { active, archived, pinned } = useMemo(() => {
     if (!raw) return { active: [], archived: [], pinned: [] };
-
     const act: NoteRecord[] = [];
     const arch: NoteRecord[] = [];
     const pin: NoteRecord[] = [];
-
     for (const n of raw) {
-      if (n.isArchived) {
+      if (n.isArchived || n.is_archived) {
         arch.push(n);
       } else {
         act.push(n);
-        if (n.isPinned) pin.push(n);
+        if (n.isPinned || n.is_pinned) pin.push(n);
       }
     }
-
     return { active: act, archived: arch, pinned: pin };
   }, [raw]);
 
-  // All unique tags across notes
-  const allTags = useMemo(() => {
-    if (!raw) return [];
-    const set = new Set<string>();
-    for (const n of raw) {
-      for (const t of n.tags ?? []) set.add(t);
-    }
-    return Array.from(set).sort();
-  }, [raw]);
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["/notes"] });
+  };
 
   return {
-    notes: active,
+    raw,
+    notes: raw,
+    active,
     archived,
     pinned,
     allTags,
-    isLoading: raw === undefined,
+    isLoading: loadingNotes || loadingTags,
     count: active.length,
 
-    create: (data: NoteCreateData) =>
-      createNote(data),
-    update: (id: Id<"notes">, data: NoteUpdateData) =>
-      updateNote({ id, ...data }),
-    togglePin: (id: Id<"notes">) => togglePin({ id }),
-    archive:   (id: Id<"notes">) => archiveNote({ id }),
-    remove:    (id: Id<"notes">) => removeNote({ id }),
+    create: async (data: NoteCreateData) => {
+      await postNotes(data as unknown as Parameters<typeof postNotes>[0], { userId });
+      invalidateAll();
+    },
+    update: async (id: string, data: Partial<NoteUpdateData>) => {
+      await patchNotesId(id, data as unknown as Parameters<typeof patchNotesId>[1]);
+      invalidateAll();
+    },
+    togglePin: async (id: string) => {
+      const note = raw?.find(n => n.id === id);
+      if (note) {
+        await patchNotesId(id, { is_pinned: !note.isPinned } as unknown as Parameters<typeof patchNotesId>[1]);
+        invalidateAll();
+      }
+    },
+    archive: async (id: string) => {
+      await patchNotesId(id, { is_archived: true } as unknown as Parameters<typeof patchNotesId>[1]);
+      invalidateAll();
+    },
+    remove: async (id: string) => {
+      await deleteNotesId(id);
+      invalidateAll();
+    },
   };
 }

@@ -1,107 +1,211 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useDeferredValue, useMemo, useState } from "react";
-import type { Id } from "@/convex/_generated/dataModel";
+import { useDeferredValue, useMemo, useState, useEffect, useCallback } from "react";
+import { useUser } from "@clerk/nextjs";
+import {
+  getTransactions,
+  getTransactionsStats,
+  postTransactionsImport,
+  patchTransactionsTxID,
+} from "@/lib/api/generated/transactions/transactions";
+import type {
+  GetTransactionsParams,
+  ModelTransaction,
+  StoreTransactionStats as TransactionFullStats,
+  PostTransactionsImportBody,
+} from "@/lib/api/model";
 
-export type TransactionFilter = {
-  excludeIntern?:    boolean;
-  onlyStorneringen?: boolean;
-  codeFilter?:       string;
-  ibanFilter?:       string;
-  maandFilter?:      string; // "YYYY-MM"
-  zoekterm?:         string;
-  categorieFilter?:  string;
-  richting?:         string; // "in" | "uit"
-  minBedrag?:        number;
-  maxBedrag?:        number;
-  datumVan?:         string; // "YYYY-MM-DD"
-  datumTot?:         string; // "YYYY-MM-DD"
-  jaarFilter?:       string; // "2025" | "2026"
+export type TransactionFilter = Omit<GetTransactionsParams, "userId"> & { maandFilter?: string };
+export type TransactionRow = ModelTransaction & {
+  tegenpartijNaam?: string | null;
+  redenRetour?: string | null;
+  isInterneOverboeking?: boolean;
+  _id?: string;
+  datum: string;
+  bedrag: number;
+  code: string;
+  omschrijving: string;
 };
+export type { TransactionFullStats };
 
 const PAGE_SIZE = 50;
 
-export function useTransactions(filter: TransactionFilter = {}) {
+function mapTransaction(tx: ModelTransaction): TransactionRow {
+  return {
+    ...tx,
+    tegenpartijNaam: tx.tegenpartij_naam,
+    redenRetour: tx.reden_retour,
+    isInterneOverboeking: tx.is_interne_overboeking,
+    _id: tx.id,
+    datum: tx.datum ?? "",
+    bedrag: tx.bedrag ?? 0,
+    code: tx.code ?? "",
+    omschrijving: tx.omschrijving ?? "",
+  };
+}
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+
+export function useTransactions(filter: TransactionFilter = {} as TransactionFilter) {
+  const { user } = useUser();
+  const userId = user?.id ?? "";
   const deferredZoek = useDeferredValue(filter.zoekterm ?? "");
+
+  const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [isDone, setIsDone] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<TransactionFullStats | null>(null);
+  const [offset, setOffset] = useState(0);
+
+  // Build a stable filter key for resetting pagination
   const filterKey = useMemo(
-    () => JSON.stringify({
-      excludeIntern: filter.excludeIntern,
-      onlyStorneringen: filter.onlyStorneringen,
-      codeFilter: filter.codeFilter,
-      ibanFilter: filter.ibanFilter,
-      maandFilter: filter.maandFilter,
-      categorieFilter: filter.categorieFilter,
-      richting: filter.richting,
-      minBedrag: filter.minBedrag,
-      maxBedrag: filter.maxBedrag,
-      datumVan: filter.datumVan,
-      datumTot: filter.datumTot,
-      jaarFilter: filter.jaarFilter,
-      zoekterm: deferredZoek,
-    }),
+    () =>
+      JSON.stringify({
+        excludeIntern: filter.excludeIntern,
+        onlyStorneringen: filter.onlyStorneringen,
+        codeFilter: filter.codeFilter,
+        ibanFilter: filter.ibanFilter,
+        maandFilter: filter.maandFilter,
+        categorieFilter: filter.categorieFilter,
+        richting: filter.richting,
+        minBedrag: filter.minBedrag,
+        maxBedrag: filter.maxBedrag,
+        datumVan: filter.datumVan,
+        datumTot: filter.datumTot,
+        jaarFilter: filter.jaarFilter,
+        zoekterm: deferredZoek,
+      }),
     [
-      filter.excludeIntern,
-      filter.onlyStorneringen,
-      filter.codeFilter,
-      filter.ibanFilter,
-      filter.maandFilter,
-      filter.categorieFilter,
-      filter.richting,
-      filter.minBedrag,
-      filter.maxBedrag,
-      filter.datumVan,
-      filter.datumTot,
-      filter.jaarFilter,
-      deferredZoek,
+      filter.excludeIntern, filter.onlyStorneringen, filter.codeFilter,
+      filter.ibanFilter, filter.maandFilter, filter.categorieFilter, filter.richting,
+      filter.minBedrag, filter.maxBedrag, filter.datumVan, filter.datumTot,
+      filter.jaarFilter, deferredZoek,
     ]
   );
-  const [pagination, setPagination] = useState<{ key: string; cursor: string | null }>({ key: "", cursor: null });
-  const cursor = pagination.key === filterKey ? pagination.cursor : null;
 
-  const result = useQuery(api.transactions.listPaginated, {
-    numItems:         PAGE_SIZE,
-    cursor,
-    excludeIntern:    filter.excludeIntern,
-    onlyStorneringen: filter.onlyStorneringen,
-    codeFilter:       filter.codeFilter,
-    ibanFilter:       filter.ibanFilter,
-    maandFilter:      filter.maandFilter,
-    zoekterm:         deferredZoek.trim() || undefined,
-    categorieFilter:  filter.categorieFilter,
-    richting:         filter.richting,
-    minBedrag:        filter.minBedrag,
-    maxBedrag:        filter.maxBedrag,
-    datumVan:         filter.jaarFilter ? filter.datumVan ?? `${filter.jaarFilter}-01-01` : filter.datumVan,
-    datumTot:         filter.jaarFilter ? filter.datumTot ?? `${filter.jaarFilter}-12-31` : filter.datumTot,
-  });
+  // Reset pagination when filters change
+  useEffect(() => {
+    setOffset(0);
+  }, [filterKey]);
 
-  const stats = useQuery(api.transactions.getStats, {
-    ibanFilter: filter.ibanFilter,
-    jaarFilter: filter.jaarFilter,
-  });
+  // Fetch transactions + stats
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
 
-  const importBatch     = useMutation(api.transactions.importBatch);
-  const updateCatMut    = useMutation(api.transactions.updateCategorie);
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const apiFilter: GetTransactionsParams = {
+          ...filter,
+          userId,
+          zoekterm: deferredZoek.trim() || undefined,
+          limit: PAGE_SIZE,
+          offset: 0,
+        };
 
-  function loadMore() {
-    if (result && !result.isDone && result.continueCursor) {
-      setPagination({ key: filterKey, cursor: result.continueCursor });
+        // Convert maandFilter to date range
+        if (filter.maandFilter) {
+          if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.maandFilter}-01`;
+          if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.maandFilter}-31`;
+        }
+
+        // If jaarFilter is set, compute datumVan/datumTot
+        if (filter.jaarFilter) {
+          if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.jaarFilter}-01-01`;
+          if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.jaarFilter}-12-31`;
+        }
+
+        const [listResult, statsResult] = await Promise.all([
+          getTransactions(apiFilter),
+          getTransactionsStats({ userId, ibanFilter: filter.ibanFilter, jaarFilter: filter.jaarFilter }),
+        ]);
+
+        if (cancelled || typeof listResult.data === "string" || typeof statsResult.data === "string") return;
+        const listData = listResult.data;
+        const pageItems = (listData.page ?? []).map(mapTransaction);
+        setTransactions(pageItems);
+        setTotalCount(listData.totalCount ?? 0);
+        setIsDone(listData.isDone ?? true);
+        setStats(statsResult.data);
+        setOffset(pageItems.length);
+      } catch {
+        if (!cancelled) {
+          setTransactions([]);
+          setTotalCount(0);
+          setIsDone(true);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, filterKey]);
+
+  const loadMore = useCallback(async () => {
+    if (!userId || isDone) return;
+
+    const apiFilter: GetTransactionsParams = {
+      ...filter,
+      userId,
+      zoekterm: deferredZoek.trim() || undefined,
+      limit: PAGE_SIZE,
+      offset,
+    };
+    if (filter.maandFilter) {
+      if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.maandFilter}-01`;
+      if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.maandFilter}-31`;
     }
-  }
+    if (filter.jaarFilter) {
+      if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.jaarFilter}-01-01`;
+      if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.jaarFilter}-12-31`;
+    }
+
+    const result = await getTransactions(apiFilter);
+    if (typeof result.data === "string") return;
+    const resultData = result.data;
+    const pageItems = (resultData.page ?? []).map(mapTransaction);
+    setTransactions(prev => [...prev, ...pageItems]);
+    setIsDone(resultData.isDone ?? true);
+    setOffset(prev => prev + pageItems.length);
+  }, [userId, isDone, offset, filter, deferredZoek]);
+
+  const importBatch = useCallback(
+    async (txs: PostTransactionsImportBody["transactions"]) => {
+      if (!userId) return { data: { ok: false, inserted: 0, total: 0, skipped: 0 } };
+      return postTransactionsImport({ userId, transactions: txs });
+    },
+    [userId]
+  );
+
+  const updateCategorie = useCallback(
+    async (id: string, categorie: string) => {
+      await patchTransactionsTxID(id, { categorie });
+      setTransactions(prev =>
+        prev.map(t => (t.id === id ? { ...t, categorie } : t))
+      );
+    },
+    []
+  );
+
+  const resetPagination = useCallback(() => {
+    setOffset(0);
+  }, []);
 
   return {
-    transactions:  result?.page ?? [],
-    isDone:        result?.isDone ?? true,
-    isLoading:     result === undefined,
-    isSearching:   (filter.zoekterm ?? "") !== deferredZoek,
+    transactions,
+    isDone,
+    isLoading,
+    isSearching: (filter.zoekterm ?? "") !== deferredZoek,
     stats,
-    totalCount:    result?.totalCount ?? stats?.aantalTxs ?? stats?.aantalAlleTxs ?? 0,
+    totalCount: totalCount || stats?.aantalTxs || stats?.aantalAlleTxs || 0,
     importBatch,
-    updateCategorie: (id: Id<"transactions">, categorie: string | undefined) =>
-      updateCatMut({ id, categorie }),
+    updateCategorie,
     loadMore,
-    resetPagination: () => setPagination({ key: filterKey, cursor: null }),
+    resetPagination,
   };
 }

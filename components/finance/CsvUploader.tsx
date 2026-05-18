@@ -69,10 +69,14 @@ export function CsvUploader() {
         if (abortRef.current) break;
 
         const slice = parseResult.transactions.slice(i, i + CHUNK);
-        const res = await importBatch({ transactions: slice });
-        toegevoegd   += res.toegevoegd;
-        overgeslagen += res.overgeslagen;
-        bijgewerkt    += res.bijgewerkt ?? 0;
+        const rawRes = await importBatch(slice);
+        const res = rawRes.data;
+        
+        // Ensure properties exist before adding
+        const isObj = typeof res === 'object' && res !== null;
+        toegevoegd   += (isObj && 'inserted' in res ? res.inserted : 0) ?? 0;
+        overgeslagen += (isObj && 'skipped' in res ? res.skipped : 0) ?? 0;
+        bijgewerkt   += 0;
 
         setProgress({ chunk: chunk + 1, total, toegevoegd, overgeslagen, bijgewerkt });
       }
@@ -162,7 +166,7 @@ export function CsvUploader() {
         {state === "importing" && (
           <motion.div key="importing" className="uploader-status uploader-status--progress" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <Loader2 className="spinner" size={22} />
-            <p>Opslaan in Convex… {progressPct}%</p>
+            <p>Opslaan in database… {progressPct}%</p>
             <div className="progress-bar">
               <div className="progress-bar__fill" style={{ width: `${progressPct}%` }} />
             </div>

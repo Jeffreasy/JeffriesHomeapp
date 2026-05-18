@@ -53,16 +53,50 @@ export function loadScheduleMeta(): ScheduleMeta | null {
   } catch { return null; }
 }
 
-export function clearSchedule(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(META_KEY);
+
+// ─── CSV → DienstRow ──────────────────────────────────────────────────────────
+
+/** Native CSV parser replacing vulnerable xlsx library */
+export function parseCsv(text: string, delimiter = ","): { headers: string[]; rows: string[][] } {
+  function parseLine(line: string): string[] {
+    const fields: string[] = [];
+    let field = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (line[i + 1] === '"') { field += '"'; i++; }
+          else inQuotes = false;
+        } else field += ch;
+      } else {
+        if (ch === '"') inQuotes = true;
+        else if (ch === delimiter) { fields.push(field); field = ""; }
+        else field += ch;
+      }
+    }
+    fields.push(field);
+    return fields;
+  }
+
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length < 2) return { headers: [], rows: [] };
+  
+  if (delimiter === "," && lines[0].includes(";") && !lines[0].includes(",")) {
+    delimiter = ";";
+  }
+
+  const headers = parseLine(lines[0]).map(h => h.trim());
+  const rows: string[][] = [];
+  for (let i = 1; i < lines.length; i++) {
+    rows.push(parseLine(lines[i]).map(c => c.trim()));
+  }
+
+  return { headers, rows };
 }
 
-// ─── XLSX → DienstRow ─────────────────────────────────────────────────────────
-
-/** Parse raw row from xlsx getValues() to DienstRow */
-export function parseXlsxRow(row: unknown[], headers: string[]): DienstRow | null {
+/** Parse raw row from csv to DienstRow */
+export function parseCsvRow(row: unknown[], headers: string[]): DienstRow | null {
   const get = (col: string): unknown => {
     const idx = headers.indexOf(col);
     return idx >= 0 ? row[idx] : undefined;

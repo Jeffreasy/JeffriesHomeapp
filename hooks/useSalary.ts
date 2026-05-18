@@ -1,10 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "convex/react";
 import { useUser } from "@clerk/nextjs";
-import { api } from "@/convex/_generated/api";
-
+import { useGetSalary } from "@/lib/api/generated/salary/salary";
+import type { ModelSalary } from "@/lib/api/model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,72 +14,68 @@ export interface SalarisRecord {
   maand:              number;
   aantalDiensten:     number;
   uurloonORT:         number;
-
   basisLoon:          number;
   amtZeerintensief:   number;
   toeslagBalansvif:   number;
-  ortTotaal:          number;   // was ortTotaalBedrag in MaandResult
+  ortTotaal:          number;
   extraUrenBedrag:    number;
   toeslagVakatieUren: number;
   reiskosten:         number;
   eenmaligTotaal:     number;
   brutoBetaling:      number;
-
   pensioenpremie:    number;
   loonheffingSchat:  number;
   nettoPrognose:     number;
-
-  ortDetail?:      string; // JSON: { VROEG: 45, ZONDAG: 89 }
-  eenmaligDetail?: string; // JSON: [{ label, bedrag }]
+  ortDetail?:      string;
+  eenmaligDetail?: string;
   berekendOp:      string;
 }
 
-// ─── useSalary ────────────────────────────────────────────────────────────────
+function fromRow(r: ModelSalary): SalarisRecord {
+  return {
+    _id:                r.id ?? "",
+    periode:            r.periode ?? "",
+    jaar:               r.jaar ?? 0,
+    maand:              r.maand ?? 0,
+    aantalDiensten:     r.aantal_diensten ?? 0,
+    uurloonORT:         r.uurloon_ort ?? 0,
+    basisLoon:          r.basis_loon ?? 0,
+    amtZeerintensief:   r.amt_zeerintensief ?? 0,
+    toeslagBalansvif:   r.toeslag_balansvlf ?? 0,
+    ortTotaal:          r.ort_totaal ?? 0,
+    extraUrenBedrag:    r.extra_uren_bedrag ?? 0,
+    toeslagVakatieUren: r.toeslag_vakatie_uren ?? 0,
+    reiskosten:         r.reiskosten ?? 0,
+    eenmaligTotaal:     r.eenmalig_totaal ?? 0,
+    brutoBetaling:      r.bruto_betaling ?? 0,
+    pensioenpremie:     r.pensioenpremie ?? 0,
+    loonheffingSchat:   r.loonheffing_schat ?? 0,
+    nettoPrognose:      r.netto_prognose ?? 0,
+    berekendOp:         r.berekend_op ?? "",
+  };
+}
+
+// ─── useSalary (Go API) ──────────────────────────────────────────────────────
 
 export function useSalary() {
   const { user } = useUser();
-  const userId   = user?.id ?? "";
+  const userId = user?.id ?? "";
 
-  // Bereken direct vanuit schedule tabel
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const computed = useQuery((api as any).salary.computeFromSchedule, userId ? { userId } : "skip");
+  const { data: salaryRaw, isLoading } = useGetSalary({ userId }, { query: { enabled: !!userId } });
+
+  const raw = useMemo(() => {
+    return Array.isArray(salaryRaw?.data) ? salaryRaw.data : undefined;
+  }, [salaryRaw]);
 
   const records: SalarisRecord[] = useMemo(() => {
-    if (!computed || computed.length === 0) return [];
-    return computed.map((r: any) => ({
-      _id:                r.maandLabel,
-      periode:            r.maandLabel,
-      jaar:               r.jaar,
-      maand:              r.maand,
-      aantalDiensten:     r.aantalDiensten,
-      uurloonORT:         r.tarieven.uurloonORT,
+    if (!raw) return [];
+    return raw.map(fromRow);
+  }, [raw]);
 
-      basisLoon:          r.basisLoon,
-      amtZeerintensief:   r.amtZeerintensief,
-      toeslagBalansvif:   r.toeslagBalansvif,
-      ortTotaal:          r.ortTotaalBedrag,
-      extraUrenBedrag:    r.extraUrenBedrag,
-      toeslagVakatieUren: r.toeslagVakatieUren,
-      reiskosten:         r.reiskosten,
-      eenmaligTotaal:     r.eenmaligTotaal,
-      brutoBetaling:      r.brutoBetaling,
-
-      pensioenpremie:    r.pensioenpremie,
-      loonheffingSchat:  r.loonheffingSchat,
-      nettoPrognose:     r.nettoPrognose,
-
-      ortDetail:      JSON.stringify(r.ortTotalen),
-      eenmaligDetail: JSON.stringify(r.eenmalig),
-      berekendOp:     new Date().toISOString(),
-    })) as SalarisRecord[];
-  }, [computed]);
-
-  // Lopende maand
-  const nu        = new Date();
+  const nu = new Date();
   const huidigKey = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, "0")}`;
-  const huidig    = records.find((r) => r.periode === huidigKey) ?? null;
+  const huidig = records.find((r) => r.periode === huidigKey) ?? null;
 
-  // Jaar-groepen
   const perJaar: Record<number, SalarisRecord[]> = {};
   for (const r of records) {
     if (!perJaar[r.jaar]) perJaar[r.jaar] = [];
@@ -96,8 +91,8 @@ export function useSalary() {
     perJaar,
     totaalBruto,
     totaalNetto,
-    isLoading:  computed === undefined,
+    isLoading,
     berekendOp: records[0]?.berekendOp ?? null,
-    isNative:   true, // altijd Convex-native berekening
+    isNative: true,
   };
 }
