@@ -119,7 +119,7 @@ export function useNotes() {
   }, [raw]);
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ["/notes"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/v1/notes"] });
   };
 
   return {
