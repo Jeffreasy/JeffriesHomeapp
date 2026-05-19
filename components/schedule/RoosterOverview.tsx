@@ -36,65 +36,87 @@ export function OverviewPanel({
   shifts: Record<string, number>;
   teams: Record<string, number>;
 }) {
+  const containerVariants: any = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        ease: [0.16, 1, 0.3, 1],
+      }
+    }
+  };
+
+  const itemVariants: any = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  };
+
   return (
-    <Panel className="overflow-hidden p-0">
-      <div className="border-b border-[var(--color-border)] px-5 py-4 sm:px-6 min-w-0">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Control center
-            </p>
-            <h2 className="mt-1 text-xl font-bold text-white">Werk, agenda en signalen</h2>
+    <motion.div variants={containerVariants} initial="hidden" animate="show">
+      <Panel className="overflow-hidden p-0 border border-white/10 bg-black/40">
+        <div className="border-b border-white/5 px-5 py-4 sm:px-6 min-w-0">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <motion.div variants={itemVariants}>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                Control center
+              </p>
+              <h2 className="mt-1 text-2xl font-black text-white tracking-tight">Werk, agenda en signalen</h2>
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <Link
+                href="/finance"
+                className="inline-flex h-9 items-center gap-2 border border-white/10 bg-black/60 px-4 text-xs font-black uppercase tracking-widest text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Finance
+                <ArrowRight size={14} />
+              </Link>
+            </motion.div>
           </div>
-          <Link
-            href="/finance"
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
-          >
-            Finance openen
-            <ArrowRight size={14} />
-          </Link>
         </div>
-      </div>
 
-      <div className="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 xl:grid-cols-4 min-w-0">
-        <StatusMetric
-          icon={Clock3}
-          label="Komende uren"
-          value={formatHours(upcomingHours)}
-          sub={pluralize(upcomingCount, "dienst", "diensten")}
-          tone="amber"
-        />
-        <StatusMetric
-          icon={Calendar}
-          label="Volgende dienst"
-          value={nextDienst ? `${nextDienst.startTijd} - ${nextDienst.eindTijd}` : "Geen dienst"}
-          sub={nextDienst ? `${nextDienst.dag}, ${new Date(`${nextDienst.startDatum}T12:00:00`).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}` : "Rooster rustig"}
-          tone={nextDienst ? "indigo" : "slate"}
-        />
-        <StatusMetric
-          icon={CalendarDays}
-          label="Agenda"
-          value={todayEventCount > 0 ? `${todayEventCount} vandaag` : `${eventCount} aankomend`}
-          sub="persoonlijke afspraken"
-          tone={todayEventCount > 0 ? "green" : "blue"}
-        />
-        <StatusMetric
-          icon={AlertTriangle}
-          label="Conflicten"
-          value={hardConflicts > 0 ? `${hardConflicts} hard` : String(conflicts)}
-          sub={hardConflicts > 0 ? "direct nalopen" : "aandachtspunten"}
-          tone={hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "green"}
-        />
-      </div>
+        <motion.div variants={itemVariants} className="grid sm:grid-cols-2 xl:grid-cols-4 min-w-0">
+          <StatusMetric
+            icon={Clock3}
+            label="Komende uren"
+            value={formatHours(upcomingHours)}
+            sub={pluralize(upcomingCount, "dienst", "diensten")}
+            tone="amber"
+          />
+          <StatusMetric
+            icon={Calendar}
+            label="Volgende dienst"
+            value={nextDienst ? `${nextDienst.startTijd} - ${nextDienst.eindTijd}` : "Geen dienst"}
+            sub={nextDienst ? `${nextDienst.dag}, ${new Date(`${nextDienst.startDatum}T12:00:00`).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}` : "Rooster rustig"}
+            tone={nextDienst ? "indigo" : "slate"}
+          />
+          <StatusMetric
+            icon={CalendarDays}
+            label="Agenda"
+            value={todayEventCount > 0 ? `${todayEventCount} vandaag` : `${eventCount} aankomend`}
+            sub="persoonlijke afspraken"
+            tone={todayEventCount > 0 ? "green" : "blue"}
+          />
+          <StatusMetric
+            icon={AlertTriangle}
+            label="Conflicten"
+            value={hardConflicts > 0 ? `${hardConflicts} hard` : String(conflicts)}
+            sub={hardConflicts > 0 ? "direct nalopen" : "aandachtspunten"}
+            tone={hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "green"}
+          />
+        </motion.div>
 
-      <div className="grid gap-3 px-5 py-4 sm:grid-cols-3 sm:px-6">
-        <MiniBreakdown label="Shifts" value={`V ${shifts["Vroeg"] ?? 0} / L ${shifts["Laat"] ?? 0}`} sub={`${shifts["Dienst"] ?? 0} dagdienst`} />
-        <MiniBreakdown label="Team R." value={String(teams["R."] ?? 0)} sub="komende diensten" />
-        <MiniBreakdown label="Team A." value={String(teams["A."] ?? 0)} sub="komende diensten" />
-      </div>
-    </Panel>
+        <motion.div variants={itemVariants} className="grid px-5 py-4 sm:grid-cols-3 sm:px-6 gap-0">
+          <MiniBreakdown label="Shifts" value={`V ${shifts["Vroeg"] ?? 0} / L ${shifts["Laat"] ?? 0}`} sub={`${shifts["Dienst"] ?? 0} dagdienst`} />
+          <MiniBreakdown label="Team R." value={String(teams["R."] ?? 0)} sub="komende diensten" />
+          <MiniBreakdown label="Team A." value={String(teams["A."] ?? 0)} sub="komende diensten" />
+        </motion.div>
+      </Panel>
+    </motion.div>
   );
 }
+
+import { ContractWidget } from "./ContractWidget";
 
 export function OverviewTab({
   unifiedWeeks,
@@ -136,6 +158,7 @@ export function OverviewTab({
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
+        <ContractWidget />
         <Panel>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <SectionTitle

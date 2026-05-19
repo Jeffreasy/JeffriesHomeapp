@@ -33,43 +33,41 @@ export function DienstItem({ dienst, isToday, afspraken = [] }: DienstItemProps)
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
-      className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
-      style={
-        isToday
-          ? { background: shift.accent + "10", border: `1px solid ${shift.accent}30` }
-          : isZondag
-          ? { background: "rgba(234,179,8,0.06)", border: "1px solid rgba(234,179,8,0.15)" }
-          : isZaterdag
-          ? { background: "rgba(234,179,8,0.03)", border: "1px solid rgba(234,179,8,0.08)" }
-          : { background: "rgba(255,255,255,0.03)", border: "1px solid transparent" }
-      }
+      whileHover={{ x: 2, backgroundColor: "rgba(255,255,255,0.05)" }}
+      className={`flex items-center gap-4 px-4 py-3 border-l-2 transition-all ${
+        isToday ? "border-b border-t border-r border-white/10" : "border-b border-white/5"
+      }`}
+      style={{
+        borderLeftColor: isToday ? shift.accent : isZondag ? "#eab308" : isZaterdag ? "#facc15" : "#475569",
+        background: isToday ? shift.accent + "10" : "transparent"
+      }}
     >
       {/* Date */}
-      <div className="w-10 text-center flex-shrink-0">
-        <p className={`text-xs font-bold ${isWeekend ? "text-yellow-400" : "text-slate-300"}`}>{dienst.startDatum.slice(8)}</p>
-        <p className={`text-[10px] ${isWeekend ? "text-yellow-600" : "text-slate-600"}`}>{dienst.dag?.slice(0, 2)}</p>
+      <div className="w-12 text-center flex-shrink-0">
+        <p className={`text-sm font-black ${isWeekend ? "text-yellow-400" : "text-white"}`}>{dienst.startDatum.slice(8)}</p>
+        <p className={`text-[10px] font-bold uppercase tracking-widest ${isWeekend ? "text-yellow-600" : "text-slate-500"}`}>{dienst.dag?.slice(0, 2)}</p>
         {isZondag && (
-          <p className="text-[8px] font-bold text-yellow-500 mt-0.5">+ORT</p>
+          <p className="text-[9px] font-black tracking-widest text-yellow-500 mt-1">+ORT</p>
         )}
       </div>
 
       {/* Shift type badge */}
       <div
-        className="w-14 text-center py-0.5 rounded-md text-[10px] font-bold flex-shrink-0"
-        style={{ background: shift.accent + "18", color: shift.accent }}
+        className="w-16 text-center py-1 text-[10px] uppercase tracking-widest font-black flex-shrink-0 border"
+        style={{ background: shift.accent + "10", color: shift.accent, borderColor: shift.accent + "30" }}
       >
         {dienst.shiftType}
       </div>
 
       {/* Time + locatie */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-300 font-medium">
-          {dienst.startTijd}–{dienst.eindTijd}
-          <span className="text-slate-600 font-normal ml-1">· {dienst.duur}u</span>
+        <p className="text-sm text-slate-300 font-mono tracking-tighter">
+          {dienst.startTijd}<span className="text-slate-600 mx-1">–</span>{dienst.eindTijd}
+          <span className="text-[10px] text-slate-500 font-bold tracking-widest ml-2 uppercase">· {dienst.duur}H</span>
         </p>
         {dienst.locatie && (
-          <p className="text-[10px] text-slate-600 truncate flex items-center gap-1 mt-0.5">
-            <MapPin size={9} className="flex-shrink-0" />
+          <p className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-1 uppercase font-bold tracking-widest">
+            <MapPin size={10} className="flex-shrink-0" />
             {dienst.locatie}
           </p>
         )}
@@ -78,21 +76,21 @@ export function DienstItem({ dienst, isToday, afspraken = [] }: DienstItemProps)
       {/* Team badge — color-coded */}
       {team && dienst.team && (
         <span
-          className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 tracking-wide"
-          style={{ background: team.bg, color: team.text, border: `1px solid ${team.border}` }}
+          className="text-[10px] font-black px-2 py-1 flex-shrink-0 tracking-widest uppercase border"
+          style={{ background: team.bg, color: team.text, borderColor: team.border }}
         >
           {dienst.team}
         </span>
       )}
 
-      {/* Afspraken badge — toont als er persoonlijke events op dezelfde dag zijn */}
+      {/* Afspraken badge */}
       {afspraken.length > 0 && (
         <span
-          className="flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
-          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.3)" }}
+          className="flex items-center gap-1 text-[10px] font-black px-2 py-1 flex-shrink-0 border uppercase tracking-widest"
+          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", borderColor: "rgba(99,102,241,0.3)" }}
           title={afspraken.map((e) => e.titel).join(" · ")}
         >
-          <CalendarDays size={9} />
+          <CalendarDays size={12} />
           {afspraken.length}
         </span>
       )}
@@ -100,8 +98,8 @@ export function DienstItem({ dienst, isToday, afspraken = [] }: DienstItemProps)
       {/* TODAY indicator */}
       {isToday && (
         <span
-          className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-          style={{ background: shift.accent + "20", color: shift.accent }}
+          className="text-[10px] font-black px-2 py-1 flex-shrink-0 uppercase tracking-widest border"
+          style={{ background: shift.accent + "20", color: shift.accent, borderColor: shift.accent + "40" }}
         >
           VANDAAG
         </span>

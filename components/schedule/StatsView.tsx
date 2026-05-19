@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, Users, Calendar, ChevronDown, ChevronRight, Clock } from "lucide-react";
+import { TrendingUp, Crosshair } from "lucide-react";
 import {
   groupByYear,
   groupByWeekNr,
@@ -12,24 +12,19 @@ import {
   type DienstRow,
 } from "@/lib/schedule";
 
-// ─── Colour helpers ───────────────────────────────────────────────────────────
-
 const SHIFT_COLORS: Record<string, string> = {
-  Vroeg:  "#f97316",
-  Laat:   "#ef4444",
-  Dienst: "#3b82f6",
+  Vroeg:  "#f97316", // Orange
+  Laat:   "#ef4444", // Red
+  Dienst: "#3b82f6", // Blue
 };
 
 function shiftColor(type: string) { return SHIFT_COLORS[type] ?? "#94a3b8"; }
 
-// ─── Mini components ──────────────────────────────────────────────────────────
-
-/** Horizontal stacked shift bar */
-function ShiftBar({ shifts, total }: { shifts: Record<string, number>; total: number }) {
-  if (!total) return <div className="h-1.5 rounded-full bg-[var(--color-surface)] w-full" />;
+function ShiftSegment({ shifts, total }: { shifts: Record<string, number>; total: number }) {
+  if (!total) return <div className="h-1 bg-white/5 w-full" />;
   const types = Object.entries(shifts).filter(([, n]) => n > 0);
   return (
-    <div className="flex h-1.5 rounded-full overflow-hidden w-full gap-px">
+    <div className="flex h-1 w-full gap-px">
       {types.map(([type, n]) => (
         <div
           key={type}
@@ -42,136 +37,99 @@ function ShiftBar({ shifts, total }: { shifts: Record<string, number>; total: nu
   );
 }
 
-/** Team split badges */
-function TeamSplit({ teams }: { teams: Record<string, number> }) {
-  const r = teams["R."] ?? 0;
-  const a = teams["A."] ?? 0;
-  if (!r && !a) return null;
-  return (
-    <div className="flex gap-1.5">
-      {r > 0 && (
-        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-          style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.3)" }}>
-          R. ×{r}
-        </span>
-      )}
-      {a > 0 && (
-        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-          style={{ background: "rgba(16,185,129,0.15)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }}>
-          A. ×{a}
-        </span>
-      )}
-    </div>
-  );
-}
-
-// ─── Month card ───────────────────────────────────────────────────────────────
-
-function MonthCard({
+function MonthStreamItem({
   stats, active, isCurrent, onClick,
 }: { stats: MonthStats; active: boolean; isCurrent: boolean; onClick: () => void }) {
   const empty = stats.count === 0;
-  const doneRatio = stats.count ? stats.gedraaid / stats.count : 0;
 
   return (
     <motion.button
       onClick={onClick}
-      whileHover={!empty ? { scale: 1.02 } : {}}
-      whileTap={!empty ? { scale: 0.97 } : {}}
-      className="w-full text-left rounded-xl border transition-all p-4"
-      style={
-        active
-          ? { background: "rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.35)" }
-          : isCurrent
-          ? { background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.12)" }
-          : { background: "rgba(255,255,255,0.02)", borderColor: "rgba(255,255,255,0.05)" }
-      }
+      whileHover={!empty ? { x: 4 } : {}}
+      className={`w-full text-left relative flex items-center justify-between border-b transition-colors group ${
+        active 
+          ? "border-white bg-white/5" 
+          : "border-white/10 hover:bg-white/5"
+      }`}
     >
-      {/* Month name */}
-      <p className={`text-[10px] font-semibold uppercase tracking-wider mb-2 ${
-        empty ? "text-slate-700" : isCurrent ? "text-amber-400" : "text-slate-400"
-      }`}>
-        {stats.label.split(" ")[0]}
-        {isCurrent && <span className="ml-1 normal-case font-normal tracking-normal">· huidig</span>}
-      </p>
-
-      {empty ? (
-        <p className="text-slate-700 text-xs">—</p>
-      ) : (
-        <>
-          {/* Hours */}
-          <p className={`text-2xl font-bold leading-none mb-1 ${
-            active ? "text-amber-400" : "text-slate-100"
-          }`}>
-            {stats.totalHours}u
-          </p>
-          <p className="text-[10px] text-slate-600 mb-3">
-            {stats.count} diensten · ∅ {stats.avgDuur}u
-          </p>
-
-          {/* Shift bar */}
-          <ShiftBar shifts={stats.shifts} total={stats.count} />
-
-          {/* Team + done */}
-          <div className="flex items-center justify-between mt-2">
-            <TeamSplit teams={stats.teams} />
-            {stats.gedraaid > 0 && (
-              <span className="text-[9px] text-slate-600">
-                {stats.gedraaid}/{stats.count} ✓
-              </span>
+      <div className="py-4 pl-2 pr-4 flex-1">
+        <div className="flex items-center gap-4">
+          <div className="w-16">
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${
+              empty ? "text-slate-600" : isCurrent ? "text-green-400" : "text-slate-400"
+            }`}>
+              {stats.label.split(" ")[0].slice(0,3)}
+            </p>
+          </div>
+          
+          <div className="flex-1">
+            {empty ? (
+              <p className="text-slate-700 text-xs tracking-widest font-mono">NO DATA</p>
+            ) : (
+              <div className="flex items-center gap-4">
+                <p className={`text-xl font-black tabular-nums tracking-tighter ${
+                  active ? "text-white" : "text-slate-300 group-hover:text-white"
+                }`}>
+                  {stats.totalHours}<span className="text-xs text-slate-500 ml-0.5">h</span>
+                </p>
+                <div className="flex-1 max-w-[100px] opacity-60">
+                  <ShiftSegment shifts={stats.shifts} total={stats.count} />
+                </div>
+              </div>
             )}
           </div>
-        </>
+          
+          {!empty && (
+            <div className="text-right">
+              <p className="text-[10px] uppercase text-slate-500 font-bold tracking-widest">
+                {stats.count} SHIFTS
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Active Indicator Line */}
+      {active && (
+        <motion.div layoutId="activeMonth" className="absolute left-0 top-0 bottom-0 w-1 bg-white" />
       )}
-
-      {/* Active indicator */}
-      {active && <div className="mt-2 h-0.5 rounded-full bg-amber-400 w-full" />}
     </motion.button>
   );
 }
 
-// ─── Month detail (week breakdown) ───────────────────────────────────────────
-
-function MonthDetail({ stats }: { stats: MonthStats }) {
+function MonthDetailStream({ stats }: { stats: MonthStats }) {
   const weekGroups = useMemo(() => groupByWeekNr(stats.rows), [stats.rows]);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -8 }}
-      className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      className="p-6 bg-black/40 border-l border-white/10 h-full"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-base font-bold text-slate-200">{stats.label}</h3>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {stats.totalHours}u · {stats.count} diensten · ∅ {stats.avgDuur}u/dienst
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {Object.entries(stats.shifts).map(([t, n]) => (
-            <span key={t} className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-              style={{ background: shiftColor(t) + "20", color: shiftColor(t), border: `1px solid ${shiftColor(t)}40` }}>
-              {t} ×{n}
-            </span>
-          ))}
+      <div className="mb-8 pb-4 border-b border-white/10">
+        <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">{stats.label}</h3>
+        <div className="flex gap-4 text-[10px] uppercase font-bold tracking-widest text-slate-500">
+          <span>Total: {stats.totalHours}H</span>
+          <span>Shifts: {stats.count}</span>
+          <span>Avg: {stats.avgDuur}H</span>
         </div>
       </div>
 
-      {/* Week breakdown */}
-      <div className="space-y-3">
+      <div className="space-y-6">
         {weekGroups.map(({ weeknr, rows }) => {
           const wkHours = calcTotalHours(rows);
           return (
-            <div key={weeknr}>
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
-                  Week {weeknr}
+            <div key={weeknr} className="relative pl-4 border-l border-white/5">
+              <div className="absolute -left-[5px] top-1.5 w-2 h-2 bg-slate-800 rounded-none border border-slate-600" />
+              
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] text-white uppercase tracking-widest font-black">
+                  WK {weeknr}
                 </p>
-                <p className="text-[10px] text-slate-500">{rows.length} diensten · {wkHours}u</p>
+                <p className="text-[10px] text-slate-400 font-bold">{wkHours}H</p>
               </div>
+              
               <div className="space-y-1">
                 {rows.map(d => (
                   <DienstregelItem key={d.eventId} dienst={d} />
@@ -185,87 +143,59 @@ function MonthDetail({ stats }: { stats: MonthStats }) {
   );
 }
 
-/** Compact dienstregelItem for detail view */
 function DienstregelItem({ dienst }: { dienst: DienstRow }) {
   const color = SHIFT_COLORS[dienst.shiftType] ?? "#94a3b8";
-  const teamStr = dienst.team?.trim();
-  const teamColor = teamStr?.startsWith("R") ? "#60a5fa" : teamStr?.startsWith("A") ? "#34d399" : "#94a3b8";
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] min-w-0">
-      {/* Date */}
-      <div className="w-8 text-center flex-shrink-0">
-        <p className="text-xs font-bold text-slate-300">{dienst.startDatum.slice(8)}</p>
-        <p className="text-[9px] text-slate-600">{dienst.dag?.slice(0, 2)}</p>
-      </div>
-
-      {/* Shift badge */}
-      <span className="text-[9px] font-bold w-12 text-center py-0.5 rounded-md flex-shrink-0"
-        style={{ background: color + "18", color }}>
-        {dienst.shiftType}
-      </span>
-
-      {/* Time */}
-      <p className="text-xs text-slate-300 flex-1">
-        {dienst.startTijd}–{dienst.eindTijd}
-        <span className="text-slate-600 ml-1 font-normal">· {dienst.duur}u</span>
-      </p>
-
-      {/* Status */}
-      {dienst.status === "Gedraaid" && (
-        <span className="text-[9px] text-slate-600">✓</span>
-      )}
-
-      {/* Team */}
-      {teamStr && (
-        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-          style={{ background: teamColor + "20", color: teamColor, border: `1px solid ${teamColor}40` }}>
-          {teamStr}
+    <div className="group flex items-center justify-between py-2 border-b border-white/5 hover:border-white/20 transition-colors">
+      <div className="flex items-center gap-4">
+        <p className="text-xs font-bold text-slate-400 w-6">{dienst.startDatum.slice(8)}</p>
+        <span 
+          className="text-[9px] font-bold px-2 py-0.5"
+          style={{ color: color, backgroundColor: color + "10", border: `1px solid ${color}30` }}
+        >
+          {dienst.shiftType}
         </span>
-      )}
+      </div>
+      
+      <div className="flex items-center gap-3">
+        <p className="text-xs font-mono text-slate-300">
+          {dienst.startTijd}<span className="text-slate-600 px-1">-</span>{dienst.eindTijd}
+        </p>
+        <p className="text-[10px] font-bold text-slate-500 w-8 text-right">{dienst.duur}H</p>
+      </div>
     </div>
   );
 }
 
-// ─── Year summary bar ─────────────────────────────────────────────────────────
-
-function YearSummary({ year }: { year: YearStats }) {
-  const r = year.teams["R."] ?? 0;
-  const a = year.teams["A."] ?? 0;
-  const rPct = year.count ? Math.round((r / year.count) * 100) : 0;
-
+function YearSummaryHero({ year }: { year: YearStats }) {
   return (
-    <div className="flex flex-wrap gap-6 items-end">
+    <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-8 pb-8 border-b border-white/10">
       <div>
-        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Totale uren</p>
-        <p className="text-4xl font-black text-white">{year.totalHours}<span className="text-2xl text-slate-500 ml-1 font-semibold">u</span></p>
-      </div>
-      <div>
-        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Diensten</p>
-        <p className="text-3xl font-bold text-slate-200">{year.count}</p>
-      </div>
-      <div>
-        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Team verdeling</p>
-        <div className="flex items-center gap-2">
-          <div className="w-24 h-2 rounded-full overflow-hidden bg-[var(--color-surface)] flex">
-            <div style={{ width: `${rPct}%`, background: "#60a5fa" }} />
-            <div style={{ width: `${100 - rPct}%`, background: "#34d399" }} />
-          </div>
-          <span className="text-xs text-slate-400">R. {rPct}% · A. {100 - rPct}%</span>
+        <div className="flex items-center gap-2 mb-2">
+          <Crosshair size={14} className="text-slate-400" />
+          <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">Annual Volume · {year.year}</p>
         </div>
-      </div>
-      <div>
-        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Gemiddeld</p>
-        <p className="text-2xl font-bold text-slate-300">
-          {year.count ? Math.round((year.totalHours / year.count) * 10) / 10 : 0}
-          <span className="text-base text-slate-600 ml-1">u/dienst</span>
+        <p className="text-7xl md:text-8xl font-black text-white tracking-tighter leading-none tabular-nums">
+          {year.totalHours}<span className="text-3xl text-slate-600 font-bold ml-2">H</span>
         </p>
       </div>
+      
+      <div className="flex gap-8">
+        <div>
+          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Total Shifts</p>
+          <p className="text-3xl font-black text-slate-300 tabular-nums">{year.count}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Avg Duration</p>
+          <p className="text-3xl font-black text-slate-300 tabular-nums">
+            {year.count ? Math.round((year.totalHours / year.count) * 10) / 10 : 0}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
-
-// ─── Main StatsView ───────────────────────────────────────────────────────────
 
 export function StatsView({ diensten }: { diensten: DienstRow[] }) {
   const years    = useMemo(() => groupByYear(diensten), [diensten]);
@@ -277,7 +207,6 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
   const yearData  = years.find(y => y.year === activeYear);
   const monthData = yearData?.months.find(m => m.month === activeMonth);
 
-  // Fill to 12 months
   const allMonths: MonthStats[] = useMemo(() => {
     if (!yearData) return [];
     const filled: MonthStats[] = [];
@@ -295,10 +224,9 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
 
   if (!years.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <TrendingUp size={32} className="text-slate-700 mb-3" />
-        <p className="text-slate-500 text-sm">Geen data beschikbaar</p>
-        <p className="text-slate-700 text-xs mt-1">Sync je rooster om statistieken te zien</p>
+      <div className="flex flex-col items-center justify-center py-24 text-center border border-white/5 bg-black/20">
+        <TrendingUp size={32} className="text-slate-700 mb-4" />
+        <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">No Data Stream</p>
       </div>
     );
   }
@@ -306,62 +234,71 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
   return (
     <div className="space-y-6">
 
-      {/* ── Year selector ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
+      {/* Year Tabs */}
+      <div className="flex items-center gap-2 mb-8">
         {years.map(y => (
           <button
             key={y.year}
             onClick={() => { setActiveYear(y.year); setActiveMonth(null); }}
-            className="relative px-5 py-2 rounded-xl text-sm font-bold transition-all border"
-            style={
+            className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
               y.year === activeYear
-                ? { background: "rgba(245,158,11,0.12)", color: "#f59e0b", borderColor: "rgba(245,158,11,0.35)" }
-                : { background: "rgba(255,255,255,0.03)", color: "#64748b", borderColor: "rgba(255,255,255,0.08)" }
-            }
+                ? "bg-white text-black"
+                : "bg-transparent text-slate-500 hover:text-white border border-white/10"
+            }`}
           >
             {y.year}
-            {y.year === activeYear && (
-              <span className="ml-2 text-[10px] font-normal opacity-60">{y.totalHours}u</span>
-            )}
           </button>
         ))}
       </div>
 
-      {/* ── Year summary ───────────────────────────────────────────────────── */}
-      {yearData && (
-        <div className="glass rounded-2xl p-5 border border-[var(--color-border)] min-w-0">
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-4">{activeYear} — Jaaroverzicht</p>
-          <YearSummary year={yearData} />
-        </div>
-      )}
+      {/* Year Hero */}
+      {yearData && <YearSummaryHero year={yearData} />}
 
-      {/* ── Month grid ─────────────────────────────────────────────────────── */}
+      {/* Asymmetric Split Layout */}
       {allMonths.length > 0 && (
-        <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-3">Maandoverzicht</p>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {allMonths.map(m => (
-              <MonthCard
-                key={m.month}
-                stats={m}
-                active={activeMonth === m.month}
-                isCurrent={m.month === currentM}
-                onClick={() => {
-                  if (!m.count) return;
-                  setActiveMonth(prev => prev === m.month ? null : m.month);
-                }}
-              />
-            ))}
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          
+          {/* Left: Month Stream */}
+          <div className="w-full md:w-1/3">
+            <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold mb-4">Monthly Stream</p>
+            <div className="flex flex-col">
+              {allMonths.map(m => (
+                <MonthStreamItem
+                  key={m.month}
+                  stats={m}
+                  active={activeMonth === m.month}
+                  isCurrent={m.month === currentM}
+                  onClick={() => {
+                    if (!m.count) return;
+                    setActiveMonth(prev => prev === m.month ? null : m.month);
+                  }}
+                />
+              ))}
+            </div>
           </div>
+
+          {/* Right: Month Detail Stream */}
+          <div className="w-full md:w-2/3 min-h-[500px]">
+            <AnimatePresence mode="wait">
+              {monthData && monthData.count > 0 ? (
+                <MonthDetailStream key={monthData.month} stats={monthData} />
+              ) : (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="h-full flex items-center justify-center border border-white/5 bg-black/20 p-12"
+                >
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-slate-600">
+                    Select a month to view stream details
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          
         </div>
       )}
-
-      {/* ── Month detail ───────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {monthData && monthData.count > 0 && (
-          <MonthDetail key={monthData.month} stats={monthData} />
-        )}
-      </AnimatePresence>
     </div>
   );
 }

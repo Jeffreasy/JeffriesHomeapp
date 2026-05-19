@@ -463,3 +463,45 @@ export function groupByYear(diensten: DienstRow[]): YearStats[] {
       return { year, months: mons, totalHours: Math.round(totalHours * 10) / 10, count, teams };
     });
 }
+
+// ─── Contract Tracking ────────────────────────────────────────────────────────
+
+export interface WeeklyBalance {
+  weeknr: string;
+  actualHours: number;
+  expectedHours: number;
+  delta: number;
+}
+
+export interface ContractStats {
+  contractUrenPerWeek: number;
+  weeklyBalances: WeeklyBalance[];
+  totalDelta: number;
+}
+
+export function analyzeContract(diensten: DienstRow[], contractUren = 16): ContractStats {
+  const weeks = groupByWeekNr(diensten);
+  
+  let totalDelta = 0;
+  const weeklyBalances: WeeklyBalance[] = [];
+
+  for (const week of weeks) {
+    const actualHours = calcTotalHours(week.rows);
+    const delta = Math.round((actualHours - contractUren) * 10) / 10;
+    
+    totalDelta += delta;
+    
+    weeklyBalances.push({
+      weeknr: week.weeknr,
+      actualHours,
+      expectedHours: contractUren,
+      delta,
+    });
+  }
+
+  return {
+    contractUrenPerWeek: contractUren,
+    weeklyBalances,
+    totalDelta: Math.round(totalDelta * 10) / 10,
+  };
+}

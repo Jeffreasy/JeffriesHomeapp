@@ -8,7 +8,7 @@ export function Panel({ children, className = "" }: { children: React.ReactNode;
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`glass rounded-2xl border border-[var(--color-border)] p-4 sm:p-5 min-w-0 ${className}`}
+      className={`bg-black/40 border border-white/10 p-4 sm:p-5 min-w-0 ${className}`}
     >
       {children}
     </motion.div>
@@ -83,23 +83,24 @@ export function StatusMetric({
   const classes = toneClasses[tone];
 
   return (
-    <div className="min-h-[132px] min-w-0 bg-[var(--color-surface)] p-4 sm:p-5">
-      <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${classes.border} ${classes.surface}`}>
-        <Icon size={16} className={classes.icon} />
+    <div className={`min-h-[132px] min-w-0 bg-black/40 p-4 sm:p-5 border-b border-r border-t border-l-2 border-white/5 transition-all hover:bg-white/5`}
+         style={{ borderLeftColor: tone === "slate" ? "#94a3b8" : tone === "green" ? "#10b981" : tone === "amber" ? "#f59e0b" : tone === "rose" ? "#f43f5e" : tone === "indigo" ? "#6366f1" : "#3b82f6" }}>
+      <div className={`flex h-8 w-8 items-center justify-center border ${classes.border} ${classes.surface}`}>
+        <Icon size={14} className={classes.icon} />
       </div>
-      <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-      <p className={`mt-1 truncate text-base font-bold ${classes.text}`}>{value}</p>
-      <p className="mt-1 truncate text-xs text-slate-500">{sub}</p>
+      <p className="mt-5 text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</p>
+      <p className={`mt-0.5 truncate text-xl tracking-tight font-black ${classes.text}`}>{value}</p>
+      <p className="mt-1 text-xs text-slate-500 uppercase tracking-widest font-bold">{sub}</p>
     </div>
   );
 }
 
 export function MiniBreakdown({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-1 text-base font-bold text-white">{value}</p>
-      <p className="mt-0.5 text-xs text-slate-500">{sub}</p>
+    <div className="border border-white/10 bg-black/40 px-4 py-3 hover:bg-white/5 transition-colors">
+      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</p>
+      <p className="mt-1 text-xl tracking-tight font-black text-white">{value}</p>
+      <p className="mt-0.5 text-[10px] uppercase font-bold tracking-widest text-slate-500">{sub}</p>
     </div>
   );
 }
@@ -118,13 +119,13 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${classes.surface}`}>
-        <Icon size={15} className={classes.icon} />
+    <div className="flex items-center gap-4 border border-white/10 bg-black/40 px-4 py-3 hover:bg-white/5 transition-colors">
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center border ${classes.border} ${classes.surface}`}>
+        <Icon size={14} className={classes.icon} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-slate-400">{label}</p>
-        <p className="mt-0.5 truncate text-sm font-semibold text-white">{value}</p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</p>
+        <p className="mt-0.5 truncate text-sm font-bold text-white tracking-tight">{value}</p>
       </div>
     </div>
   );

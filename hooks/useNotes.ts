@@ -6,9 +6,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetNotes,
   useGetNotesTags,
-  postNotes,
-  patchNotesId,
-  deleteNotesId,
+  usePostNotes,
+  usePatchNotesId,
+  useDeleteNotesId,
 } from "@/lib/api/generated/notes/notes";
 import type { ModelNote } from "@/lib/api/model";
 
@@ -81,12 +81,17 @@ function toRecord(row: ModelNote): NoteRecord {
   };
 }
 
+import { useToast } from "@/components/ui/Toast";
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useNotes() {
   const { user } = useUser();
   const userId = user?.id ?? "";
   const queryClient = useQueryClient();
+  const { error: toastError } = useToast();
+
+  const queryKey = ["/api/v1/notes", { userId }];
 
   const { data: notesRaw, isLoading: loadingNotes } = useGetNotes({ userId }, { query: { enabled: !!userId } });
   const { data: tagsRaw, isLoading: loadingTags } = useGetNotesTags({ userId }, { query: { enabled: !!userId } });
@@ -118,9 +123,105 @@ export function useNotes() {
     return { active: act, archived: arch, pinned: pin };
   }, [raw]);
 
-  const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/v1/notes"] });
-  };
+  // Mutations
+  const createMut = usePostNotes({
+    mutation: {
+      onMutate: async (variables) => {
+        await queryClient.cancelQueries({ queryKey });
+        const previousNotes = queryClient.getQueryData<any>(queryKey);
+        
+        // Optimistic UI Update
+        const newNote: ModelNote = {
+          id: `temp-${Date.now()}`,
+          user_id: userId,
+          titel: variables.data.titel ?? undefined,
+          inhoud: variables.data.inhoud,
+          tags: variables.data.tags ?? [],
+          kleur: variables.data.kleur ?? undefined,
+          is_pinned: false,
+          is_archived: false,
+          deadline: variables.data.deadline ?? undefined,
+          prioriteit: variables.data.prioriteit ?? "normaal",
+          aangemaakt: new Date().toISOString(),
+          gewijzigd: new Date().toISOString(),
+        };
+
+        queryClient.setQueryData(queryKey, (old: any) => {
+          if (!old) return { data: [newNote], status: 200 };
+          return { ...old, data: [newNote, ...(old.data || [])] };
+        });
+
+        return { previousNotes };
+      },
+      onError: (err, variables, context) => {
+        toastError("Kon notitie niet opslaan.");
+        if (context?.previousNotes) {
+          queryClient.setQueryData(queryKey, context.previousNotes);
+        }
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({ queryKey });
+      },
+    }
+  });
+
+  const updateMut = usePatchNotesId({
+    mutation: {
+      onMutate: async (variables) => {
+        await queryClient.cancelQueries({ queryKey });
+        const previousNotes = queryClient.getQueryData<any>(queryKey);
+
+        queryClient.setQueryData(queryKey, (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((note: ModelNote) =>
+              note.id === variables.id ? { ...note, ...variables.data, gewijzigd: new Date().toISOString() } : note
+            ),
+          };
+        });
+
+        return { previousNotes };
+      },
+      onError: (err, variables, context) => {
+        toastError("Kon wijzigingen niet opslaan.");
+        if (context?.previousNotes) {
+          queryClient.setQueryData(queryKey, context.previousNotes);
+        }
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({ queryKey });
+      },
+    }
+  });
+
+  const deleteMut = useDeleteNotesId({
+    mutation: {
+      onMutate: async (variables) => {
+        await queryClient.cancelQueries({ queryKey });
+        const previousNotes = queryClient.getQueryData<any>(queryKey);
+
+        queryClient.setQueryData(queryKey, (old: any) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.filter((note: ModelNote) => note.id !== variables.id),
+          };
+        });
+
+        return { previousNotes };
+      },
+      onError: (err, variables, context) => {
+        toastError("Kon notitie niet verwijderen.");
+        if (context?.previousNotes) {
+          queryClient.setQueryData(queryKey, context.previousNotes);
+        }
+      },
+      onSettled: () => {
+        queryClient.invalidateQueries({ queryKey });
+      },
+    }
+  });
 
   return {
     raw,
@@ -133,27 +234,22 @@ export function useNotes() {
     count: active.length,
 
     create: async (data: NoteCreateData) => {
-      await postNotes(data as unknown as Parameters<typeof postNotes>[0], { userId });
-      invalidateAll();
+      await createMut.mutateAsync({ data: data as any, params: { userId } });
     },
     update: async (id: string, data: Partial<NoteUpdateData>) => {
-      await patchNotesId(id, data as unknown as Parameters<typeof patchNotesId>[1]);
-      invalidateAll();
+      await updateMut.mutateAsync({ id, data: data as any });
     },
     togglePin: async (id: string) => {
       const note = raw?.find(n => n.id === id);
       if (note) {
-        await patchNotesId(id, { is_pinned: !note.isPinned } as unknown as Parameters<typeof patchNotesId>[1]);
-        invalidateAll();
+        await updateMut.mutateAsync({ id, data: { is_pinned: !note.isPinned } as any });
       }
     },
     archive: async (id: string) => {
-      await patchNotesId(id, { is_archived: true } as unknown as Parameters<typeof patchNotesId>[1]);
-      invalidateAll();
+      await updateMut.mutateAsync({ id, data: { is_archived: true } as any });
     },
     remove: async (id: string) => {
-      await deleteNotesId(id);
-      invalidateAll();
+      await deleteMut.mutateAsync({ id });
     },
   };
 }

@@ -18,7 +18,6 @@ export const viewport = {
 export const metadata: Metadata = {
   title: "Homeapp — Smart Home Control",
   description: "Control your WiZ smart lights from anywhere on your local network.",
-  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
