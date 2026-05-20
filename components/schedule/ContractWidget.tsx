@@ -125,7 +125,7 @@ export function ContractWidget() {
             </div>
           </div>
 
-          {/* Global Balance */}
+                    {/* Global Balance */}
           <div className="flex justify-between items-center bg-black/40 border border-slate-800 p-3">
             <span className="text-xs uppercase tracking-widest font-semibold text-slate-400">Global Balance</span>
             <span 
@@ -137,8 +137,35 @@ export function ContractWidget() {
             </span>
           </div>
 
+          {/* Weekly History Sparkline */}
+          <div className="pt-2">
+            <div className="flex items-end h-8 gap-1 w-full opacity-80">
+              {stats.weeklyBalances.slice(-15).map((w, i) => {
+                const h = Math.max(2, Math.min(32, Math.abs(w.delta) * 2));
+                const isOver = w.delta > 0;
+                const color = isOver ? "#f97316" : w.delta < 0 ? "#ef4444" : "#10b981";
+                return (
+                  <div
+                    key={w.weeknr}
+                    title={"Week " + w.weeknr + ": " + w.delta + "h"}
+                    className="flex-1 rounded-t-sm transition-all duration-300 hover:opacity-100 opacity-60"
+                    style={{
+                      height: h + "px",
+                      backgroundColor: color,
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <div className="flex justify-between mt-1 text-[8px] uppercase tracking-widest text-slate-500 font-bold">
+              <span>Historical Trend (15w)</span>
+              <span>{stats.weeklyBalances.length}w tracked</span>
+            </div>
+          </div>
+
         </div>
       </div>
     </motion.div>
   );
 }
+

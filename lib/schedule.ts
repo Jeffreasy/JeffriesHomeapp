@@ -322,7 +322,7 @@ function normalizeWeekNr(raw: string): string {
 
 export function groupByWeekNr(diensten: DienstRow[]): { weeknr: string; rows: DienstRow[] }[] {
   const map = new Map<string, DienstRow[]>();
-  for (const d of diensten) {
+  for (const d of diensten) { if (d.status === "VERWIJDERD") continue;
     const key = normalizeWeekNr(d.weeknr || "?");
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(d);
@@ -335,13 +335,13 @@ export function groupByWeekNr(diensten: DienstRow[]): { weeknr: string; rows: Di
 
 /** Total hours across a set of diensten */
 export function calcTotalHours(diensten: DienstRow[]): number {
-  return Math.round(diensten.reduce((sum, d) => sum + (d.duur ?? 0), 0) * 10) / 10;
+  return Math.round(diensten.reduce((sum, d) => sum + (d.status === "VERWIJDERD" ? 0 : (d.duur ?? 0)), 0) * 10) / 10;
 }
 
 /** Count per shiftType */
 export function shiftBreakdown(diensten: DienstRow[]): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const d of diensten) {
+  for (const d of diensten) { if (d.status === "VERWIJDERD") continue;
     out[d.shiftType] = (out[d.shiftType] ?? 0) + 1;
   }
   return out;
@@ -350,7 +350,7 @@ export function shiftBreakdown(diensten: DienstRow[]): Record<string, number> {
 /** Count per team prefix */
 export function teamBreakdown(diensten: DienstRow[]): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const d of diensten) {
+  for (const d of diensten) { if (d.status === "VERWIJDERD") continue;
     const key = d.team?.trim() || "?";
     out[key] = (out[key] ?? 0) + 1;
   }
@@ -395,14 +395,14 @@ export function computeMonthStats(month: string, rows: DienstRow[]): MonthStats 
   const teams:  Record<string, number> = {};
   let gedraaid = 0;
 
-  for (const d of rows) {
+  for (const d of rows) { if (d.status === "VERWIJDERD") continue;
     shifts[d.shiftType] = (shifts[d.shiftType] ?? 0) + 1;
     const t = d.team?.trim() || "?";
     teams[t] = (teams[t] ?? 0) + 1;
     if (d.status === "Gedraaid") gedraaid++;
   }
 
-  const totalHours = Math.round(rows.reduce((s, d) => s + (d.duur ?? 0), 0) * 10) / 10;
+  const totalHours = Math.round(rows.reduce((s, d) => s + (d.status === "VERWIJDERD" ? 0 : (d.duur ?? 0)), 0) * 10) / 10;
   return {
     month,
     label:  monthLabel(month),
@@ -419,7 +419,7 @@ export function computeMonthStats(month: string, rows: DienstRow[]): MonthStats 
 /** Group ALL diensten by "YYYY-MM", return sorted ascending */
 export function groupByMonth(diensten: DienstRow[]): MonthStats[] {
   const map = new Map<string, DienstRow[]>();
-  for (const d of diensten) {
+  for (const d of diensten) { if (d.status === "VERWIJDERD") continue;
     if (!d.startDatum) continue;
     const key = d.startDatum.slice(0, 7); // "YYYY-MM"
     if (!map.has(key)) map.set(key, []);

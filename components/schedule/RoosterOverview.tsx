@@ -117,6 +117,7 @@ export function OverviewPanel({
 }
 
 import { ContractWidget } from "./ContractWidget";
+import { MonthBalanceChart } from "./MonthBalanceChart";
 
 export function OverviewTab({
   unifiedWeeks,
@@ -159,6 +160,7 @@ export function OverviewTab({
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
         <ContractWidget />
+          <MonthBalanceChart />
         <Panel>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <SectionTitle
@@ -308,3 +310,4 @@ export function OverviewTab({
     </section>
   );
 }
+
