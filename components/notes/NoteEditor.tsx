@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, ChevronDown, Link2, Check } from "lucide-react";
+import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, ChevronDown, Link2, Check, Trash2, Archive, Pin } from "lucide-react";
 import { getNotesSearch } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 
@@ -22,9 +22,20 @@ interface NoteEditorProps {
   userId?: string;
   onSave:  (data: NoteCreateData) => Promise<void>;
   onClose: () => void;
+  onDelete?: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onTogglePin?: (id: string) => void;
 }
 
-export function NoteEditor({ note, userId, onSave, onClose }: NoteEditorProps) {
+export function NoteEditor({ 
+  note, 
+  userId, 
+  onSave, 
+  onClose,
+  onDelete,
+  onArchive,
+  onTogglePin,
+}: NoteEditorProps) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [titel, setTitel]           = useState(note?.titel ?? "");
@@ -209,6 +220,28 @@ export function NoteEditor({ note, userId, onSave, onClose }: NoteEditorProps) {
     onClose();
   }, [titel, inhoud, deadline, prioriteit, kleur, tags, note, onClose]);
 
+  const handleDeleteClick = () => {
+    if (onDelete && note) {
+      if (window.confirm("Notitie permanent verwijderen?")) {
+        onDelete(note.id);
+        onClose();
+      }
+    }
+  };
+
+  const handleArchiveClick = () => {
+    if (onArchive && note) {
+      onArchive(note.id);
+      onClose();
+    }
+  };
+
+  const handlePinClick = () => {
+    if (onTogglePin && note) {
+      onTogglePin(note.id);
+    }
+  };
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); handleCloseAttempt(); }
@@ -287,13 +320,30 @@ export function NoteEditor({ note, userId, onSave, onClose }: NoteEditorProps) {
               {note ? "Notitie bewerken" : "Nieuwe notitie"}
             </h3>
           </div>
-          <button
-            onClick={handleCloseAttempt}
-            className="p-2 -mr-1 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
-            aria-label="Sluiten"
-          >
-            <X size={18} className="text-[var(--color-text-muted)]" />
-          </button>
+          <div className="flex items-center gap-1 -mr-1">
+            {note && onTogglePin && (
+              <button
+                type="button"
+                onClick={handlePinClick}
+                className={`p-2 rounded-lg transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center ${
+                  note.isPinned
+                    ? "text-amber-400"
+                    : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+                }`}
+                title={note.isPinned ? "Ontpinnen" : "Pinnen"}
+                aria-label={note.isPinned ? "Ontpinnen" : "Pinnen"}
+              >
+                <Pin size={18} className={note.isPinned ? "fill-amber-400" : ""} />
+              </button>
+            )}
+            <button
+              onClick={handleCloseAttempt}
+              className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Sluiten"
+            >
+              <X size={18} className="text-[var(--color-text-muted)]" />
+            </button>
+          </div>
         </div>
 
         {/* Body — scrollable */}
@@ -504,22 +554,50 @@ export function NoteEditor({ note, userId, onSave, onClose }: NoteEditorProps) {
               {saveError}
             </p>
           )}
-          <div className="flex items-center gap-2">
-            <p className="text-[10px] text-[var(--color-text-subtle)] hidden sm:block">
-              Ctrl+Enter om op te slaan
-            </p>
-            <div className="flex items-center gap-2 ml-auto w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full justify-between">
+            {/* Quick Actions (Delete, Archive) */}
+            <div className="flex items-center gap-1">
+              {note && onDelete && (
+                <button
+                  type="button"
+                  onClick={handleDeleteClick}
+                  className="p-2.5 rounded-xl border border-red-500/10 hover:border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold"
+                  title="Notitie verwijderen"
+                  aria-label="Notitie verwijderen"
+                >
+                  <Trash2 size={16} />
+                  <span className="hidden sm:inline">Verwijderen</span>
+                </button>
+              )}
+              {note && onArchive && (
+                <button
+                  type="button"
+                  onClick={handleArchiveClick}
+                  className="p-2.5 rounded-xl border border-[var(--color-border)] hover:border-[var(--color-border-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold"
+                  title={note.isArchived ? "Dearchiveren" : "Archiveren"}
+                  aria-label={note.isArchived ? "Dearchiveren" : "Archiveren"}
+                >
+                  <Archive size={16} />
+                  <span className="hidden sm:inline">{note.isArchived ? "Dearchiveren" : "Archiveren"}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 ml-auto">
+              <p className="text-[10px] text-[var(--color-text-subtle)] hidden md:block mr-2">
+                Ctrl+Enter om op te slaan
+              </p>
               <button
                 onClick={handleCloseAttempt}
                 disabled={saving}
-                className="flex-1 sm:flex-none px-5 py-2.5 text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors cursor-pointer min-h-[44px] rounded-xl border border-[var(--color-border)] sm:border-none disabled:opacity-50"
+                className="px-5 py-2.5 text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors cursor-pointer min-h-[44px] rounded-xl border border-[var(--color-border)] sm:border-none disabled:opacity-50"
               >
                 Annuleren
               </button>
               <button
                 onClick={handleSave}
                 disabled={!inhoud.trim() || saving}
-                className="flex-1 sm:flex-none px-6 py-2.5 text-sm font-semibold text-[var(--color-primary-foreground)] bg-amber-500 hover:bg-amber-400 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
+                className="px-6 py-2.5 text-sm font-semibold text-[var(--color-primary-foreground)] bg-amber-500 hover:bg-amber-400 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
               >
                 {saving ? "Opslaan..." : note ? "Opslaan" : "Aanmaken"}
               </button>

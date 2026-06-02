@@ -248,6 +248,9 @@ export default function NotitiesPage() {
               setEditorOpen(false);
               setEditNote(null);
             }}
+            onDelete={remove}
+            onArchive={archive}
+            onTogglePin={togglePin}
           />
         )}
       </AnimatePresence>
