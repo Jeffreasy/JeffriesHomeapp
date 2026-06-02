@@ -6,6 +6,7 @@ import { X, Calendar, Clock, MapPin, FileText, Plus, Save } from "lucide-react";
 import { personalEventsApi } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
 
 const CATEGORIES = [
   { id: "sociaal",     emoji: "☕", label: "Sociaal" },
@@ -33,13 +34,14 @@ function stripCategoryTag(desc: string): string {
 interface CreateEventModalProps {
   open:       boolean;
   onClose:    () => void;
+  onSuccess?: () => void;
   editEvent?: PersonalEvent | null;
 }
 
-export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalProps) {
+export function CreateEventModal({ open, onClose, onSuccess, editEvent }: CreateEventModalProps) {
   const { user }  = useUser();
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getAmsterdamTodayIso();
 
   const [titel,        setTitel]        = useState("");
   const [startDatum,   setStartDatum]   = useState(today);
@@ -105,13 +107,15 @@ export function CreateEventModal({ open, onClose, editEvent }: CreateEventModalP
         eind_tijd:    heledag ? null : eindTijd  || null,
         locatie:      locatie.trim() || null,
         beschrijving: fullDesc || null,
-        status:       "active",
+        status:       "Aankomend",
+        kalender:     "Main",
         bron:         "manual",
         google_event_id: null,
         created_at:   editEvent ? undefined : new Date().toISOString(),
       };
 
       await personalEventsApi.upsert(row as any);
+      onSuccess?.();
       handleClose();
     } catch (err: any) {
       setError(err.message ?? "Opslaan mislukt");

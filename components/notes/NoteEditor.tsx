@@ -19,11 +19,14 @@ const PRIORITEITEN = [
 
 interface NoteEditorProps {
   note?: NoteRecord | null;
-  onSave:  (data: NoteCreateData) => void;
+  userId?: string;
+  onSave:  (data: NoteCreateData) => Promise<void>;
   onClose: () => void;
 }
 
-export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
+export function NoteEditor({ note, userId, onSave, onClose }: NoteEditorProps) {
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [titel, setTitel]           = useState(note?.titel ?? "");
   const [inhoud, setInhoud]         = useState(note?.inhoud ?? "");
   const [tags, setTags]             = useState<string[]>(note?.tags ?? []);
@@ -41,20 +44,22 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
 
   const [linkResults, setLinkResults]  = useState<{ id: string; titel: string }[]>([]);
 
+  const resolvedUserId = userId || note?.user_id;
+
   useEffect(() => {
-    if (!linkActive || !linkSearch || !note?.user_id) {
+    if (!linkActive || !linkSearch || !resolvedUserId) {
       setLinkResults([]);
       return;
     }
     const timer = setTimeout(async () => {
       try {
-        const results = await getNotesSearch({ userId: note.user_id, q: linkSearch, limit: 5 });
+        const results = await getNotesSearch({ userId: resolvedUserId, q: linkSearch, limit: 5 });
         const items = Array.isArray(results) ? results : Array.isArray((results as any).data) ? (results as any).data : [];
         setLinkResults(items.map((r: any) => ({ id: r.id, titel: r.titel ?? "Zonder titel" })));
       } catch { setLinkResults([]); }
     }, 200);
     return () => clearTimeout(timer);
-  }, [linkActive, linkSearch, note?.user_id]);
+  }, [linkActive, linkSearch, resolvedUserId]);
 
   const textRef = useRef<HTMLTextAreaElement>(null);
 
@@ -126,17 +131,25 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
     });
   }, [inhoud, linkCursorPos, autoResize]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     if (!inhoud.trim()) return;
-    onSave({
-      titel: titel.trim() || undefined,
-      inhoud: inhoud.trim(),
-      tags: tags.length > 0 ? tags : undefined,
-      kleur: kleur || undefined,
-      deadline: deadline || undefined,
-      prioriteit: prioriteit !== "normaal" ? prioriteit : undefined,
-    });
-    onClose();
+    setSaving(true);
+    setSaveError("");
+    try {
+      await onSave({
+        titel: titel.trim() || undefined,
+        inhoud: inhoud.trim(),
+        tags: tags.length > 0 ? tags : undefined,
+        kleur: kleur || undefined,
+        deadline: deadline || undefined,
+        prioriteit: prioriteit,
+      });
+      onClose();
+    } catch (err: any) {
+      setSaveError(err?.message ?? "Opslaan mislukt");
+    } finally {
+      setSaving(false);
+    }
   }, [inhoud, titel, tags, kleur, deadline, prioriteit, onSave, onClose]);
 
   useEffect(() => {
@@ -415,20 +428,28 @@ export function NoteEditor({ note, onSave, onClose }: NoteEditorProps) {
         </div>
 
         {/* Footer — fixed at bottom */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-[var(--color-border)] shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer min-h-[44px] rounded-xl"
-          >
-            Annuleren
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!inhoud.trim()}
-            className="px-5 py-2.5 text-sm font-semibold text-white bg-amber-500/90 hover:bg-amber-500 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
-          >
-            {note ? "Opslaan" : "Aanmaken"}
-          </button>
+        <div className="flex flex-col gap-2 px-5 py-3 border-t border-[var(--color-border)] shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+          {saveError && (
+            <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              {saveError}
+            </p>
+          )}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer min-h-[44px] rounded-xl disabled:opacity-50"
+            >
+              Annuleren
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!inhoud.trim() || saving}
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-amber-500/90 hover:bg-amber-500 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
+            >
+              {saving ? "Opslaan..." : note ? "Opslaan" : "Aanmaken"}
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>

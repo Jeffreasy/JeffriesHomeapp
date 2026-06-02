@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
+import { useUser } from "@clerk/nextjs";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { NoteEditor } from "@/components/notes/NoteEditor";
@@ -14,8 +15,9 @@ import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { Search } from "lucide-react";
 
 export default function NotitiesPage() {
+  const { user } = useUser();
   const {
-    notes,
+    active,
     archived,
     pinned,
     allTags,
@@ -67,7 +69,7 @@ export default function NotitiesPage() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const sourceNotes = viewMode === "active" ? notes : archived;
+  const sourceNotes = viewMode === "active" ? active : archived;
 
   const tagCounts = useMemo(() => {
     const map = new Map<string, number>();
@@ -119,7 +121,7 @@ export default function NotitiesPage() {
   }, [search, sortMode, sourceNotes, tagFilter, viewMode]);
 
   const checklistStats = useMemo(() => {
-    return notes.reduce(
+    return active.reduce(
       (total, note) => {
         const info = getChecklistInfo(note.inhoud);
         total.done += info.done;
@@ -128,12 +130,12 @@ export default function NotitiesPage() {
       },
       { done: 0, total: 0 }
     );
-  }, [notes]);
+  }, [active]);
 
   const deadlineStats = useMemo(() => {
     if (!nowMs) return { overdue: 0, soon: 0, next: null as NoteRecord | null };
     const week = nowMs + 7 * 24 * 60 * 60 * 1000;
-    const withDeadline = notes
+    const withDeadline = active
       .filter((note) => note.deadline)
       .sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
 
@@ -145,11 +147,11 @@ export default function NotitiesPage() {
       }).length,
       next: withDeadline.find((note) => new Date(note.deadline as string).getTime() >= nowMs) ?? null,
     };
-  }, [notes, nowMs]);
+  }, [active, nowMs]);
 
-  const highPriorityCount = notes.filter((note) => note.prioriteit === "hoog").length;
-  const linkedCount = notes.filter((note) => note.linkedEventId).length;
-  const totalCount = notes.length + archived.length;
+  const highPriorityCount = active.filter((note) => note.prioriteit === "hoog").length;
+  const linkedCount = active.filter((note) => note.linkedEventId).length;
+  const totalCount = active.length + archived.length;
   const activeFilters = [search.trim(), tagFilter, viewMode === "archived", sortMode !== "recent"].filter(Boolean).length;
 
   const handleEdit = (note: NoteRecord) => {
@@ -226,7 +228,7 @@ export default function NotitiesPage() {
               setViewMode={setViewMode}
               sortMode={sortMode}
               setSortMode={setSortMode}
-              activeCount={notes.length}
+              activeCount={active.length}
               archivedCount={archived.length}
               allTags={allTags}
               tagCounts={tagCounts}
@@ -245,7 +247,7 @@ export default function NotitiesPage() {
 
         <NotesMetricsRow
           totalCount={totalCount}
-          activeCount={notes.length}
+          activeCount={active.length}
           archivedCount={archived.length}
           checklistDone={checklistStats.done}
           checklistTotal={checklistStats.total}
@@ -279,6 +281,7 @@ export default function NotitiesPage() {
         {editorOpen && (
           <NoteEditor
             note={editNote}
+            userId={user?.id}
             onSave={handleSave}
             onClose={() => {
               setEditorOpen(false);

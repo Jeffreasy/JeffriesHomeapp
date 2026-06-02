@@ -243,6 +243,7 @@ export default function AgendaPage() {
                     label={`Vandaag - ${formatDateLabel(todayIso)}`}
                     events={todayEvents}
                     onEdit={openEditEvent}
+                    onRefetch={refetchEvents}
                     todayIso={todayIso}
                     conflictMap={conflictMap}
                   />
@@ -250,6 +251,7 @@ export default function AgendaPage() {
                     label={`Morgen - ${formatDateLabel(tomorrowIso)}`}
                     events={tomorrowEvents}
                     onEdit={openEditEvent}
+                    onRefetch={refetchEvents}
                     todayIso={todayIso}
                     conflictMap={conflictMap}
                   />
@@ -278,6 +280,7 @@ export default function AgendaPage() {
                       event={event}
                       isToday={eventCoversDate(event, todayIso)}
                       onEdit={openEditEvent}
+                      onRefetch={refetchEvents}
                       conflictInfo={conflictMap.get(event.eventId)}
                     />
                   ))}
@@ -322,6 +325,7 @@ export default function AgendaPage() {
                       key={event.eventId}
                       event={event}
                       onEdit={openEditEvent}
+                      onRefetch={refetchEvents}
                       conflictInfo={conflictMap.get(event.eventId)}
                     />
                   ))}
@@ -340,6 +344,7 @@ export default function AgendaPage() {
                       key={event.eventId}
                       event={event}
                       onEdit={openEditEvent}
+                      onRefetch={refetchEvents}
                       conflictInfo={conflictMap.get(event.eventId)}
                     />
                   ))}
@@ -370,7 +375,7 @@ export default function AgendaPage() {
                 <SectionHeader icon={History} label="Historie" title="Recent voorbij" />
                 <div className="space-y-2 opacity-70">
                   {history.slice(0, 4).map((event) => (
-                    <PersonalEventItem key={event.eventId} event={event} onEdit={openEditEvent} />
+                    <PersonalEventItem key={event.eventId} event={event} onEdit={openEditEvent} onRefetch={refetchEvents} />
                   ))}
                 </div>
               </Panel>
@@ -382,6 +387,7 @@ export default function AgendaPage() {
       <CreateEventModal
         open={modalOpen}
         editEvent={editEvent}
+        onSuccess={() => refetchEvents()}
         onClose={() => {
           setModalOpen(false);
           setEditEvent(null);

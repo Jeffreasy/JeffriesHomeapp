@@ -136,12 +136,14 @@ export function DayBlock({
   label,
   events,
   onEdit,
+  onRefetch,
   todayIso,
   conflictMap,
 }: {
   label: string;
   events: PersonalEvent[];
   onEdit: (event: PersonalEvent) => void;
+  onRefetch?: () => void;
   todayIso: string;
   conflictMap: ReturnType<typeof usePersonalEvents>["conflictMap"];
 }) {
@@ -159,6 +161,7 @@ export function DayBlock({
               event={event}
               isToday={eventCoversDate(event, todayIso)}
               onEdit={onEdit}
+              onRefetch={onRefetch}
               conflictInfo={conflictMap.get(event.eventId)}
             />
           ))}

@@ -17,10 +17,11 @@ interface PersonalEventItemProps {
   event:        PersonalEvent;
   isToday?:     boolean;
   onEdit?:      (event: PersonalEvent) => void;
+  onRefetch?:   () => void;
   conflictInfo?: ConflictInfo;
 }
 
-export function PersonalEventItem({ event, isToday, onEdit, conflictInfo }: PersonalEventItemProps) {
+export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictInfo }: PersonalEventItemProps) {
   const hasConflict = !!conflictInfo;
   const multiDay    = isMultiDay(event);
 
@@ -53,6 +54,7 @@ export function PersonalEventItem({ event, isToday, onEdit, conflictInfo }: Pers
     try {
       await personalEventsApi.updateStatus(event.userId, event.eventId, "cancelled");
       success("Afspraak verwijderd");
+      onRefetch?.();
     } catch (e: any) {
       error(`Mislukt: ${e.message}`);
       setConfirmDelete(false);
