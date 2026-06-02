@@ -164,7 +164,7 @@ export function DayColumn({ date, isToday, notes, onEdit, onCreate }: DayColumnP
             onKeyDown={handleKeyDown}
             placeholder="Schrijf iets..."
             disabled={saving}
-            className="flex-1 bg-transparent text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] outline-none disabled:opacity-50"
+            className="flex-1 bg-transparent text-base sm:text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] outline-none disabled:opacity-50"
           />
           {quickText.trim() && (
             <span className="text-[10px] text-[var(--color-text-subtle)]">↵</span>

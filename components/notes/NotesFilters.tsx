@@ -75,7 +75,7 @@ export function NotesFilters({
               placeholder="Zoek in notities..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm text-slate-200 outline-none placeholder:text-slate-600"
+              className="min-w-0 flex-1 bg-transparent text-base sm:text-sm text-slate-200 outline-none placeholder:text-slate-600"
             />
             {search && (
               <button

@@ -69,7 +69,7 @@ export function QuickNote() {
                 handleQuickSave();
               }
             }}
-            className="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-600 outline-none"
+            className="flex-1 bg-transparent text-base sm:text-sm text-slate-200 placeholder:text-slate-600 outline-none"
           />
           {text.trim() && (
             <motion.button
