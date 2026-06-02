@@ -1,84 +1,79 @@
 import { cn } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2, Loader2, CalendarDays, type LucideIcon } from "lucide-react";
-import { type Tone, toneClasses } from "./RoosterUtils";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Loader2,
+  AlertTriangle,
+  type LucideIcon,
+} from "lucide-react";
 import { PersonalEventItem } from "./PersonalEventItem";
-import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
-import { eventCoversDate } from "./AgendaUtils";
+import { usePersonalEvents, type PersonalEvent, getTimeLabel, formatDateRange } from "@/hooks/usePersonalEvents";
+import { eventCoversDate, formatDateLabel } from "./AgendaUtils";
+
+/* ─── Panel (kept, still useful) ─────────────────────────────────────────── */
 
 export function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <section className={cn("glass min-w-0 rounded-2xl p-4 sm:p-5", className)}>
+    <section className={cn("rounded-2xl border border-[var(--color-border)] bg-white/[0.03] p-4 sm:p-5", className)}>
       {children}
     </section>
   );
 }
 
-export function MetricTile({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  sub: string;
-  tone: Tone;
-}) {
-  const toneClass = toneClasses[tone];
-  return (
-    <div className="glass min-w-0 rounded-2xl p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p>
-          <p className="mt-2 truncate text-xl font-bold text-white">{value}</p>
-          <p className="mt-1 truncate text-xs text-slate-500">{sub}</p>
-        </div>
-        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border", toneClass.surface, toneClass.border)}>
-          <Icon size={17} className={toneClass.icon} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function SectionHeader({
-  icon: Icon,
-  label,
-  title,
-  action,
-}: {
-  icon: LucideIcon;
-  label: string;
-  title: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-          <Icon size={17} className="text-slate-300" />
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p>
-          <h2 className="mt-0.5 text-lg font-bold text-white">{title}</h2>
-        </div>
-      </div>
-      {action}
-    </div>
-  );
-}
+/* ─── Empty State ────────────────────────────────────────────────────────── */
 
 export function EmptyState({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-8 text-center min-w-0">
-      <Icon size={28} className="mx-auto text-slate-600" />
-      <p className="mt-3 text-sm font-semibold text-slate-300">{title}</p>
-      <p className="mt-1 text-xs text-slate-500">{text}</p>
+    <div className="flex flex-col items-center gap-2 py-10 text-center">
+      <Icon size={24} className="text-slate-600" />
+      <p className="text-sm font-medium text-slate-400">{title}</p>
+      <p className="text-xs text-slate-600">{text}</p>
     </div>
   );
 }
+
+/* ─── Inline Stats Bar ───────────────────────────────────────────────────── */
+
+export function InlineStats({
+  todayCount,
+  monthCount,
+  conflictCount,
+  pendingCount,
+}: {
+  todayCount: number;
+  monthCount: number;
+  conflictCount: number;
+  pendingCount: number;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+      <span className={todayCount > 0 ? "text-emerald-400 font-medium" : ""}>
+        {todayCount > 0 ? `${todayCount} vandaag` : "Rustige dag"}
+      </span>
+      <span className="text-slate-700">·</span>
+      <span>{monthCount} deze maand</span>
+      {conflictCount > 0 && (
+        <>
+          <span className="text-slate-700">·</span>
+          <span className="text-amber-400 font-medium flex items-center gap-1">
+            <AlertTriangle size={11} />
+            {conflictCount} {conflictCount === 1 ? "conflict" : "conflicten"}
+          </span>
+        </>
+      )}
+      {pendingCount > 0 && (
+        <>
+          <span className="text-slate-700">·</span>
+          <span className="text-sky-400 font-medium">
+            {pendingCount} in wachtrij
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ─── Status Pill (for sync) ─────────────────────────────────────────────── */
 
 export function StatusPill({ status }: { status?: string }) {
   const isRunning = status === "running";
@@ -86,89 +81,110 @@ export function StatusPill({ status }: { status?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-wider",
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
         isRunning
-          ? "border-blue-500/25 bg-blue-500/10 text-blue-200"
+          ? "bg-sky-500/10 text-sky-300"
           : isSuccess
-            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-            : "border-amber-500/25 bg-amber-500/10 text-amber-200",
+            ? "bg-emerald-500/10 text-emerald-300"
+            : "bg-amber-500/10 text-amber-300",
       )}
     >
-      {isRunning ? <Loader2 size={12} className="animate-spin" /> : isSuccess ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
-      {status ?? "unknown"}
+      {isRunning && <Loader2 size={10} className="animate-spin" />}
+      {isSuccess && <CheckCircle2 size={10} />}
+      {!isRunning && !isSuccess && <AlertTriangle size={10} />}
+      {status ?? "—"}
     </span>
   );
 }
 
-export function ToolbarButton({
-  icon: Icon,
-  label,
-  onClick,
-  loading,
-  tone = "slate",
-}: {
-  icon: LucideIcon;
-  label: string;
-  onClick: () => void;
-  loading?: boolean;
-  tone?: Tone;
-}) {
-  const toneClass = toneClasses[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={loading}
-      className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 min-w-0",
-        toneClass.surface,
-        toneClass.border,
-        toneClass.text,
-      )}
-    >
-      {loading ? <Loader2 size={15} className="animate-spin" /> : <Icon size={15} />}
-      {label}
-    </button>
-  );
-}
+/* ─── Next Event Card ────────────────────────────────────────────────────── */
 
-export function DayBlock({
-  label,
-  events,
-  onEdit,
-  onRefetch,
-  todayIso,
-  conflictMap,
-}: {
-  label: string;
-  events: PersonalEvent[];
-  onEdit: (event: PersonalEvent) => void;
-  onRefetch?: () => void;
-  todayIso: string;
-  conflictMap: ReturnType<typeof usePersonalEvents>["conflictMap"];
-}) {
+export function NextEventCard({ event }: { event: PersonalEvent | null }) {
+  if (!event) return null;
+
+  const dayName = new Date(event.startDatum + "T12:00:00").toLocaleDateString("nl-NL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
   return (
-    <div className="min-w-0">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-        <span className="text-[10px] text-slate-600">{events.length}</span>
+    <div className="rounded-xl border border-indigo-500/15 bg-indigo-500/[0.06] p-4">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400/70 mb-2">
+        Volgende afspraak
+      </p>
+      <p className="text-sm font-bold text-white truncate">{event.titel}</p>
+      <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-400">
+        <span>{dayName}</span>
+        <span className="text-slate-600">·</span>
+        <span>{getTimeLabel(event)}</span>
       </div>
-      {events.length > 0 ? (
-        <div className="space-y-2">
-          {events.map((event) => (
-            <PersonalEventItem
-              key={event.eventId}
-              event={event}
-              isToday={eventCoversDate(event, todayIso)}
-              onEdit={onEdit}
-              onRefetch={onRefetch}
-              conflictInfo={conflictMap.get(event.eventId)}
-            />
-          ))}
-        </div>
-      ) : (
-        <EmptyState icon={CalendarDays} title="Geen afspraken" text="Geen items voor dit blok." />
+      {event.locatie && (
+        <p className="text-[11px] text-slate-500 mt-1 truncate">{event.locatie}</p>
       )}
     </div>
   );
 }
+
+/* ─── Timeline Day Group ─────────────────────────────────────────────────── */
+
+export function TimelineDay({
+  dateIso,
+  label,
+  isToday,
+  events,
+  onEdit,
+  onRefetch,
+  conflictMap,
+}: {
+  dateIso: string;
+  label: string;
+  isToday: boolean;
+  events: PersonalEvent[];
+  onEdit: (event: PersonalEvent) => void;
+  onRefetch?: () => void;
+  conflictMap: ReturnType<typeof usePersonalEvents>["conflictMap"];
+}) {
+  return (
+    <div>
+      {/* Day separator */}
+      <div className="flex items-center gap-3 mb-2">
+        <div className={cn(
+          "flex items-center gap-2 text-xs font-semibold tracking-wide",
+          isToday ? "text-emerald-400" : "text-slate-400"
+        )}>
+          {isToday && (
+            <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          )}
+          {label}
+        </div>
+        <div className="flex-1 h-px bg-[var(--color-border)]" />
+        <span className="text-[10px] text-slate-600 tabular-nums">{events.length}</span>
+      </div>
+
+      {/* Events */}
+      <div className="space-y-1 ml-0 sm:ml-1">
+        {events.map((event) => (
+          <PersonalEventItem
+            key={event.eventId}
+            event={event}
+            isToday={isToday}
+            onEdit={onEdit}
+            onRefetch={onRefetch}
+            conflictInfo={conflictMap.get(event.eventId)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Legacy exports (keep DayBlock for other consumers) ──────────────── */
+
+export { type PersonalEvent } from "@/hooks/usePersonalEvents";
+
+// Re-export unused but previously exported names so any stale imports don't break
+export const MetricTile = () => null;
+export const SectionHeader = () => null;
+export const ToolbarButton = () => null;
+export const DayBlock = TimelineDay;
