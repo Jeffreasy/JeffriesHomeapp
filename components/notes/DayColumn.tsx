@@ -40,12 +40,13 @@ export function DayColumn({ date, isToday, notes, onEdit, onCreate }: DayColumnP
       await onCreate({
         inhoud: text,
         titel: text.length > 80 ? text.slice(0, 77) + "..." : text,
+        deadline: date.toISOString(),
       });
       setQuickText("");
     } finally {
       setSaving(false);
     }
-  }, [quickText, saving, onCreate]);
+  }, [quickText, saving, onCreate, date]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

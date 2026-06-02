@@ -62,7 +62,7 @@ export function WeekJournal({ notes, weekStart, onWeekChange, onEdit, onCreate }
       map.set(isoDate(day), []);
     }
     for (const note of notes) {
-      const noteDate = new Date(note.aangemaakt);
+      const noteDate = new Date(note.deadline || note.aangemaakt);
       const key = isoDate(noteDate);
       if (map.has(key)) {
         map.get(key)!.push(note);
@@ -70,7 +70,7 @@ export function WeekJournal({ notes, weekStart, onWeekChange, onEdit, onCreate }
     }
     // Sort each day's notes by time
     for (const [, dayNotes] of map) {
-      dayNotes.sort((a, b) => new Date(a.aangemaakt).getTime() - new Date(b.aangemaakt).getTime());
+      dayNotes.sort((a, b) => new Date(a.deadline || a.aangemaakt).getTime() - new Date(b.deadline || b.aangemaakt).getTime());
     }
     return map;
   }, [notes, days]);
