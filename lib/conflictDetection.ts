@@ -80,6 +80,7 @@ export function analyzeConflicts(
   const levelOrder: Record<ConflictLevel, number> = { hard: 2, soft: 1, info: 0 };
 
   for (const event of events) {
+    if (event.kalender === "Rooster") continue;
     for (const dienst of diensten) {
       const level = detectConflict(event, dienst);
       if (!level) continue;

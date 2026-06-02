@@ -12,6 +12,7 @@ import {
   getTimeLabel,
   isMultiDay,
 } from "@/hooks/usePersonalEvents";
+import { shiftTypeColor } from "@/lib/schedule";
 
 interface PersonalEventItemProps {
   event:        PersonalEvent;
@@ -24,6 +25,8 @@ interface PersonalEventItemProps {
 export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictInfo }: PersonalEventItemProps) {
   const hasConflict = !!conflictInfo;
   const multiDay    = isMultiDay(event);
+  const isRooster   = event.kalender === "Rooster";
+  const shiftColors = isRooster && event.shiftType ? shiftTypeColor(event.shiftType) : null;
 
   const { success, error } = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -58,7 +61,11 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
         : "border-l-sky-500/40"
     : isToday
       ? "border-l-emerald-500/40"
-      : "border-l-transparent";
+      : isRooster
+        ? shiftColors
+          ? ""
+          : "border-l-slate-600/40"
+        : "border-l-transparent";
 
   return (
     <motion.div
@@ -70,16 +77,38 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
         border-l-2 ${borderLeft}
         hover:bg-white/[0.04] transition-colors cursor-default
       `}
+      style={
+        !hasConflict && !isToday && shiftColors
+          ? { borderLeftColor: shiftColors.accent }
+          : undefined
+      }
     >
       {/* Main content */}
       <div className="flex-1 min-w-0">
         {/* Title + Time row */}
         <div className="flex items-center gap-2 min-w-0">
+          {isRooster && event.team && (
+            <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-indigo-500/10 text-indigo-300 border-indigo-500/20 shrink-0 uppercase tracking-wider">
+              {event.team}
+            </span>
+          )}
           <p className="text-[13px] font-semibold text-slate-200 truncate">{event.titel}</p>
           <span className="flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
             <Clock size={10} className="text-slate-600" />
             {getTimeLabel(event)}
           </span>
+          {isRooster && event.shiftType && (
+            <span
+              className="text-[9px] font-black px-1.5 py-0.5 rounded border shrink-0 uppercase tracking-widest"
+              style={{
+                background: shiftColors ? shiftColors.accent + "15" : "rgba(255,255,255,0.05)",
+                color: shiftColors ? shiftColors.accent : "#94a3b8",
+                borderColor: shiftColors ? shiftColors.accent + "30" : "rgba(255,255,255,0.1)",
+              }}
+            >
+              {event.shiftType}
+            </span>
+          )}
         </div>
 
         {/* Meta row — location, multi-day, conflict */}
@@ -112,53 +141,55 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
       </div>
 
       {/* Actions — visible on hover */}
-      <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-        <AnimatePresence mode="wait">
-          {isDeleting ? (
-            <motion.div key="loader" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Loader2 size={14} className="animate-spin text-slate-500" />
-            </motion.div>
-          ) : confirmDelete ? (
-            <motion.div
-              key="confirm"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="flex items-center gap-0.5 bg-red-950/50 border border-red-500/20 rounded-md px-1.5 py-0.5"
-            >
-              <span className="text-[10px] text-red-400 font-medium mr-0.5">Zeker?</span>
-              <button onClick={handleDelete} className="p-0.5 hover:bg-red-500/20 rounded text-red-500 cursor-pointer">
-                <Check size={12} />
-              </button>
-              <button onClick={() => setConfirmDelete(false)} className="p-0.5 hover:bg-slate-700/50 rounded text-slate-400 cursor-pointer">
-                <X size={12} />
-              </button>
-            </motion.div>
-          ) : (
-            <>
-              {onEdit && (
-                <button
-                  onClick={() => onEdit(event)}
-                  className="p-1.5 hover:bg-white/[0.06] rounded-md text-slate-600 hover:text-indigo-400 transition-colors cursor-pointer"
-                  title="Wijzigen"
-                >
-                  <Pencil size={13} />
-                </button>
-              )}
-              <button
-                onClick={handleDelete}
-                className="p-1.5 hover:bg-red-500/10 rounded-md text-slate-600 hover:text-red-400 transition-colors cursor-pointer"
-                title="Verwijderen"
+      {!isRooster && (
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <AnimatePresence mode="wait">
+            {isDeleting ? (
+              <motion.div key="loader" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <Loader2 size={14} className="animate-spin text-slate-500" />
+              </motion.div>
+            ) : confirmDelete ? (
+              <motion.div
+                key="confirm"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex items-center gap-0.5 bg-red-950/50 border border-red-500/20 rounded-md px-1.5 py-0.5"
               >
-                <Trash2 size={13} />
-              </button>
-            </>
-          )}
-        </AnimatePresence>
-      </div>
+                <span className="text-[10px] text-red-400 font-medium mr-0.5">Zeker?</span>
+                <button onClick={handleDelete} className="p-0.5 hover:bg-red-500/20 rounded text-red-500 cursor-pointer">
+                  <Check size={12} />
+                </button>
+                <button onClick={() => setConfirmDelete(false)} className="p-0.5 hover:bg-slate-700/50 rounded text-slate-400 cursor-pointer">
+                  <X size={12} />
+                </button>
+              </motion.div>
+            ) : (
+              <>
+                {onEdit && (
+                  <button
+                    onClick={() => onEdit(event)}
+                    className="p-1.5 hover:bg-white/[0.06] rounded-md text-slate-600 hover:text-indigo-400 transition-colors cursor-pointer"
+                    title="Wijzigen"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
+                <button
+                  onClick={handleDelete}
+                  className="p-1.5 hover:bg-red-500/10 rounded-md text-slate-600 hover:text-red-400 transition-colors cursor-pointer"
+                  title="Verwijderen"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Today indicator */}
-      {isToday && !hasConflict && (
+      {isToday && !hasConflict && !isRooster && (
         <span className="absolute right-2 bottom-1 text-[8px] font-bold uppercase tracking-wider text-emerald-500/50">
           nu
         </span>

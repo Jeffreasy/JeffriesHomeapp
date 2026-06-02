@@ -22,6 +22,8 @@ export interface PersonalEvent {
   beschrijving?:     string;
   status:            "Aankomend" | "Voorbij" | "VERWIJDERD" | string;
   kalender:          string;
+  shiftType?:        string;
+  team?:             string;
 }
 
 function fromRow(r: PersonalEventRow): PersonalEvent {
@@ -39,6 +41,26 @@ function fromRow(r: PersonalEventRow): PersonalEvent {
     beschrijving: r.beschrijving ?? undefined,
     status:       r.status,
     kalender:     r.kalender,
+  };
+}
+
+function fromDienstToEvent(d: DienstRow, userId: string): PersonalEvent {
+  return {
+    _id:          d.eventId,
+    userId:       userId,
+    eventId:      d.eventId,
+    titel:        d.titel || (d.team ? `${d.team} ${d.shiftType}` : d.shiftType),
+    startDatum:   d.startDatum,
+    startTijd:    d.startTijd || undefined,
+    eindDatum:    d.eindDatum,
+    eindTijd:     d.eindTijd || undefined,
+    heledag:      d.heledag,
+    locatie:      d.locatie || undefined,
+    beschrijving: d.beschrijving || undefined,
+    status:       d.status === "Gedraaid" ? "Voorbij" : "Aankomend",
+    kalender:     "Rooster",
+    shiftType:    d.shiftType,
+    team:         d.team,
   };
 }
 
@@ -135,10 +157,13 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
     [raw]
   );
 
-  const visibleEvents = useMemo(
-    () => events.filter((e) => !isScheduleDuplicateEvent(e, options?.diensten ?? [])),
-    [events, options?.diensten]
-  );
+  const visibleEvents = useMemo(() => {
+    const personal = events.filter((e) => !isScheduleDuplicateEvent(e, options?.diensten ?? []));
+    const mappedDiensten = (options?.diensten ?? [])
+      .filter((d) => d.status !== "VERWIJDERD")
+      .map((d) => fromDienstToEvent(d, userId));
+    return [...personal, ...mappedDiensten];
+  }, [events, options?.diensten, userId]);
 
   const upcoming = useMemo(
     () => visibleEvents.filter((e) => e.status === "Aankomend"),
