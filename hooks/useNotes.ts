@@ -9,6 +9,8 @@ import {
   usePostNotes,
   usePatchNotesId,
   useDeleteNotesId,
+  getGetNotesQueryKey,
+  getGetNotesTagsQueryKey,
 } from "@/lib/api/generated/notes/notes";
 import type { ModelNote } from "@/lib/api/model";
 
@@ -91,7 +93,8 @@ export function useNotes() {
   const queryClient = useQueryClient();
   const { error: toastError } = useToast();
 
-  const queryKey = ["/api/v1/notes", { userId }];
+  const queryKey = getGetNotesQueryKey({ userId });
+  const tagsQueryKey = getGetNotesTagsQueryKey({ userId });
 
   const { data: notesRaw, isLoading: loadingNotes } = useGetNotes({ userId }, { query: { enabled: !!userId } });
   const { data: tagsRaw, isLoading: loadingTags } = useGetNotesTags({ userId }, { query: { enabled: !!userId } });
@@ -161,6 +164,7 @@ export function useNotes() {
       },
       onSettled: () => {
         queryClient.invalidateQueries({ queryKey });
+        queryClient.invalidateQueries({ queryKey: tagsQueryKey });
       },
     }
   });
@@ -191,6 +195,7 @@ export function useNotes() {
       },
       onSettled: () => {
         queryClient.invalidateQueries({ queryKey });
+        queryClient.invalidateQueries({ queryKey: tagsQueryKey });
       },
     }
   });
@@ -219,6 +224,7 @@ export function useNotes() {
       },
       onSettled: () => {
         queryClient.invalidateQueries({ queryKey });
+        queryClient.invalidateQueries({ queryKey: tagsQueryKey });
       },
     }
   });
