@@ -6,13 +6,11 @@ import { useUser } from "@clerk/nextjs";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { NoteEditor } from "@/components/notes/NoteEditor";
-import { type ViewMode, type SortMode, SORT_OPTIONS, getChecklistInfo, getDisplayTitle } from "@/components/notes/NotesUtils";
-import { NotesHeader } from "@/components/notes/NotesHeader";
+import { type ViewMode, type SortMode, getDisplayTitle } from "@/components/notes/NotesUtils";
+import { NotesHeader, type NotesTab } from "@/components/notes/NotesHeader";
 import { NotesFilters } from "@/components/notes/NotesFilters";
-import { NotesMetricsRow, NotesSignals } from "@/components/notes/NotesMetrics";
 import { NotesList } from "@/components/notes/NotesList";
-import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
-import { Search } from "lucide-react";
+import { WeekJournal, getMonday } from "@/components/notes/WeekJournal";
 
 export default function NotitiesPage() {
   const { user } = useUser();
@@ -31,23 +29,25 @@ export default function NotitiesPage() {
   } = useNotes();
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("notes");
 
+  // ── Tab state ──────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<NotesTab>("journal");
+
+  // ── Week Journal state ─────────────────────────────────────
+  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
+
+  // ── Collection state ───────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("active");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+
+  // ── Editor state ───────────────────────────────────────────
   const [editorOpen, setEditorOpen] = useState(false);
   const [editNote, setEditNote] = useState<NoteRecord | null>(null);
-  const [nowMs, setNowMs] = useState<number | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const updateNow = () => setNowMs(Date.now());
-    updateNow();
-    const interval = window.setInterval(updateNow, 60_000);
-    return () => window.clearInterval(interval);
-  }, []);
-
+  // ── Keyboard shortcuts ─────────────────────────────────────
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
@@ -61,14 +61,17 @@ export default function NotitiesPage() {
 
       if ((event.ctrlKey || event.metaKey) && event.key === "k") {
         event.preventDefault();
-        searchRef.current?.focus();
+        if (activeTab === "collection") {
+          searchRef.current?.focus();
+        }
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [activeTab]);
 
+  // ── Collection: filtered & sorted notes ────────────────────
   const sourceNotes = viewMode === "active" ? active : archived;
 
   const tagCounts = useMemo(() => {
@@ -120,40 +123,9 @@ export default function NotitiesPage() {
     return list;
   }, [search, sortMode, sourceNotes, tagFilter, viewMode]);
 
-  const checklistStats = useMemo(() => {
-    return active.reduce(
-      (total, note) => {
-        const info = getChecklistInfo(note.inhoud);
-        total.done += info.done;
-        total.total += info.total;
-        return total;
-      },
-      { done: 0, total: 0 }
-    );
-  }, [active]);
-
-  const deadlineStats = useMemo(() => {
-    if (!nowMs) return { overdue: 0, soon: 0, next: null as NoteRecord | null };
-    const week = nowMs + 7 * 24 * 60 * 60 * 1000;
-    const withDeadline = active
-      .filter((note) => note.deadline)
-      .sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
-
-    return {
-      overdue: withDeadline.filter((note) => new Date(note.deadline as string).getTime() < nowMs).length,
-      soon: withDeadline.filter((note) => {
-        const time = new Date(note.deadline as string).getTime();
-        return time >= nowMs && time <= week;
-      }).length,
-      next: withDeadline.find((note) => new Date(note.deadline as string).getTime() >= nowMs) ?? null,
-    };
-  }, [active, nowMs]);
-
-  const highPriorityCount = active.filter((note) => note.prioriteit === "hoog").length;
-  const linkedCount = active.filter((note) => note.linkedEventId).length;
-  const totalCount = active.length + archived.length;
   const activeFilters = [search.trim(), tagFilter, viewMode === "archived", sortMode !== "recent"].filter(Boolean).length;
 
+  // ── Handlers ───────────────────────────────────────────────
   const handleEdit = (note: NoteRecord) => {
     setEditNote(note);
     setEditorOpen(true);
@@ -183,6 +155,7 @@ export default function NotitiesPage() {
   };
 
   const handleNavigateToNote = (title: string) => {
+    setActiveTab("collection");
     setViewMode("active");
     setTagFilter(null);
     setSearch(title);
@@ -206,18 +179,25 @@ export default function NotitiesPage() {
         privacyOn={privacyOn}
         togglePrivacy={togglePrivacy}
         handleNew={handleNew}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <CollapsibleSection
-            title="Geavanceerd Zoeken & Filters"
-            subtitle={`${activeFilters} actieve filters`}
-            icon={<Search size={18} />}
-            theme="primary"
-            defaultOpen={false}
-            keepMounted={true}
-          >
+        {/* ── Week Journal Tab ── */}
+        {activeTab === "journal" && (
+          <WeekJournal
+            notes={active}
+            weekStart={weekStart}
+            onWeekChange={setWeekStart}
+            onEdit={handleEdit}
+            onCreate={create}
+          />
+        )}
+
+        {/* ── Collection Tab ── */}
+        {activeTab === "collection" && (
+          <>
             <NotesFilters
               activeFilters={activeFilters}
               search={search}
@@ -236,45 +216,26 @@ export default function NotitiesPage() {
               setTagFilter={setTagFilter}
               privacyOn={privacyOn}
             />
-          </CollapsibleSection>
 
-          <NotesSignals
-            pinnedCount={pinned.length}
-            overdueCount={deadlineStats.overdue}
-            highPriorityCount={highPriorityCount}
-          />
-        </section>
-
-        <NotesMetricsRow
-          totalCount={totalCount}
-          activeCount={active.length}
-          archivedCount={archived.length}
-          checklistDone={checklistStats.done}
-          checklistTotal={checklistStats.total}
-          deadlineSoon={deadlineStats.soon}
-          deadlineOverdue={deadlineStats.overdue}
-          deadlineNext={deadlineStats.next}
-          tagsCount={allTags.length}
-          linkedCount={linkedCount}
-        />
-
-        <NotesList
-          displayed={displayed}
-          isLoading={isLoading}
-          viewMode={viewMode}
-          sortMode={sortMode}
-          search={search}
-          tagFilter={tagFilter}
-          privacyOn={privacyOn}
-          handleNew={handleNew}
-          clearFilters={clearFilters}
-          handleEdit={handleEdit}
-          togglePin={togglePin}
-          archive={archive}
-          handleDelete={handleDelete}
-          handleUpdateContent={handleUpdateContent}
-          handleNavigateToNote={handleNavigateToNote}
-        />
+            <NotesList
+              displayed={displayed}
+              isLoading={isLoading}
+              viewMode={viewMode}
+              sortMode={sortMode}
+              search={search}
+              tagFilter={tagFilter}
+              privacyOn={privacyOn}
+              handleNew={handleNew}
+              clearFilters={clearFilters}
+              handleEdit={handleEdit}
+              togglePin={togglePin}
+              archive={archive}
+              handleDelete={handleDelete}
+              handleUpdateContent={handleUpdateContent}
+              handleNavigateToNote={handleNavigateToNote}
+            />
+          </>
+        )}
       </main>
 
       <AnimatePresence>
