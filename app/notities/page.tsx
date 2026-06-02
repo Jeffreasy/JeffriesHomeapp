@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { usePrivacy } from "@/hooks/usePrivacy";
+import { useSchedule } from "@/hooks/useSchedule";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import { type ViewMode, type SortMode, getDisplayTitle } from "@/components/notes/NotesUtils";
 import { NotesHeader, type NotesTab } from "@/components/notes/NotesHeader";
@@ -28,6 +29,7 @@ export default function NotitiesPage() {
     remove,
   } = useNotes();
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("notes");
+  const { diensten } = useSchedule();
 
   // ── Tab state ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<NotesTab>("journal");
@@ -188,6 +190,7 @@ export default function NotitiesPage() {
         {activeTab === "journal" && (
           <WeekJournal
             notes={active}
+            diensten={diensten}
             weekStart={weekStart}
             onWeekChange={setWeekStart}
             onEdit={handleEdit}

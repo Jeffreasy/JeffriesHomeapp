@@ -4,11 +4,13 @@ import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, FileText } from "lucide-react";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
+import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
 
 interface DayColumnProps {
   date: Date;
   isToday: boolean;
   notes: NoteRecord[];
+  dienst?: DienstRow;
   onEdit: (note: NoteRecord) => void;
   onCreate: (data: NoteCreateData) => Promise<void>;
 }
@@ -21,7 +23,7 @@ function formatTime(iso: string): string {
 const DAG_NAMEN = ["zo", "ma", "di", "wo", "do", "vr", "za"];
 const DAG_NAMEN_LANG = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
 
-export function DayColumn({ date, isToday, notes, onEdit, onCreate }: DayColumnProps) {
+export function DayColumn({ date, isToday, notes, dienst, onEdit, onCreate }: DayColumnProps) {
   const [quickText, setQuickText] = useState("");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,6 +32,7 @@ export function DayColumn({ date, isToday, notes, onEdit, onCreate }: DayColumnP
   const dagNr = date.getDate();
   const maand = date.toLocaleDateString("nl-NL", { month: "short" });
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+  const shiftColors = dienst && dienst.shiftType ? shiftTypeColor(dienst.shiftType) : null;
 
   const handleQuickSave = useCallback(async () => {
     const text = quickText.trim();
@@ -93,6 +96,28 @@ export function DayColumn({ date, isToday, notes, onEdit, onCreate }: DayColumnP
           </span>
         )}
       </div>
+
+      {dienst && (
+        <div
+          className="mx-3 mt-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.1)] transition-colors"
+          style={{
+            background: shiftColors ? shiftColors.accent + "0a" : "rgba(255,255,255,0.03)",
+            borderColor: shiftColors ? shiftColors.accent + "1a" : "rgba(255,255,255,0.08)",
+            color: shiftColors ? shiftColors.accent : "#94a3b8",
+          }}
+        >
+          <span className="flex items-center gap-1.5 uppercase tracking-widest font-black text-[9px]">
+            <span
+              className="h-1.5 w-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: shiftColors ? shiftColors.accent : "#94a3b8" }}
+            />
+            {dienst.shiftType}
+          </span>
+          <span className="font-mono tracking-tighter text-slate-400">
+            {dienst.startTijd}–{dienst.eindTijd}
+          </span>
+        </div>
+      )}
 
       {/* Notities lijst */}
       <div className="flex-1 px-3 py-2 space-y-1 min-h-[60px]">

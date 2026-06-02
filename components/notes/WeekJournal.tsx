@@ -5,9 +5,11 @@ import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { DayColumn } from "./DayColumn";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
+import { type DienstRow } from "@/lib/schedule";
 
 interface WeekJournalProps {
   notes: NoteRecord[];
+  diensten?: DienstRow[];
   weekStart: Date;
   onWeekChange: (newMonday: Date) => void;
   onEdit: (note: NoteRecord) => void;
@@ -34,7 +36,7 @@ function getWeekNumber(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-export function WeekJournal({ notes, weekStart, onWeekChange, onEdit, onCreate }: WeekJournalProps) {
+export function WeekJournal({ notes, diensten = [], weekStart, onWeekChange, onEdit, onCreate }: WeekJournalProps) {
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -155,6 +157,7 @@ export function WeekJournal({ notes, weekStart, onWeekChange, onEdit, onCreate }
           const key = isoDate(day);
           const dayNotes = notesByDate.get(key) ?? [];
           const dayIsToday = isoDate(day) === isoDate(today);
+          const dayDienst = diensten.find((d) => d.startDatum === key);
 
           return (
             <DayColumn
@@ -162,6 +165,7 @@ export function WeekJournal({ notes, weekStart, onWeekChange, onEdit, onCreate }
               date={day}
               isToday={dayIsToday}
               notes={dayNotes}
+              dienst={dayDienst}
               onEdit={onEdit}
               onCreate={onCreate}
             />
