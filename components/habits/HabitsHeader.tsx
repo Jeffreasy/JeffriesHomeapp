@@ -1,9 +1,9 @@
 "use client";
 
-import { Eye, EyeOff, Plus, Target } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatLevel, formatXP } from "@/lib/habit-constants";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 export function HabitsHeader({
   level,
@@ -24,7 +24,7 @@ export function HabitsHeader({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
-              <Target size={20} className="text-amber-300" />
+              <AppIcon name="habit" tone="amber" size="lg" />
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -50,7 +50,7 @@ export function HabitsHeader({
                   : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
               )}
             >
-              {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}
+              <AppIcon name={privacyOn ? "hide" : "show"} tone={privacyOn ? "indigo" : "slate"} size="sm" />
               <span className="hidden sm:inline">{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
             </button>
             <motion.button
@@ -59,7 +59,7 @@ export function HabitsHeader({
               onClick={() => setShowForm(true)}
               className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
             >
-              <Plus size={16} />
+              <AppIcon name="add" tone="amber" size="sm" />
               <span className="hidden sm:inline">Nieuw</span>
             </motion.button>
           </div>

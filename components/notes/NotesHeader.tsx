@@ -1,8 +1,9 @@
 "use client";
 
-import { Eye, EyeOff, Plus, BookOpen, Grid3X3 } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/ui/AppIcon";
+import type { AppIconName } from "@/lib/symbols";
 
 export type NotesTab = "journal" | "collection";
 
@@ -27,9 +28,9 @@ export function NotesHeader({
   activeTab: NotesTab;
   onTabChange: (tab: NotesTab) => void;
 }) {
-  const tabs: { id: NotesTab; label: string; icon: typeof BookOpen }[] = [
-    { id: "journal", label: "Week Journal", icon: BookOpen },
-    { id: "collection", label: "Collectie", icon: Grid3X3 },
+  const tabs: { id: NotesTab; label: string; icon: AppIconName }[] = [
+    { id: "journal", label: "Week Journal", icon: "book" },
+    { id: "collection", label: "Collectie", icon: "list" },
   ];
 
   return (
@@ -59,7 +60,7 @@ export function NotesHeader({
                   : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
               )}
             >
-              {privacyOn ? <EyeOff size={15} /> : <Eye size={15} />}
+              <AppIcon name={privacyOn ? "hide" : "show"} tone={privacyOn ? "indigo" : "slate"} size="sm" />
             </button>
             <motion.button
               type="button"
@@ -67,7 +68,7 @@ export function NotesHeader({
               onClick={handleNew}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 cursor-pointer"
             >
-              <Plus size={15} />
+              <AppIcon name="add" tone="amber" size="sm" />
               <span className="hidden sm:inline">Nieuw</span>
             </motion.button>
           </div>
@@ -75,7 +76,7 @@ export function NotesHeader({
 
         {/* Tab bar */}
         <div className="flex gap-1 -mb-px">
-          {tabs.map(({ id, label, icon: Icon }) => (
+          {tabs.map(({ id, label, icon }) => (
             <button
               key={id}
               onClick={() => onTabChange(id)}
@@ -86,7 +87,7 @@ export function NotesHeader({
                   : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
               )}
             >
-              <Icon size={15} />
+              <AppIcon name={icon} tone={activeTab === id ? "amber" : "slate"} size="sm" />
               {label}
               {activeTab === id && (
                 <motion.div

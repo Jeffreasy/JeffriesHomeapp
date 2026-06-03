@@ -6,6 +6,7 @@ import type { SalarisRecord } from "@/hooks/useSalary";
 import type { LoonstrookRecord } from "@/hooks/useLoonstroken";
 import { type SalarisDisplayRecord } from "./SalaryTypes";
 import { fmt, MAANDEN } from "./SalaryUtils";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
   const isWerkelijk = record.bron === "werkelijk";
@@ -125,7 +126,10 @@ export function JaarSectie({ jaar, records }: { jaar: number; records: SalarisDi
   return (
     <div className="glass rounded-2xl border border-[var(--color-border)] overflow-hidden min-w-0">
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
-        <span className="text-sm font-bold text-slate-200">📅 {jaar}</span>
+        <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-200">
+          <AppIcon name="calendar" tone="slate" size="sm" />
+          {jaar}
+        </span>
         <div className="flex items-center gap-4 text-xs">
           {werkelijkAantal > 0 && <span className="text-emerald-400">{werkelijkAantal} werkelijk</span>}
           <span className="text-slate-500">Bruto <span className="text-slate-300 font-medium">{fmt(totBruto)}</span></span>

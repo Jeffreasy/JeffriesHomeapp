@@ -5,6 +5,27 @@ import { ChevronRight, ArrowRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { type Tone, toneClasses } from "./DashboardUtils";
+import { AppIcon } from "@/components/ui/AppIcon";
+import type { AppIconName } from "@/lib/symbols";
+
+type IconSource = LucideIcon | AppIconName;
+
+function RenderIcon({
+  icon,
+  size,
+  className,
+}: {
+  icon: IconSource;
+  size: number;
+  className?: string;
+}) {
+  if (typeof icon === "string") {
+    return <AppIcon name={icon} size={size <= 15 ? "sm" : "md"} iconClassName={className} />;
+  }
+
+  const Icon = icon;
+  return <Icon size={size} className={className} />;
+}
 
 export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -19,14 +40,14 @@ export function Panel({ children, className = "" }: { children: ReactNode; class
 }
 
 export function SectionHeader({
-  icon: Icon,
+  icon,
   label,
   title,
   href,
   actionLabel,
   compact,
 }: {
-  icon: LucideIcon;
+  icon: IconSource;
   label: string;
   title: string;
   href?: string;
@@ -37,7 +58,7 @@ export function SectionHeader({
     <div className={`flex items-center justify-between gap-3 ${compact ? "mb-3" : "mb-4"}`}>
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)]">
-          <Icon size={16} className="text-amber-300" />
+          <RenderIcon icon={icon} size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
@@ -59,14 +80,14 @@ export function SectionHeader({
 
 export function MetricTile({
   href,
-  icon: Icon,
+  icon,
   label,
   value,
   sub,
   tone,
 }: {
   href: string;
-  icon: LucideIcon;
+  icon: IconSource;
   label: string;
   value: string;
   sub: string;
@@ -82,7 +103,7 @@ export function MetricTile({
       >
         <div className="flex items-start justify-between gap-3">
           <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${classes.border} bg-black/10`}>
-            <Icon size={18} className={classes.icon} />
+            <RenderIcon icon={icon} size={18} className={classes.icon} />
           </div>
           <ArrowRight size={15} className="mt-1 text-slate-600 transition-colors group-hover:text-slate-300" />
         </div>
@@ -98,13 +119,13 @@ export function MetricTile({
 
 export function RouteTile({
   href,
-  icon: Icon,
+  icon,
   label,
   sub,
   tone,
 }: {
   href: string;
-  icon: LucideIcon;
+  icon: IconSource;
   label: string;
   sub: string;
   tone: Tone;
@@ -115,7 +136,7 @@ export function RouteTile({
     <Link href={href} className="group block min-w-0">
       <div className="flex min-h-[86px] items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] p-3 transition-colors hover:bg-[var(--color-surface-hover)]">
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${classes.border} ${classes.surface}`}>
-          <Icon size={18} className={classes.icon} />
+          <RenderIcon icon={icon} size={18} className={classes.icon} />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">{label}</p>
@@ -128,12 +149,12 @@ export function RouteTile({
 }
 
 export function StatusRow({
-  icon: Icon,
+  icon,
   label,
   value,
   tone,
 }: {
-  icon: LucideIcon;
+  icon: IconSource;
   label: string;
   value: string;
   tone: Tone;
@@ -143,7 +164,7 @@ export function StatusRow({
   return (
     <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${classes.surface}`}>
-        <Icon size={15} className={classes.icon} />
+        <RenderIcon icon={icon} size={15} className={classes.icon} />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-slate-400">{label}</p>
@@ -153,10 +174,10 @@ export function StatusRow({
   );
 }
 
-export function EmptyState({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
+export function EmptyState({ icon, title, text }: { icon: IconSource; title: string; text: string }) {
   return (
     <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-4 py-6 text-center">
-      <Icon size={22} className="text-slate-600" />
+      <RenderIcon icon={icon} size={22} className="text-slate-600" />
       <p className="mt-3 text-sm font-semibold text-slate-300">{title}</p>
       <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{text}</p>
     </div>

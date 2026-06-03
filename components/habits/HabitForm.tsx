@@ -6,6 +6,7 @@ import { X, Plus, Zap, Clock, CalendarDays, Timer, Hash, Ruler } from "lucide-re
 import { HABIT_EMOJIS, ROOSTER_FILTER_OPTIONS } from "@/lib/habit-constants";
 import { HABIT_COLORS, FREQUENTIE_LABELS, MOEILIJKHEID_LABELS, DAG_LABELS } from "@/lib/habit-constants";
 import type { HabitCreateData } from "@/hooks/useHabits";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 /**
  * HabitForm — Create/edit modal.
@@ -230,15 +231,17 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                   {(["positief", "negatief"] as const).map((t) => (
                     <button
                       key={t}
+                      type="button"
                       onClick={() => setType(t)}
-                      className="py-3 px-4 rounded-xl text-sm font-medium transition-all min-h-[48px]"
+                      className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all"
                       style={{
                         background: type === t ? (t === "positief" ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)") : "rgba(255,255,255,0.03)",
                         border: type === t ? `1px solid ${t === "positief" ? "rgba(34,197,94,0.20)" : "rgba(239,68,68,0.20)"}` : "1px solid rgba(255,255,255,0.05)",
                         color: type === t ? (t === "positief" ? "#4ade80" : "#f87171") : "#94a3b8",
                       }}
                     >
-                      {t === "positief" ? "✅ Doen" : "🚫 Vermijden"}
+                      <AppIcon name={t === "positief" ? "check" : "warning"} tone={t === "positief" ? "green" : "red"} size="sm" />
+                      {t === "positief" ? "Doen" : "Vermijden"}
                     </button>
                   ))}
                 </div>

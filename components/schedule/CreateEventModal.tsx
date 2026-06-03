@@ -2,24 +2,15 @@
 
 import { useCallback, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Calendar, Clock, MapPin, FileText, Plus, Save } from "lucide-react";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
 import { useToast } from "@/components/ui/Toast";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { EVENT_CATEGORY_SYMBOLS } from "@/lib/symbols";
 
-const CATEGORIES = [
-  { id: "sociaal",     emoji: "☕", label: "Sociaal" },
-  { id: "werk",        emoji: "💼", label: "Werk" },
-  { id: "gezondheid",  emoji: "🏥", label: "Gezondheid" },
-  { id: "sport",       emoji: "🏋️", label: "Sport" },
-  { id: "admin",       emoji: "📋", label: "Admin" },
-  { id: "studie",      emoji: "🎓", label: "Studie" },
-  { id: "onderhoud",   emoji: "🔧", label: "Onderhoud" },
-  { id: "evenement",   emoji: "🎉", label: "Evenement" },
-  { id: "overig",      emoji: "📌", label: "Overig" },
-] as const;
+const CATEGORIES = EVENT_CATEGORY_SYMBOLS;
 
 type CategoryId = typeof CATEGORIES[number]["id"];
 
@@ -166,12 +157,15 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
                 <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <Calendar size={14} className="text-indigo-400" />
+                  <AppIcon name="agenda" tone="indigo" size="sm" />
                   {editEvent ? "Afspraak wijzigen" : "Nieuwe afspraak"}
                 </h2>
-                <button onClick={handleClose}
+                <button
+                  type="button"
+                  aria-label="Afspraakmodal sluiten"
+                  onClick={handleClose}
                   className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
-                  <X size={16} />
+                  <AppIcon name="close" tone="slate" size="sm" />
                 </button>
               </div>
 
@@ -210,7 +204,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                      <Calendar size={9} /> Start
+                      <AppIcon name="calendar" tone="slate" size="xs" /> Start
                     </label>
                     <input type="date" value={startDatum}
                       onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
@@ -219,7 +213,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                   </div>
                   <div>
                     <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                      <Calendar size={9} /> Eind
+                      <AppIcon name="calendar" tone="slate" size="xs" /> Eind
                     </label>
                     <input type="date" value={eindDatum} min={startDatum}
                       onChange={e => setEindDatum(e.target.value)}
@@ -234,7 +228,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                     exit={{ opacity: 0, height: 0 }} className="grid grid-cols-2 gap-3 overflow-hidden">
                     <div>
                       <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                        <Clock size={9} /> Van
+                        <AppIcon name="time" tone="slate" size="xs" /> Van
                       </label>
                       <input type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
                         className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
@@ -242,7 +236,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                     </div>
                     <div>
                       <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                        <Clock size={9} /> Tot
+                        <AppIcon name="time" tone="slate" size="xs" /> Tot
                       </label>
                       <input type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
                         className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
@@ -254,7 +248,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                 {/* Locatie */}
                 <div>
                   <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                    <MapPin size={9} /> Locatie (optioneel)
+                    <AppIcon name="location" tone="slate" size="xs" /> Locatie (optioneel)
                   </label>
                   <input type="text" value={locatie} onChange={e => setLocatie(e.target.value)}
                     placeholder="bijv. Amsterdam"
@@ -268,7 +262,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                     Categorie
                   </label>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {CATEGORIES.map(({ id, emoji, label }) => (
+                    {CATEGORIES.map(({ id, icon, label }) => (
                       <button
                         key={id}
                         type="button"
@@ -279,7 +273,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                             : "bg-[var(--color-surface)] text-slate-500 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] hover:text-slate-300"
                         }`}
                       >
-                        <span>{emoji}</span>
+                        <AppIcon name={icon} tone={categorie === id ? "indigo" : "slate"} size="xs" />
                         {label}
                       </button>
                     ))}
@@ -289,7 +283,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                 {/* Beschrijving */}
                 <div>
                   <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                    <FileText size={9} /> Notitie (optioneel)
+                    <AppIcon name="note" tone="slate" size="xs" /> Notitie (optioneel)
                   </label>
                   <textarea value={beschrijving} onChange={e => setBeschrijving(e.target.value)}
                     rows={2} placeholder="Aantekeningen..."
@@ -320,7 +314,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                   </button>
                   <button type="submit" disabled={loading}
                     className="flex-1 py-2 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 hover:bg-indigo-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
-                    {editEvent ? <Save size={13} /> : <Plus size={13} />}
+                    <AppIcon name={editEvent ? "save" : "add"} tone="indigo" size="xs" />
                     {loading ? "Bezig..." : (editEvent ? "Opslaan" : "Aanmaken")}
                   </button>
                 </div>

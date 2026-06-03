@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { MoreHorizontal, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/ui/AppIcon";
 import {
   MOBILE_MORE_ITEMS,
   MOBILE_PRIMARY_ITEMS,
@@ -75,7 +75,7 @@ export function BottomNav() {
                   aria-label="Meer menu sluiten"
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors active:scale-95 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
                 >
-                  <X size={17} />
+                  <AppIcon name="close" tone="slate" size="sm" />
                 </button>
               </div>
 
@@ -120,7 +120,7 @@ export function BottomNav() {
               />
             )}
             <span className="relative z-10 flex h-7 w-7 items-center justify-center rounded-lg">
-              <MoreHorizontal size={20} />
+              <AppIcon name="more" tone={moreActive || moreOpen ? "amber" : "slate"} size="md" />
             </span>
             <span className="relative z-10 max-w-full truncate text-[10px] font-bold leading-none">
               {moreActive && activeItem ? activeItem.shortLabel : "Meer"}
@@ -142,7 +142,6 @@ function BottomNavLink({
   onNavigate: () => void;
 }) {
   const active = isNavigationItemActive(pathname, item.href);
-  const Icon = item.icon;
 
   return (
     <Link href={item.href} aria-current={active ? "page" : undefined} onClick={onNavigate}>
@@ -163,7 +162,7 @@ function BottomNavLink({
           />
         )}
         <span className="relative z-10 flex h-7 w-7 items-center justify-center rounded-lg">
-          <Icon size={19} />
+          <AppIcon name={item.icon} tone={active ? "amber" : "slate"} size="md" />
         </span>
         <span className="relative z-10 max-w-full truncate text-[10px] font-bold leading-none">
           {item.shortLabel}
@@ -183,7 +182,6 @@ function MoreNavLink({
   onNavigate: () => void;
 }) {
   const active = isNavigationItemActive(pathname, item.href);
-  const Icon = item.icon;
 
   return (
     <Link
@@ -205,7 +203,7 @@ function MoreNavLink({
             : "border-[var(--color-border)] bg-[var(--color-surface-hover)] text-slate-500",
         )}
       >
-        <Icon size={18} />
+        <AppIcon name={item.icon} tone={active ? "amber" : "slate"} size="md" />
       </span>
       <span className="min-w-0">
         <span className="block truncate text-sm font-bold">{item.label}</span>

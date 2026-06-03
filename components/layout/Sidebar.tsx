@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { SignInButton, UserButton, useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
-import { Home, LogIn } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/ui/AppIcon";
 import {
   NAVIGATION_ITEMS,
   NAVIGATION_SECTIONS,
@@ -52,7 +52,7 @@ export function Sidebar() {
         className="group flex items-center gap-3 border-b border-[var(--color-border)] px-4 py-5 transition-colors hover:bg-[var(--color-surface-hover)]"
       >
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/[0.12] text-amber-300 transition-colors group-hover:bg-amber-500/[0.18]">
-          <Home size={18} />
+          <AppIcon name="home" tone="amber" size="md" />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-white">Jeffries Homeapp</p>
@@ -75,7 +75,7 @@ export function Sidebar() {
                 </h2>
 
                 <div className="space-y-1">
-                  {items.map(({ href, icon: Icon, label, description }) => {
+                  {items.map(({ href, icon, label, description }) => {
                     const active = isNavigationItemActive(pathname, href);
 
                     return (
@@ -104,7 +104,7 @@ export function Sidebar() {
                                 : "border-[var(--color-border)] bg-[var(--color-surface-hover)] text-slate-500",
                             )}
                           >
-                            <Icon size={17} />
+                            <AppIcon name={icon} tone={active ? "amber" : "slate"} size="sm" />
                           </span>
                           <span className="relative z-10 min-w-0">
                             <span className="block truncate text-sm font-semibold">{label}</span>
@@ -157,7 +157,7 @@ export function Sidebar() {
         ) : (
           <SignInButton mode="redirect">
             <button className="flex h-11 w-full items-center gap-3 rounded-lg border border-transparent px-3 text-sm font-semibold text-slate-400 transition-colors hover:border-amber-500/20 hover:bg-amber-500/10 hover:text-amber-300">
-              <LogIn size={17} className="shrink-0" />
+              <AppIcon name="login" tone="amber" size="sm" />
               Inloggen
             </button>
           </SignInButton>

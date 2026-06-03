@@ -1,22 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Activity,
-  Calendar,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  EyeOff,
-  Landmark,
-  Lightbulb,
-  NotebookPen,
-  Plus,
-  ShieldCheck,
-  Target,
-  Wallet,
-  Zap,
-} from "lucide-react";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useSalary } from "@/hooks/useSalary";
@@ -35,6 +19,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { EmptyState, MetricTile, Panel, RouteTile, SectionHeader, StatusRow } from "@/components/dashboard/DashboardPrimitives";
 import { OverviewPanel } from "@/components/dashboard/DashboardOverviewPanel";
 import { CommandPanel } from "@/components/dashboard/DashboardCommandPanel";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 export default function DashboardPage() {
   const [dateInfo, setDateInfo] = useState<DashboardDateInfo | null>(null);
@@ -115,7 +100,7 @@ export default function DashboardPage() {
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
         {hasLoadingData && (
           <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-500">
-            <Activity size={13} className="text-sky-300" />
+            <AppIcon name="activity" tone="blue" size="xs" />
             Dashboardgegevens worden bijgewerkt
           </div>
         )}
@@ -147,7 +132,7 @@ export default function DashboardPage() {
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricTile
             href="/lampen"
-            icon={Lightbulb}
+            icon="lights"
             tone={onlineDevices.length === 0 ? "slate" : onDevices.length > 0 ? "amber" : "blue"}
             label="Lampen"
             value={devices.length === 0 ? "Geen lampen" : `${onDevices.length}/${devices.length} aan`}
@@ -155,7 +140,7 @@ export default function DashboardPage() {
           />
           <MetricTile
             href="/rooster"
-            icon={CalendarDays}
+            icon="calendarDays"
             tone={nextDienst ? "indigo" : "slate"}
             label="Rooster"
             value={nextDienst ? `${nextDienst.dag} ${nextDienst.startTijd}` : "Geen dienst"}
@@ -163,7 +148,7 @@ export default function DashboardPage() {
           />
           <MetricTile
             href="/agenda"
-            icon={Calendar}
+            icon="agenda"
             tone={hardConflicts > 0 ? "rose" : todayEvents.length > 0 ? "green" : "blue"}
             label="Agenda"
             value={todayEvents.length > 0 ? `${todayEvents.length} vandaag` : "Rustige dag"}
@@ -171,7 +156,7 @@ export default function DashboardPage() {
           />
           <MetricTile
             href="/finance"
-            icon={Wallet}
+            icon="wallet"
             tone="green"
             label={nettoLabel}
             value={mask(formatCurrency(nettoValue))}
@@ -183,7 +168,7 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <div>
               <SectionHeader
-                icon={Clock3}
+                icon="time"
                 label="Planning"
                 title="Werk en afspraken"
                 href="/rooster"
@@ -211,7 +196,7 @@ export default function DashboardPage() {
                       onClick={openNewEvent}
                       className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 text-xs font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/15"
                     >
-                      <Plus size={14} />
+                      <AppIcon name="add" tone="indigo" size="xs" />
                       Nieuwe afspraak
                     </button>
                   </div>
@@ -232,7 +217,7 @@ export default function DashboardPage() {
                       ))
                     ) : (
                       <EmptyState
-                        icon={Calendar}
+                        icon="calendar"
                         title="Geen aankomende afspraken"
                         text="Voeg een afspraak toe of synchroniseer je Google Calendar."
                       />
@@ -244,16 +229,16 @@ export default function DashboardPage() {
 
             <div>
               <SectionHeader
-                icon={Zap}
+                icon="automations"
                 label="Navigatie"
                 title="Snel naar je belangrijkste modules"
               />
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <RouteTile href="/lampen" icon={Lightbulb} label="Lampen" sub="Kamers en scenes" tone="amber" />
-                <RouteTile href="/rooster" icon={CalendarDays} label="Rooster" sub="Diensten en import" tone="indigo" />
-                <RouteTile href="/agenda" icon={Calendar} label="Agenda" sub="Afspraken en sync" tone="blue" />
-                <RouteTile href="/finance" icon={Landmark} label="Financien" sub="Salaris en uitgaven" tone="green" />
-                <RouteTile href="/notities" icon={NotebookPen} label="Notities" sub="Capture en lijsten" tone="blue" />
+                <RouteTile href="/lampen" icon="lights" label="Lampen" sub="Kamers en scenes" tone="amber" />
+                <RouteTile href="/rooster" icon="roster" label="Rooster" sub="Diensten en import" tone="indigo" />
+                <RouteTile href="/agenda" icon="agenda" label="Agenda" sub="Afspraken en sync" tone="blue" />
+                <RouteTile href="/finance" icon="finance" label="Financien" sub="Salaris en uitgaven" tone="green" />
+                <RouteTile href="/notities" icon="pageNote" label="Notities" sub="Capture en lijsten" tone="blue" />
               </div>
             </div>
           </div>
@@ -263,26 +248,26 @@ export default function DashboardPage() {
             <QuickNote />
             <Panel>
               <SectionHeader
-                icon={ShieldCheck}
+                icon="shield"
                 label="Kwaliteit"
                 title="Status"
                 compact
               />
               <div className="space-y-3">
                 <StatusRow
-                  icon={CheckCircle2}
+                  icon="statusOk"
                   label="Devices"
                   value={devices.length === 0 ? "Nog geen lampen" : `${onlineDevices.length}/${devices.length} online`}
                   tone={onlineDevices.length === devices.length && devices.length > 0 ? "green" : "amber"}
                 />
                 <StatusRow
-                  icon={Target}
+                  icon="habit"
                   label="Agenda conflicten"
                   value={hardConflicts > 0 ? `${hardConflicts} harde overlap` : `${withConflicts.length} aandachtspunt(en)`}
                   tone={hardConflicts > 0 ? "rose" : withConflicts.length > 0 ? "amber" : "green"}
                 />
                 <StatusRow
-                  icon={EyeOff}
+                  icon="hide"
                   label="Privacy"
                   value={privacyOn ? "Financiele waarden verborgen" : "Financiele waarden zichtbaar"}
                   tone={privacyOn ? "green" : "slate"}

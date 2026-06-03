@@ -7,6 +7,7 @@ import { usePostLoonstrokenImport } from "@/lib/api/generated/loonstroken/loonst
 import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 type UploadState = "idle" | "parsing" | "preview" | "importing" | "done" | "error";
 
@@ -180,8 +181,9 @@ export function LoonstrookUploader() {
             </div>
 
             {parseResult.skipped.length > 0 && (
-              <p style={{ fontSize: "0.72rem", color: "#f59e0b", marginTop: 8 }}>
-                ⚠ Overgeslagen (geen loonstrook): {parseResult.skipped.join(", ")}
+              <p style={{ fontSize: "0.72rem", color: "#f59e0b", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+                <AppIcon name="warning" tone="amber" size="xs" />
+                Overgeslagen (geen loonstrook): {parseResult.skipped.join(", ")}
               </p>
             )}
             {parseResult.errors.length > 0 && (

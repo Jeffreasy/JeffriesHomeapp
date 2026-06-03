@@ -1,11 +1,12 @@
 "use client";
 
-import { Clock, MapPin, Timer, Upload } from "lucide-react";
 import { motion } from "framer-motion";
 import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type ConflictInfo } from "@/lib/conflictDetection";
 import { cn } from "@/lib/utils";
+import { AppIcon, type SymbolTone } from "@/components/ui/AppIcon";
+import type { AppIconName } from "@/lib/symbols";
 
 /** Format ISO date string (YYYY-MM-DD) → DD-MM-YYYY veilig. */
 function formatDate(iso: string, style: "compact" | "full" = "full"): string {
@@ -50,7 +51,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
               onClick={onImport}
               className="mt-2 text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 mx-auto"
             >
-              <Upload size={10} /> Rooster importeren
+              <AppIcon name="upload" tone="amber" size="xs" /> Rooster importeren
             </button>
           )}
         </div>
@@ -76,10 +77,11 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
         : "info");
     return {
       textClass: level === "hard" ? "text-red-400" : level === "soft" ? "text-amber-400" : "text-blue-400",
+      iconTone: (level === "hard" ? "red" : level === "soft" ? "amber" : "blue") as SymbolTone,
       textColor: level === "hard" ? "#ef4444" : level === "soft" ? "#f59e0b" : "#60a5fa",
       bg:     level === "hard" ? "rgba(239,68,68,0.10)" : level === "soft" ? "rgba(245,158,11,0.10)" : "rgba(96,165,250,0.08)",
       border: level === "hard" ? "rgba(239,68,68,0.25)" : level === "soft" ? "rgba(245,158,11,0.25)" : "rgba(96,165,250,0.20)",
-      icon:      level === "hard" ? "⚠" : isHeledag ? "📅" : "ℹ",
+      icon:      (level === "hard" ? "warning" : isHeledag ? "calendar" : "info") as AppIconName,
       timeLabel: isHeledag ? "hele dag" : `${evt.startTijd}–${evt.eindTijd}`,
       suffix:    level === "hard" ? " — overlapt!" : "",
     };
@@ -95,8 +97,14 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
       >
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400 mb-0.5">
-              {isBezig ? "🟢 Nu bezig" : "⏰ Volgende dienst"}
+            <p className="mb-0.5 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+              <AppIcon
+                name={isBezig ? "statusActive" : "time"}
+                tone={isBezig ? "green" : "amber"}
+                size="xs"
+                iconClassName={isBezig ? "fill-current" : undefined}
+              />
+              {isBezig ? "Nu bezig" : "Volgende dienst"}
             </p>
             <p className={cn("text-sm font-bold", colors.text)}>
               {dienst.dag} · {formatDate(dienst.startDatum, "compact")}
@@ -106,25 +114,36 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
             </p>
             {!isBezig && (
               <p className={cn(
-                "text-[10px] font-semibold mt-0.5",
+                "mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold",
                 isToday ? "text-green-400" : isTomorrow ? "text-amber-400" : "text-slate-500"
               )}>
-                {isToday ? "🟢 Vandaag" : `📅 ${relativeDay.charAt(0).toUpperCase() + relativeDay.slice(1)}`}
+                <AppIcon
+                  name={isToday ? "statusActive" : "calendar"}
+                  tone={isToday ? "green" : isTomorrow ? "amber" : "slate"}
+                  size="xs"
+                  iconClassName={isToday ? "fill-current" : undefined}
+                />
+                {isToday ? "Vandaag" : relativeDay.charAt(0).toUpperCase() + relativeDay.slice(1)}
               </p>
             )}
             {isZondag && (
-              <p className="text-[10px] font-bold text-yellow-400 mt-0.5">💰 +ORT toeslag</p>
+              <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-bold text-yellow-400">
+                <AppIcon name="money" tone="yellow" size="xs" /> +ORT toeslag
+              </p>
             )}
             {isZaterdag && (
-              <p className="text-[10px] font-medium text-yellow-600 mt-0.5">📅 Weekend</p>
+              <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-yellow-600">
+                <AppIcon name="calendar" tone="yellow" size="xs" /> Weekend
+              </p>
             )}
             {afspraken.length > 0 && (
               <div className="mt-1.5 space-y-0.5">
                 {afspraken.map(evt => {
                   const c = resolveConflict(evt);
                   return (
-                    <p key={evt.eventId} className={`text-[10px] font-medium ${c.textClass}`}>
-                      {c.icon} {evt.titel} · {c.timeLabel}{c.suffix}
+                    <p key={evt.eventId} className={`inline-flex items-center gap-1 text-[10px] font-medium ${c.textClass}`}>
+                      <AppIcon name={c.icon} tone={c.iconTone} size="xs" />
+                      {evt.titel} · {c.timeLabel}{c.suffix}
                     </p>
                   );
                 })}
@@ -135,7 +154,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
             className="w-10 h-10 rounded-xl flex items-center justify-center"
             style={{ background: colors.accent + "22", border: `1px solid ${colors.accent}44` }}
           >
-            <Clock size={18} style={{ color: colors.accent }} />
+            <AppIcon name="time" size="md" iconClassName="text-current" />
           </div>
         </div>
       </motion.div>
@@ -158,8 +177,20 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
         className="px-4 py-1.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2"
         style={{ background: colors.accent + "20", color: colors.accent }}
       >
-        {isBezig ? "🟢 Bezig" : "⏰ Volgende dienst"}
-        {isZondag && <span className="ml-2 text-yellow-400">💰 +ORT</span>}
+        <span className="inline-flex items-center gap-1.5">
+          <AppIcon
+            name={isBezig ? "statusActive" : "time"}
+            tone={isBezig ? "green" : "amber"}
+            size="xs"
+            iconClassName={isBezig ? "fill-current" : "text-current"}
+          />
+          {isBezig ? "Bezig" : "Volgende dienst"}
+        </span>
+        {isZondag && (
+          <span className="ml-2 inline-flex items-center gap-1 text-yellow-400">
+            <AppIcon name="money" tone="yellow" size="xs" /> +ORT
+          </span>
+        )}
         {isZaterdag && <span className="ml-2 text-yellow-600">weekend</span>}
         <span className="ml-auto font-normal normal-case tracking-normal opacity-70">
           {dienst.shiftType}
@@ -190,12 +221,12 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
         <div className="space-y-1.5 text-sm">
           {dienst.locatie && (
             <div className="flex items-center gap-2 text-slate-300">
-              <MapPin size={13} className="text-slate-500 shrink-0" />
+              <AppIcon name="location" tone="slate" size="xs" />
               <span className="truncate">{dienst.locatie}</span>
             </div>
           )}
           <div className="flex items-center gap-2 text-slate-300">
-            <Timer size={13} className="text-slate-500 shrink-0" />
+            <AppIcon name="timer" tone="slate" size="xs" />
             <span>{dienst.duur} uur · Team {dienst.team || "?"}</span>
           </div>
         </div>
@@ -210,7 +241,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
                   className="flex items-center gap-2 text-xs px-3 py-2 rounded-xl"
                   style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.textColor }}
                 >
-                  <span>{c.icon}</span>
+                  <AppIcon name={c.icon} tone={c.iconTone} size="xs" iconClassName="text-current" />
                   <span>{evt.titel} · {c.timeLabel}{c.suffix}</span>
                 </div>
               );

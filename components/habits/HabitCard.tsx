@@ -7,6 +7,7 @@ import { formatStreak, formatXP, MOEILIJKHEID_LABELS, FREQUENTIE_LABELS } from "
 import { getLevel } from "@/lib/habit-constants";
 import { DEFAULT_STAP, INCIDENT_TRIGGERS } from "@/lib/habit-constants";
 import type { HabitWithLog } from "@/hooks/useHabits";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 /**
  * HabitCard — Habit kaart met checkbox/stepper, streak, XP, incident triggers.
@@ -181,7 +182,10 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
               {MOEILIJKHEID_LABELS[habit.moeilijkheid as string]}
             </span>
             {habit.doelTijd && !masked && (
-              <span className="text-[10px] text-sky-400/60">⏰ {habit.doelTijd}</span>
+              <span className="inline-flex items-center gap-1 text-[10px] text-sky-400/60">
+                <AppIcon name="time" tone="blue" size="xs" />
+                {habit.doelTijd}
+              </span>
             )}
           </div>
         </div>

@@ -1,16 +1,4 @@
-import {
-  BriefcaseBusiness,
-  Calendar,
-  CalendarClock,
-  Home,
-  Landmark,
-  Lightbulb,
-  Settings,
-  StickyNote,
-  Target,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
+import type { AppIconName } from "@/lib/symbols";
 
 export type NavigationSectionId = "start" | "planning" | "persoonlijk" | "bedrijf" | "systeem";
 
@@ -19,7 +7,7 @@ export interface NavigationItem {
   label: string;
   shortLabel: string;
   description: string;
-  icon: LucideIcon;
+  icon: AppIconName;
   section: NavigationSectionId;
   mobile: "primary" | "more";
 }
@@ -38,7 +26,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Dashboard",
     shortLabel: "Home",
     description: "Dagoverzicht en slimme signalen",
-    icon: Home,
+    icon: "home",
     section: "start",
     mobile: "primary",
   },
@@ -47,7 +35,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Lampen",
     shortLabel: "Lampen",
     description: "Kamers, scenes en bediening",
-    icon: Lightbulb,
+    icon: "lights",
     section: "start",
     mobile: "primary",
   },
@@ -56,7 +44,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Rooster",
     shortLabel: "Rooster",
     description: "Diensten, uren en planning",
-    icon: Calendar,
+    icon: "roster",
     section: "planning",
     mobile: "primary",
   },
@@ -65,7 +53,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Agenda",
     shortLabel: "Agenda",
     description: "Afspraken en Google sync",
-    icon: CalendarClock,
+    icon: "agenda",
     section: "planning",
     mobile: "primary",
   },
@@ -74,7 +62,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Automatisch",
     shortLabel: "Auto",
     description: "Regels, scenes en routines",
-    icon: Zap,
+    icon: "automations",
     section: "planning",
     mobile: "more",
   },
@@ -83,7 +71,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Finance",
     shortLabel: "Finance",
     description: "Transacties en salaris",
-    icon: Landmark,
+    icon: "finance",
     section: "persoonlijk",
     mobile: "more",
   },
@@ -92,7 +80,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Notities",
     shortLabel: "Notities",
     description: "Capture, lijsten en geheugen",
-    icon: StickyNote,
+    icon: "notes",
     section: "persoonlijk",
     mobile: "more",
   },
@@ -101,7 +89,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Habits",
     shortLabel: "Habits",
     description: "Gewoontes, streaks en XP",
-    icon: Target,
+    icon: "habit",
     section: "persoonlijk",
     mobile: "more",
   },
@@ -110,7 +98,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "LaventeCare",
     shortLabel: "Bedrijf",
     description: "Bedrijfsbrein, funnel en delivery",
-    icon: BriefcaseBusiness,
+    icon: "business",
     section: "bedrijf",
     mobile: "more",
   },
@@ -119,7 +107,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Instellingen",
     shortLabel: "Instel.",
     description: "Accounts, koppelingen en beheer",
-    icon: Settings,
+    icon: "settings",
     section: "systeem",
     mobile: "more",
   },
