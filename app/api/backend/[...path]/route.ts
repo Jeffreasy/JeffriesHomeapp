@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
@@ -51,11 +52,23 @@ function copyResponseHeaders(headers: Headers) {
   return nextHeaders;
 }
 
+function shouldInjectUserId(path: string) {
+  return path === "notes" || path.startsWith("notes/");
+}
+
 async function proxyBackend(request: NextRequest, context: RouteContext) {
   const params = await context.params;
   const path = (params.path ?? []).map(encodeURIComponent).join("/");
   const target = new URL(`${backendBaseUrl()}/${path}`);
   target.search = request.nextUrl.search;
+
+  if (shouldInjectUserId(path)) {
+    const { userId } = await auth();
+    if (!userId) {
+      return Response.json({ detail: "Niet ingelogd." }, { status: 401 });
+    }
+    target.searchParams.set("userId", userId);
+  }
 
   const method = request.method.toUpperCase();
   const init: RequestInit = {
