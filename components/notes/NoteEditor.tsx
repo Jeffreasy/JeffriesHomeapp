@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, Link2, Check, Trash2, Archive, Pin } from "lucide-react";
+import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, Link2, Check, Trash2, Archive, Pin, type LucideIcon } from "lucide-react";
 import { getNotesSearch } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 import { formatDateRange, getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
@@ -325,7 +325,7 @@ export function NoteEditor({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
     >
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-pointer" 
@@ -341,7 +341,7 @@ export function NoteEditor({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative w-full h-[100dvh] sm:h-auto sm:max-w-lg sm:mx-4 rounded-none sm:rounded-2xl border-0 sm:border border-[var(--color-border)] overflow-hidden flex flex-col"
+        className="relative flex h-[100dvh] w-full flex-col overflow-hidden rounded-none border-0 border-[var(--color-border)] sm:h-auto sm:max-w-2xl sm:rounded-2xl sm:border lg:max-w-3xl"
         style={{
           maxHeight: "100dvh",
           background: kleur
@@ -350,17 +350,17 @@ export function NoteEditor({
         }}
       >
         {/* Drag handle (mobile) */}
-        <div className="flex justify-center pt-2 pb-0 sm:hidden">
+        <div className="flex justify-center pb-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:hidden">
           <div className="w-10 h-1 rounded-full bg-white/20" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-[var(--color-border)] shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2">
             {kleur && (
               <span className="h-3 w-3 rounded-full shrink-0" style={{ background: kleur }} />
             )}
-            <h3 id={titleId} className="text-sm font-semibold text-[var(--color-text)]">
+            <h3 id={titleId} className="truncate text-sm font-semibold text-[var(--color-text)]">
               {note ? "Notitie bewerken" : "Nieuwe notitie"}
             </h3>
           </div>
@@ -381,6 +381,7 @@ export function NoteEditor({
               </button>
             )}
             <button
+              type="button"
               onClick={handleCloseAttempt}
               className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
               aria-label="Sluiten"
@@ -391,7 +392,7 @@ export function NoteEditor({
         </div>
 
         {/* Body — scrollable */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-5 py-4 space-y-4">
+        <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
           {/* Title */}
           <input
             type="text"
@@ -432,7 +433,7 @@ export function NoteEditor({
                 }
               }}
               className="w-full bg-transparent text-base sm:text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] outline-none resize-none leading-relaxed rounded-xl border border-[var(--color-border)] focus:border-amber-500/30 px-3 py-3 transition-colors"
-              style={{ minHeight: 100 }}
+              style={{ minHeight: 140 }}
             />
 
             {/* [[wiki-link]] autocomplete dropdown */}
@@ -461,12 +462,12 @@ export function NoteEditor({
           </div>
 
           {/* Toolbar row */}
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-2">
             <ToolbarButton icon={ListChecks} label="Checklist" onClick={insertChecklist} active={false} />
             <ToolbarButton icon={Palette} label="Kleur" onClick={() => setShowColors(!showColors)} active={showColors} />
             <ToolbarButton icon={CalendarDays} label="Deadline" onClick={() => setShowMeta(!showMeta)} active={showMeta} />
 
-            <div className="ml-auto flex items-center gap-1 text-[10px] text-[var(--color-text-subtle)]">
+            <div className="ml-auto flex min-h-[44px] items-center gap-1 text-[10px] text-[var(--color-text-subtle)]">
               <Clock size={10} />
               {wordCount}w · {charCount}c
             </div>
@@ -483,8 +484,9 @@ export function NoteEditor({
               >
                 <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
                   <button
+                    type="button"
                     onClick={() => setKleur("")}
-                    className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center ${
+                    className={`flex h-11 w-11 items-center justify-center rounded-full border-2 transition-all cursor-pointer sm:h-9 sm:w-9 ${
                       !kleur ? "border-white/40 bg-[var(--color-surface)]" : "border-transparent bg-[var(--color-surface)] hover:border-white/20"
                     }`}
                     aria-label="Geen kleur"
@@ -494,8 +496,9 @@ export function NoteEditor({
                   {KLEUREN.map((c) => (
                     <button
                       key={c}
+                      type="button"
                       onClick={() => setKleur(c)}
-                      className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center ${
+                      className={`flex h-11 w-11 items-center justify-center rounded-full border-2 transition-all cursor-pointer sm:h-9 sm:w-9 ${
                         kleur === c ? "border-white/60 scale-110" : "border-transparent hover:scale-105"
                       }`}
                       style={{ background: c }}
@@ -520,16 +523,17 @@ export function NoteEditor({
               >
                 <div className="flex flex-col gap-3 p-3 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">
                   {/* Deadline picker */}
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2">
                     <Clock size={14} className="text-[var(--color-text-subtle)] shrink-0" />
                     <input
                       type="datetime-local"
                       value={formatDeadlineForInput(deadline)}
                       onChange={(e) => setDeadline(e.target.value ? localDateTimeToIso(e.target.value) : "")}
-                      className="bg-transparent text-base sm:text-sm text-[var(--color-text)] outline-none border border-[var(--color-border)] rounded-lg px-3 py-2.5 flex-1 min-h-[44px] [color-scheme:dark]"
+                      className="min-h-[44px] min-w-0 rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2.5 text-base text-[var(--color-text)] outline-none [color-scheme:dark] sm:text-sm"
                     />
                     {deadline && (
                       <button
+                        type="button"
                         onClick={() => setDeadline("")}
                         className="p-2 hover:bg-[var(--color-surface-hover)] rounded-lg cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center"
                         aria-label="Deadline verwijderen"
@@ -540,12 +544,13 @@ export function NoteEditor({
                   </div>
 
                   {/* Priority selector */}
-                  <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-[1rem_minmax(0,1fr)] items-center gap-2">
                     <AlertTriangle size={14} className="text-[var(--color-text-subtle)] shrink-0" />
-                    <div className="flex gap-1.5 flex-1">
+                    <div className="grid min-w-0 grid-cols-3 gap-1.5">
                       {PRIORITEITEN.map((p) => (
                         <button
                           key={p.value}
+                          type="button"
                           onClick={() => setPrioriteit(p.value)}
                           className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer min-h-[40px] ${
                             prioriteit === p.value
@@ -561,7 +566,7 @@ export function NoteEditor({
                   </div>
 
                   {showEventSelector && (
-                    <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2">
                       <CalendarDays size={14} className="text-[var(--color-text-subtle)] shrink-0" />
                       <select
                         value={linkedEventId}
@@ -604,13 +609,15 @@ export function NoteEditor({
           {/* Tags */}
           <div className="flex items-center flex-wrap gap-1.5">
             {tags.map((tag) => (
-              <span
+              <button
                 key={tag}
-                className="inline-flex items-center gap-1 text-xs text-amber-300/80 bg-amber-500/10 border border-amber-500/15 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/20 transition-colors min-h-[36px]"
+                type="button"
+                className="inline-flex min-h-[40px] items-center gap-1 rounded-lg border border-amber-500/15 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-300/80 transition-colors cursor-pointer hover:border-red-500/20 hover:bg-red-500/20 hover:text-red-300"
                 onClick={() => removeTag(tag)}
+                aria-label={`Tag ${tag} verwijderen`}
               >
                 <Tag size={10} /> {tag} <X size={10} />
-              </span>
+              </button>
             ))}
             <input
               type="text"
@@ -629,56 +636,60 @@ export function NoteEditor({
         </div>
 
         {/* Footer — fixed at bottom */}
-        <div className="flex flex-col gap-2 px-4 sm:px-5 py-3 border-t border-[var(--color-border)] shrink-0 bg-[var(--color-surface)] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="flex shrink-0 flex-col gap-3 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
           {saveError && (
             <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
               {saveError}
             </p>
           )}
-          <div className="flex items-center gap-2 w-full justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Quick Actions (Delete, Archive) */}
-            <div className="flex items-center gap-1">
-              {note && onDelete && (
-                <button
-                  type="button"
-                  onClick={handleDeleteClick}
-                  className="p-2.5 rounded-xl border border-red-500/10 hover:border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold"
-                  title="Notitie verwijderen"
-                  aria-label="Notitie verwijderen"
-                >
-                  <Trash2 size={16} />
-                  <span className="hidden sm:inline">Verwijderen</span>
-                </button>
-              )}
-              {note && onArchive && (
-                <button
-                  type="button"
-                  onClick={handleArchiveClick}
-                  className="p-2.5 rounded-xl border border-[var(--color-border)] hover:border-[var(--color-border-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center gap-1.5 text-xs font-semibold"
-                  title={note.isArchived ? "Dearchiveren" : "Archiveren"}
-                  aria-label={note.isArchived ? "Dearchiveren" : "Archiveren"}
-                >
-                  <Archive size={16} />
-                  <span className="hidden sm:inline">{note.isArchived ? "Dearchiveren" : "Archiveren"}</span>
-                </button>
-              )}
-            </div>
+            {(note && (onDelete || onArchive)) && (
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                {note && onDelete && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteClick}
+                    className="flex min-h-[44px] min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-red-500/15 px-3 py-2.5 text-xs font-semibold text-red-400 transition-colors cursor-pointer hover:border-red-500/30 hover:bg-red-500/10 sm:flex-none"
+                    title="Notitie verwijderen"
+                    aria-label="Notitie verwijderen"
+                  >
+                    <Trash2 size={16} />
+                    <span className="truncate">Verwijderen</span>
+                  </button>
+                )}
+                {note && onArchive && (
+                  <button
+                    type="button"
+                    onClick={handleArchiveClick}
+                    className="flex min-h-[44px] min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-3 py-2.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors cursor-pointer hover:border-[var(--color-border-hover)] hover:text-[var(--color-text)] sm:flex-none"
+                    title={note.isArchived ? "Dearchiveren" : "Archiveren"}
+                    aria-label={note.isArchived ? "Dearchiveren" : "Archiveren"}
+                  >
+                    <Archive size={16} />
+                    <span className="truncate">{note.isArchived ? "Dearchiveren" : "Archiveren"}</span>
+                  </button>
+                )}
+              </div>
+            )}
 
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="grid w-full grid-cols-2 gap-2 sm:ml-auto sm:flex sm:w-auto sm:items-center">
               <p className="text-[10px] text-[var(--color-text-subtle)] hidden md:block mr-2">
                 Ctrl+Enter om op te slaan
               </p>
               <button
+                type="button"
                 onClick={handleCloseAttempt}
                 disabled={saving}
-                className="px-5 py-2.5 text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors cursor-pointer min-h-[44px] rounded-xl border border-[var(--color-border)] sm:border-none disabled:opacity-50"
+                className="min-h-[44px] min-w-0 rounded-xl border border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-muted)] transition-colors cursor-pointer hover:text-[var(--color-text)] disabled:opacity-50 sm:min-w-[104px]"
               >
                 Annuleren
               </button>
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={!inhoud.trim() || saving}
-                className="px-6 py-2.5 text-sm font-semibold text-[var(--color-primary-foreground)] bg-amber-500 hover:bg-amber-400 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer min-h-[44px]"
+                className="min-h-[44px] min-w-0 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-[var(--color-primary-foreground)] transition-all cursor-pointer hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-30 sm:min-w-[112px]"
               >
                 {saving ? "Opslaan..." : note ? "Opslaan" : "Aanmaken"}
               </button>
@@ -780,15 +791,16 @@ function ToolbarButton({
   onClick,
   active,
 }: {
-  icon: typeof ListChecks;
+  icon: LucideIcon;
   label: string;
   onClick: () => void;
   active: boolean;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`p-2.5 rounded-lg transition-colors cursor-pointer min-w-[44px] min-h-[44px] flex items-center justify-center ${
+      className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2.5 transition-colors cursor-pointer ${
         active
           ? "bg-amber-500/10 text-amber-400"
           : "hover:bg-[var(--color-surface-hover)] text-[var(--color-text-subtle)]"
