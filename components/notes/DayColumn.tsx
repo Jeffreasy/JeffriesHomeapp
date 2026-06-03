@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, type KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, Clock, ListChecks, Plus, RotateCcw } from "lucide-react";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
@@ -249,14 +249,26 @@ function JournalNoteButton({
   onToggleComplete: (note: NoteRecord) => void | Promise<void>;
 }) {
   const checklist = getChecklistInfo(note.inhoud);
+  const previewTitle = note.titel || note.inhoud.split("\n")[0].slice(0, 50) || "Zonder titel";
+  const openNote = () => onEdit(note);
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    event.preventDefault();
+    openNote();
+  };
 
   return (
-    <motion.button
+    <motion.div
       layout
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      onClick={() => onEdit(note)}
+      role="button"
+      tabIndex={0}
+      aria-label={`Notitie openen: ${previewTitle}`}
+      onClick={openNote}
+      onKeyDown={handleKeyDown}
       className={`group/item w-full cursor-pointer rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5 ${
         completed ? "opacity-80" : ""
       }`}
@@ -272,7 +284,7 @@ function JournalNoteButton({
         />
         <div className="min-w-0 flex-1">
           <p className={`truncate text-sm font-medium ${completed ? "text-slate-500 line-through decoration-emerald-400/50" : "text-[var(--color-text)]"}`}>
-            {note.titel || note.inhoud.split("\n")[0].slice(0, 50)}
+            {previewTitle}
           </p>
           {note.titel && note.inhoud !== note.titel && (
             <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
@@ -312,6 +324,6 @@ function JournalNoteButton({
           </button>
         </div>
       </div>
-    </motion.button>
+    </motion.div>
   );
 }
