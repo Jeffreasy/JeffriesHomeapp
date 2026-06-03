@@ -17,6 +17,7 @@ export interface GithubComJeffreasyJeffriesBackendInternalModelNote {
   kleur?: string;
   linked_event_id?: string;
   prioriteit?: string;
+  symbol?: string;
   tags?: string[];
   titel?: string;
   triage_flag?: boolean;

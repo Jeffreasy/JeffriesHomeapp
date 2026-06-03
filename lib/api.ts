@@ -294,6 +294,7 @@ export interface PersonalEventRow {
   locatie: string | null;
   beschrijving: string | null;
   conflict_met_dienst: string | null;
+  symbol?: string | null;
   status: string;
   kalender: string;
 }
@@ -684,6 +685,7 @@ export interface NoteRow {
   deadline: string | null;
   linked_event_id: string | null;
   prioriteit: string | null;
+  symbol?: string | null;
   triage_flag: boolean | null;
   aangemaakt: string;
   gewijzigd: string;

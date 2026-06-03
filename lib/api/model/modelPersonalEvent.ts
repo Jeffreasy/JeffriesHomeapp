@@ -19,6 +19,7 @@ export interface ModelPersonalEvent {
   start_datum?: string;
   start_tijd?: string;
   status?: string;
+  symbol?: string;
   titel?: string;
   user_id?: string;
 }

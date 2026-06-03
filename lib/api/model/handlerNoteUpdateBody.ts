@@ -14,6 +14,7 @@ export interface HandlerNoteUpdateBody {
   kleur?: string;
   linkedEventId?: string;
   prioriteit?: string;
+  symbol?: string;
   tags?: string[];
   titel?: string;
 }

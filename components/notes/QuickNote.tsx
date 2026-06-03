@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { StickyNote, Plus, ChevronRight, Pin, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { resolveAppIconName } from "@/lib/symbols";
 
 export function QuickNote() {
   const { notes, create, isLoading } = useNotes();
@@ -119,9 +121,12 @@ function RecentNoteRow({ note }: { note: NoteRecord }) {
         className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors group cursor-pointer"
       >
         {note.isPinned && <Pin size={10} className="text-amber-400 fill-amber-400 shrink-0" />}
-        <div
-          className="w-1.5 h-1.5 rounded-full shrink-0"
-          style={{ background: note.kleur ?? "#475569" }}
+        <AppIcon
+          name={resolveAppIconName(note.symbol, "note")}
+          tone="amber"
+          size="xs"
+          framed
+          className="h-6 w-6 rounded-md"
         />
         <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate flex-1 min-w-0">
           {displayTitle}

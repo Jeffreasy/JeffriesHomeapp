@@ -4,6 +4,8 @@ import { motion } from "framer-motion";
 import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2 } from "lucide-react";
 import { useGetNotesIdBacklinks } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord } from "@/hooks/useNotes";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { resolveAppIconName } from "@/lib/symbols";
 
 interface NoteCardProps {
   note: NoteRecord;
@@ -33,6 +35,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
   const deadlineInfo = note.deadline ? getDeadlineInfo(note.deadline) : null;
   const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
   const canLoadBacklinks = !masked && isUuid(note.id);
+  const symbol = resolveAppIconName(note.symbol, "note");
   
   const { data: backlinksRaw } = useGetNotesIdBacklinks(note.id, { query: { enabled: canLoadBacklinks, staleTime: 60_000 } });
   const backlinks = Array.isArray(backlinksRaw?.data) ? backlinksRaw.data : [];
@@ -78,7 +81,8 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
 
       <div className="p-4">
         {/* Title row with priority dot */}
-        <div className="flex items-center gap-1.5 mb-1">
+        <div className="flex items-center gap-2 mb-1">
+          <AppIcon name={symbol} tone="amber" size="sm" framed className="h-8 w-8 rounded-lg" />
           {note.prioriteit && note.prioriteit !== "normaal" && (
             <span
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${prio.dot}`}

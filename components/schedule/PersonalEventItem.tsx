@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Clock, CalendarDays, AlertTriangle, Trash2, Loader2, X, Check, Pencil } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { type ConflictInfo } from "@/lib/conflictDetection";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { resolveAppIconName } from "@/lib/symbols";
 import {
   type PersonalEvent,
   formatDateRange,
@@ -39,6 +41,7 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
   const canEdit = Boolean(onEdit && !isRooster && !isPendingDelete);
   const badge = statusBadge(event);
   const shiftColors = isRooster && event.shiftType ? shiftTypeColor(event.shiftType) : null;
+  const symbol = resolveAppIconName(event.symbol, isRooster ? "roster" : "agenda");
 
   const { success, error, toast } = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -110,6 +113,15 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
           : undefined
       }
     >
+      <AppIcon
+        name={symbol}
+        tone={hasConflict ? "amber" : isRooster ? "indigo" : "cyan"}
+        size="sm"
+        framed
+        active={isToday}
+        className="h-8 w-8 rounded-lg"
+      />
+
       {/* Main content */}
       <div className="flex-1 min-w-0">
         {/* Title + Time row */}

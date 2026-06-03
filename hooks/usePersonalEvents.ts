@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { type DienstRow } from "@/lib/schedule";
 import { analyzeConflicts, type ConflictInfo } from "@/lib/conflictDetection";
+import { getEventCategoryIcon, resolveAppIconName, type AppIconName } from "@/lib/symbols";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ export interface PersonalEvent {
   heledag:           boolean;
   locatie?:          string;
   beschrijving?:     string;
+  symbol?:           AppIconName;
   status:            "Aankomend" | "Voorbij" | "VERWIJDERD" | string;
   kalender:          string;
   shiftType?:        string;
@@ -35,6 +37,8 @@ type AmsterdamNow = {
 };
 
 function fromRow(r: PersonalEventRow): PersonalEvent {
+  const category = parseCategoryMetadata(r.beschrijving);
+  const metadataSymbol = parseSymbolMetadata(r.beschrijving);
   return {
     _id:          r.id ?? "",
     userId:       r.user_id,
@@ -47,6 +51,7 @@ function fromRow(r: PersonalEventRow): PersonalEvent {
     heledag:      r.heledag,
     locatie:      r.locatie ?? undefined,
     beschrijving: r.beschrijving ?? undefined,
+    symbol:       resolveAppIconName(r.symbol ?? metadataSymbol, getEventCategoryIcon(category)),
     status:       r.status,
     kalender:     r.kalender,
   };
@@ -65,6 +70,7 @@ function fromDienstToEvent(d: DienstRow, userId: string): PersonalEvent {
     heledag:      d.heledag,
     locatie:      d.locatie || undefined,
     beschrijving: d.beschrijving || undefined,
+    symbol:       "roster",
     status:       d.status === "Gedraaid" ? "Voorbij" : "Aankomend",
     kalender:     "Rooster",
     shiftType:    d.shiftType,
@@ -104,6 +110,14 @@ export function formatDateRange(event: PersonalEvent, locale = "nl-NL"): string 
 
 function normalizeText(value?: string): string {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function parseCategoryMetadata(description?: string | null): string | undefined {
+  return description?.match(/\[categorie:([a-z0-9_-]+)\]/i)?.[1];
+}
+
+function parseSymbolMetadata(description?: string | null): string | undefined {
+  return description?.match(/\[symbol:([a-z0-9_-]+)\]/i)?.[1];
 }
 
 function isShiftLikeTitle(title: string): boolean {

@@ -172,6 +172,12 @@ export const APP_ICONS = {
 
 export type AppIconName = keyof typeof APP_ICONS;
 
+export type SymbolOption = {
+  id: string;
+  icon: AppIconName;
+  label: string;
+};
+
 export const EVENT_CATEGORY_SYMBOLS = [
   { id: "sociaal", icon: "categorySocial", label: "Sociaal" },
   { id: "werk", icon: "categoryWork", label: "Werk" },
@@ -182,4 +188,42 @@ export const EVENT_CATEGORY_SYMBOLS = [
   { id: "onderhoud", icon: "categoryMaintenance", label: "Onderhoud" },
   { id: "evenement", icon: "categoryEvent", label: "Evenement" },
   { id: "overig", icon: "categoryOther", label: "Overig" },
-] as const satisfies ReadonlyArray<{ id: string; icon: AppIconName; label: string }>;
+] as const satisfies ReadonlyArray<SymbolOption>;
+
+export const NOTE_SYMBOL_OPTIONS = [
+  { id: "note", icon: "note", label: "Notitie" },
+  { id: "pageNote", icon: "pageNote", label: "Pagina" },
+  { id: "book", icon: "book", label: "Logboek" },
+  { id: "list", icon: "list", label: "Lijst" },
+  { id: "check", icon: "check", label: "Actie" },
+  { id: "pin", icon: "pin", label: "Belangrijk" },
+  { id: "calendar", icon: "calendar", label: "Datum" },
+  { id: "time", icon: "time", label: "Tijd" },
+  { id: "warning", icon: "warning", label: "Urgent" },
+  { id: "work", icon: "work", label: "Werk" },
+  { id: "finance", icon: "finance", label: "Financie" },
+  { id: "habit", icon: "habit", label: "Habit" },
+  { id: "shield", icon: "shield", label: "Prive" },
+  { id: "sparkles", icon: "sparkles", label: "Idee" },
+  { id: "light", icon: "light", label: "Inzicht" },
+] as const satisfies ReadonlyArray<SymbolOption>;
+
+export const EVENT_SYMBOL_OPTIONS = [
+  { id: "agenda", icon: "agenda", label: "Afspraak" },
+  { id: "calendar", icon: "calendar", label: "Kalender" },
+  { id: "time", icon: "time", label: "Tijd" },
+  { id: "location", icon: "location", label: "Locatie" },
+  ...EVENT_CATEGORY_SYMBOLS,
+] as const satisfies ReadonlyArray<SymbolOption>;
+
+export function isAppIconName(value?: string | null): value is AppIconName {
+  return Boolean(value && Object.prototype.hasOwnProperty.call(APP_ICONS, value));
+}
+
+export function resolveAppIconName(value?: string | null, fallback: AppIconName = "note"): AppIconName {
+  return isAppIconName(value) ? value : fallback;
+}
+
+export function getEventCategoryIcon(categoryId?: string | null): AppIconName {
+  return EVENT_CATEGORY_SYMBOLS.find((category) => category.id === categoryId)?.icon ?? "categoryOther";
+}

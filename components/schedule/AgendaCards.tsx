@@ -13,6 +13,8 @@ import { usePersonalEvents, type PersonalEvent, getTimeLabel } from "@/hooks/use
 import type { NoteRecord } from "@/hooks/useNotes";
 import { getLinkedEventId } from "@/components/notes/NoteAgendaUtils";
 import { getDisplayTitle } from "@/components/notes/NotesUtils";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { resolveAppIconName } from "@/lib/symbols";
 
 /* ─── Panel (kept, still useful) ─────────────────────────────────────────── */
 
@@ -118,7 +120,10 @@ export function NextEventCard({ event }: { event: PersonalEvent | null }) {
       <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400/70 mb-2">
         Volgende afspraak
       </p>
-      <p className="text-sm font-bold text-white truncate">{event.titel}</p>
+      <div className="flex min-w-0 items-center gap-2">
+        <AppIcon name={resolveAppIconName(event.symbol, "agenda")} tone="indigo" size="sm" framed className="h-8 w-8 rounded-lg" />
+        <p className="min-w-0 truncate text-sm font-bold text-white">{event.titel}</p>
+      </div>
       <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-400">
         <span>{dayName}</span>
         <span className="text-slate-600">·</span>
@@ -265,7 +270,11 @@ function NoteChip({ note, onEdit, tone }: { note: NoteRecord; onEdit?: (note: No
       className={`inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium transition-colors cursor-pointer ${colorClass}`}
       title={getDisplayTitle(note)}
     >
-      {isPinned ? <Pin size={10} className="shrink-0 text-amber-300 fill-amber-300" /> : <FileText size={10} className="shrink-0" />}
+      {isPinned ? (
+        <Pin size={10} className="shrink-0 text-amber-300 fill-amber-300" />
+      ) : (
+        <AppIcon name={resolveAppIconName(note.symbol, "note")} tone={tone} size="xs" />
+      )}
       <span className="max-w-[180px] truncate">{getDisplayTitle(note)}</span>
     </button>
   );

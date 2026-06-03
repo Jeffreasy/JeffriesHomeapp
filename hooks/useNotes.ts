@@ -32,6 +32,7 @@ export interface NoteRecord {
   linkedEventId?:  string | null;
   linked_event_id?: string | null;
   prioriteit?:     string | null;
+  symbol?:         string | null;
   aangemaakt:      string;
   gewijzigd:       string;
 }
@@ -44,6 +45,7 @@ export type NoteCreateData = {
   deadline?: string;
   linkedEventId?: string;
   prioriteit?: string;
+  symbol?: string;
 };
 
 export type NoteUpdateData = {
@@ -54,6 +56,7 @@ export type NoteUpdateData = {
   deadline?: string;
   linkedEventId?: string;
   prioriteit?: string;
+  symbol?: string;
   isPinned?: boolean;
   isArchived?: boolean;
   is_pinned?: boolean;
@@ -83,6 +86,7 @@ function toRecord(row: ModelNote): NoteRecord {
     linkedEventId: row.linked_event_id,
     linked_event_id: row.linked_event_id,
     prioriteit: row.prioriteit,
+    symbol: row.symbol,
     aangemaakt: row.aangemaakt ?? new Date().toISOString(),
     gewijzigd: row.gewijzigd ?? new Date().toISOString(),
   };
@@ -168,6 +172,7 @@ export function useNotes() {
           deadline: variables.data.deadline ?? undefined,
           linked_event_id: variables.data.linkedEventId ?? undefined,
           prioriteit: variables.data.prioriteit ?? "normaal",
+          symbol: variables.data.symbol ?? "note",
           aangemaakt: new Date().toISOString(),
           gewijzigd: new Date().toISOString(),
         };

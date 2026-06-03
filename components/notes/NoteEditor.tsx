@@ -6,6 +6,9 @@ import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, Link2,
 import { getNotesSearch } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 import { formatDateRange, getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { SymbolPicker } from "@/components/ui/SymbolPicker";
+import { NOTE_SYMBOL_OPTIONS, resolveAppIconName, type AppIconName } from "@/lib/symbols";
 
 const KLEUREN = [
   "#f59e0b", "#22c55e", "#3b82f6", "#ef4444",
@@ -70,6 +73,8 @@ export function NoteEditor({
   const [deadline, setDeadline]     = useState(note?.deadline ?? initialDeadline ?? "");
   const [linkedEventId, setLinkedEventId] = useState(note?.linkedEventId ?? note?.linked_event_id ?? initialLinkedEventId ?? "");
   const [prioriteit, setPrioriteit] = useState(note?.prioriteit ?? "normaal");
+  const [symbol, setSymbol] = useState<AppIconName>(() => resolveAppIconName(note?.symbol, "note"));
+  const [showSymbols, setShowSymbols] = useState(false);
   const [showMeta, setShowMeta]     = useState(!!(note?.deadline || initialDeadline || linkedEventId || (note?.prioriteit && note.prioriteit !== "normaal")));
 
   const eventOptionGroups = useMemo(
@@ -223,6 +228,7 @@ export function NoteEditor({
         deadline: normalizeDeadlineForSave(deadline) || (isEditing ? "" : undefined),
         linkedEventId: linkedEventId || (isEditing ? "" : undefined),
         prioriteit: prioriteit,
+        symbol,
       });
       onClose();
     } catch (err: unknown) {
@@ -230,7 +236,7 @@ export function NoteEditor({
     } finally {
       setSaving(false);
     }
-  }, [inhoud, titel, tags, kleur, deadline, linkedEventId, prioriteit, note, onSave, onClose]);
+  }, [inhoud, titel, tags, kleur, deadline, linkedEventId, prioriteit, symbol, note, onSave, onClose]);
 
   const handleCloseAttempt = useCallback(() => {
     const cleanTitel = titel.trim();
@@ -242,6 +248,7 @@ export function NoteEditor({
     const origKleur = note?.kleur ?? "";
     const origTags = note?.tags ?? [];
     const origLinkedEventId = note?.linkedEventId ?? note?.linked_event_id ?? initialLinkedEventId ?? "";
+    const origSymbol = resolveAppIconName(note?.symbol, "note");
 
     const hasChanges =
       cleanTitel !== origTitel ||
@@ -249,6 +256,7 @@ export function NoteEditor({
       deadline !== origDeadline ||
       linkedEventId !== origLinkedEventId ||
       prioriteit !== origPrioriteit ||
+      symbol !== origSymbol ||
       kleur !== origKleur ||
       [...tags].sort().join(",") !== [...origTags].sort().join(",");
 
@@ -259,7 +267,7 @@ export function NoteEditor({
       if (!confirmClose) return;
     }
     onClose();
-  }, [titel, inhoud, deadline, linkedEventId, initialLinkedEventId, prioriteit, kleur, tags, note, onClose]);
+  }, [titel, inhoud, deadline, linkedEventId, initialLinkedEventId, prioriteit, symbol, kleur, tags, note, onClose]);
 
   const handleDeleteClick = () => {
     if (onDelete && note) {
@@ -357,6 +365,7 @@ export function NoteEditor({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-2">
+            <AppIcon name={symbol} tone="amber" size="sm" framed active />
             {kleur && (
               <span className="h-3 w-3 rounded-full shrink-0" style={{ background: kleur }} />
             )}
@@ -464,6 +473,7 @@ export function NoteEditor({
           {/* Toolbar row */}
           <div className="flex flex-wrap items-center gap-2">
             <ToolbarButton icon={ListChecks} label="Checklist" onClick={insertChecklist} active={false} />
+            <SymbolToolbarButton symbol={symbol} label="Symbool" onClick={() => setShowSymbols(!showSymbols)} active={showSymbols} />
             <ToolbarButton icon={Palette} label="Kleur" onClick={() => setShowColors(!showColors)} active={showColors} />
             <ToolbarButton icon={CalendarDays} label="Deadline" onClick={() => setShowMeta(!showMeta)} active={showMeta} />
 
@@ -472,6 +482,26 @@ export function NoteEditor({
               {wordCount}w · {charCount}c
             </div>
           </div>
+
+          {/* Symbol picker */}
+          <AnimatePresence>
+            {showSymbols && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <SymbolPicker
+                  value={symbol}
+                  options={NOTE_SYMBOL_OPTIONS}
+                  onChange={setSymbol}
+                  tone="amber"
+                  fallback="note"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Color picker */}
           <AnimatePresence>
@@ -809,6 +839,35 @@ function ToolbarButton({
       aria-label={label}
     >
       <Icon size={16} />
+    </button>
+  );
+}
+
+function SymbolToolbarButton({
+  symbol,
+  label,
+  onClick,
+  active,
+}: {
+  symbol: AppIconName;
+  label: string;
+  onClick: () => void;
+  active: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2.5 transition-colors cursor-pointer ${
+        active
+          ? "bg-amber-500/10 text-amber-400"
+          : "hover:bg-[var(--color-surface-hover)] text-[var(--color-text-subtle)]"
+      }`}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+    >
+      <AppIcon name={symbol} tone="amber" size="sm" />
     </button>
   );
 }

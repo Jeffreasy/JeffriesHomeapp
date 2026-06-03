@@ -2,10 +2,12 @@
 
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CalendarDays, Clock, FileText, Plus } from "lucide-react";
+import { Clock, Plus } from "lucide-react";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 import { getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { resolveAppIconName } from "@/lib/symbols";
 
 interface DayColumnProps {
   date: Date;
@@ -135,7 +137,7 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
               className="flex items-center justify-between gap-2 rounded-lg border border-sky-500/15 bg-sky-500/[0.045] px-2.5 py-1.5 text-[11px]"
             >
               <span className="flex min-w-0 items-center gap-1.5 font-semibold text-sky-200">
-                <CalendarDays size={11} className="shrink-0 text-sky-300/80" />
+                <AppIcon name={resolveAppIconName(event.symbol, "agenda")} tone="cyan" size="xs" />
                 <span className="truncate">{event.titel}</span>
               </span>
               <span className="flex shrink-0 items-center gap-1 text-[10px] text-slate-400">
@@ -173,14 +175,14 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
               className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group/item"
             >
               <div className="flex items-start gap-2">
-                {note.kleur ? (
-                  <span
-                    className="mt-1.5 h-2 w-2 rounded-full shrink-0"
-                    style={{ backgroundColor: note.kleur }}
-                  />
-                ) : (
-                  <FileText size={12} className="mt-1 shrink-0 text-[var(--color-text-subtle)]" />
-                )}
+                <AppIcon
+                  name={resolveAppIconName(note.symbol, "note")}
+                  tone="amber"
+                  size="xs"
+                  framed
+                  className="mt-0.5 h-6 w-6 rounded-md"
+                  iconClassName={note.kleur ? undefined : "text-[var(--color-text-muted)]"}
+                />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-[var(--color-text)] truncate font-medium">
                     {note.titel || note.inhoud.split("\n")[0].slice(0, 50)}

@@ -8,19 +8,38 @@ import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
 import { useToast } from "@/components/ui/Toast";
 import { AppIcon } from "@/components/ui/AppIcon";
-import { EVENT_CATEGORY_SYMBOLS } from "@/lib/symbols";
+import { SymbolPicker } from "@/components/ui/SymbolPicker";
+import {
+  EVENT_CATEGORY_SYMBOLS,
+  EVENT_SYMBOL_OPTIONS,
+  getEventCategoryIcon,
+  resolveAppIconName,
+  type AppIconName,
+} from "@/lib/symbols";
 
 const CATEGORIES = EVENT_CATEGORY_SYMBOLS;
 
 type CategoryId = typeof CATEGORIES[number]["id"];
 
 function parseCategoryFromDescription(desc?: string): CategoryId {
-  const match = desc?.match(/\[categorie:(\w+)\]/);
+  const match = desc?.match(/\[categorie:([a-z0-9_-]+)\]/i);
   return (match?.[1] as CategoryId) ?? "overig";
 }
 
-function stripCategoryTag(desc: string): string {
-  return desc.replace(/\s*\[categorie:\w+\]/, "").trim();
+function parseSymbolFromDescription(desc?: string): string | undefined {
+  return desc?.match(/\[symbol:([a-z0-9_-]+)\]/i)?.[1];
+}
+
+function stripEventMetadata(desc: string): string {
+  return desc.replace(/\s*\[(categorie|symbol):[a-z0-9_-]+\]/gi, "").trim();
+}
+
+function categoryIcon(category: CategoryId): AppIconName {
+  return getEventCategoryIcon(category);
+}
+
+function buildDescription(description: string, category: CategoryId, symbol: AppIconName): string {
+  return `${description.trim()} [categorie:${category}] [symbol:${symbol}]`.trim();
 }
 
 function nextPendingStatus(editEvent?: PersonalEvent | null) {
@@ -51,13 +70,14 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
   const [locatie,      setLocatie]      = useState("");
   const [beschrijving, setBeschrijving] = useState("");
   const [categorie,    setCategorie]    = useState<CategoryId>("overig");
+  const [symbol,       setSymbol]       = useState<AppIconName>(categoryIcon("overig"));
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
 
   const reset = useCallback(() => {
     setTitel(""); setStartDatum(today); setEindDatum(today);
     setHeledag(true); setStartTijd("09:00"); setEindTijd("10:00");
-    setLocatie(""); setBeschrijving(""); setCategorie("overig"); setError("");
+    setLocatie(""); setBeschrijving(""); setCategorie("overig"); setSymbol(categoryIcon("overig")); setError("");
   }, [today]);
 
   useEffect(() => {
@@ -70,8 +90,10 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
         setStartTijd(editEvent.startTijd ?? "09:00");
         setEindTijd(editEvent.eindTijd ?? "10:00");
         setLocatie(editEvent.locatie ?? "");
-        setCategorie(parseCategoryFromDescription(editEvent.beschrijving));
-        setBeschrijving(stripCategoryTag(editEvent.beschrijving ?? ""));
+        const nextCategory = parseCategoryFromDescription(editEvent.beschrijving);
+        setCategorie(nextCategory);
+        setSymbol(resolveAppIconName(editEvent.symbol ?? parseSymbolFromDescription(editEvent.beschrijving), categoryIcon(nextCategory)));
+        setBeschrijving(stripEventMetadata(editEvent.beschrijving ?? ""));
         setError("");
       } else {
         reset();
@@ -80,6 +102,14 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
   }, [open, editEvent, reset]);
 
   const handleClose = () => { reset(); onClose(); };
+
+  const handleCategoryChange = (nextCategory: CategoryId) => {
+    const previousIcon = categoryIcon(categorie);
+    if (symbol === previousIcon) {
+      setSymbol(categoryIcon(nextCategory));
+    }
+    setCategorie(nextCategory);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,9 +125,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
     setError("");
     try {
       const rawDesc = beschrijving.trim();
-      const fullDesc = rawDesc
-        ? `${rawDesc} [categorie:${categorie}]`
-        : `[categorie:${categorie}]`;
+      const fullDesc = buildDescription(rawDesc, categorie, symbol);
 
       const row: PersonalEventRow = {
         user_id:      user.id,
@@ -111,6 +139,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
         locatie:      locatie.trim() || null,
         beschrijving: fullDesc || null,
         conflict_met_dienst: null,
+        symbol,
         status:       nextPendingStatus(editEvent),
         kalender:     editEvent?.kalender ?? "Main",
       };
@@ -150,12 +179,12 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
             animate={{ opacity: 1, scale: 1,    y: 0   }}
             exit={{   opacity: 0, scale: 0.95, y: 16  }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 max-w-md mx-auto"
+            className="fixed inset-x-3 top-1/2 z-50 mx-auto max-w-lg -translate-y-1/2 sm:inset-x-4"
           >
-            <div className="glass rounded-2xl border border-[var(--color-border)] shadow-2xl overflow-hidden">
+            <div className="glass flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] shadow-2xl">
 
               {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
+              <div className="flex shrink-0 items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
                 <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                   <AppIcon name="agenda" tone="indigo" size="sm" />
                   {editEvent ? "Afspraak wijzigen" : "Nieuwe afspraak"}
@@ -170,7 +199,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto px-5 py-4">
 
                 {/* Titel */}
                 <div>
@@ -266,7 +295,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                       <button
                         key={id}
                         type="button"
-                        onClick={() => setCategorie(id)}
+                        onClick={() => handleCategoryChange(id)}
                         className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border cursor-pointer ${
                           categorie === id
                             ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
@@ -278,6 +307,21 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Symbool */}
+                <div>
+                  <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                    Symbool
+                  </label>
+                  <SymbolPicker
+                    value={symbol}
+                    options={EVENT_SYMBOL_OPTIONS}
+                    onChange={setSymbol}
+                    tone="indigo"
+                    fallback={categoryIcon(categorie)}
+                    gridClassName="grid-cols-2 sm:grid-cols-3"
+                  />
                 </div>
 
                 {/* Beschrijving */}
