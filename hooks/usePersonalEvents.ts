@@ -26,6 +26,14 @@ export interface PersonalEvent {
   team?:             string;
 }
 
+const PENDING_STATUSES = new Set(["PendingCreate", "PendingUpdate", "PendingDelete"]);
+const DELETED_STATUSES = new Set(["VERWIJDERD", "cancelled"]);
+
+type AmsterdamNow = {
+  date: string;
+  time: string;
+};
+
 function fromRow(r: PersonalEventRow): PersonalEvent {
   return {
     _id:          r.id ?? "",
@@ -67,13 +75,7 @@ function fromDienstToEvent(d: DienstRow, userId: string): PersonalEvent {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function getDisplayEndDate(event: PersonalEvent): string {
-  if (!event.heledag) return event.eindDatum || event.startDatum;
-  const raw = event.eindDatum;
-  if (!raw || raw.length < 10) return event.startDatum;
-  const d = new Date(raw + "T12:00:00");
-  if (isNaN(d.getTime())) return event.startDatum;
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return event.eindDatum || event.startDatum;
 }
 
 export function getTimeLabel(event: PersonalEvent): string {
@@ -137,6 +139,62 @@ function isScheduleDuplicateEvent(event: PersonalEvent, diensten: DienstRow[]): 
   });
 }
 
+function isPending(event: PersonalEvent): boolean {
+  return PENDING_STATUSES.has(event.status);
+}
+
+function isDeleted(event: PersonalEvent): boolean {
+  return DELETED_STATUSES.has(event.status);
+}
+
+function getAmsterdamNow(now = new Date()): AmsterdamNow {
+  const date = now.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+  const time = new Intl.DateTimeFormat("nl-NL", {
+    timeZone: "Europe/Amsterdam",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(now);
+  return { date, time };
+}
+
+function isEventPast(event: PersonalEvent, now: AmsterdamNow): boolean {
+  const endDate = getDisplayEndDate(event) || event.startDatum;
+
+  if (event.heledag) {
+    return endDate < now.date;
+  }
+
+  const endTime = event.eindTijd || "23:59";
+  return endDate < now.date || (endDate === now.date && endTime <= now.time);
+}
+
+function normalizeTemporalStatus(event: PersonalEvent, now: AmsterdamNow): PersonalEvent {
+  if (isPending(event) || isDeleted(event)) return event;
+  const shouldBePast = isEventPast(event, now);
+  if (shouldBePast && event.status !== "Voorbij") return { ...event, status: "Voorbij" };
+  if (!shouldBePast && event.status === "Voorbij") return { ...event, status: "Aankomend" };
+  return event;
+}
+
+function startSortKey(event: PersonalEvent): string {
+  return `${event.startDatum || "9999-12-31"}T${event.startTijd || "00:00"}`;
+}
+
+function endSortKey(event: PersonalEvent): string {
+  return `${getDisplayEndDate(event) || event.startDatum || "9999-12-31"}T${event.eindTijd || "23:59"}`;
+}
+
+function compareEvents(a: PersonalEvent, b: PersonalEvent): number {
+  return startSortKey(a).localeCompare(startSortKey(b)) || a.titel.localeCompare(b.titel);
+}
+
+function addDaysIso(baseIso: string, days: number): string {
+  const date = new Date(`${baseIso}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 // ─── Hook (Go API) ───────────────────────────────────────────────────────────
 
 export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
@@ -144,10 +202,27 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
   const userId = user?.id ?? "";
 
   const [raw, setRaw] = useState<PersonalEventRow[] | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<Error | null>(null);
+  const [now, setNow] = useState<AmsterdamNow>(() => getAmsterdamNow());
 
-  const reload = useCallback(() => {
-    if (!userId) return;
-    personalEventsApi.list(userId).then(setRaw);
+  const reload = useCallback(async () => {
+    setNow(getAmsterdamNow());
+    if (!userId) {
+      setRaw([]);
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      setRaw(await personalEventsApi.list(userId));
+    } catch (err) {
+      setLoadError(err instanceof Error ? err : new Error("Agenda laden mislukt"));
+      setRaw((current) => current ?? []);
+    } finally {
+      setIsLoading(false);
+    }
   }, [userId]);
 
   useEffect(() => { reload(); }, [reload]);
@@ -158,26 +233,32 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
   );
 
   const visibleEvents = useMemo(() => {
-    const personal = events.filter((e) => !isScheduleDuplicateEvent(e, options?.diensten ?? []));
+    const personal = events
+      .map((e) => normalizeTemporalStatus(e, now))
+      .filter((e) => !isDeleted(e) && !isScheduleDuplicateEvent(e, options?.diensten ?? []));
     const mappedDiensten = (options?.diensten ?? [])
       .filter((d) => d.status !== "VERWIJDERD")
-      .map((d) => fromDienstToEvent(d, userId));
-    return [...personal, ...mappedDiensten];
-  }, [events, options?.diensten, userId]);
+      .map((d) => normalizeTemporalStatus(fromDienstToEvent(d, userId), now));
+    return [...personal, ...mappedDiensten].sort(compareEvents);
+  }, [events, now, options?.diensten, userId]);
 
   const upcoming = useMemo(
-    () => visibleEvents.filter((e) => e.status === "Aankomend"),
-    [visibleEvents]
+    () => visibleEvents
+      .filter((e) => !isEventPast(e, now) && e.status !== "PendingDelete" && !isDeleted(e))
+      .sort(compareEvents),
+    [now, visibleEvents]
   );
 
   const pending = useMemo(
-    () => visibleEvents.filter((e) => e.status === "PendingCreate"),
+    () => visibleEvents.filter(isPending).sort(compareEvents),
     [visibleEvents]
   );
 
   const history = useMemo(
-    () => visibleEvents.filter((e) => e.status === "Voorbij"),
-    [visibleEvents]
+    () => visibleEvents
+      .filter((e) => e.status === "Voorbij" || isEventPast(e, now))
+      .sort((a, b) => endSortKey(b).localeCompare(endSortKey(a))),
+    [now, visibleEvents]
   );
 
   const conflictMap = useMemo(
@@ -196,7 +277,15 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
   const eventsByDate = useMemo(() => {
     const map: Record<string, PersonalEvent[]> = {};
     for (const e of upcoming) {
-      (map[e.startDatum] ??= []).push(e);
+      let day = e.startDatum;
+      const end = getDisplayEndDate(e);
+      while (day <= end) {
+        (map[day] ??= []).push(e);
+        day = addDaysIso(day, 1);
+      }
+    }
+    for (const dayEvents of Object.values(map)) {
+      dayEvents.sort(compareEvents);
     }
     return map;
   }, [upcoming]);
@@ -212,7 +301,8 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
     conflictMap,
     eventsByDate,
     nextAppointment,
-    isLoading:       raw === undefined,
+    error:           loadError,
+    isLoading:       raw === undefined || isLoading,
     refetch:         reload,
   };
 }

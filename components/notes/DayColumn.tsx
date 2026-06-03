@@ -2,15 +2,17 @@
 
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, FileText } from "lucide-react";
+import { CalendarDays, Clock, FileText, Plus } from "lucide-react";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
+import { getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
 
 interface DayColumnProps {
   date: Date;
   isToday: boolean;
   notes: NoteRecord[];
-  dienst?: DienstRow;
+  diensten?: DienstRow[];
+  agendaEvents?: PersonalEvent[];
   onEdit: (note: NoteRecord) => void;
   onCreate: (data: NoteCreateData) => Promise<void>;
 }
@@ -20,10 +22,9 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Amsterdam" });
 }
 
-const DAG_NAMEN = ["zo", "ma", "di", "wo", "do", "vr", "za"];
 const DAG_NAMEN_LANG = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
 
-export function DayColumn({ date, isToday, notes, dienst, onEdit, onCreate }: DayColumnProps) {
+export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = [], onEdit, onCreate }: DayColumnProps) {
   const [quickText, setQuickText] = useState("");
   const [saving, setSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +33,6 @@ export function DayColumn({ date, isToday, notes, dienst, onEdit, onCreate }: Da
   const dagNr = date.getDate();
   const maand = date.toLocaleDateString("nl-NL", { month: "short" });
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-  const shiftColors = dienst && dienst.shiftType ? shiftTypeColor(dienst.shiftType) : null;
 
   const handleQuickSave = useCallback(async () => {
     const text = quickText.trim();
@@ -43,7 +43,7 @@ export function DayColumn({ date, isToday, notes, dienst, onEdit, onCreate }: Da
       await onCreate({
         inhoud: text,
         titel: text.length > 80 ? text.slice(0, 77) + "..." : text,
-        deadline: date.toISOString(),
+        deadline: date.toLocaleDateString("sv-SE"),
       });
       setQuickText("");
     } finally {
@@ -97,25 +97,56 @@ export function DayColumn({ date, isToday, notes, dienst, onEdit, onCreate }: Da
         )}
       </div>
 
-      {dienst && (
-        <div
-          className="mx-3 mt-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.1)] transition-colors"
-          style={{
-            background: shiftColors ? shiftColors.accent + "0a" : "rgba(255,255,255,0.03)",
-            borderColor: shiftColors ? shiftColors.accent + "1a" : "rgba(255,255,255,0.08)",
-            color: shiftColors ? shiftColors.accent : "#94a3b8",
-          }}
-        >
-          <span className="flex items-center gap-1.5 uppercase tracking-widest font-black text-[9px]">
-            <span
-              className="h-1.5 w-1.5 rounded-full shrink-0"
-              style={{ backgroundColor: shiftColors ? shiftColors.accent : "#94a3b8" }}
-            />
-            {dienst.shiftType}
-          </span>
-          <span className="font-mono tracking-tighter text-slate-400">
-            {dienst.startTijd}–{dienst.eindTijd}
-          </span>
+      {diensten.length > 0 && (
+        <div className="mx-3 mt-2 space-y-1">
+          {diensten.map((dienst) => {
+            const shiftColors = dienst.shiftType ? shiftTypeColor(dienst.shiftType) : null;
+            return (
+              <div
+                key={dienst.eventId}
+                className="px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.1)] transition-colors"
+                style={{
+                  background: shiftColors ? shiftColors.accent + "0a" : "rgba(255,255,255,0.03)",
+                  borderColor: shiftColors ? shiftColors.accent + "1a" : "rgba(255,255,255,0.08)",
+                  color: shiftColors ? shiftColors.accent : "#94a3b8",
+                }}
+              >
+                <span className="flex items-center gap-1.5 uppercase tracking-widest font-black text-[9px]">
+                  <span
+                    className="h-1.5 w-1.5 rounded-full shrink-0"
+                    style={{ backgroundColor: shiftColors ? shiftColors.accent : "#94a3b8" }}
+                  />
+                  {dienst.shiftType}
+                </span>
+                <span className="font-mono tracking-tighter text-slate-400">
+                  {dienst.startTijd}–{dienst.eindTijd}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {agendaEvents.length > 0 && (
+        <div className="mx-3 mt-2 space-y-1">
+          {agendaEvents.slice(0, 4).map((event) => (
+            <div
+              key={event.eventId}
+              className="flex items-center justify-between gap-2 rounded-lg border border-sky-500/15 bg-sky-500/[0.045] px-2.5 py-1.5 text-[11px]"
+            >
+              <span className="flex min-w-0 items-center gap-1.5 font-semibold text-sky-200">
+                <CalendarDays size={11} className="shrink-0 text-sky-300/80" />
+                <span className="truncate">{event.titel}</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1 text-[10px] text-slate-400">
+                <Clock size={9} />
+                {getTimeLabel(event)}
+              </span>
+            </div>
+          ))}
+          {agendaEvents.length > 4 && (
+            <p className="px-2 text-[10px] font-medium text-slate-500">+{agendaEvents.length - 4} meer afspraken</p>
+          )}
         </div>
       )}
 

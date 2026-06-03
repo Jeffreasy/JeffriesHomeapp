@@ -97,11 +97,11 @@ export function useSchedule() {
 
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/schedule"] });
+    queryClient.invalidateQueries({ queryKey: ["/schedule/meta"] });
   }, [queryClient]);
 
-  const refetch = useCallback(() => {
-    refetchSchedule();
-    refetchMeta();
+  const refetch = useCallback(async () => {
+    await Promise.all([refetchSchedule(), refetchMeta()]);
   }, [refetchSchedule, refetchMeta]);
 
   const clear = useCallback(async () => {
@@ -144,8 +144,10 @@ export function useSchedule() {
   }, [userId, invalidateAll]);
 
   const toggleStatus = async (event_id: string, status: string) => {
+    const dienst = diensten.find((d) => d.eventId === event_id);
+    if (!dienst) return;
     setVersion((v) => v + 1);
-    await postScheduleImport({ userId, fileName: "status-update", rows: [{ event_id, status }] } as unknown as Parameters<typeof postScheduleImport>[0]);
+    await postScheduleImport({ userId, fileName: "status-update", rows: [{ ...dienst, status }] } as unknown as Parameters<typeof postScheduleImport>[0]);
     invalidateAll();
   };
 

@@ -13,6 +13,7 @@ interface NoteCardProps {
   onDelete:    (id: string) => void;
   onUpdateContent?: (id: string, inhoud: string) => void;
   onNavigateToNote?: (title: string) => void;
+  linkedEventLabel?: string;
   masked?:     boolean;
 }
 
@@ -24,7 +25,7 @@ const PRIORITEIT_STYLES: Record<string, { dot: string; label: string }> = {
   laag:    { dot: "bg-blue-400",   label: "Laag" },
 };
 
-export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpdateContent, onNavigateToNote, masked }: NoteCardProps) {
+export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpdateContent, onNavigateToNote, linkedEventLabel, masked }: NoteCardProps) {
   const displayTitle = note.titel || note.inhoud.slice(0, 50);
   const age = formatAge(note.gewijzigd);
   const checklistInfo = getChecklistInfo(note.inhoud);
@@ -101,9 +102,12 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
 
         {/* Linked event chip */}
         {!masked && note.linkedEventId && (
-          <div className="inline-flex items-center gap-1 text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-md mb-2 ml-1">
+          <div
+            className="inline-flex max-w-full items-center gap-1 rounded-md bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-400 mb-2 ml-1"
+            title={linkedEventLabel ? `Gekoppeld aan ${linkedEventLabel}` : "Gekoppeld aan afspraak"}
+          >
             <CalendarDays size={9} aria-hidden="true" />
-            <span>Gekoppeld</span>
+            <span className="truncate">{linkedEventLabel ?? "Gekoppeld"}</span>
           </div>
         )}
 

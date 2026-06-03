@@ -430,7 +430,7 @@ Elke agent heeft een `getContext()` functie die **live data** ophaalt uit Convex
 ### 7.6 [api.ts](file:///c:/Users/JJALa/Desktop/2026Developer/JeffriesHomeapp/lib/api.ts) (106 regels)
 
 **FastAPI REST client:**
-- `API_BASE` via `NEXT_PUBLIC_API_URL` (default `http://localhost:8000/api/v1`)
+- Browser calls use `/api/backend`; the Next proxy targets `BACKEND_API_URL` or Render by default.
 - `X-API-Key` header authenticatie
 - **roomsApi:** CRUD (list, get, create, update, delete)
 - **devicesApi:** CRUD + `command(id, cmd)` + `register(data)`

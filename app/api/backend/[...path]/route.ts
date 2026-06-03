@@ -17,8 +17,10 @@ const HOP_BY_HOP_HEADERS = new Set([
   "upgrade",
 ]);
 
+const DEFAULT_BACKEND_API_URL = "https://jeffriesbackend.onrender.com/api/v1";
+
 function backendBaseUrl() {
-  return (process.env.BACKEND_API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1").replace(/\/+$/, "");
+  return (process.env.BACKEND_API_URL ?? DEFAULT_BACKEND_API_URL).replace(/\/+$/, "");
 }
 
 function backendApiKey() {

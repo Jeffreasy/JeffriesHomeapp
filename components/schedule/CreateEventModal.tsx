@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Calendar, Clock, MapPin, FileText, Plus, Save } from "lucide-react";
-import { personalEventsApi } from "@/lib/api";
+import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
+import { useToast } from "@/components/ui/Toast";
 
 const CATEGORIES = [
   { id: "sociaal",     emoji: "☕", label: "Sociaal" },
@@ -31,15 +32,22 @@ function stripCategoryTag(desc: string): string {
   return desc.replace(/\s*\[categorie:\w+\]/, "").trim();
 }
 
+function nextPendingStatus(editEvent?: PersonalEvent | null) {
+  if (!editEvent) return "PendingCreate";
+  if (editEvent.status === "PendingCreate") return "PendingCreate";
+  return "PendingUpdate";
+}
+
 interface CreateEventModalProps {
   open:       boolean;
   onClose:    () => void;
-  onSuccess?: () => void;
+  onSuccess?: () => void | Promise<void>;
   editEvent?: PersonalEvent | null;
 }
 
 export function CreateEventModal({ open, onClose, onSuccess, editEvent }: CreateEventModalProps) {
   const { user }  = useUser();
+  const { success, toast } = useToast();
 
   const today = getAmsterdamTodayIso();
 
@@ -55,11 +63,11 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setTitel(""); setStartDatum(today); setEindDatum(today);
     setHeledag(true); setStartTijd("09:00"); setEindTijd("10:00");
     setLocatie(""); setBeschrijving(""); setCategorie("overig"); setError("");
-  };
+  }, [today]);
 
   useEffect(() => {
     if (open) {
@@ -78,7 +86,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
         reset();
       }
     }
-  }, [open, editEvent]);
+  }, [open, editEvent, reset]);
 
   const handleClose = () => { reset(); onClose(); };
 
@@ -87,6 +95,10 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
     if (!user?.id) return;
     if (!titel.trim()) { setError("Titel is verplicht"); return; }
     if (eindDatum < startDatum) { setError("Einddatum mag niet vóór startdatum zijn"); return; }
+    if (!heledag && startDatum === eindDatum && eindTijd <= startTijd) {
+      setError("Eindtijd moet na starttijd liggen");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -96,7 +108,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
         ? `${rawDesc} [categorie:${categorie}]`
         : `[categorie:${categorie}]`;
 
-      const row = {
+      const row: PersonalEventRow = {
         user_id:      user.id,
         event_id:     editEvent?.eventId ?? crypto.randomUUID(),
         titel:        titel.trim(),
@@ -107,18 +119,24 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
         eind_tijd:    heledag ? null : eindTijd  || null,
         locatie:      locatie.trim() || null,
         beschrijving: fullDesc || null,
-        status:       "Aankomend",
-        kalender:     "Main",
-        bron:         "manual",
-        google_event_id: null,
-        created_at:   editEvent ? undefined : new Date().toISOString(),
+        conflict_met_dienst: null,
+        status:       nextPendingStatus(editEvent),
+        kalender:     editEvent?.kalender ?? "Main",
       };
 
-      await personalEventsApi.upsert(row as any);
-      onSuccess?.();
+      const result = await personalEventsApi.upsert(row);
+      if (result.instantSync) {
+        success(editEvent ? "Afspraak direct bijgewerkt in Google Calendar" : "Afspraak direct gesynchroniseerd met Google Calendar");
+      } else {
+        toast(result.syncError
+          ? "Afspraak opgeslagen; Google sync blijft in de wachtrij."
+          : "Afspraak opgeslagen en staat in de Google Calendar wachtrij.",
+        "info");
+      }
+      await onSuccess?.();
       handleClose();
-    } catch (err: any) {
-      setError(err.message ?? "Opslaan mislukt");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Opslaan mislukt");
     } finally {
       setLoading(false);
     }
@@ -289,8 +307,8 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
                 {/* Info */}
                 <p className="text-[10px] text-slate-600">
                   {editEvent
-                    ? "Wijzigingen worden direct gesynchroniseerd met Google Calendar."
-                    : "Afspraak wordt lokaal opgeslagen. Bij de volgende sync wordt deze automatisch naar Google Calendar gestuurd."
+                    ? "Wijzigingen worden direct naar Google Calendar gepusht. Als Google niet reageert, blijft de actie in de Render-wachtrij."
+                    : "Afspraak wordt direct naar Google Calendar gepusht. Als Google niet reageert, blijft de actie in de Render-wachtrij."
                   }
                 </p>
 

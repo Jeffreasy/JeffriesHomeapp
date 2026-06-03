@@ -1,5 +1,5 @@
 import { type DienstRow } from "./schedule";
-import { type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,7 +37,7 @@ function detectConflict(
   event: PersonalEvent,
   dienst: DienstRow,
 ): ConflictLevel | null {
-  if (event.startDatum !== dienst.startDatum) return null;
+  if (event.startDatum > dienst.startDatum || getDisplayEndDate(event) < dienst.startDatum) return null;
 
   // Hele-dag event → altijd zacht conflict
   if (event.heledag || !event.startTijd || !event.eindTijd) return "soft";

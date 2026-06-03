@@ -14,7 +14,7 @@
     "directBackend": "Private /api/v1 routes require X-API-Key.",
     "frontend": "Browser code calls /api/backend. The Next.js proxy injects X-API-Key server-side.",
     "serverEnvVars": ["BACKEND_API_URL", "BACKEND_API_KEY", "APP_SECRET_KEY"],
-    "legacyFallbackEnvVars": ["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_API_KEY"]
+    "legacyFallbackEnvVars": ["NEXT_PUBLIC_API_KEY"]
   },
   "sourceFiles": {
     "frontendProxy": "app/api/backend/[...path]/route.ts",

@@ -1,7 +1,7 @@
 "use client";
 
 import { ClerkProvider } from "@clerk/nextjs";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { defaultShouldDehydrateQuery, QueryClient, QueryClientProvider, type QueryKey } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { get, set, del } from "idb-keyval";
@@ -9,6 +9,13 @@ import { useState } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { PwaRegistry } from "@/components/pwa/PwaRegistry";
+
+const PERSIST_DENY_PREFIXES = ["/notes", "/personal-events", "/schedule", "/sync", "sync-status"];
+
+function shouldPersistQuery(queryKey: QueryKey) {
+  const first = queryKey[0];
+  return typeof first !== "string" || !PERSIST_DENY_PREFIXES.some((prefix) => first.startsWith(prefix));
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -40,7 +47,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
       {persister ? (
-        <PersistQueryClientProvider client={queryClient} persistOptions={{ persister }}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister,
+            dehydrateOptions: {
+              shouldDehydrateQuery: (query) =>
+                defaultShouldDehydrateQuery(query) && shouldPersistQuery(query.queryKey),
+            },
+          }}
+        >
           <ToastProvider>
             <ConfirmProvider>
               <PwaRegistry />

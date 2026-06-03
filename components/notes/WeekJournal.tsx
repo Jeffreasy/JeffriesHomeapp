@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { DayColumn } from "./DayColumn";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
+import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type DienstRow } from "@/lib/schedule";
 
 interface WeekJournalProps {
@@ -14,6 +15,7 @@ interface WeekJournalProps {
   onWeekChange: (newMonday: Date) => void;
   onEdit: (note: NoteRecord) => void;
   onCreate: (data: NoteCreateData) => Promise<void>;
+  agendaEvents?: PersonalEvent[];
 }
 
 function getMonday(d: Date): Date {
@@ -36,7 +38,7 @@ function getWeekNumber(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-export function WeekJournal({ notes, diensten = [], weekStart, onWeekChange, onEdit, onCreate }: WeekJournalProps) {
+export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart, onWeekChange, onEdit, onCreate }: WeekJournalProps) {
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -157,7 +159,10 @@ export function WeekJournal({ notes, diensten = [], weekStart, onWeekChange, onE
           const key = isoDate(day);
           const dayNotes = notesByDate.get(key) ?? [];
           const dayIsToday = isoDate(day) === isoDate(today);
-          const dayDienst = diensten.find((d) => d.startDatum === key);
+          const dayDiensten = diensten.filter((d) => d.startDatum === key);
+          const dayAgendaEvents = agendaEvents.filter(
+            (event) => event.kalender !== "Rooster" && event.startDatum <= key && getDisplayEndDate(event) >= key
+          );
 
           return (
             <DayColumn
@@ -165,7 +170,8 @@ export function WeekJournal({ notes, diensten = [], weekStart, onWeekChange, onE
               date={day}
               isToday={dayIsToday}
               notes={dayNotes}
-              dienst={dayDienst}
+              diensten={dayDiensten}
+              agendaEvents={dayAgendaEvents}
               onEdit={onEdit}
               onCreate={onCreate}
             />

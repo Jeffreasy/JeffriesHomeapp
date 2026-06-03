@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, ChevronDown, Link2, Check, Trash2, Archive, Pin } from "lucide-react";
+import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, Link2, Check, Trash2, Archive, Pin } from "lucide-react";
 import { getNotesSearch } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
+import { formatDateRange, getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
 
 const KLEUREN = [
   "#f59e0b", "#22c55e", "#3b82f6", "#ef4444",
@@ -17,6 +18,11 @@ const PRIORITEITEN = [
   { value: "laag",    label: "Laag",    dot: "bg-blue-400" },
 ] as const;
 
+type LinkSearchItem = {
+  id?: string;
+  titel?: string | null;
+};
+
 interface NoteEditorProps {
   note?: NoteRecord | null;
   userId?: string;
@@ -25,6 +31,11 @@ interface NoteEditorProps {
   onDelete?: (id: string) => void;
   onArchive?: (id: string) => void;
   onTogglePin?: (id: string) => void;
+  eventOptions?: PersonalEvent[];
+  initialDeadline?: string;
+  initialLinkedEventId?: string;
+  initialTags?: string[];
+  initialTitle?: string;
 }
 
 export function NoteEditor({ 
@@ -35,18 +46,24 @@ export function NoteEditor({
   onDelete,
   onArchive,
   onTogglePin,
+  eventOptions = [],
+  initialDeadline,
+  initialLinkedEventId,
+  initialTags,
+  initialTitle,
 }: NoteEditorProps) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [titel, setTitel]           = useState(note?.titel ?? "");
+  const [titel, setTitel]           = useState(note?.titel ?? initialTitle ?? "");
   const [inhoud, setInhoud]         = useState(note?.inhoud ?? "");
-  const [tags, setTags]             = useState<string[]>(note?.tags ?? []);
+  const [tags, setTags]             = useState<string[]>(note?.tags ?? initialTags ?? []);
   const [kleur, setKleur]           = useState(note?.kleur ?? "");
   const [tagInput, setTagInput]     = useState("");
   const [showColors, setShowColors] = useState(false);
-  const [deadline, setDeadline]     = useState(note?.deadline ?? "");
+  const [deadline, setDeadline]     = useState(note?.deadline ?? initialDeadline ?? "");
+  const [linkedEventId, setLinkedEventId] = useState(note?.linkedEventId ?? note?.linked_event_id ?? initialLinkedEventId ?? "");
   const [prioriteit, setPrioriteit] = useState(note?.prioriteit ?? "normaal");
-  const [showMeta, setShowMeta]     = useState(!!(note?.deadline || (note?.prioriteit && note.prioriteit !== "normaal")));
+  const [showMeta, setShowMeta]     = useState(!!(note?.deadline || initialDeadline || linkedEventId || (note?.prioriteit && note.prioriteit !== "normaal")));
 
   // ── Zettelkasten [[link]] autocomplete ──────────────────────────────
   const [linkSearch, setLinkSearch]     = useState("");
@@ -65,8 +82,10 @@ export function NoteEditor({
     const timer = setTimeout(async () => {
       try {
         const results = await getNotesSearch({ userId: resolvedUserId, q: linkSearch, limit: 5 });
-        const items = Array.isArray(results) ? results : Array.isArray((results as any).data) ? (results as any).data : [];
-        setLinkResults(items.map((r: any) => ({ id: r.id, titel: r.titel ?? "Zonder titel" })));
+        const items = getLinkSearchItems(results);
+        setLinkResults(items
+          .filter((item): item is LinkSearchItem & { id: string } => Boolean(item.id))
+          .map((item) => ({ id: item.id, titel: item.titel ?? "Zonder titel" })));
       } catch { setLinkResults([]); }
     }, 200);
     return () => clearTimeout(timer);
@@ -177,21 +196,23 @@ export function NoteEditor({
     setSaving(true);
     setSaveError("");
     try {
+      const isEditing = Boolean(note);
       await onSave({
         titel: titel.trim() || undefined,
         inhoud: inhoud.trim(),
-        tags: tags.length > 0 ? tags : undefined,
-        kleur: kleur || undefined,
-        deadline: deadline || undefined,
+        tags: tags.length > 0 ? tags : isEditing ? [] : undefined,
+        kleur: kleur || (isEditing ? "" : undefined),
+        deadline: deadline || (isEditing ? "" : undefined),
+        linkedEventId: linkedEventId || (isEditing ? "" : undefined),
         prioriteit: prioriteit,
       });
       onClose();
-    } catch (err: any) {
-      setSaveError(err?.message ?? "Opslaan mislukt");
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : "Opslaan mislukt");
     } finally {
       setSaving(false);
     }
-  }, [inhoud, titel, tags, kleur, deadline, prioriteit, onSave, onClose]);
+  }, [inhoud, titel, tags, kleur, deadline, linkedEventId, prioriteit, note, onSave, onClose]);
 
   const handleCloseAttempt = useCallback(() => {
     const cleanTitel = titel.trim();
@@ -202,11 +223,13 @@ export function NoteEditor({
     const origPrioriteit = note?.prioriteit ?? "normaal";
     const origKleur = note?.kleur ?? "";
     const origTags = note?.tags ?? [];
+    const origLinkedEventId = note?.linkedEventId ?? note?.linked_event_id ?? initialLinkedEventId ?? "";
 
     const hasChanges =
       cleanTitel !== origTitel ||
       cleanInhoud !== origInhoud ||
       deadline !== origDeadline ||
+      linkedEventId !== origLinkedEventId ||
       prioriteit !== origPrioriteit ||
       kleur !== origKleur ||
       [...tags].sort().join(",") !== [...origTags].sort().join(",");
@@ -218,7 +241,7 @@ export function NoteEditor({
       if (!confirmClose) return;
     }
     onClose();
-  }, [titel, inhoud, deadline, prioriteit, kleur, tags, note, onClose]);
+  }, [titel, inhoud, deadline, linkedEventId, initialLinkedEventId, prioriteit, kleur, tags, note, onClose]);
 
   const handleDeleteClick = () => {
     if (onDelete && note) {
@@ -515,6 +538,34 @@ export function NoteEditor({
                       ))}
                     </div>
                   </div>
+
+                  {eventOptions.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <CalendarDays size={14} className="text-[var(--color-text-subtle)] shrink-0" />
+                      <select
+                        value={linkedEventId}
+                        onChange={(e) => setLinkedEventId(e.target.value)}
+                        className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-base text-[var(--color-text)] outline-none [color-scheme:dark] sm:text-sm"
+                      >
+                        <option value="">Geen afspraak gekoppeld</option>
+                        {eventOptions.slice(0, 80).map((event) => (
+                          <option key={event.eventId} value={event.eventId}>
+                            {formatEventOption(event)}
+                          </option>
+                        ))}
+                      </select>
+                      {linkedEventId && (
+                        <button
+                          type="button"
+                          onClick={() => setLinkedEventId("")}
+                          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 hover:bg-[var(--color-surface-hover)] cursor-pointer"
+                          aria-label="Afspraak loskoppelen"
+                        >
+                          <X size={14} className="text-[var(--color-text-muted)]" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -607,6 +658,18 @@ export function NoteEditor({
       </motion.div>
     </motion.div>
   );
+}
+
+function formatEventOption(event: PersonalEvent) {
+  const source = event.kalender === "Rooster" ? "Dienst" : event.kalender;
+  return `${formatDateRange(event)} - ${getTimeLabel(event)} - ${event.titel} (${source})`;
+}
+
+function getLinkSearchItems(results: unknown): LinkSearchItem[] {
+  if (Array.isArray(results)) return results as LinkSearchItem[];
+  if (!results || typeof results !== "object") return [];
+  const data = (results as { data?: unknown }).data;
+  return Array.isArray(data) ? data as LinkSearchItem[] : [];
 }
 
 // ── Extracted toolbar button ──────────────────────────────────────────

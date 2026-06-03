@@ -17,7 +17,7 @@ The browser must call the local frontend proxy, not Render directly.
 | Context | Base URL to use | Auth behavior |
 |---|---|---|
 | React components/hooks | `/api/backend` | No API key in browser code |
-| Next.js proxy | `BACKEND_API_URL` or `NEXT_PUBLIC_API_URL` | Injects `X-API-Key` server-side |
+| Next.js proxy | `BACKEND_API_URL`, otherwise Render default | Injects `X-API-Key` server-side |
 | Direct backend debugging | `https://jeffriesbackend.onrender.com/api/v1` | Requires `X-API-Key` except public routes |
 
 ## Files To Read
@@ -45,6 +45,7 @@ The browser must call the local frontend proxy, not Render directly.
 - Frontend code should never read or send `NEXT_PUBLIC_API_KEY`.
 - The proxy injects the key from `BACKEND_API_KEY`, `APP_SECRET_KEY`, or the old fallback `NEXT_PUBLIC_API_KEY`.
 - Prefer server-only env vars in production: `BACKEND_API_URL` and `BACKEND_API_KEY`.
+- `NEXT_PUBLIC_API_URL` is intentionally not used by the proxy anymore; browser-visible env vars should not decide the backend target.
 
 ## How To Call The API From Frontend Code
 

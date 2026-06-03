@@ -1,20 +1,24 @@
 import { cn } from "@/lib/utils";
 import {
-  CalendarDays,
   CheckCircle2,
   Loader2,
   AlertTriangle,
+  FileText,
+  Pin,
+  Plus,
   type LucideIcon,
 } from "lucide-react";
 import { PersonalEventItem } from "./PersonalEventItem";
-import { usePersonalEvents, type PersonalEvent, getTimeLabel, formatDateRange } from "@/hooks/usePersonalEvents";
-import { eventCoversDate, formatDateLabel } from "./AgendaUtils";
+import { usePersonalEvents, type PersonalEvent, getTimeLabel } from "@/hooks/usePersonalEvents";
+import type { NoteRecord } from "@/hooks/useNotes";
+import { getLinkedEventId } from "@/components/notes/NoteAgendaUtils";
+import { getDisplayTitle } from "@/components/notes/NotesUtils";
 
 /* ─── Panel (kept, still useful) ─────────────────────────────────────────── */
 
 export function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <section className={cn("rounded-2xl border border-[var(--color-border)] bg-white/[0.03] p-4 sm:p-5", className)}>
+    <section className={cn("rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-4 sm:p-5", className)}>
       {children}
     </section>
   );
@@ -78,6 +82,7 @@ export function InlineStats({
 export function StatusPill({ status }: { status?: string }) {
   const isRunning = status === "running";
   const isSuccess = status === "success";
+  const label = isRunning ? "Sync" : isSuccess ? "OK" : status ? "Check" : "Geen status";
   return (
     <span
       className={cn(
@@ -92,7 +97,7 @@ export function StatusPill({ status }: { status?: string }) {
       {isRunning && <Loader2 size={10} className="animate-spin" />}
       {isSuccess && <CheckCircle2 size={10} />}
       {!isRunning && !isSuccess && <AlertTriangle size={10} />}
-      {status ?? "—"}
+      {label}
     </span>
   );
 }
@@ -109,7 +114,7 @@ export function NextEventCard({ event }: { event: PersonalEvent | null }) {
   });
 
   return (
-    <div className="rounded-xl border border-indigo-500/15 bg-indigo-500/[0.06] p-4">
+    <div className="rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] p-4">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400/70 mb-2">
         Volgende afspraak
       </p>
@@ -129,22 +134,32 @@ export function NextEventCard({ event }: { event: PersonalEvent | null }) {
 /* ─── Timeline Day Group ─────────────────────────────────────────────────── */
 
 export function TimelineDay({
-  dateIso,
   label,
   isToday,
   events,
   onEdit,
   onRefetch,
   conflictMap,
+  notes = [],
+  notesByEventId,
+  onEditNote,
+  onCreateNoteForDate,
+  onCreateNoteForEvent,
 }: {
-  dateIso: string;
   label: string;
   isToday: boolean;
   events: PersonalEvent[];
   onEdit: (event: PersonalEvent) => void;
-  onRefetch?: () => void;
+  onRefetch?: () => void | Promise<void>;
   conflictMap: ReturnType<typeof usePersonalEvents>["conflictMap"];
+  notes?: NoteRecord[];
+  notesByEventId?: Map<string, NoteRecord[]>;
+  onEditNote?: (note: NoteRecord) => void;
+  onCreateNoteForDate?: () => void;
+  onCreateNoteForEvent?: (event: PersonalEvent) => void;
 }) {
+  const dayNotes = notes.filter((note) => !getLinkedEventId(note));
+
   return (
     <div>
       {/* Day separator */}
@@ -159,23 +174,100 @@ export function TimelineDay({
           {label}
         </div>
         <div className="flex-1 h-px bg-[var(--color-border)]" />
+        {onCreateNoteForDate && (
+          <button
+            type="button"
+            onClick={onCreateNoteForDate}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-amber-500/15 bg-amber-500/[0.06] px-2 text-[10px] font-semibold text-amber-300 transition-colors hover:bg-amber-500/[0.1] cursor-pointer"
+          >
+            <Plus size={11} />
+            Notitie
+          </button>
+        )}
         <span className="text-[10px] text-slate-600 tabular-nums">{events.length}</span>
       </div>
 
       {/* Events */}
       <div className="space-y-1 ml-0 sm:ml-1">
-        {events.map((event) => (
-          <PersonalEventItem
-            key={event.eventId}
-            event={event}
-            isToday={isToday}
-            onEdit={onEdit}
-            onRefetch={onRefetch}
-            conflictInfo={conflictMap.get(event.eventId)}
-          />
-        ))}
+        {events.map((event) => {
+          const linkedNotes = notesByEventId?.get(event.eventId) ?? [];
+          return (
+            <div key={event.eventId} className="group/event">
+              <PersonalEventItem
+                event={event}
+                isToday={isToday}
+                onEdit={onEdit}
+                onRefetch={onRefetch}
+                conflictInfo={conflictMap.get(event.eventId)}
+              />
+              {(linkedNotes.length > 0 || onCreateNoteForEvent) && (
+                <div className={cn(
+                  "ml-4 mt-1 flex-wrap gap-1.5 border-l border-cyan-500/15 pl-3 transition-opacity",
+                  linkedNotes.length > 0 ? "flex" : "hidden sm:flex sm:opacity-0 sm:group-hover/event:opacity-100"
+                )}>
+                  {linkedNotes.slice(0, 3).map((note) => (
+                    <NoteChip key={note.id} note={note} onEdit={onEditNote} tone="cyan" />
+                  ))}
+                  {linkedNotes.length > 3 && (
+                    <span className="rounded-md bg-cyan-500/10 px-1.5 py-1 text-[10px] font-medium text-cyan-300/70">
+                      +{linkedNotes.length - 3}
+                    </span>
+                  )}
+                  {onCreateNoteForEvent && (
+                    <button
+                      type="button"
+                      onClick={() => onCreateNoteForEvent(event)}
+                      className="inline-flex items-center gap-1 rounded-md bg-cyan-500/10 px-1.5 py-1 text-[10px] font-medium text-cyan-200 transition-colors hover:bg-cyan-500/15 cursor-pointer"
+                    >
+                      <Plus size={10} />
+                      Notitie bij afspraak
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {dayNotes.length > 0 && (
+        <div className="ml-0 mt-2 rounded-lg border border-amber-500/12 bg-amber-500/[0.035] px-3 py-2 sm:ml-1">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-amber-300/70">
+            <FileText size={11} />
+            Dagnotities
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {dayNotes.slice(0, 5).map((note) => (
+              <NoteChip key={note.id} note={note} onEdit={onEditNote} tone="amber" />
+            ))}
+            {dayNotes.length > 5 && (
+              <span className="rounded-md bg-amber-500/10 px-1.5 py-1 text-[10px] font-medium text-amber-300/70">
+                +{dayNotes.length - 5}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function NoteChip({ note, onEdit, tone }: { note: NoteRecord; onEdit?: (note: NoteRecord) => void; tone: "amber" | "cyan" }) {
+  const isPinned = note.isPinned || note.is_pinned;
+  const colorClass = tone === "cyan"
+    ? "bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/15"
+    : "bg-amber-500/10 text-amber-200 hover:bg-amber-500/15";
+
+  return (
+    <button
+      type="button"
+      onClick={() => onEdit?.(note)}
+      className={`inline-flex max-w-full items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-medium transition-colors cursor-pointer ${colorClass}`}
+      title={getDisplayTitle(note)}
+    >
+      {isPinned ? <Pin size={10} className="shrink-0 text-amber-300 fill-amber-300" /> : <FileText size={10} className="shrink-0" />}
+      <span className="max-w-[180px] truncate">{getDisplayTitle(note)}</span>
+    </button>
   );
 }
 

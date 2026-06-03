@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
+import { formatDateRange, getTimeLabel, usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { useSchedule } from "@/hooks/useSchedule";
 import { NoteEditor } from "@/components/notes/NoteEditor";
@@ -30,6 +31,7 @@ export default function NotitiesPage() {
   } = useNotes();
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("notes");
   const { diensten } = useSchedule();
+  const { events: agendaEvents, upcoming: upcomingAgendaEvents, history: agendaHistory } = usePersonalEvents({ diensten });
 
   // ── Tab state ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<NotesTab>("journal");
@@ -126,6 +128,17 @@ export default function NotitiesPage() {
   }, [search, sortMode, sourceNotes, tagFilter, viewMode]);
 
   const activeFilters = [search.trim(), tagFilter, viewMode === "archived", sortMode !== "recent"].filter(Boolean).length;
+  const agendaLinkOptions = useMemo(
+    () => [...upcomingAgendaEvents, ...agendaHistory.slice(0, 25)],
+    [agendaHistory, upcomingAgendaEvents],
+  );
+  const eventLabelById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const event of agendaEvents) {
+      map.set(event.eventId, formatEventLabel(event));
+    }
+    return map;
+  }, [agendaEvents]);
 
   // ── Handlers ───────────────────────────────────────────────
   const handleEdit = (note: NoteRecord) => {
@@ -191,6 +204,7 @@ export default function NotitiesPage() {
           <WeekJournal
             notes={active}
             diensten={diensten}
+            agendaEvents={upcomingAgendaEvents}
             weekStart={weekStart}
             onWeekChange={setWeekStart}
             onEdit={handleEdit}
@@ -236,6 +250,7 @@ export default function NotitiesPage() {
               handleDelete={handleDelete}
               handleUpdateContent={handleUpdateContent}
               handleNavigateToNote={handleNavigateToNote}
+              eventLabelById={eventLabelById}
             />
           </>
         )}
@@ -254,9 +269,14 @@ export default function NotitiesPage() {
             onDelete={remove}
             onArchive={archive}
             onTogglePin={togglePin}
+            eventOptions={agendaLinkOptions}
           />
         )}
       </AnimatePresence>
     </div>
   );
+}
+
+function formatEventLabel(event: PersonalEvent) {
+  return `${formatDateRange(event)} · ${getTimeLabel(event)} · ${event.titel}`;
 }

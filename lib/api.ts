@@ -261,16 +261,25 @@ export const personalEventsApi = {
   listByDate: (userId: string, date: string) =>
     apiFetch<PersonalEventRow[]>(`/personal-events/date/${date}?userId=${userId}`),
   upsert: (data: PersonalEventRow) =>
-    apiFetch<{ ok: boolean }>("/personal-events", {
+    apiFetch<PersonalEventMutationResult>("/personal-events", {
       method: "POST",
       body: JSON.stringify(data),
     }),
   updateStatus: (userId: string, eventId: string, status: string) =>
-    apiFetch<{ ok: boolean }>(`/personal-events/${encodeURIComponent(eventId)}/status?userId=${userId}`, {
+    apiFetch<PersonalEventMutationResult>(`/personal-events/${encodeURIComponent(eventId)}/status?userId=${userId}`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
     }),
 };
+
+export interface PersonalEventMutationResult {
+  ok: boolean;
+  instantSync?: boolean;
+  pending?: boolean;
+  pendingProcessed?: number;
+  syncError?: string;
+  syncMessage?: string;
+}
 
 export interface PersonalEventRow {
   id?: string;
@@ -634,10 +643,32 @@ export const settingsApi = {
 };
 
 export const syncApi = {
-	status: () => apiFetch<any>("/sync/status"),
-	calendar: (userId: string) => apiFetch<any>(`/sync/calendar?userId=${userId}`, { method: "POST" }),
-	gmail: (userId: string) => apiFetch<any>(`/sync/gmail?userId=${userId}`, { method: "POST" }),
+	status: () => apiFetch<SyncStatusResult>("/sync/status"),
+	calendar: (userId: string) => apiFetch<SyncCalendarResult>(`/sync/calendar?userId=${userId}`, { method: "POST" }),
+	gmail: (userId: string) => apiFetch<Record<string, unknown>>(`/sync/gmail?userId=${userId}`, { method: "POST" }),
 };
+
+export type SyncStatusResult = Record<string, SyncStatusTarget>;
+
+export interface SyncStatusTarget {
+  source?: string;
+  status: string;
+  startedAt?: string;
+  finishedAt?: string;
+  lastSuccessAt?: string;
+  lastErrorAt?: string;
+  lastError?: string;
+  updatedAt?: string;
+}
+
+export interface SyncCalendarResult {
+  ok: boolean;
+  scheduleCount?: number;
+  personalCount?: number;
+  pendingProcessed?: number;
+  pendingError?: string;
+  message?: string;
+}
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
 

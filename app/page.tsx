@@ -61,6 +61,7 @@ export default function DashboardPage() {
     conflictMap,
     withConflicts,
     isLoading: eventsLoading,
+    refetch: refetchEvents,
   } = usePersonalEvents({ diensten: thisWeek });
   const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("finance");
   
@@ -294,6 +295,7 @@ export default function DashboardPage() {
 
       <CreateEventModal
         open={modalOpen}
+        onSuccess={() => refetchEvents()}
         onClose={() => {
           setModalOpen(false);
           setEditEvent(null);

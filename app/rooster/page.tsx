@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Calendar, CalendarClock, Clock3, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 
 import { useUser } from "@clerk/nextjs";
 import { useSchedule } from "@/hooks/useSchedule";
@@ -58,7 +57,7 @@ export default function RoosterPage() {
     refetch,
   } = useSchedule();
 
-  const { success, error: toastError } = useToast();
+  const { success, error: toastError, toast } = useToast();
   const { user } = useUser();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -90,13 +89,8 @@ export default function RoosterPage() {
     conflictMap,
     withConflicts,
     pending: pendingEvents,
+    refetch: refetchEvents,
   } = usePersonalEvents({ diensten: timelineDiensten });
-
-  const { data: syncStatuses } = useQuery({
-    queryKey: ["sync-status"],
-    queryFn: () => syncApi.status(),
-    refetchInterval: 10000,
-  });
 
   const upcomingHours = calcTotalHours(upcoming);
   const shifts = shiftBreakdown(upcoming);
@@ -133,9 +127,13 @@ export default function RoosterPage() {
 
     setCalSyncing(true);
     try {
-      await syncApi.calendar(user.id);
+      const result = await syncApi.calendar(user.id);
       await refetch();
-      success("Rooster en persoonlijke agenda gesynchroniseerd.");
+      if (result.pendingError) {
+        toast(`Rooster en agenda opgehaald; wachtrij faalde: ${shortSyncError(result.pendingError)}`, "info");
+      } else {
+        success("Rooster en persoonlijke agenda gesynchroniseerd.");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "onbekende fout";
       toastError(`Fout bij synchroniseren: ${message}`);
@@ -374,6 +372,7 @@ export default function RoosterPage() {
 
       <CreateEventModal
         open={modalOpen}
+        onSuccess={() => refetchEvents()}
         onClose={() => {
           setModalOpen(false);
           setEditEvent(null);
@@ -382,4 +381,8 @@ export default function RoosterPage() {
       />
     </div>
   );
+}
+
+function shortSyncError(error: string) {
+  return error.length > 140 ? `${error.slice(0, 137)}...` : error;
 }

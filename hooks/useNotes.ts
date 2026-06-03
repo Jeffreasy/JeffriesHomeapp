@@ -12,7 +12,7 @@ import {
   getGetNotesQueryKey,
   getGetNotesTagsQueryKey,
 } from "@/lib/api/generated/notes/notes";
-import type { ModelNote } from "@/lib/api/model";
+import type { HandlerNoteUpdateBody, ModelNote } from "@/lib/api/model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +60,11 @@ export type NoteUpdateData = {
   is_archived?: boolean;
 };
 
+type NotesCache = {
+  data?: ModelNote[];
+  status?: number;
+};
+
 function toRecord(row: ModelNote): NoteRecord {
   return {
     ...row,
@@ -81,6 +86,23 @@ function toRecord(row: ModelNote): NoteRecord {
     aangemaakt: row.aangemaakt ?? new Date().toISOString(),
     gewijzigd: row.gewijzigd ?? new Date().toISOString(),
   };
+}
+
+function toModelPatch(data: Partial<NoteUpdateData>): Partial<ModelNote> {
+  const patch: Partial<ModelNote> = { ...(data as Partial<ModelNote>) };
+  if ("linkedEventId" in data) {
+    patch.linked_event_id = data.linkedEventId || undefined;
+    delete (patch as Record<string, unknown>).linkedEventId;
+  }
+  if ("isPinned" in data) {
+    patch.is_pinned = data.isPinned;
+    delete (patch as Record<string, unknown>).isPinned;
+  }
+  if ("isArchived" in data) {
+    patch.is_archived = data.isArchived;
+    delete (patch as Record<string, unknown>).isArchived;
+  }
+  return patch;
 }
 
 import { useToast } from "@/components/ui/Toast";
@@ -131,7 +153,7 @@ export function useNotes() {
     mutation: {
       onMutate: async (variables) => {
         await queryClient.cancelQueries({ queryKey });
-        const previousNotes = queryClient.getQueryData<any>(queryKey);
+        const previousNotes = queryClient.getQueryData<NotesCache>(queryKey);
         
         // Optimistic UI Update
         const newNote: ModelNote = {
@@ -144,12 +166,13 @@ export function useNotes() {
           is_pinned: false,
           is_archived: false,
           deadline: variables.data.deadline ?? undefined,
+          linked_event_id: variables.data.linkedEventId ?? undefined,
           prioriteit: variables.data.prioriteit ?? "normaal",
           aangemaakt: new Date().toISOString(),
           gewijzigd: new Date().toISOString(),
         };
 
-        queryClient.setQueryData(queryKey, (old: any) => {
+        queryClient.setQueryData<NotesCache>(queryKey, (old) => {
           if (!old) return { data: [newNote], status: 200 };
           return { ...old, data: [newNote, ...(old.data || [])] };
         });
@@ -173,14 +196,15 @@ export function useNotes() {
     mutation: {
       onMutate: async (variables) => {
         await queryClient.cancelQueries({ queryKey });
-        const previousNotes = queryClient.getQueryData<any>(queryKey);
+        const previousNotes = queryClient.getQueryData<NotesCache>(queryKey);
 
-        queryClient.setQueryData(queryKey, (old: any) => {
+        const patch = toModelPatch(variables.data as Partial<NoteUpdateData>);
+        queryClient.setQueryData<NotesCache>(queryKey, (old) => {
           if (!old?.data) return old;
           return {
             ...old,
             data: old.data.map((note: ModelNote) =>
-              note.id === variables.id ? { ...note, ...variables.data, gewijzigd: new Date().toISOString() } : note
+              note.id === variables.id ? { ...note, ...patch, gewijzigd: new Date().toISOString() } : note
             ),
           };
         });
@@ -204,9 +228,9 @@ export function useNotes() {
     mutation: {
       onMutate: async (variables) => {
         await queryClient.cancelQueries({ queryKey });
-        const previousNotes = queryClient.getQueryData<any>(queryKey);
+        const previousNotes = queryClient.getQueryData<NotesCache>(queryKey);
 
-        queryClient.setQueryData(queryKey, (old: any) => {
+        queryClient.setQueryData<NotesCache>(queryKey, (old) => {
           if (!old?.data) return old;
           return {
             ...old,
@@ -240,19 +264,20 @@ export function useNotes() {
     count: active.length,
 
     create: async (data: NoteCreateData) => {
-      await createMut.mutateAsync({ data: data as any, params: { userId } });
+      await createMut.mutateAsync({ data, params: { userId } });
     },
     update: async (id: string, data: Partial<NoteUpdateData>) => {
-      await updateMut.mutateAsync({ id, data: data as any });
+      await updateMut.mutateAsync({ id, data: data as HandlerNoteUpdateBody });
     },
     togglePin: async (id: string) => {
       const note = raw?.find(n => n.id === id);
       if (note) {
-        await updateMut.mutateAsync({ id, data: { is_pinned: !note.isPinned } as any });
+        await updateMut.mutateAsync({ id, data: { isPinned: !(note.isPinned || note.is_pinned) } });
       }
     },
     archive: async (id: string) => {
-      await updateMut.mutateAsync({ id, data: { is_archived: true } as any });
+      const note = raw?.find(n => n.id === id);
+      await updateMut.mutateAsync({ id, data: { isArchived: !(note?.isArchived || note?.is_archived) } });
     },
     remove: async (id: string) => {
       await deleteMut.mutateAsync({ id });

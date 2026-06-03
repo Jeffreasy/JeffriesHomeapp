@@ -24,6 +24,7 @@ export function NotesList({
   handleDelete,
   handleUpdateContent,
   handleNavigateToNote,
+  eventLabelById,
 }: {
   displayed: NoteRecord[];
   isLoading: boolean;
@@ -40,6 +41,7 @@ export function NotesList({
   handleDelete: (id: string) => void;
   handleUpdateContent: (id: string, inhoud: string) => void;
   handleNavigateToNote: (title: string) => void;
+  eventLabelById?: Map<string, string>;
 }) {
   const activeSort = SORT_OPTIONS.find((option) => option.id === sortMode) ?? SORT_OPTIONS[0];
 
@@ -113,6 +115,7 @@ export function NotesList({
                 onDelete={handleDelete}
                 onUpdateContent={handleUpdateContent}
                 onNavigateToNote={handleNavigateToNote}
+                linkedEventLabel={note.linkedEventId ? eventLabelById?.get(note.linkedEventId) : undefined}
                 masked={privacyOn}
               />
             ))}
