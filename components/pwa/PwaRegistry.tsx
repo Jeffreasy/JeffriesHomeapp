@@ -5,12 +5,13 @@ import { WifiOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export function PwaRegistry() {
-  const [isOffline, setIsOffline] = useState(false);
+  const [isOffline, setIsOffline] = useState(() =>
+    typeof window === "undefined" ? false : !window.navigator.onLine
+  );
 
   useEffect(() => {
-    // Register Service Worker
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
+    const registerServiceWorker = () => {
+      if ("serviceWorker" in navigator) {
         navigator.serviceWorker
           .register("/sw.js")
           .then((registration) => {
@@ -19,24 +20,20 @@ export function PwaRegistry() {
           .catch((error) => {
             console.error("Service Worker registration failed:", error);
           });
-      });
-    }
+      }
+    };
 
-    // Monitor Online/Offline Status
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
 
-    if (typeof window !== "undefined") {
-      setIsOffline(!window.navigator.onLine);
-      window.addEventListener("online", handleOnline);
-      window.addEventListener("offline", handleOffline);
-    }
+    window.addEventListener("load", registerServiceWorker);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("online", handleOnline);
-        window.removeEventListener("offline", handleOffline);
-      }
+      window.removeEventListener("load", registerServiceWorker);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 

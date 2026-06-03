@@ -35,16 +35,13 @@ export interface DeviceCommand {
 
 // ─── API Client ───────────────────────────────────────────────────────────────
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
+const API_BASE = "/api/backend";
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
       ...init?.headers,
     },
   });

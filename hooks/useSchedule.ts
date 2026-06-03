@@ -63,14 +63,13 @@ export function useSchedule() {
     { query: { enabled: !!userId } }
   );
 
-  const rawDocs = Array.isArray(scheduleRaw?.data) ? scheduleRaw.data : [];
-
   const diensten: DienstRow[] = useMemo(() => {
+    const rawDocs = Array.isArray(scheduleRaw?.data) ? scheduleRaw.data as ModelSchedule[] : [];
     if (!rawDocs || rawDocs.length === 0) return [];
     
     // 1. Dedupliceer op eventId
     const deduped = new Map<string, ModelSchedule>();
-    for (const doc of rawDocs as ModelSchedule[]) {
+    for (const doc of rawDocs) {
       if (doc.event_id) deduped.set(doc.event_id, doc);
     }
     // 2. Deduplicate op startDatum+startTijd
@@ -82,7 +81,7 @@ export function useSchedule() {
       }
     }
     return Array.from(byKey.values());
-  }, [rawDocs]);
+  }, [scheduleRaw]);
 
   const metaDoc = metaRaw?.data as ModelScheduleMeta | undefined;
   
@@ -96,9 +95,9 @@ export function useSchedule() {
 
   const isLoading = loadingSchedule || loadingMeta;
 
-  const invalidateAll = () => {
+  const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/schedule"] });
-  };
+  }, [queryClient]);
 
   const refetch = useCallback(() => {
     refetchSchedule();
@@ -110,7 +109,7 @@ export function useSchedule() {
     await postScheduleImport({ userId, fileName: "", rows: [] } as unknown as Parameters<typeof postScheduleImport>[0]);
     invalidateAll();
     setVersion(v => v + 1);
-  }, [userId]);
+  }, [userId, invalidateAll]);
 
   const importCsv = useCallback(async (file: File) => {
     if (!userId) return { ok: false, count: 0, error: "Niet ingelogd" };
@@ -142,7 +141,7 @@ export function useSchedule() {
       const message = e instanceof Error ? e.message : "Onbekende fout";
       return { ok: false, count: 0, error: message };
     }
-  }, [userId]);
+  }, [userId, invalidateAll]);
 
   const toggleStatus = async (event_id: string, status: string) => {
     setVersion((v) => v + 1);

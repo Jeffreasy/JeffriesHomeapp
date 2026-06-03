@@ -53,7 +53,7 @@ export function SettingsRuntime({
           icon={Network}
           label="Command queue"
           value={String(overview?.commands.pending ?? 0)}
-          sub={`${overview?.commands.failed ?? 0} mislukt`}
+          sub={`${overview?.commands.processing ?? 0} bezig, ${overview?.commands.failed ?? 0} mislukt`}
           tone={(overview?.commands.failed ?? 0) > 0 ? "rose" : (overview?.commands.pending ?? 0) > 0 ? "amber" : "green"}
         />
       </div>
@@ -141,7 +141,7 @@ export function SettingsBridge({ overview }: { overview: any }) {
         <StatusRow
           icon={Activity}
           label="Commands"
-          value={`${overview?.bridge?.commandsDone ?? 0} uitgevoerd / ${overview?.bridge?.commandsFailed ?? 0} mislukt`}
+          value={`${overview?.bridge?.commandsPending ?? 0} wachtend / ${overview?.bridge?.commandsProcessing ?? 0} bezig / ${overview?.bridge?.commandsFailed ?? 0} mislukt`}
           tone={(overview?.bridge?.commandsFailed ?? 0) > 0 ? "amber" : "slate"}
         />
         <StatusRow

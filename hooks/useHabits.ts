@@ -20,7 +20,7 @@ import {
   deleteHabitsId,
 } from "@/lib/api/generated/habits/habits";
 
-import type { ModelHabit, ModelHabitBadge, GetHabitsStats200 } from "@/lib/api/model";
+import type { ModelHabit, ModelHabitBadge } from "@/lib/api/model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@ export interface HabitStatsRecord {
   perfectDays?: number;
   currentStreak?: number;
   longestStreak?: number;
-  [key: string]: any; // Allow other properties for now
+  [key: string]: unknown;
 }
 
 export interface HabitBadgeRecord {
@@ -175,21 +175,33 @@ function toRecord(row: ModelHabit): HabitRecord {
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toLogEntry(log: any): HabitLogEntry {
+type HabitLogApiRow = {
+  id?: string;
+  voltooid?: boolean;
+  waarde?: number | null;
+  is_incident?: boolean;
+  trigger_cat?: string | null;
+  notitie?: string | null;
+  xp_verdiend?: number;
+};
+
+type HabitWithLogApiRow = ModelHabit & {
+  log?: HabitLogApiRow | null;
+};
+
+function toLogEntry(log: HabitLogApiRow): HabitLogEntry {
   return {
-    _id: log.id,
-    voltooid: log.voltooid,
+    _id: log.id ?? "",
+    voltooid: log.voltooid ?? false,
     waarde: log.waarde,
-    isIncident: log.is_incident,
+    isIncident: log.is_incident ?? false,
     trigger: log.trigger_cat,
     notitie: log.notitie,
-    xpVerdiend: log.xp_verdiend,
+    xpVerdiend: log.xp_verdiend ?? 0,
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toWithLog(wl: any): HabitWithLogRecord {
+function toWithLog(wl: HabitWithLogApiRow): HabitWithLogRecord {
   return {
     ...toRecord(wl as ModelHabit),
     log: wl.log ? toLogEntry(wl.log) : null,
@@ -217,7 +229,10 @@ export function useHabits(datum?: string) {
   const userId = user?.id ?? "";
   const queryClient = useQueryClient();
 
-  const queryParams = { userId, datum: datum ?? new Date().toISOString().slice(0, 10) };
+  const queryParams = useMemo(
+    () => ({ userId, datum: datum ?? new Date().toISOString().slice(0, 10) }),
+    [userId, datum]
+  );
   
   const { data: allHabitsRaw, isLoading: loadingHabits } = useGetHabits({ userId }, { query: { enabled: !!userId } });
   const { data: statsRaw, isLoading: loadingStats } = useGetHabitsStats({ userId }, { query: { enabled: !!userId } });
@@ -228,10 +243,10 @@ export function useHabits(datum?: string) {
   const stats = statsRaw?.data as HabitStatsRecord | undefined;
   const badges = useMemo<HabitBadgeRecord[]>(() => (Array.isArray(badgesRaw?.data) ? badgesRaw.data as ModelHabitBadge[] : []).map(toBadge), [badgesRaw]);
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const forDateData = forDateRaw?.data as any;
-  const todayHabitsRaw = Array.isArray(forDateData?.habits) ? forDateData.habits : [];
-  const todayHabits = useMemo<HabitWithLogRecord[]>(() => todayHabitsRaw.map(toWithLog), [todayHabitsRaw]);
+  const todayHabits = useMemo<HabitWithLogRecord[]>(() => {
+    const forDateData = forDateRaw?.data as { habits?: HabitWithLogApiRow[] } | undefined;
+    return Array.isArray(forDateData?.habits) ? forDateData.habits.map(toWithLog) : [];
+  }, [forDateRaw]);
 
   const level = useMemo(() => {
     if (!stats) return { level: 1, xp: 0, nextXP: 100, progress: 0, titel: "Beginner" };

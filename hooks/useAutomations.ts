@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
+import { useQuery } from "@tanstack/react-query";
 import { automationsApi, type AutomationRow } from "@/lib/api";
 import {
   type Automation,
@@ -30,20 +31,22 @@ export function useAutomations() {
   const { user } = useUser();
   const userId = user?.id ?? "";
 
-  const [docs, setDocs] = useState<AutomationRow[]>([]);
-  const automations: Automation[] = docs.map(fromRow);
+  const {
+    data: docs = [],
+    refetch,
+  } = useQuery({
+    queryKey: ["automations", userId],
+    queryFn: () => automationsApi.list(userId),
+    enabled: !!userId,
+    initialData: [] as AutomationRow[],
+  });
+
+  const automations = useMemo<Automation[]>(() => docs.map(fromRow), [docs]);
 
   const fetchAutomations = useCallback(async () => {
     if (!userId) return;
-    try {
-      const result = await automationsApi.list(userId);
-      setDocs(result);
-    } catch {
-      setDocs([]);
-    }
-  }, [userId]);
-
-  useEffect(() => { fetchAutomations(); }, [fetchAutomations]);
+    await refetch();
+  }, [userId, refetch]);
 
   const add = useCallback(
     async (data: Omit<Automation, "id" | "createdAt" | "lastFiredAt">) => {

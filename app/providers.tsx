@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { get, set, del } from "idb-keyval";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { PwaRegistry } from "@/components/pwa/PwaRegistry";
@@ -25,21 +25,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
       })
   );
 
-  const [persister, setPersister] = useState<any>(null);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setPersister(
-        createAsyncStoragePersister({
+  const [persister] = useState(() =>
+    typeof window === "undefined"
+      ? null
+      : createAsyncStoragePersister({
           storage: {
-            getItem: async (key) => await get(key) || null,
+            getItem: async (key) => (await get(key)) || null,
             setItem: async (key, value) => await set(key, value),
             removeItem: async (key) => await del(key),
           },
         })
-      );
-    }
-  }, []);
+  );
 
   return (
     <ClerkProvider>

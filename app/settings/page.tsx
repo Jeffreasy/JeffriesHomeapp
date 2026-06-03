@@ -44,7 +44,6 @@ import { useQuery } from "@tanstack/react-query";
 
 import {
   formatDateTime,
-  formatHost,
   plural,
   routeTiles,
   type PrivacyScope,
@@ -113,7 +112,7 @@ export default function SettingsPage() {
   const isLoading = devicesLoading || roomsLoading || overviewLoading;
   const accountName = user?.fullName ?? overview?.account?.name ?? "Jeffries Home";
   const accountEmail = user?.primaryEmailAddress?.emailAddress ?? overview?.account?.email ?? "Clerk account";
-  const localApiHost = formatHost(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1");
+  const localApiHost = "Next.js proxy -> Render backend";
   const syncMap = (syncStatus ?? {}) as Record<string, SyncStatusView | undefined>;
 
   const roomRows = useMemo(() => {

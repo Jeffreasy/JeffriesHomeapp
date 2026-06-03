@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Debounce a value: only update the returned value after `delay` ms of no changes.
@@ -20,17 +20,24 @@ export function useDebounce<T>(value: T, delay: number): T {
  * Debounced callback: fires the callback only after `delay` ms of no calls.
  * Used to prevent API spam while dragging sliders.
  */
-export function useDebouncedCallback<T extends (...args: any[]) => void>(
-  callback: T,
+export function useDebouncedCallback<Args extends unknown[]>(
+  callback: (...args: Args) => void,
   delay: number
-): T {
+): (...args: Args) => void {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cbRef = useRef(callback);
-  cbRef.current = callback;
 
-  return ((...args: Parameters<T>) => {
+  useEffect(() => {
+    cbRef.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
+
+  return useCallback((...args: Args) => {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => cbRef.current(...args), delay);
-  }) as T;
+  }, [delay]);
 }
 
