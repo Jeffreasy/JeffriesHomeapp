@@ -32,8 +32,9 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
   const allLines = note.inhoud.split("\n");
   const deadlineInfo = note.deadline ? getDeadlineInfo(note.deadline) : null;
   const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
+  const canLoadBacklinks = !masked && isUuid(note.id);
   
-  const { data: backlinksRaw } = useGetNotesIdBacklinks(note.id, { query: { enabled: !masked } });
+  const { data: backlinksRaw } = useGetNotesIdBacklinks(note.id, { query: { enabled: canLoadBacklinks, staleTime: 60_000 } });
   const backlinks = Array.isArray(backlinksRaw?.data) ? backlinksRaw.data : [];
 
   const toggleCheckbox = (originalLineIndex: number) => {
@@ -253,6 +254,10 @@ function getChecklistInfo(text: string) {
   const total = lines.filter((l) => UNCHECKED.test(l) || CHECKED.test(l)).length;
   const done  = lines.filter((l) => CHECKED.test(l)).length;
   return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void, onNavigateToNote?: (title: string) => void) {

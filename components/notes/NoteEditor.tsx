@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, Link2, Check, Trash2, Archive, Pin } from "lucide-react";
 import { getNotesSearch } from "@/lib/api/generated/notes/notes";
@@ -58,6 +58,7 @@ export function NoteEditor({
   initialTags,
   initialTitle,
 }: NoteEditorProps) {
+  const titleId = useId();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [titel, setTitel]           = useState(note?.titel ?? initialTitle ?? "");
@@ -136,8 +137,9 @@ export function NoteEditor({
   }, [autoResize]);
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
+    return () => { document.body.style.overflow = previousOverflow; };
   }, []);
 
   // ── Visualviewport resize for mobile keyboard ──
@@ -218,7 +220,7 @@ export function NoteEditor({
         inhoud: inhoud.trim(),
         tags: tags.length > 0 ? tags : isEditing ? [] : undefined,
         kleur: kleur || (isEditing ? "" : undefined),
-        deadline: deadline || (isEditing ? "" : undefined),
+        deadline: normalizeDeadlineForSave(deadline) || (isEditing ? "" : undefined),
         linkedEventId: linkedEventId || (isEditing ? "" : undefined),
         prioriteit: prioriteit,
       });
@@ -336,6 +338,9 @@ export function NoteEditor({
         exit={{ opacity: 0, y: 60 }}
         transition={{ type: "spring", damping: 28, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className="relative w-full h-[100dvh] sm:h-auto sm:max-w-lg sm:mx-4 rounded-none sm:rounded-2xl border-0 sm:border border-[var(--color-border)] overflow-hidden flex flex-col"
         style={{
           maxHeight: "100dvh",
@@ -355,7 +360,7 @@ export function NoteEditor({
             {kleur && (
               <span className="h-3 w-3 rounded-full shrink-0" style={{ background: kleur }} />
             )}
-            <h3 className="text-sm font-semibold text-[var(--color-text)]">
+            <h3 id={titleId} className="text-sm font-semibold text-[var(--color-text)]">
               {note ? "Notitie bewerken" : "Nieuwe notitie"}
             </h3>
           </div>
@@ -519,8 +524,8 @@ export function NoteEditor({
                     <Clock size={14} className="text-[var(--color-text-subtle)] shrink-0" />
                     <input
                       type="datetime-local"
-                      value={deadline ? deadline.slice(0, 16) : ""}
-                      onChange={(e) => setDeadline(e.target.value ? new Date(e.target.value).toISOString() : "")}
+                      value={formatDeadlineForInput(deadline)}
+                      onChange={(e) => setDeadline(e.target.value ? localDateTimeToIso(e.target.value) : "")}
                       className="bg-transparent text-base sm:text-sm text-[var(--color-text)] outline-none border border-[var(--color-border)] rounded-lg px-3 py-2.5 flex-1 min-h-[44px] [color-scheme:dark]"
                     />
                     {deadline && (
@@ -688,6 +693,33 @@ export function NoteEditor({
 function formatEventOption(event: PersonalEvent) {
   const source = event.kalender === "Rooster" ? "Dienst" : event.kalender;
   return `${formatDateRange(event)} - ${getTimeLabel(event)} - ${event.titel} (${source})`;
+}
+
+function formatDeadlineForInput(value?: string | null): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return `${value}T09:00`;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value)) return value.slice(0, 16);
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-") + `T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function localDateTimeToIso(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+function normalizeDeadlineForSave(value: string): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value)) {
+    return localDateTimeToIso(value);
+  }
+  return value;
 }
 
 function buildEventOptionGroups(events: PersonalEvent[]): EventOptionGroup[] {
