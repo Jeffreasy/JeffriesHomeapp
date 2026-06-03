@@ -10,6 +10,7 @@ interface DienstItemProps {
   dienst:     DienstRow;
   isToday?:   boolean;
   afspraken?: PersonalEvent[]; // personal events on same day
+  compact?:   boolean;
 }
 
 /** Returns a distinct color per team prefix */
@@ -22,12 +23,81 @@ function teamColor(team: string): { bg: string; text: string; border: string } {
   return { bg: "rgba(255,255,255,0.06)", text: "#94a3b8", border: "rgba(255,255,255,0.1)" };
 }
 
-export function DienstItem({ dienst, isToday, afspraken = [] }: DienstItemProps) {
+export function DienstItem({ dienst, isToday, afspraken = [], compact = false }: DienstItemProps) {
   const shift  = shiftTypeColor(dienst.shiftType);
   const team   = dienst.team ? teamColor(dienst.team) : null;
   const isZondag   = dienst.dag === "Zondag";
   const isZaterdag = dienst.dag === "Zaterdag";
   const isWeekend  = isZondag || isZaterdag;
+
+  if (compact) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="rounded-xl border border-white/8 bg-white/[0.025] p-3"
+        style={{
+          borderLeftColor: isToday ? shift.accent : isZondag ? "#eab308" : isZaterdag ? "#facc15" : shift.accent,
+          borderLeftWidth: 2,
+        }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex w-11 shrink-0 flex-col items-center rounded-lg border border-white/8 bg-black/30 px-2 py-2 text-center">
+            <span className={`text-sm font-black leading-none ${isWeekend ? "text-yellow-300" : "text-white"}`}>
+              {dienst.startDatum.slice(8)}
+            </span>
+            <span className={`mt-1 text-[9px] font-bold uppercase tracking-widest ${isWeekend ? "text-yellow-600" : "text-slate-500"}`}>
+              {dienst.dag?.slice(0, 2)}
+            </span>
+            {isZondag && <span className="mt-1 text-[8px] font-black text-yellow-500">ORT</span>}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                className="shrink-0 rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-widest"
+                style={{ background: shift.accent + "12", color: shift.accent, borderColor: shift.accent + "35" }}
+              >
+                {dienst.shiftType}
+              </span>
+              {team && dienst.team && (
+                <span
+                  className="shrink-0 rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-widest"
+                  style={{ background: team.bg, color: team.text, borderColor: team.border }}
+                >
+                  {dienst.team}
+                </span>
+              )}
+              {isToday && (
+                <span className="ml-auto rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-300">
+                  Vandaag
+                </span>
+              )}
+            </div>
+
+            <p className="mt-2 font-mono text-sm font-semibold tracking-tight text-slate-200">
+              {dienst.startTijd}<span className="mx-1 text-slate-600">-</span>{dienst.eindTijd}
+              <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">{dienst.duur}u</span>
+            </p>
+
+            {dienst.locatie && (
+              <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                <MapPin size={10} className="shrink-0" />
+                {dienst.locatie}
+              </p>
+            )}
+
+            {afspraken.length > 0 && (
+              <p className="mt-2 inline-flex items-center gap-1 rounded-md border border-indigo-500/20 bg-indigo-500/10 px-2 py-1 text-[10px] font-semibold text-indigo-200">
+                <CalendarDays size={11} />
+                {afspraken.length} {afspraken.length === 1 ? "afspraak" : "afspraken"} op deze dag
+              </p>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

@@ -69,6 +69,7 @@ export default function RoosterPage() {
   const [weekOverrides, setWeekOverrides] = useState<Record<string, boolean>>({});
   const [confirmClear, setConfirmClear] = useState(false);
   const [calSyncing, setCalSyncing] = useState(false);
+  const [compactTimeline, setCompactTimeline] = useState(false);
 
   useEffect(() => {
     const updateToday = () => setTodayIso(getAmsterdamTodayIso());
@@ -79,6 +80,15 @@ export default function RoosterPage() {
       window.clearTimeout(timeout);
       window.clearInterval(interval);
     };
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const updateCompactTimeline = () => setCompactTimeline(media.matches);
+    updateCompactTimeline();
+    media.addEventListener("change", updateCompactTimeline);
+
+    return () => media.removeEventListener("change", updateCompactTimeline);
   }, []);
 
   const timelineDiensten = useMemo(() => getUpcoming(diensten, 90), [diensten]);
@@ -106,7 +116,9 @@ export default function RoosterPage() {
   const thisMonthEvents = currentMonth
     ? upcomingEvents.filter((event) => event.startDatum.slice(0, 7) === currentMonth)
     : [];
-  const nextShiftEvents = nextDienst ? (eventsByDate[nextDienst.startDatum] ?? []) : [];
+  const nextShiftEvents = nextDienst
+    ? (eventsByDate[nextDienst.startDatum] ?? []).filter((event) => conflictMap.has(event.eventId))
+    : [];
   const hasScheduleData = meta || nextDienst || diensten.length > 0;
 
   const openNewEvent = () => {
@@ -163,7 +175,7 @@ export default function RoosterPage() {
     event.target.value = "";
   };
 
-  const isWeekOpen = (weeknr: string, index: number) => weekOverrides[weeknr] ?? index < 3;
+  const isWeekOpen = (weeknr: string, index: number) => weekOverrides[weeknr] ?? index < (compactTimeline ? 1 : 3);
   const toggleWeek = (weeknr: string, index: number) => {
     setWeekOverrides((current) => ({
       ...current,
@@ -289,19 +301,21 @@ export default function RoosterPage() {
         {hasScheduleData && (
           <>
             <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_420px]">
-              <OverviewPanel
-                upcomingHours={upcomingHours}
-                upcomingCount={upcoming.length}
-                eventCount={upcomingEvents.length}
-                todayEventCount={todayEvents.length}
-                hardConflicts={hardConflicts}
-                conflicts={withConflicts.length}
-                nextDienst={nextDienst}
-                shifts={shifts}
-                teams={teams}
-              />
+              <div className="order-2 hidden md:block xl:order-1">
+                <OverviewPanel
+                  upcomingHours={upcomingHours}
+                  upcomingCount={upcoming.length}
+                  eventCount={upcomingEvents.length}
+                  todayEventCount={todayEvents.length}
+                  hardConflicts={hardConflicts}
+                  conflicts={withConflicts.length}
+                  nextDienst={nextDienst}
+                  shifts={shifts}
+                  teams={teams}
+                />
+              </div>
 
-              <div className="space-y-4">
+              <div className="order-1 space-y-4 xl:order-2">
                 <SectionHeader
                   icon={CalendarClock}
                   label="Volgende"

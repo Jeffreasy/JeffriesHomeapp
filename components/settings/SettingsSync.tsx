@@ -8,7 +8,10 @@ import { cn } from "@/lib/utils";
 function syncTone(status?: SyncStatusView): Tone {
   if (!status) return "slate";
   if (status.status === "failed") return "rose";
+  if (status.status === "missing_config") return "rose";
   if (status.status === "running") return "amber";
+  if (status.status === "pending") return "amber";
+  if (status.status === "disabled") return "slate";
   return "green";
 }
 
@@ -26,6 +29,12 @@ function SyncStatusRow({ label, status }: { label: string; status?: SyncStatusVi
     ? "Bezig"
     : status?.status === "failed"
       ? "Mislukt"
+      : status?.status === "missing_config"
+        ? "Mist config"
+        : status?.status === "pending"
+          ? "Nog geen sync"
+          : status?.status === "disabled"
+            ? "Uit"
       : status?.status === "success"
         ? "Succes"
         : "Geen run";

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
+import { ArrowUpRight, Plus, StickyNote } from "lucide-react";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { formatDateRange, getTimeLabel, usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { usePrivacy } from "@/hooks/usePrivacy";
@@ -68,6 +69,8 @@ export default function NotitiesPage() {
   // ── Editor state ───────────────────────────────────────────
   const [editorOpen, setEditorOpen] = useState(false);
   const [editNote, setEditNote] = useState<NoteRecord | null>(null);
+  const [quickText, setQuickText] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -218,6 +221,24 @@ export default function NotitiesPage() {
     setEditorOpen(true);
   };
 
+  const handleQuickCreate = async () => {
+    if (quickSaving) return;
+    const { cleanText, extractedTags } = parseHashTags(quickText);
+    if (!cleanText) return;
+
+    setQuickSaving(true);
+    try {
+      await create({
+        titel: cleanText.length > 80 ? `${cleanText.slice(0, 77)}...` : cleanText,
+        inhoud: cleanText,
+        tags: extractedTags.length > 0 ? extractedTags : undefined,
+      });
+      setQuickText("");
+    } finally {
+      setQuickSaving(false);
+    }
+  };
+
   const handleSave = async (data: NoteCreateData) => {
     if (editNote) {
       await update(editNote.id, data);
@@ -271,7 +292,7 @@ export default function NotitiesPage() {
         onTabChange={setActiveTab}
       />
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto flex max-w-7xl flex-col gap-4 px-3 pb-28 pt-4 sm:gap-6 sm:px-6 sm:py-6 lg:px-8">
         {/* ── Week Journal Tab ── */}
         {activeTab === "journal" && (
           <WeekJournal
@@ -289,6 +310,14 @@ export default function NotitiesPage() {
         {/* ── Collection Tab ── */}
         {activeTab === "collection" && (
           <>
+            <NotesCaptureCard
+              value={quickText}
+              saving={quickSaving}
+              onChange={setQuickText}
+              onSave={handleQuickCreate}
+              onOpenEditor={handleNew}
+            />
+
             <NotesMetricsRow
               totalCount={active.length + completed.length + archived.length}
               activeCount={active.length}
@@ -380,4 +409,96 @@ export default function NotitiesPage() {
 
 function formatEventLabel(event: PersonalEvent) {
   return `${formatDateRange(event)} · ${getTimeLabel(event)} · ${event.titel}`;
+}
+
+function NotesCaptureCard({
+  value,
+  saving,
+  onChange,
+  onSave,
+  onOpenEditor,
+}: {
+  value: string;
+  saving: boolean;
+  onChange: (value: string) => void;
+  onSave: () => void | Promise<void>;
+  onOpenEditor: () => void;
+}) {
+  const { extractedTags } = parseHashTags(value);
+  const canSave = Boolean(parseHashTags(value).cleanText);
+
+  return (
+    <section className="glass border-amber-500/20 bg-amber-500/[0.045] p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10">
+            <StickyNote size={17} className="text-amber-300" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-base font-bold text-white">Snel noteren</h2>
+            <p className="mt-0.5 text-sm text-slate-500">Typ, druk op Enter, klaar.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenEditor}
+          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
+        >
+          <ArrowUpRight size={14} />
+          Editor
+        </button>
+      </div>
+
+      <div className="mt-3 flex min-h-12 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 focus-within:border-amber-500/45">
+        <input
+          type="text"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void onSave();
+            }
+          }}
+          placeholder="Nieuwe notitie... gebruik #tag voor labels"
+          disabled={saving}
+          className="min-w-0 flex-1 bg-transparent text-base text-slate-100 outline-none placeholder:text-slate-600 disabled:opacity-50 sm:text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => void onSave()}
+          disabled={!canSave || saving}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-[var(--color-primary-foreground)] transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-35"
+          aria-label="Snelle notitie opslaan"
+        >
+          <Plus size={17} />
+        </button>
+      </div>
+
+      {extractedTags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {extractedTags.map((tag) => (
+            <span key={tag} className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function parseHashTags(value: string) {
+  const extractedTags: string[] = [];
+  const cleanText = value
+    .trim()
+    .replace(/#([a-zA-Z\u00C0-\u024F0-9_-]+)/g, (_match, rawTag: string) => {
+      const tag = rawTag.trim().toLowerCase();
+      if (tag && !extractedTags.includes(tag)) extractedTags.push(tag);
+      return "";
+    })
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return { cleanText, extractedTags };
 }

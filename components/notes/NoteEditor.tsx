@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, useId, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Archive,
   CalendarDays,
+  ChevronDown,
   Check,
   CheckCircle2,
   Clock,
@@ -20,6 +22,7 @@ import {
   Quote,
   RefreshCw,
   RotateCcw,
+  Search,
   Sparkles,
   Tag,
   Trash2,
@@ -144,6 +147,7 @@ export function NoteEditor({
   const titleId = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
   const { openConfirm } = useConfirm();
 
   const [saving, setSaving] = useState(false);
@@ -158,7 +162,7 @@ export function NoteEditor({
   const [linkedEventId, setLinkedEventId] = useState(note?.linkedEventId ?? note?.linked_event_id ?? initialLinkedEventId ?? "");
   const [prioriteit, setPrioriteit] = useState(note?.prioriteit ?? "normaal");
   const [symbol, setSymbol] = useState<AppIconName>(() => resolveAppIconName(note?.symbol, "note"));
-  const [activePanel, setActivePanel] = useState<EditorPanel>(() => note ? "details" : "style");
+  const [activePanel, setActivePanel] = useState<EditorPanel>("details");
   const [showTemplates, setShowTemplates] = useState(false);
 
   const [linkSearch, setLinkSearch] = useState("");
@@ -185,8 +189,8 @@ export function NoteEditor({
   const lineCount = inhoud ? inhoud.split("\n").length : 0;
 
   const eventOptionGroups = useMemo(
-    () => buildEventOptionGroups(eventOptions),
-    [eventOptions],
+    () => buildEventOptionGroups(eventOptions, linkedEventId),
+    [eventOptions, linkedEventId],
   );
   const eventById = useMemo(() => {
     const map = new Map<string, PersonalEvent>();
@@ -557,6 +561,40 @@ export function NoteEditor({
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (event.key === "Tab") {
+        const modal = modalRef.current;
+        if (!modal) return;
+
+        const focusable = Array.from(
+          modal.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter(isFocusableElement);
+
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        const activeElement = document.activeElement;
+
+        if (!activeElement || !modal.contains(activeElement)) {
+          event.preventDefault();
+          first.focus();
+          return;
+        }
+
+        if (event.shiftKey && activeElement === first) {
+          event.preventDefault();
+          last.focus();
+          return;
+        }
+
+        if (!event.shiftKey && activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+
       if (event.key === "Escape") {
         event.preventDefault();
         void handleCloseAttempt();
@@ -625,12 +663,12 @@ export function NoteEditor({
     }
   };
 
-  return (
+  const editorModal = (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
+      className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
     >
       <div
         className="absolute inset-0 cursor-pointer bg-black/65 backdrop-blur-sm"
@@ -638,6 +676,7 @@ export function NoteEditor({
       />
 
       <motion.div
+        ref={modalRef}
         initial={{ opacity: 0, y: 48, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 48, scale: 0.98 }}
@@ -886,35 +925,13 @@ export function NoteEditor({
 
                     <PanelSection title="Afspraak">
                       {showEventSelector ? (
-                        <div className="space-y-2">
-                          <select
-                            value={linkedEventId}
-                            onChange={(event) => handleEventChange(event.target.value)}
-                            className="min-h-[44px] w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text)] outline-none [color-scheme:dark]"
-                          >
-                            <option value="">Geen afspraak gekoppeld</option>
-                            {linkedEventId && !linkedEventExists && (
-                              <option value={linkedEventId}>
-                                Huidige koppeling ({shortEventId(linkedEventId)})
-                              </option>
-                            )}
-                            {eventOptionGroups.map((group) => (
-                              <optgroup key={group.id} label={group.label}>
-                                {group.events.map((event) => (
-                                  <option key={event.eventId} value={event.eventId}>
-                                    {formatEventOption(event)}
-                                  </option>
-                                ))}
-                              </optgroup>
-                            ))}
-                          </select>
-                          {selectedEvent && (
-                            <div className="rounded-xl border border-cyan-500/15 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100/80">
-                              <p className="truncate font-semibold text-cyan-100">{selectedEvent.titel}</p>
-                              <p className="mt-0.5 text-cyan-100/60">{formatDateRange(selectedEvent)} · {getTimeLabel(selectedEvent)}</p>
-                            </div>
-                          )}
-                        </div>
+                        <EventLinkPicker
+                          groups={eventOptionGroups}
+                          selectedEvent={selectedEvent}
+                          selectedEventId={linkedEventId}
+                          linkedEventExists={linkedEventExists}
+                          onChange={handleEventChange}
+                        />
                       ) : (
                         <p className="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-muted)]">
                           Geen afspraken beschikbaar.
@@ -1114,20 +1131,22 @@ export function NoteEditor({
           </div>
         </div>
 
-        <footer className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
+        <footer className="relative z-10 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
           {saveError && (
             <p role="alert" className="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
               {saveError}
             </p>
           )}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto">
+            <div className={`grid gap-2 sm:flex sm:w-auto ${note ? "grid-cols-3" : "grid-cols-2"}`}>
               {isDirty && (
                 <button
                   type="button"
                   onClick={() => void handleResetChanges()}
                   disabled={actionBusy}
-                  className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-3 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-45"
+                  className={`flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-3 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-45 sm:col-auto ${
+                    note ? "col-span-3" : "col-span-2"
+                  }`}
                 >
                   <RotateCcw size={16} />
                   <span className="truncate">Terugzetten</span>
@@ -1141,7 +1160,8 @@ export function NoteEditor({
                   className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-red-500/20 px-3 text-sm font-semibold text-red-400 transition-colors hover:border-red-500/35 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Trash2 size={16} />
-                  <span className="truncate">{pendingAction === "delete" ? "Bezig..." : "Verwijderen"}</span>
+                  <span className="truncate sm:hidden">{pendingAction === "delete" ? "..." : "Wissen"}</span>
+                  <span className="hidden truncate sm:inline">{pendingAction === "delete" ? "Bezig..." : "Verwijderen"}</span>
                 </button>
               )}
               {note && onArchive && (
@@ -1152,7 +1172,10 @@ export function NoteEditor({
                   className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-3 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Archive size={16} />
-                  <span className="truncate">
+                  <span className="truncate sm:hidden">
+                    {pendingAction === "archive" ? "..." : note.isArchived ? "Terug" : "Archief"}
+                  </span>
+                  <span className="hidden truncate sm:inline">
                     {pendingAction === "archive" ? "Bezig..." : note.isArchived ? "Dearchiveren" : "Archiveren"}
                   </span>
                 </button>
@@ -1166,7 +1189,10 @@ export function NoteEditor({
                   className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-emerald-500/20 px-3 text-sm font-semibold text-emerald-300 transition-colors hover:border-emerald-500/35 hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <CheckCircle2 size={16} />
-                  <span className="truncate">
+                  <span className="truncate sm:hidden">
+                    {pendingAction === "complete" ? "..." : isCompleted ? "Open" : "Klaar"}
+                  </span>
+                  <span className="hidden truncate sm:inline">
                     {pendingAction === "complete" ? "Bezig..." : isCompleted ? "Heropenen" : "Afronden"}
                   </span>
                 </button>
@@ -1196,6 +1222,268 @@ export function NoteEditor({
       </motion.div>
     </motion.div>
   );
+
+  return typeof document === "undefined" ? editorModal : createPortal(editorModal, document.body);
+}
+
+function isFocusableElement(element: HTMLElement) {
+  const style = window.getComputedStyle(element);
+  return (
+    style.display !== "none" &&
+    style.visibility !== "hidden" &&
+    element.getBoundingClientRect().width > 0 &&
+    element.getBoundingClientRect().height > 0
+  );
+}
+
+function EventLinkPicker({
+  groups,
+  selectedEvent,
+  selectedEventId,
+  linkedEventExists,
+  onChange,
+}: {
+  groups: EventOptionGroup[];
+  selectedEvent?: PersonalEvent;
+  selectedEventId: string;
+  linkedEventExists: boolean;
+  onChange: (eventId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const normalizedQuery = query.trim().toLowerCase();
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const root = rootRef.current;
+      if (root && event.target instanceof Node && !root.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      rootRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 40);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
+  const filteredGroups = useMemo(() => {
+    const defaultLimit = 6;
+    const searchLimit = 12;
+
+    return groups
+      .map((group) => {
+        const groupLimit = group.id === "history" && !normalizedQuery ? 4 : defaultLimit;
+        const matches = normalizedQuery
+          ? group.events.filter((event) => eventMatchesQuery(event, normalizedQuery))
+          : group.events;
+        return {
+          ...group,
+          events: matches.slice(0, normalizedQuery ? searchLimit : groupLimit),
+          hiddenCount: Math.max(0, matches.length - (normalizedQuery ? searchLimit : groupLimit)),
+        };
+      })
+      .filter((group) => group.events.length > 0);
+  }, [groups, normalizedQuery]);
+
+  const selectedLabel = selectedEvent
+    ? `${formatDateRange(selectedEvent)} · ${getTimeLabel(selectedEvent)}`
+    : selectedEventId && !linkedEventExists
+      ? `Huidige koppeling ${shortEventId(selectedEventId)}`
+      : "Geen afspraak gekoppeld";
+
+  const clearSelection = () => {
+    onChange("");
+    setQuery("");
+    setOpen(false);
+  };
+
+  const selectEvent = (eventId: string) => {
+    onChange(eventId);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div ref={rootRef} className="space-y-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          className="flex min-h-[54px] min-w-0 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left transition-colors hover:border-cyan-500/25 hover:bg-cyan-500/[0.04]"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-500/20 bg-cyan-500/10 text-cyan-200">
+            <CalendarDays size={16} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-[var(--color-text)]">
+              {selectedEvent?.titel ?? "Geen afspraak gekoppeld"}
+            </span>
+            <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
+              {selectedLabel}
+            </span>
+          </span>
+          <ChevronDown
+            size={16}
+            className={`shrink-0 text-[var(--color-text-subtle)] transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {selectedEventId && (
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="flex min-h-[54px] min-w-[46px] items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] transition-colors hover:bg-red-500/10 hover:text-red-300"
+            aria-label="Afspraak ontkoppelen"
+            title="Afspraak ontkoppelen"
+          >
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="overflow-hidden rounded-xl border border-cyan-500/15 bg-[var(--color-surface)] shadow-xl shadow-black/25"
+          >
+            <div className="border-b border-[var(--color-border)] p-2">
+              <div className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--color-border)] bg-black/15 px-3">
+                <Search size={14} className="shrink-0 text-[var(--color-text-subtle)]" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setOpen(false);
+                    }
+                  }}
+                  placeholder="Zoek op titel, datum of kalender..."
+                  className="min-w-0 flex-1 bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] sm:text-sm"
+                  autoFocus
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+                    aria-label="Zoekterm wissen"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="max-h-[min(48dvh,360px)] overflow-y-auto p-2" role="listbox">
+              <button
+                type="button"
+                onClick={clearSelection}
+                className={`mb-2 flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold transition-colors ${
+                  !selectedEventId
+                    ? "bg-amber-500/15 text-amber-200"
+                    : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+                }`}
+              >
+                <X size={14} />
+                Geen afspraak koppelen
+              </button>
+
+              {filteredGroups.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-[var(--color-border)] px-3 py-5 text-center text-sm text-[var(--color-text-muted)]">
+                  Geen afspraken gevonden.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {filteredGroups.map((group) => (
+                    <div key={group.id} className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <p className="text-[11px] font-bold uppercase text-[var(--color-text-subtle)]">
+                          {group.label}
+                        </p>
+                        {group.hiddenCount > 0 && (
+                          <span className="text-[10px] text-[var(--color-text-subtle)]">
+                            +{group.hiddenCount} meer
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {group.events.map((event) => (
+                          <EventOptionButton
+                            key={event.eventId}
+                            event={event}
+                            active={selectedEventId === event.eventId}
+                            onSelect={() => selectEvent(event.eventId)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function EventOptionButton({
+  event,
+  active,
+  onSelect,
+}: {
+  event: PersonalEvent;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={active}
+      onClick={onSelect}
+      className={`flex min-h-[54px] w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
+        active
+          ? "border-cyan-500/30 bg-cyan-500/12 text-cyan-100"
+          : "border-transparent text-[var(--color-text)] hover:border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+      }`}
+    >
+      <AppIcon name={resolveAppIconName(event.symbol, "agenda")} tone={active ? "cyan" : "slate"} size="sm" framed />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{event.titel}</span>
+        <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
+          {formatDateRange(event)} · {getTimeLabel(event)} · {event.kalender}
+        </span>
+      </span>
+      {active && <Check size={15} className="shrink-0 text-cyan-200" />}
+    </button>
+  );
+}
+
+function eventMatchesQuery(event: PersonalEvent, query: string) {
+  return normalizeEventSearchText(formatEventOption(event)).includes(query);
+}
+
+function normalizeEventSearchText(value: string) {
+  return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 function ToolbarButton({
@@ -1295,7 +1583,7 @@ function formatEventOption(event: PersonalEvent) {
   return `${formatDateRange(event)} - ${getTimeLabel(event)} - ${event.titel} (${source})`;
 }
 
-function buildEventOptionGroups(events: PersonalEvent[]): EventOptionGroup[] {
+function buildEventOptionGroups(events: PersonalEvent[], selectedEventId?: string): EventOptionGroup[] {
   const unique = new Map<string, PersonalEvent>();
   for (const event of events) {
     if (!event.eventId || isDeletedEvent(event)) continue;
@@ -1305,21 +1593,26 @@ function buildEventOptionGroups(events: PersonalEvent[]): EventOptionGroup[] {
   const personal: PersonalEvent[] = [];
   const roster: PersonalEvent[] = [];
   const history: PersonalEvent[] = [];
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
 
   for (const event of unique.values()) {
-    if (event.kalender !== "Rooster") {
-      personal.push(event);
-    } else if (event.status === "Voorbij") {
+    const selected = Boolean(selectedEventId && event.eventId === selectedEventId);
+    const past = isPastEventOption(event, today);
+    if (!selected && isLowSignalEventOption(event)) continue;
+
+    if (past && !selected) {
       history.push(event);
+    } else if (event.kalender !== "Rooster") {
+      personal.push(event);
     } else {
       roster.push(event);
     }
   }
 
   return [
-    { id: "personal", label: "Eigen afspraken", events: personal.sort(compareEventOptions) },
-    { id: "roster", label: "Diensten", events: roster.sort(compareEventOptions) },
-    { id: "history", label: "Voorbij", events: history.sort(compareEventOptions).reverse() },
+    { id: "personal", label: "Eigen afspraken", events: personal.sort(compareEventOptions).slice(0, 80) },
+    { id: "roster", label: "Diensten", events: roster.sort(compareEventOptions).slice(0, 80) },
+    { id: "history", label: "Recent voorbij", events: history.sort(compareEventOptions).reverse().slice(0, 30) },
   ].filter((group) => group.events.length > 0);
 }
 
@@ -1329,6 +1622,16 @@ function compareEventOptions(a: PersonalEvent, b: PersonalEvent) {
 
 function eventOptionSortKey(event: PersonalEvent) {
   return `${event.startDatum || "9999-12-31"}T${event.startTijd || "00:00"}`;
+}
+
+function isPastEventOption(event: PersonalEvent, todayIso: string) {
+  if (event.status === "Voorbij") return true;
+  const endDate = event.eindDatum || event.startDatum;
+  return Boolean(endDate && endDate < todayIso);
+}
+
+function isLowSignalEventOption(event: PersonalEvent) {
+  return /feestdagen/i.test(event.kalender);
 }
 
 function eventToDeadline(event: PersonalEvent) {

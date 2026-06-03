@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect, useState, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
+import { useQuery } from "@tanstack/react-query";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { type DienstRow } from "@/lib/schedule";
 import { analyzeConflicts, type ConflictInfo } from "@/lib/conflictDetection";
@@ -54,27 +55,6 @@ function fromRow(r: PersonalEventRow): PersonalEvent {
     symbol:       resolveAppIconName(r.symbol ?? metadataSymbol, getEventCategoryIcon(category)),
     status:       r.status,
     kalender:     r.kalender,
-  };
-}
-
-function fromDienstToEvent(d: DienstRow, userId: string): PersonalEvent {
-  return {
-    _id:          d.eventId,
-    userId:       userId,
-    eventId:      d.eventId,
-    titel:        d.titel || (d.team ? `${d.team} ${d.shiftType}` : d.shiftType),
-    startDatum:   d.startDatum,
-    startTijd:    d.startTijd || undefined,
-    eindDatum:    d.eindDatum,
-    eindTijd:     d.eindTijd || undefined,
-    heledag:      d.heledag,
-    locatie:      d.locatie || undefined,
-    beschrijving: d.beschrijving || undefined,
-    symbol:       "roster",
-    status:       d.status === "Gedraaid" ? "Voorbij" : "Aankomend",
-    kalender:     "Rooster",
-    shiftType:    d.shiftType,
-    team:         d.team,
   };
 }
 
@@ -209,52 +189,53 @@ function addDaysIso(baseIso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+export function isActionableConflict(event: PersonalEvent, conflict?: ConflictInfo): boolean {
+  if (!conflict || conflict.level === "info") return false;
+  if (conflict.level === "soft" && (event.heledag || !event.startTijd || !event.eindTijd)) return false;
+  return true;
+}
+
 // ─── Hook (Go API) ───────────────────────────────────────────────────────────
 
 export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
-  const { user } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const userId = user?.id ?? "";
-
-  const [raw, setRaw] = useState<PersonalEventRow[] | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadError, setLoadError] = useState<Error | null>(null);
   const [now, setNow] = useState<AmsterdamNow>(() => getAmsterdamNow());
+
+  const {
+    data: raw = [],
+    error: loadError,
+    isLoading,
+    refetch: refetchRows,
+  } = useQuery<PersonalEventRow[], Error>({
+    queryKey: ["/personal-events", userId],
+    queryFn: () => personalEventsApi.list(userId),
+    enabled: userLoaded && Boolean(userId),
+    staleTime: 10_000,
+  });
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(getAmsterdamNow()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const reload = useCallback(async () => {
     setNow(getAmsterdamNow());
-    if (!userId) {
-      setRaw([]);
-      return;
-    }
-
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      setRaw(await personalEventsApi.list(userId));
-    } catch (err) {
-      setLoadError(err instanceof Error ? err : new Error("Agenda laden mislukt"));
-      setRaw((current) => current ?? []);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => { reload(); }, [reload]);
+    if (!userLoaded || !userId) return;
+    await refetchRows();
+  }, [refetchRows, userId, userLoaded]);
 
   const events = useMemo(
-    () => (raw ?? []).map(fromRow),
+    () => raw.map(fromRow),
     [raw]
   );
 
   const visibleEvents = useMemo(() => {
-    const personal = events
+    return events
       .map((e) => normalizeTemporalStatus(e, now))
-      .filter((e) => !isDeleted(e) && !isScheduleDuplicateEvent(e, options?.diensten ?? []));
-    const mappedDiensten = (options?.diensten ?? [])
-      .filter((d) => d.status !== "VERWIJDERD")
-      .map((d) => normalizeTemporalStatus(fromDienstToEvent(d, userId), now));
-    return [...personal, ...mappedDiensten].sort(compareEvents);
-  }, [events, now, options?.diensten, userId]);
+      .filter((e) => e.kalender !== "Rooster" && !isDeleted(e) && !isScheduleDuplicateEvent(e, options?.diensten ?? []))
+      .sort(compareEvents);
+  }, [events, now, options?.diensten]);
 
   const upcoming = useMemo(
     () => visibleEvents
@@ -278,7 +259,18 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
   const conflictMap = useMemo(
     () => {
       if (!options?.diensten?.length) return new Map<string, ConflictInfo>();
-      return analyzeConflicts(upcoming, options.diensten);
+      const rawConflicts = analyzeConflicts(upcoming, options.diensten);
+      const actionable = new Map<string, ConflictInfo>();
+      const eventById = new Map(upcoming.map((event) => [event.eventId, event]));
+
+      for (const [eventId, conflict] of rawConflicts) {
+        const event = eventById.get(eventId);
+        if (event && isActionableConflict(event, conflict)) {
+          actionable.set(eventId, conflict);
+        }
+      }
+
+      return actionable;
     },
     [upcoming, options?.diensten]
   );
@@ -316,7 +308,7 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
     eventsByDate,
     nextAppointment,
     error:           loadError,
-    isLoading:       raw === undefined || isLoading,
+    isLoading:       !userLoaded || isLoading,
     refetch:         reload,
   };
 }

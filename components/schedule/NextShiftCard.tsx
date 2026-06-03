@@ -29,6 +29,10 @@ function getRelativeDay(iso: string): string {
   return `over ${diff} dagen`;
 }
 
+function capitalize(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
 interface NextShiftCardProps {
   dienst:     DienstRow | null;
   compact?:   boolean;
@@ -62,6 +66,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
   const colors      = shiftTypeColor(dienst.shiftType);
   const isBezig      = dienst.status === "Bezig";
   const relativeDay  = getRelativeDay(dienst.startDatum);
+  const relativeDate = `${capitalize(relativeDay)} (${formatDate(dienst.startDatum, "full")})`;
   const isToday      = relativeDay === "vandaag";
   const isTomorrow   = relativeDay === "morgen";
   const isZondag     = dienst.dag === "Zondag";
@@ -202,15 +207,15 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
         </span>
       </div>
 
-      <div className="p-5">
+      <div className="p-4 sm:p-5">
         {/* Date + time */}
-        <div className="flex items-end justify-between mb-3">
-          <div>
-            <p className="text-2xl font-bold text-white">{dienst.dag}</p>
-            <p className="text-sm text-slate-400">{formatDate(dienst.startDatum, "full")}</p>
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-xl font-bold text-white sm:text-2xl">{dienst.dag}</p>
+            <p className="text-sm text-slate-400">{relativeDate}</p>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-bold" style={{ color: colors.accent }}>
+          <div className="shrink-0 text-right">
+            <p className="text-xl font-bold sm:text-2xl" style={{ color: colors.accent }}>
               {dienst.startTijd}
             </p>
             <p className="text-sm text-slate-400">tot {dienst.eindTijd}</p>
@@ -242,7 +247,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
                   style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.textColor }}
                 >
                   <AppIcon name={c.icon} tone={c.iconTone} size="xs" iconClassName="text-current" />
-                  <span>{evt.titel} · {c.timeLabel}{c.suffix}</span>
+                  <span className="min-w-0 truncate">{evt.titel} · {c.timeLabel}{c.suffix}</span>
                 </div>
               );
             })}

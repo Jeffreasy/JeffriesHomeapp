@@ -22,6 +22,7 @@ interface PersonalEventItemProps {
   onEdit?:      (event: PersonalEvent) => void;
   onRefetch?:   () => void | Promise<void>;
   conflictInfo?: ConflictInfo;
+  compact?:     boolean;
 }
 
 function statusBadge(event: PersonalEvent) {
@@ -33,12 +34,13 @@ function statusBadge(event: PersonalEvent) {
   return null;
 }
 
-export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictInfo }: PersonalEventItemProps) {
+export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictInfo, compact = false }: PersonalEventItemProps) {
   const hasConflict = !!conflictInfo;
   const multiDay    = isMultiDay(event);
   const isRooster   = event.kalender === "Rooster";
   const isPendingDelete = event.status === "PendingDelete";
   const canEdit = Boolean(onEdit && !isRooster && !isPendingDelete);
+  const keyboardEditable = canEdit && compact;
   const badge = statusBadge(event);
   const shiftColors = isRooster && event.shiftType ? shiftTypeColor(event.shiftType) : null;
   const symbol = resolveAppIconName(event.symbol, isRooster ? "roster" : "agenda");
@@ -100,8 +102,16 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.15 }}
       onClick={handleEdit}
+      onKeyDown={(event) => {
+        if (!keyboardEditable || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        handleEdit();
+      }}
+      role={keyboardEditable ? "button" : undefined}
+      tabIndex={keyboardEditable ? 0 : undefined}
       className={`
-        group relative flex items-center gap-3 px-3 py-2.5 rounded-lg border border-transparent
+        group relative flex items-start rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]
+        ${compact ? "gap-2 px-2.5 py-2.5" : "gap-3 px-3 py-3"}
         border-l-2 ${borderLeft}
         ${isPendingDelete ? "opacity-70" : ""}
         ${canEdit ? "hover:bg-white/[0.04] cursor-pointer" : "cursor-default"}
@@ -119,23 +129,21 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
         size="sm"
         framed
         active={isToday}
-        className="h-8 w-8 rounded-lg"
+        className={`${compact ? "h-8 w-8" : "h-9 w-9"} mt-0.5 rounded-lg`}
       />
 
       {/* Main content */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         {/* Title + Time row */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {isRooster && event.team && (
             <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-indigo-500/10 text-indigo-300 border-indigo-500/20 shrink-0 uppercase tracking-wider">
               {event.team}
             </span>
           )}
-          <p className="text-[13px] font-semibold text-slate-200 truncate">{event.titel}</p>
-          <span className="flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
-            <Clock size={10} className="text-slate-600" />
-            {getTimeLabel(event)}
-          </span>
+          <p className={`min-w-0 flex-1 break-words font-semibold text-slate-200 sm:truncate ${compact ? "text-xs leading-4" : "text-[13px] leading-5"}`}>
+            {event.titel}
+          </p>
           {badge && (
             <span className={`hidden sm:inline-flex shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${badge.className}`}>
               {badge.label}
@@ -156,16 +164,26 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
         </div>
 
         {/* Meta row — location, multi-day, conflict */}
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+        <div className={`mt-1 flex flex-wrap items-center ${compact ? "gap-x-2 gap-y-1" : "gap-2"}`}>
+          <span className="flex items-center gap-1 text-[10px] text-slate-500">
+            <Clock size={9} className="text-slate-600" />
+            {getTimeLabel(event)}
+          </span>
+
+          <span className="flex items-center gap-1 text-[10px] text-slate-600">
+            <CalendarDays size={9} />
+            {formatDateRange(event)}
+          </span>
+
           {multiDay && (
             <span className="flex items-center gap-1 text-[10px] text-slate-600">
               <CalendarDays size={9} />
-              {formatDateRange(event)}
+              meerdaags
             </span>
           )}
 
           {event.locatie && (
-            <span className="flex items-center gap-1 text-[10px] text-slate-500 truncate max-w-[160px]">
+            <span className="flex min-w-0 max-w-full items-center gap-1 truncate text-[10px] text-slate-500 sm:max-w-[220px]">
               <MapPin size={9} className="shrink-0" />
               {event.locatie}
             </span>
@@ -191,8 +209,8 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
       </div>
 
       {/* Actions — visible on hover */}
-      {!isRooster && (
-        <div className="flex items-center gap-0.5 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+      {!isRooster && !compact && (
+        <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
           <AnimatePresence mode="wait">
             {isDeleting ? (
               <motion.div key="loader" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -219,7 +237,8 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
                 {onEdit && !isPendingDelete && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onEdit(event); }}
-                    className="p-1.5 hover:bg-white/[0.06] rounded-md text-slate-600 hover:text-indigo-400 transition-colors cursor-pointer"
+                    className={`${compact ? "h-8 w-8" : "h-9 w-9"} flex items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white/[0.06] hover:text-indigo-400`}
+                    aria-label="Afspraak wijzigen"
                     title="Wijzigen"
                   >
                     <Pencil size={13} />
@@ -227,7 +246,8 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
                 )}
                 <button
                   onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-                  className="p-1.5 hover:bg-red-500/10 rounded-md text-slate-600 hover:text-red-400 transition-colors cursor-pointer"
+                  className={`${compact ? "h-8 w-8" : "h-9 w-9"} flex items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-red-500/10 hover:text-red-400`}
+                  aria-label="Afspraak verwijderen"
                   title="Verwijderen"
                 >
                   <Trash2 size={13} />

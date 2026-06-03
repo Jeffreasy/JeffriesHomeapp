@@ -54,14 +54,14 @@ export function OverviewPanel({
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show">
-      <Panel className="overflow-hidden p-0 border border-white/10 bg-black/40">
-        <div className="border-b border-white/5 px-5 py-4 sm:px-6 min-w-0">
+      <Panel className="overflow-hidden border border-white/10 bg-black/40 p-0">
+        <div className="min-w-0 border-b border-white/5 px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <motion.div variants={itemVariants}>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
                 Control center
               </p>
-              <h2 className="mt-1 text-2xl font-black text-white tracking-tight">Werk, agenda en signalen</h2>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-white sm:text-2xl">Werk, agenda en signalen</h2>
             </motion.div>
             <motion.div variants={itemVariants}>
               <Link
@@ -75,7 +75,7 @@ export function OverviewPanel({
           </div>
         </div>
 
-        <motion.div variants={itemVariants} className="grid sm:grid-cols-2 xl:grid-cols-4 min-w-0">
+        <motion.div variants={itemVariants} className="grid min-w-0 grid-cols-2 xl:grid-cols-4">
           <StatusMetric
             icon={Clock3}
             label="Komende uren"
@@ -106,7 +106,7 @@ export function OverviewPanel({
           />
         </motion.div>
 
-        <motion.div variants={itemVariants} className="grid px-5 py-4 sm:grid-cols-3 sm:px-6 gap-0">
+        <motion.div variants={itemVariants} className="hidden px-5 py-4 sm:grid sm:grid-cols-3 sm:px-6 gap-0">
           <MiniBreakdown label="Shifts" value={`V ${shifts["Vroeg"] ?? 0} / L ${shifts["Laat"] ?? 0}`} sub={`${shifts["Dienst"] ?? 0} dagdienst`} />
           <MiniBreakdown label="Team R." value={String(teams["R."] ?? 0)} sub="komende diensten" />
           <MiniBreakdown label="Team A." value={String(teams["A."] ?? 0)} sub="komende diensten" />
@@ -159,8 +159,10 @@ export function OverviewTab({
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
-        <ContractWidget />
+        <div className="hidden space-y-4 md:block">
+          <ContractWidget />
           <MonthBalanceChart />
+        </div>
         <Panel>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <SectionTitle
@@ -169,7 +171,7 @@ export function OverviewTab({
               title="Diensten en afspraken"
               sub={`${unifiedWeeks.length} weken`}
             />
-            <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 sm:flex">
               <button
                 type="button"
                 onClick={() => setAllWeeks(true)}
@@ -215,7 +217,7 @@ export function OverviewTab({
         )}
       </div>
 
-      <aside className="space-y-5 xl:sticky xl:top-32 xl:self-start">
+      <aside className="hidden space-y-5 md:block xl:sticky xl:top-32 xl:self-start">
         <Panel>
           <SectionTitle
             icon={CalendarDays}

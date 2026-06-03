@@ -3,7 +3,7 @@
 import { type ReactNode } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, CircleMinus, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toneClasses, type Tone } from "./SettingsUtils";
 
@@ -133,17 +133,23 @@ export function StatusRow({
   );
 }
 
-export function StatusPill({ ok, label }: { ok: boolean; label: string }) {
+export type StatusPillTone = "ok" | "warn" | "neutral" | "bad";
+
+export function StatusPill({ ok, label, tone }: { ok: boolean; label: string; tone?: StatusPillTone }) {
+  const resolvedTone: StatusPillTone = tone ?? (ok ? "ok" : "bad");
+  const Icon = resolvedTone === "ok" ? CheckCircle2 : resolvedTone === "neutral" ? CircleMinus : AlertTriangle;
+
   return (
     <span
       className={cn(
         "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-bold",
-        ok
-          ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
-          : "border-rose-500/20 bg-rose-500/10 text-rose-200"
+        resolvedTone === "ok" && "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
+        resolvedTone === "warn" && "border-amber-500/20 bg-amber-500/10 text-amber-200",
+        resolvedTone === "neutral" && "border-slate-500/20 bg-slate-500/10 text-slate-300",
+        resolvedTone === "bad" && "border-rose-500/20 bg-rose-500/10 text-rose-200"
       )}
     >
-      {ok ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+      <Icon size={13} />
       {label}
     </span>
   );

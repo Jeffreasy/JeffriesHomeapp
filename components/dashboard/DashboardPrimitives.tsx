@@ -32,7 +32,7 @@ export function Panel({ children, className = "" }: { children: ReactNode; class
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5 ${className}`}
+      className={`rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:rounded-2xl sm:p-5 ${className}`}
     >
       {children}
     </motion.div>
@@ -99,18 +99,18 @@ export function MetricTile({
     <Link href={href} className="group block min-w-0">
       <motion.div
         whileHover={{ y: -2 }}
-        className={`min-h-[132px] rounded-2xl border ${classes.border} ${classes.surface} p-4 transition-colors group-hover:bg-[var(--color-surface-hover)]`}
+        className={`min-h-[108px] rounded-xl border ${classes.border} ${classes.surface} p-3 transition-colors group-hover:bg-[var(--color-surface-hover)] sm:min-h-[132px] sm:rounded-2xl sm:p-4`}
       >
         <div className="flex items-start justify-between gap-3">
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${classes.border} bg-black/10`}>
-            <RenderIcon icon={icon} size={18} className={classes.icon} />
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border sm:h-10 sm:w-10 ${classes.border} bg-black/10`}>
+            <RenderIcon icon={icon} size={17} className={classes.icon} />
           </div>
           <ArrowRight size={15} className="mt-1 text-slate-600 transition-colors group-hover:text-slate-300" />
         </div>
-        <div className="mt-4 min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-          <p className="mt-1 truncate text-lg font-bold text-white">{value}</p>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{sub}</p>
+        <div className="mt-3 min-w-0 sm:mt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:text-[11px]">{label}</p>
+          <p className="mt-1 line-clamp-2 break-words text-base font-bold leading-tight text-white sm:text-lg">{value}</p>
+          <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5">{sub}</p>
         </div>
       </motion.div>
     </Link>
@@ -134,8 +134,8 @@ export function RouteTile({
 
   return (
     <Link href={href} className="group block min-w-0">
-      <div className="flex min-h-[86px] items-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] p-3 transition-colors hover:bg-[var(--color-surface-hover)]">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${classes.border} ${classes.surface}`}>
+      <div className="flex min-h-[86px] items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] p-3 transition-colors hover:bg-[var(--color-surface-hover)] sm:rounded-2xl">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border sm:h-11 sm:w-11 ${classes.border} ${classes.surface}`}>
           <RenderIcon icon={icon} size={18} className={classes.icon} />
         </div>
         <div className="min-w-0 flex-1">

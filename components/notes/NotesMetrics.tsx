@@ -63,7 +63,7 @@ export function NotesMetricsRow({
   linkedCount: number;
 }) {
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-5">
       <MetricTile
         icon={StickyNote}
         label="Totaal"

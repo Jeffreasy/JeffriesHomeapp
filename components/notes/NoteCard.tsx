@@ -56,6 +56,11 @@ export function NoteCard({
   const symbol = resolveAppIconName(note.symbol, "note");
   const compact = density === "compact";
   const isCompleted = note.isCompleted || note.is_completed;
+  const isPinned = note.isPinned || note.is_pinned;
+  const linkedEventId = note.linkedEventId ?? note.linked_event_id;
+  const actionButtonClass = compact
+    ? "flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[40px] sm:min-w-[40px]"
+    : "flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-45";
   
   const { data: backlinksRaw } = useGetNotesIdBacklinks(note.id, { query: { enabled: canLoadBacklinks, staleTime: 60_000 } });
   const backlinks = Array.isArray(backlinksRaw?.data) ? backlinksRaw.data : [];
@@ -94,6 +99,8 @@ export function NoteCard({
           ? "cursor-progress opacity-80"
           : `cursor-pointer hover:border-[var(--color-border-hover)] ${isCompleted ? "opacity-80" : ""}`
       }`}
+      role="button"
+      tabIndex={0}
       style={{
         background: note.kleur
           ? `linear-gradient(135deg, ${note.kleur}${KLEUR_OPACITY} 0%, rgba(15,15,20,0.85) 100%)`
@@ -101,6 +108,11 @@ export function NoteCard({
       }}
       onClick={() => {
         if (!pendingAction) onEdit(note);
+      }}
+      onKeyDown={(event) => {
+        if (pendingAction || (event.key !== "Enter" && event.key !== " ")) return;
+        event.preventDefault();
+        onEdit(note);
       }}
     >
       {/* Priority indicator — left strip */}
@@ -111,7 +123,7 @@ export function NoteCard({
       )}
 
       {/* Pin indicator */}
-      {note.isPinned && (
+      {isPinned && (
         <div className="absolute top-2 right-2">
           <Pin size={12} className="text-amber-400 fill-amber-400" />
         </div>
@@ -151,7 +163,7 @@ export function NoteCard({
         )}
 
         {/* Linked event chip */}
-        {!masked && note.linkedEventId && (
+        {!masked && linkedEventId && (
           <div
             className="inline-flex max-w-full items-center gap-1 rounded-md bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-400 mb-2 ml-1"
             title={linkedEventLabel ? `Gekoppeld aan ${linkedEventLabel}` : "Gekoppeld aan afspraak"}
@@ -190,7 +202,7 @@ export function NoteCard({
         )}
 
         {/* Footer: tags + time + actions */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-end justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             {masked ? (
               <span className="inline-flex items-center gap-0.5 rounded-md bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-slate-500">
@@ -223,7 +235,7 @@ export function NoteCard({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); void runAction("complete", () => onToggleComplete(note.id)); }}
                 disabled={Boolean(pendingAction)}
-                className="flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-45"
+                className={`${actionButtonClass} hover:bg-emerald-500/15`}
                 aria-label={isCompleted ? "Heropenen" : "Afronden"}
                 title={isCompleted ? "Heropenen" : "Afronden"}
               >
@@ -234,16 +246,16 @@ export function NoteCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); void runAction("pin", () => onTogglePin(note.id)); }}
               disabled={Boolean(pendingAction)}
-              className="flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-45"
-              aria-label={note.isPinned ? "Losmaken" : "Vastpinnen"}
+              className={`${actionButtonClass} hover:bg-[var(--color-surface-hover)]`}
+              aria-label={isPinned ? "Losmaken" : "Vastpinnen"}
             >
-              <Pin size={14} className={note.isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
+              <Pin size={14} className={isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
             </button>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); void runAction("archive", () => onArchive(note.id)); }}
               disabled={Boolean(pendingAction)}
-              className="flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+              className={`${actionButtonClass} hidden hover:bg-[var(--color-surface-hover)] sm:flex`}
               aria-label={note.isArchived ? "Terugzetten" : "Archiveren"}
             >
               <Archive size={14} className="text-slate-500" />
@@ -252,7 +264,7 @@ export function NoteCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); void runAction("delete", () => onDelete(note.id)); }}
               disabled={Boolean(pendingAction)}
-              className="flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+              className={`${actionButtonClass} hidden hover:bg-red-500/20 sm:flex`}
               aria-label="Verwijderen"
             >
               <Trash2 size={14} className="text-slate-500 hover:text-red-400" />

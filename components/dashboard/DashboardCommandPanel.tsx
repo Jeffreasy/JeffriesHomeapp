@@ -19,13 +19,13 @@ export function SceneButton({
       onClick={onClick}
       disabled={disabled}
       title={`Scene ${scene.label} toepassen`}
-      className="flex min-h-[72px] min-w-0 flex-col items-start justify-between rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] p-3 text-left transition-colors hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex min-h-[64px] min-w-0 flex-col items-start justify-between rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] p-2.5 text-left transition-colors hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 sm:min-h-[72px] sm:p-3"
     >
       <span
         className="h-3 w-8 rounded-full border border-white/20"
         style={{ backgroundColor: scene.color }}
       />
-      <span className="truncate text-sm font-semibold text-slate-200">{scene.label}</span>
+      <span className="truncate text-xs font-semibold text-slate-200 sm:text-sm">{scene.label}</span>
     </button>
   );
 }
@@ -68,7 +68,7 @@ export function CommandPanel({
         </button>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-5">
         {CUSTOM_SCENES.slice(0, 6).map((scene) => (
           <SceneButton
             key={scene.id}

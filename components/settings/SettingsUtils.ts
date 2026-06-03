@@ -24,17 +24,30 @@ export type SyncStatusView = {
 
 export type TelegramStatusResult = {
   ok: boolean;
-  bot: { username: string; first_name: string; id: number };
+  enabled?: boolean;
+  mode?: string;
+  reason?: string;
+  error?: string;
+  bot?: { username: string; first_name: string; id: number };
+  tokenConfigured?: boolean;
   ownerConfigured: boolean;
   ownerChatSuffix: string | null;
   webhookSecretConfigured: boolean;
-  webhook: {
+  webAppUrlConfigured?: boolean;
+  webAppUrl?: string;
+  backgroundEngineEnabled?: boolean;
+  telegramPollerConfigured?: boolean;
+  webhook?: {
     configured: boolean;
     urlHost: string | null;
     pendingUpdateCount: number;
-    lastErrorDate: number | null;
+    lastErrorDate: string | null;
     lastErrorMessage: string | null;
     maxConnections: number | null;
+    allowedUpdates?: string[];
+    hasCustomCertificate?: boolean;
+    lastSyncErrorDate?: string | null;
+    longPollingWillBeActive?: boolean;
   };
 };
 

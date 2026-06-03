@@ -72,8 +72,8 @@ export default function SettingsPage() {
   });
 
   const { data: syncStatus } = useQuery({
-    queryKey: ["sync-status"],
-    queryFn: () => syncApi.status(),
+    queryKey: ["sync-status", user?.id],
+    queryFn: () => syncApi.status(user?.id),
     refetchInterval: 10000,
   });
 
@@ -114,6 +114,14 @@ export default function SettingsPage() {
   const accountEmail = user?.primaryEmailAddress?.emailAddress ?? overview?.account?.email ?? "Clerk account";
   const localApiHost = "Next.js proxy -> Render backend";
   const syncMap = (syncStatus ?? {}) as Record<string, SyncStatusView | undefined>;
+  const bridgeQueueActive = Boolean(overview?.integrations.queueLightCommands);
+  const hasStartBackgroundEngineFlag =
+    overview?.integrations && Object.prototype.hasOwnProperty.call(overview.integrations, "startBackgroundEngine");
+  const telegramNeedsAttention = Boolean(
+    overview?.integrations.telegramBot &&
+      (!overview.integrations.telegramOwner ||
+        (hasStartBackgroundEngineFlag && !overview.integrations.startBackgroundEngine))
+  );
 
   const roomRows = useMemo(() => {
     return rooms.map((room) => ({
@@ -392,8 +400,14 @@ export default function SettingsPage() {
               <StatusRow
                 icon={Smartphone}
                 label="Lokale bridge"
-                value={overview?.integrations.localBridge ? "Beveiligd" : "Secret ontbreekt"}
-                tone={overview?.integrations.localBridge ? "green" : "rose"}
+                value={
+                  bridgeQueueActive
+                    ? overview?.integrations.localBridge
+                      ? "Queue beveiligd"
+                      : "Bridge-key mist"
+                    : "Direct LAN"
+                }
+                tone={bridgeQueueActive ? (overview?.integrations.localBridge ? "green" : "rose") : "slate"}
               />
             </div>
           </Panel>
@@ -498,6 +512,7 @@ export default function SettingsPage() {
               telegramChecking={telegramChecking}
               handleTelegramCheck={handleTelegramCheck}
               grokCapabilities={grokCapabilities}
+              syncMap={syncMap}
             />
 
             <Panel>
@@ -581,14 +596,13 @@ export default function SettingsPage() {
           </div>
         </CollapsibleSection>
 
-        {(overview?.integrations.telegramBot && !overview.integrations.telegramOwner) ||
-        (overview?.integrations.telegramBot && !overview.integrations.telegramWebhookSecret) ? (
+        {telegramNeedsAttention ? (
           <div className="flex items-start gap-3 rounded-lg border border-rose-500/20 bg-rose-500/10 p-4">
             <TriangleAlert size={18} className="mt-0.5 shrink-0 text-rose-300" />
             <div className="min-w-0">
               <p className="text-sm font-semibold text-rose-200">Telegram is niet volledig dichtgezet</p>
               <p className="mt-1 text-xs leading-5 text-slate-400">
-                Zet owner chat id en webhook secret in de Go API env voordat Telegram/Grok write-flows actief blijven.
+                Zet owner chat id en START_BACKGROUND_ENGINE=true in de Go API env voordat Telegram/Grok write-flows actief blijven.
               </p>
             </div>
           </div>

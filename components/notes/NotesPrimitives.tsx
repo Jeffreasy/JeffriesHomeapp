@@ -19,15 +19,15 @@ export function MetricTile({
   const toneClass = toneClasses[tone];
 
   return (
-    <div className={cn("glass p-4", toneClass.border)}>
-      <div className="flex items-start gap-3">
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", toneClass.surface)}>
-          <Icon size={18} className={toneClass.icon} />
+    <div className={cn("glass min-w-0 p-3 sm:p-4", toneClass.border)}>
+      <div className="flex items-start gap-2.5 sm:gap-3">
+        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10", toneClass.surface)}>
+          <Icon size={16} className={toneClass.icon} />
         </div>
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-          <p className={cn("mt-2 truncate text-2xl font-bold leading-tight", toneClass.text)}>{value}</p>
-          <p className="mt-1 text-xs leading-relaxed text-slate-500">{meta}</p>
+          <p className={cn("mt-1 truncate text-xl font-bold leading-tight sm:mt-2 sm:text-2xl", toneClass.text)}>{value}</p>
+          <p className="mt-1 hidden text-xs leading-relaxed text-slate-500 sm:block">{meta}</p>
         </div>
       </div>
     </div>
@@ -48,8 +48,8 @@ export function SectionTitle({
   return (
     <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10">
-          <Icon size={17} className="text-amber-300" />
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 sm:h-9 sm:w-9">
+          <Icon size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
           <h2 className="text-base font-bold text-white">{title}</h2>
@@ -66,24 +66,27 @@ export function SegmentedButton({
   icon: Icon,
   children,
   onClick,
+  className,
 }: {
   active: boolean;
   icon: LucideIcon;
   children: ReactNode;
   onClick: () => void;
+  className?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
+        "inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
         active
           ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-          : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
+          : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200",
+        className,
       )}
     >
-      <Icon size={15} />
+      <Icon size={15} className="shrink-0" />
       {children}
     </button>
   );

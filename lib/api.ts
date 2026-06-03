@@ -644,7 +644,8 @@ export const settingsApi = {
 };
 
 export const syncApi = {
-	status: () => apiFetch<SyncStatusResult>("/sync/status"),
+	status: (userId?: string) =>
+		apiFetch<SyncStatusResult>(userId ? `/sync/status?userId=${encodeURIComponent(userId)}` : "/sync/status"),
 	calendar: (userId: string) => apiFetch<SyncCalendarResult>(`/sync/calendar?userId=${userId}`, { method: "POST" }),
 	gmail: (userId: string) => apiFetch<Record<string, unknown>>(`/sync/gmail?userId=${userId}`, { method: "POST" }),
 };

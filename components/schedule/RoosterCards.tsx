@@ -83,14 +83,14 @@ export function StatusMetric({
   const classes = toneClasses[tone];
 
   return (
-    <div className={`min-h-[132px] min-w-0 bg-black/40 p-4 sm:p-5 border-b border-r border-t border-l-2 border-white/5 transition-all hover:bg-white/5`}
+    <div className="min-h-[112px] min-w-0 border-b border-r border-t border-l-2 border-white/5 bg-black/40 p-3 transition-all hover:bg-white/5 sm:min-h-[132px] sm:p-5"
          style={{ borderLeftColor: tone === "slate" ? "#94a3b8" : tone === "green" ? "#10b981" : tone === "amber" ? "#f59e0b" : tone === "rose" ? "#f43f5e" : tone === "indigo" ? "#6366f1" : "#3b82f6" }}>
       <div className={`flex h-8 w-8 items-center justify-center border ${classes.border} ${classes.surface}`}>
         <Icon size={14} className={classes.icon} />
       </div>
-      <p className="mt-5 text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</p>
-      <p className={`mt-0.5 truncate text-xl tracking-tight font-black ${classes.text}`}>{value}</p>
-      <p className="mt-1 text-xs text-slate-500 uppercase tracking-widest font-bold">{sub}</p>
+      <p className="mt-3 text-[8px] font-black uppercase tracking-widest text-slate-500 sm:mt-5 sm:text-[9px]">{label}</p>
+      <p className={`mt-0.5 truncate text-base font-black tracking-tight sm:text-xl ${classes.text}`}>{value}</p>
+      <p className="mt-1 line-clamp-2 text-[10px] font-bold uppercase leading-4 tracking-widest text-slate-500 sm:text-xs">{sub}</p>
     </div>
   );
 }

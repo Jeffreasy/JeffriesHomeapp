@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useSalary } from "@/hooks/useSalary";
@@ -14,7 +15,14 @@ import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { QuickNote } from "@/components/notes/QuickNote";
 import { DailyChecklist } from "@/components/habits/DailyChecklist";
 
-import { type DashboardDateInfo, formatCurrency, getDashboardDateInfo } from "@/components/dashboard/DashboardUtils";
+import {
+  type DashboardDateInfo,
+  calculateScheduleSalaryForecast,
+  formatCurrency,
+  formatEventMeta,
+  formatRelativeDateLabel,
+  getDashboardDateInfo,
+} from "@/components/dashboard/DashboardUtils";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { EmptyState, MetricTile, Panel, RouteTile, SectionHeader, StatusRow } from "@/components/dashboard/DashboardPrimitives";
 import { OverviewPanel } from "@/components/dashboard/DashboardOverviewPanel";
@@ -37,7 +45,7 @@ export default function DashboardPage() {
 
   const { data: devices = [], isLoading: devicesLoading } = useDevices();
   const { mutate: sendCommand } = useLampCommand();
-  const { nextDienst, thisWeek, upcoming: upcomingShifts, isLoading: scheduleLoading } = useSchedule();
+  const { diensten, nextDienst, upcoming: upcomingShifts, isLoading: scheduleLoading } = useSchedule();
   const { huidig: salarisHuidig, isLoading: salaryLoading } = useSalary();
   const loonstroken = useLoonstroken();
   const {
@@ -47,7 +55,7 @@ export default function DashboardPage() {
     withConflicts,
     isLoading: eventsLoading,
     refetch: refetchEvents,
-  } = usePersonalEvents({ diensten: thisWeek });
+  } = usePersonalEvents({ diensten });
   const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("finance");
   
   const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
@@ -58,15 +66,45 @@ export default function DashboardPage() {
   const allOn = onDevices.length === devices.length && devices.length > 0;
   
   const todayIso = dateInfo?.todayIso;
-  const todayEvents = todayIso ? (eventsByDate[todayIso] ?? []) : [];
-  const nextShiftEvents = nextDienst ? (eventsByDate[nextDienst.startDatum] ?? []) : [];
-  const nextEvent = upcomingEvents[0] ?? null;
+  const personalUpcomingEvents = useMemo(
+    () => upcomingEvents.filter((event) => event.kalender !== "Rooster"),
+    [upcomingEvents]
+  );
+  const todayEvents = todayIso ? (eventsByDate[todayIso] ?? []).filter((event) => event.kalender !== "Rooster") : [];
+  const getDashboardConflict = (event: PersonalEvent) => {
+    const conflict = conflictMap.get(event.eventId);
+    if (!conflict || conflict.level === "info") return undefined;
+    if (conflict.level === "soft" && event.heledag) return undefined;
+    return conflict;
+  };
+  const dashboardAppointments = personalUpcomingEvents.slice(0, 3);
+  const moreAppointments = Math.max(0, personalUpcomingEvents.length - dashboardAppointments.length);
+  const nextShiftEvents = nextDienst
+    ? (eventsByDate[nextDienst.startDatum] ?? []).filter((event) => event.kalender !== "Rooster" && getDashboardConflict(event))
+    : [];
+  const nextEvent = personalUpcomingEvents[0] ?? null;
   const hardConflicts = withConflicts.filter((event) => conflictMap.get(event.eventId)?.level === "hard").length;
+  const actionableConflicts = personalUpcomingEvents.filter((event) => getDashboardConflict(event)).length;
   
+  const scheduleForecast = useMemo(
+    () => calculateScheduleSalaryForecast(diensten, dateInfo?.period),
+    [diensten, dateInfo?.period]
+  );
   const werkelijkNetto = dateInfo ? loonstroken.byPeriode.get(dateInfo.period)?.netto : undefined;
+  const salaryForecast = salarisHuidig && salarisHuidig.nettoPrognose > 0
+    ? salarisHuidig.nettoPrognose
+    : scheduleForecast?.nettoPrognose;
   const nettoLabel = werkelijkNetto ? "Netto salaris" : "Netto prognose";
-  const nettoValue = werkelijkNetto ?? salarisHuidig?.nettoPrognose;
-  const nettoSub = werkelijkNetto ? "loonstrook bevestigd" : "op basis van rooster";
+  const nettoValue = werkelijkNetto ?? salaryForecast;
+  const nettoSub = werkelijkNetto
+    ? "loonstrook bevestigd"
+    : salarisHuidig && salarisHuidig.nettoPrognose > 0
+      ? "Render salarisberekening"
+      : scheduleForecast
+        ? `${scheduleForecast.aantalDiensten} diensten · ${scheduleForecast.totaalUren}u rooster`
+        : scheduleLoading
+          ? "rooster laden"
+          : "geen roosterdata deze maand";
   
   const greeting = dateInfo?.greeting ?? "Welkom";
   const today = dateInfo?.todayLabel ?? "vandaag";
@@ -97,7 +135,7 @@ export default function DashboardPage() {
         toggleAll={toggleAll}
       />
 
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+      <main className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-6 sm:px-6 sm:py-5 lg:px-8 lg:py-7">
         {hasLoadingData && (
           <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-500">
             <AppIcon name="activity" tone="blue" size="xs" />
@@ -115,8 +153,10 @@ export default function DashboardPage() {
             lampsOn={onDevices.length}
             lampsTotal={devices.length}
             devicesOnline={onlineDevices.length}
-            conflicts={withConflicts.length}
+            conflicts={actionableConflicts}
             hardConflicts={hardConflicts}
+            todayIso={todayIso}
+            appointmentsLoading={eventsLoading}
           />
 
           <CommandPanel
@@ -129,7 +169,7 @@ export default function DashboardPage() {
           />
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricTile
             href="/lampen"
             icon="lights"
@@ -143,16 +183,16 @@ export default function DashboardPage() {
             icon="calendarDays"
             tone={nextDienst ? "indigo" : "slate"}
             label="Rooster"
-            value={nextDienst ? `${nextDienst.dag} ${nextDienst.startTijd}` : "Geen dienst"}
-            sub={`${upcomingShifts.length} komende diensten`}
+            value={nextDienst ? nextDienst.startTijd : "Geen dienst"}
+            sub={nextDienst ? `${formatRelativeDateLabel(nextDienst.startDatum, todayIso)} · ${upcomingShifts.length} diensten` : `${upcomingShifts.length} komende diensten`}
           />
           <MetricTile
             href="/agenda"
             icon="agenda"
-            tone={hardConflicts > 0 ? "rose" : todayEvents.length > 0 ? "green" : "blue"}
+            tone={hardConflicts > 0 ? "rose" : actionableConflicts > 0 ? "amber" : todayEvents.length > 0 ? "green" : "blue"}
             label="Agenda"
-            value={todayEvents.length > 0 ? `${todayEvents.length} vandaag` : "Rustige dag"}
-            sub={nextEvent?.titel ?? "Geen aankomende afspraak"}
+            value={eventsLoading ? "Laden" : todayEvents.length > 0 ? `${todayEvents.length} vandaag` : "Rustig"}
+            sub={eventsLoading ? "Agenda wordt geladen" : nextEvent ? formatEventMeta(nextEvent, todayIso) : "Geen aankomende afspraak"}
           />
           <MetricTile
             href="/finance"
@@ -181,29 +221,45 @@ export default function DashboardPage() {
                   conflictMap={conflictMap}
                 />
 
-                <Panel>
+                <Panel className="p-3 sm:p-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-white">Aankomende afspraken</p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {upcomingEvents.length > 0
-                          ? `${upcomingEvents.length} items in je agenda`
+                        {eventsLoading
+                          ? "Google Calendar wordt gelezen"
+                          : personalUpcomingEvents.length > 0
+                          ? `${dashboardAppointments.length} eerstvolgende · ${personalUpcomingEvents.length} totaal`
                           : "Je agenda is leeg voor de komende periode"}
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={openNewEvent}
-                      className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 text-xs font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/15"
-                    >
-                      <AppIcon name="add" tone="indigo" size="xs" />
-                      Nieuwe afspraak
-                    </button>
+                    <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                      <Link
+                        href="/agenda"
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] sm:h-9"
+                      >
+                        Agenda
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={openNewEvent}
+                        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 text-xs font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/15 sm:h-9"
+                      >
+                        <AppIcon name="add" tone="indigo" size="xs" />
+                        Nieuw
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="mt-4 space-y-2">
-                    {upcomingEvents.length > 0 ? (
-                      upcomingEvents.slice(0, 5).map((event) => (
+                  <div className="mt-3 space-y-2 sm:mt-4">
+                    {eventsLoading ? (
+                      <EmptyState
+                        icon="calendar"
+                        title="Afspraken laden"
+                        text="Je Google Calendar en lokale wachtrij worden opgehaald."
+                      />
+                    ) : dashboardAppointments.length > 0 ? (
+                      dashboardAppointments.map((event) => (
                         <PersonalEventItem
                           key={event.eventId}
                           event={event}
@@ -212,7 +268,8 @@ export default function DashboardPage() {
                             setEditEvent(selected);
                             setModalOpen(true);
                           }}
-                          conflictInfo={conflictMap.get(event.eventId)}
+                          conflictInfo={getDashboardConflict(event)}
+                          compact
                         />
                       ))
                     ) : (
@@ -222,18 +279,26 @@ export default function DashboardPage() {
                         text="Voeg een afspraak toe of synchroniseer je Google Calendar."
                       />
                     )}
+                    {moreAppointments > 0 && (
+                      <Link
+                        href="/agenda"
+                        className="flex min-h-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] text-xs font-semibold text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
+                      >
+                        Bekijk {moreAppointments} meer in Agenda
+                      </Link>
+                    )}
                   </div>
                 </Panel>
               </div>
             </div>
 
-            <div>
+            <div className="hidden md:block">
               <SectionHeader
                 icon="automations"
                 label="Navigatie"
                 title="Snel naar je belangrijkste modules"
               />
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
                 <RouteTile href="/lampen" icon="lights" label="Lampen" sub="Kamers en scenes" tone="amber" />
                 <RouteTile href="/rooster" icon="roster" label="Rooster" sub="Diensten en import" tone="indigo" />
                 <RouteTile href="/agenda" icon="agenda" label="Agenda" sub="Afspraken en sync" tone="blue" />
@@ -243,7 +308,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <aside className="space-y-6 xl:sticky xl:top-24 xl:self-start">
+          <aside className="hidden space-y-6 md:block xl:sticky xl:top-24 xl:self-start">
             <DailyChecklist />
             <QuickNote />
             <Panel>
@@ -263,8 +328,8 @@ export default function DashboardPage() {
                 <StatusRow
                   icon="habit"
                   label="Agenda conflicten"
-                  value={hardConflicts > 0 ? `${hardConflicts} harde overlap` : `${withConflicts.length} aandachtspunt(en)`}
-                  tone={hardConflicts > 0 ? "rose" : withConflicts.length > 0 ? "amber" : "green"}
+                  value={hardConflicts > 0 ? `${hardConflicts} harde overlap` : actionableConflicts > 0 ? `${actionableConflicts} aandachtspunt(en)` : "Geen conflicten"}
+                  tone={hardConflicts > 0 ? "rose" : actionableConflicts > 0 ? "amber" : "green"}
                 />
                 <StatusRow
                   icon="hide"
