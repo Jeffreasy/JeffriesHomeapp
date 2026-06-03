@@ -1,8 +1,24 @@
-import { ArrowDownAZ, ArrowUpDown, CalendarClock, Clock3, type LucideIcon } from "lucide-react";
+import {
+  ArrowDownAZ,
+  ArrowUpDown,
+  Archive,
+  CalendarClock,
+  Clock3,
+  Hash,
+  Link2,
+  ListChecks,
+  Pin,
+  ShieldAlert,
+  CheckCircle2,
+  StickyNote,
+  type LucideIcon,
+} from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
 
-export type ViewMode = "active" | "archived";
+export type ViewMode = "active" | "completed" | "archived";
+export type BoardMode = "board" | "grid";
 export type SortMode = "recent" | "oldest" | "title" | "deadline";
+export type NoteScope = "all" | "pinned" | "attention" | "deadlines" | "checklists" | "linked" | "untagged";
 export type Tone = "amber" | "green" | "rose" | "sky" | "indigo" | "slate";
 
 export const SORT_OPTIONS: Array<{ id: SortMode; label: string; icon: LucideIcon }> = [
@@ -10,6 +26,16 @@ export const SORT_OPTIONS: Array<{ id: SortMode; label: string; icon: LucideIcon
   { id: "oldest", label: "Oudst", icon: Clock3 },
   { id: "title", label: "A-Z", icon: ArrowDownAZ },
   { id: "deadline", label: "Deadline", icon: CalendarClock },
+];
+
+export const SCOPE_OPTIONS: Array<{ id: NoteScope; label: string; icon: LucideIcon }> = [
+  { id: "all", label: "Alles", icon: StickyNote },
+  { id: "attention", label: "Aandacht", icon: ShieldAlert },
+  { id: "pinned", label: "Vastgezet", icon: Pin },
+  { id: "deadlines", label: "Deadlines", icon: CalendarClock },
+  { id: "checklists", label: "Checklists", icon: ListChecks },
+  { id: "linked", label: "Agenda", icon: Link2 },
+  { id: "untagged", label: "Zonder tag", icon: Hash },
 ];
 
 export const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string }> = {
@@ -62,7 +88,7 @@ export function getChecklistInfo(text: string) {
   const lines = text.split("\n");
   const total = lines.filter((line) => /^- \[[ x]\] /i.test(line)).length;
   const done = lines.filter((line) => /^- \[x\] /i.test(line)).length;
-  return { total, done };
+  return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
 }
 
 export function getDisplayTitle(note: NoteRecord) {
@@ -71,4 +97,78 @@ export function getDisplayTitle(note: NoteRecord) {
 
 export function tagLabel(tag: string, index: number, masked: boolean) {
   return masked ? `Tag ${index + 1}` : tag;
+}
+
+export function getDeadlineState(deadline?: string | null, now = new Date()) {
+  if (!deadline) {
+    return { hasDeadline: false, overdue: false, today: false, soon: false, timestamp: 0 };
+  }
+
+  const date = new Date(deadline);
+  if (Number.isNaN(date.getTime())) {
+    return { hasDeadline: false, overdue: false, today: false, soon: false, timestamp: 0 };
+  }
+
+  const timestamp = date.getTime();
+  const nowTime = now.getTime();
+  const today = isSameLocalDate(date, now);
+  const soonLimit = nowTime + 7 * 86400000;
+
+  return {
+    hasDeadline: true,
+    overdue: timestamp < nowTime && !today,
+    today,
+    soon: timestamp >= nowTime && timestamp <= soonLimit,
+    timestamp,
+  };
+}
+
+export function isAttentionNote(note: NoteRecord, now = new Date()) {
+  const deadline = getDeadlineState(note.deadline, now);
+  return note.prioriteit === "hoog" || deadline.overdue || deadline.today;
+}
+
+export function noteMatchesScope(note: NoteRecord, scope: NoteScope, now = new Date()) {
+  switch (scope) {
+    case "pinned":
+      return note.isPinned || note.is_pinned;
+    case "attention":
+      return isAttentionNote(note, now);
+    case "deadlines":
+      return getDeadlineState(note.deadline, now).hasDeadline;
+    case "checklists":
+      return getChecklistInfo(note.inhoud).total > 0;
+    case "linked":
+      return Boolean(note.linkedEventId || note.linked_event_id);
+    case "untagged":
+      return (note.tags ?? []).length === 0;
+    default:
+      return true;
+  }
+}
+
+export const VIEW_OPTIONS: Array<{ id: ViewMode; label: string; icon: LucideIcon }> = [
+  { id: "active", label: "Actief", icon: StickyNote },
+  { id: "completed", label: "Afgerond", icon: CheckCircle2 },
+  { id: "archived", label: "Archief", icon: Archive },
+];
+
+export function getScopeCounts(notes: NoteRecord[], now = new Date()): Record<NoteScope, number> {
+  return {
+    all: notes.length,
+    pinned: notes.filter((note) => noteMatchesScope(note, "pinned", now)).length,
+    attention: notes.filter((note) => noteMatchesScope(note, "attention", now)).length,
+    deadlines: notes.filter((note) => noteMatchesScope(note, "deadlines", now)).length,
+    checklists: notes.filter((note) => noteMatchesScope(note, "checklists", now)).length,
+    linked: notes.filter((note) => noteMatchesScope(note, "linked", now)).length,
+    untagged: notes.filter((note) => noteMatchesScope(note, "untagged", now)).length,
+  };
+}
+
+function isSameLocalDate(a: Date, b: Date) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }

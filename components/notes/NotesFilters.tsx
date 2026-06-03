@@ -1,9 +1,18 @@
 "use client";
 
 import type { RefObject } from "react";
-import { Archive, FolderOpen, LayoutGrid, RotateCcw, Search, Tag, X } from "lucide-react";
+import { Columns3, FolderOpen, LayoutGrid, RotateCcw, Search, Tag, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { type ViewMode, type SortMode, SORT_OPTIONS, tagLabel } from "./NotesUtils";
+import {
+  type BoardMode,
+  type NoteScope,
+  type ViewMode,
+  type SortMode,
+  SCOPE_OPTIONS,
+  SORT_OPTIONS,
+  VIEW_OPTIONS,
+  tagLabel,
+} from "./NotesUtils";
 import { SectionTitle, SegmentedButton } from "./NotesPrimitives";
 
 export function NotesFilters({
@@ -14,9 +23,15 @@ export function NotesFilters({
   clearFilters,
   viewMode,
   setViewMode,
+  boardMode,
+  setBoardMode,
+  noteScope,
+  setNoteScope,
+  scopeCounts,
   sortMode,
   setSortMode,
   activeCount,
+  completedCount,
   archivedCount,
   allTags,
   tagCounts,
@@ -31,9 +46,15 @@ export function NotesFilters({
   clearFilters: () => void;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+  boardMode: BoardMode;
+  setBoardMode: (mode: BoardMode) => void;
+  noteScope: NoteScope;
+  setNoteScope: (scope: NoteScope) => void;
+  scopeCounts: Record<NoteScope, number>;
   sortMode: SortMode;
   setSortMode: (mode: SortMode) => void;
   activeCount: number;
+  completedCount: number;
   archivedCount: number;
   allTags: string[];
   tagCounts: Map<string, number>;
@@ -50,7 +71,7 @@ export function NotesFilters({
           subtitle={
             activeFilters > 0
               ? `${activeFilters} actieve instelling(en)`
-              : "Actieve notities, archief, tags en sortering"
+              : "Weergave, slimme filters, tags en sortering"
           }
           action={
             activeFilters > 0 ? (
@@ -90,12 +111,37 @@ export function NotesFilters({
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <SegmentedButton active={viewMode === "active"} icon={LayoutGrid} onClick={() => setViewMode("active")}>
-              Actief <span className="text-xs opacity-70">{activeCount}</span>
+            {VIEW_OPTIONS.map((option) => (
+              <SegmentedButton key={option.id} active={viewMode === option.id} icon={option.icon} onClick={() => setViewMode(option.id)}>
+                {option.label}
+                <span className="text-xs opacity-70">
+                  {option.id === "active" ? activeCount : option.id === "completed" ? completedCount : archivedCount}
+                </span>
+              </SegmentedButton>
+            ))}
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <SegmentedButton active={boardMode === "board"} icon={Columns3} onClick={() => setBoardMode("board")}>
+              Board
             </SegmentedButton>
-            <SegmentedButton active={viewMode === "archived"} icon={Archive} onClick={() => setViewMode("archived")}>
-              Archief <span className="text-xs opacity-70">{archivedCount}</span>
+            <SegmentedButton active={boardMode === "grid"} icon={LayoutGrid} onClick={() => setBoardMode("grid")}>
+              Grid
             </SegmentedButton>
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {SCOPE_OPTIONS.map((option) => (
+              <SegmentedButton
+                key={option.id}
+                active={noteScope === option.id}
+                icon={option.icon}
+                onClick={() => setNoteScope(option.id)}
+              >
+                {option.label}
+                <span className="text-xs opacity-60">{scopeCounts[option.id] ?? 0}</span>
+              </SegmentedButton>
+            ))}
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">

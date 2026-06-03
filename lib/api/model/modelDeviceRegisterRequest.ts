@@ -5,9 +5,13 @@
  * Backend REST API for Jeffries Homeapp.
  * OpenAPI spec version: 1.0
  */
+import type { ModelDeviceRegisterRequestCurrentState } from './modelDeviceRegisterRequestCurrentState';
 
 export interface ModelDeviceRegisterRequest {
+  current_state?: ModelDeviceRegisterRequestCurrentState;
   ip_address?: string;
   name?: string;
   room_id?: string;
+  skip_probe?: boolean;
+  status?: string;
 }

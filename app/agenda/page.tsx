@@ -105,6 +105,9 @@ export default function AgendaPage() {
     remove: removeNote,
     archive: archiveNote,
     togglePin: togglePinNote,
+    toggleComplete: toggleCompleteNote,
+    revisions: noteRevisions,
+    restoreRevision: restoreNoteRevision,
   } = useNotes();
   const {
     events: agendaEvents,
@@ -579,6 +582,12 @@ export default function AgendaPage() {
       <AnimatePresence>
         {noteEditorOpen && (
           <NoteEditor
+            key={editNote?.id ?? [
+              noteDefaults.linkedEventId ?? "new-note",
+              noteDefaults.deadline ?? "",
+              noteDefaults.title ?? "",
+              ...(noteDefaults.tags ?? []),
+            ].join(":")}
             note={editNote}
             userId={user?.id}
             onSave={handleSaveNote}
@@ -590,6 +599,9 @@ export default function AgendaPage() {
             onDelete={removeNote}
             onArchive={archiveNote}
             onTogglePin={togglePinNote}
+            onToggleComplete={toggleCompleteNote}
+            onLoadRevisions={noteRevisions}
+            onRestoreRevision={restoreNoteRevision}
             eventOptions={agendaEvents}
             initialDeadline={noteDefaults.deadline}
             initialLinkedEventId={noteDefaults.linkedEventId}

@@ -3,8 +3,8 @@ import { existsSync } from 'node:fs';
 
 const swaggerInput = [
   process.env.BACKEND_SWAGGER_PATH,
-  '../JeffriesBackend-render-fix/backend/docs/swagger.json',
   '../JeffriesBackend/backend/docs/swagger.json',
+  '../JeffriesBackend-render-fix/backend/docs/swagger.json',
 ].find((path): path is string => Boolean(path && existsSync(path))) ?? '../JeffriesBackend/backend/docs/swagger.json';
 
 export default defineConfig({

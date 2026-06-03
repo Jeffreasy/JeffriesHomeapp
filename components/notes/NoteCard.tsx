@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
-import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2 } from "lucide-react";
+import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2, CheckCircle2 } from "lucide-react";
 import { useGetNotesIdBacklinks } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord } from "@/hooks/useNotes";
 import { AppIcon } from "@/components/ui/AppIcon";
@@ -10,10 +11,12 @@ import { resolveAppIconName } from "@/lib/symbols";
 interface NoteCardProps {
   note: NoteRecord;
   onEdit:      (note: NoteRecord) => void;
-  onTogglePin: (id: string) => void;
-  onArchive:   (id: string) => void;
-  onDelete:    (id: string) => void;
-  onUpdateContent?: (id: string, inhoud: string) => void;
+  density?: "comfortable" | "compact";
+  onTogglePin: (id: string) => void | Promise<void>;
+  onToggleComplete?: (id: string) => void | Promise<void>;
+  onArchive:   (id: string) => void | Promise<void>;
+  onDelete:    (id: string) => void | Promise<void>;
+  onUpdateContent?: (id: string, inhoud: string) => void | Promise<void>;
   onNavigateToNote?: (title: string) => void;
   linkedEventLabel?: string;
   masked?:     boolean;
@@ -27,7 +30,22 @@ const PRIORITEIT_STYLES: Record<string, { dot: string; label: string }> = {
   laag:    { dot: "bg-blue-400",   label: "Laag" },
 };
 
-export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpdateContent, onNavigateToNote, linkedEventLabel, masked }: NoteCardProps) {
+type PendingAction = "pin" | "complete" | "archive" | "delete" | "check" | null;
+
+export function NoteCard({
+  note,
+  density = "comfortable",
+  onEdit,
+  onTogglePin,
+  onToggleComplete,
+  onArchive,
+  onDelete,
+  onUpdateContent,
+  onNavigateToNote,
+  linkedEventLabel,
+  masked,
+}: NoteCardProps) {
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const displayTitle = note.titel || note.inhoud.slice(0, 50);
   const age = formatAge(note.gewijzigd);
   const checklistInfo = getChecklistInfo(note.inhoud);
@@ -36,11 +54,23 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
   const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
   const canLoadBacklinks = !masked && isUuid(note.id);
   const symbol = resolveAppIconName(note.symbol, "note");
+  const compact = density === "compact";
+  const isCompleted = note.isCompleted || note.is_completed;
   
   const { data: backlinksRaw } = useGetNotesIdBacklinks(note.id, { query: { enabled: canLoadBacklinks, staleTime: 60_000 } });
   const backlinks = Array.isArray(backlinksRaw?.data) ? backlinksRaw.data : [];
 
-  const toggleCheckbox = (originalLineIndex: number) => {
+  const runAction = async (action: PendingAction, callback: () => void | Promise<void>) => {
+    if (pendingAction) return;
+    setPendingAction(action);
+    try {
+      await callback();
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const toggleCheckbox = async (originalLineIndex: number) => {
     if (!onUpdateContent) return;
     const lines = [...allLines];
     const line = lines[originalLineIndex];
@@ -50,7 +80,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
     } else if (CHECKED.test(line)) {
       lines[originalLineIndex] = line.replace(/- \[x\]/i, "- [ ]");
     }
-    onUpdateContent(note.id, lines.join("\n"));
+    await runAction("check", () => onUpdateContent(note.id, lines.join("\n")));
   };
 
   return (
@@ -59,16 +89,24 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="glass group relative rounded-xl border border-[var(--color-border)] hover:border-[var(--color-border-hover)] transition-all cursor-pointer"
+      className={`glass group relative rounded-xl border border-[var(--color-border)] transition-all ${
+        pendingAction
+          ? "cursor-progress opacity-80"
+          : `cursor-pointer hover:border-[var(--color-border-hover)] ${isCompleted ? "opacity-80" : ""}`
+      }`}
       style={{
         background: note.kleur
           ? `linear-gradient(135deg, ${note.kleur}${KLEUR_OPACITY} 0%, rgba(15,15,20,0.85) 100%)`
           : "var(--color-surface)",
       }}
-      onClick={() => onEdit(note)}
+      onClick={() => {
+        if (!pendingAction) onEdit(note);
+      }}
     >
       {/* Priority indicator — left strip */}
-      {note.prioriteit === "hoog" && (
+      {isCompleted ? (
+        <div className="absolute bottom-3 left-0 top-3 w-0.5 rounded-full bg-emerald-500" />
+      ) : note.prioriteit === "hoog" && (
         <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-red-500" />
       )}
 
@@ -79,9 +117,9 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
         </div>
       )}
 
-      <div className="p-4">
+      <div className={compact ? "p-3" : "p-4"}>
         {/* Title row with priority dot */}
-        <div className="flex items-center gap-2 mb-1">
+        <div className="mb-1 flex items-center gap-2">
           <AppIcon name={symbol} tone="amber" size="sm" framed className="h-8 w-8 rounded-lg" />
           {note.prioriteit && note.prioriteit !== "normaal" && (
             <span
@@ -89,10 +127,17 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
               title={`Prioriteit: ${prio.label}`}
             />
           )}
-          <h3 className="text-sm font-semibold text-slate-200 line-clamp-1">
+          <h3 className={`line-clamp-1 text-sm font-semibold text-slate-200 ${isCompleted ? "text-slate-400 line-through decoration-emerald-400/50" : ""}`}>
             {masked ? "••••••" : displayTitle}
           </h3>
         </div>
+
+        {!masked && isCompleted && (
+          <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+            <CheckCircle2 size={9} aria-hidden="true" />
+            Afgerond{note.completedAt || note.completed_at ? ` · ${formatAge(note.completedAt ?? note.completed_at ?? note.gewijzigd)}` : ""}
+          </div>
+        )}
 
         {/* Deadline badge */}
         {!masked && deadlineInfo && (
@@ -117,13 +162,13 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
         )}
 
         {/* Content preview with checklist + wiki-link support */}
-        <div className="text-xs text-slate-500 line-clamp-4 mb-2 leading-relaxed">
+        <div className={`mb-2 break-words text-xs leading-relaxed text-slate-500 ${compact ? "line-clamp-3" : "line-clamp-4"}`}>
           {masked ? "•••• •••• ••••" : renderPreview(allLines, onUpdateContent ? toggleCheckbox : undefined, onNavigateToNote)}
         </div>
 
         {/* Checklist progress */}
         {!masked && checklistInfo.total > 0 && (
-          <div className="flex items-center gap-2 mb-2">
+          <div className="mb-2 flex items-center gap-2">
             <ListChecks size={10} className="text-slate-600 shrink-0" aria-hidden="true" />
             <div className="flex-1 h-1 rounded-full bg-[var(--color-surface)] overflow-hidden" role="progressbar" aria-valuenow={checklistInfo.pct} aria-valuemin={0} aria-valuemax={100}>
               <div
@@ -145,10 +190,10 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
         )}
 
         {/* Footer: tags + time + actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
             {masked ? (
-              <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 bg-[var(--color-surface)] px-1.5 py-0.5 rounded-md">
+              <span className="inline-flex items-center gap-0.5 rounded-md bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-slate-500">
                 <Tag size={8} aria-hidden="true" />
                 ••••
               </span>
@@ -157,10 +202,10 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
                 {(note.tags ?? []).slice(0, 2).map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-0.5 text-[10px] text-slate-400 bg-[var(--color-surface)] px-1.5 py-0.5 rounded-md"
+                    className="inline-flex min-w-0 items-center gap-0.5 rounded-md bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-slate-400"
                   >
                     <Tag size={8} aria-hidden="true" />
-                    {tag}
+                    <span className="max-w-[5rem] truncate">{tag}</span>
                   </span>
                 ))}
                 {(note.tags ?? []).length > 2 && (
@@ -172,24 +217,42 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
           </div>
 
           {/* Action buttons — always visible on mobile, hover on desktop */}
-          <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+            {onToggleComplete && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); void runAction("complete", () => onToggleComplete(note.id)); }}
+                disabled={Boolean(pendingAction)}
+                className="flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-45"
+                aria-label={isCompleted ? "Heropenen" : "Afronden"}
+                title={isCompleted ? "Heropenen" : "Afronden"}
+              >
+                <CheckCircle2 size={14} className={isCompleted ? "text-emerald-400 fill-emerald-400/20" : "text-slate-500"} />
+              </button>
+            )}
             <button
-              onClick={(e) => { e.stopPropagation(); onTogglePin(note.id); }}
-              className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+              type="button"
+              onClick={(e) => { e.stopPropagation(); void runAction("pin", () => onTogglePin(note.id)); }}
+              disabled={Boolean(pendingAction)}
+              className="flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-45"
               aria-label={note.isPinned ? "Losmaken" : "Vastpinnen"}
             >
               <Pin size={14} className={note.isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onArchive(note.id); }}
-              className="p-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+              type="button"
+              onClick={(e) => { e.stopPropagation(); void runAction("archive", () => onArchive(note.id)); }}
+              disabled={Boolean(pendingAction)}
+              className="flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-45"
               aria-label={note.isArchived ? "Terugzetten" : "Archiveren"}
             >
               <Archive size={14} className="text-slate-500" />
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
-              className="p-2 rounded-lg hover:bg-red-500/20 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
+              type="button"
+              onClick={(e) => { e.stopPropagation(); void runAction("delete", () => onDelete(note.id)); }}
+              disabled={Boolean(pendingAction)}
+              className="flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="Verwijderen"
             >
               <Trash2 size={14} className="text-slate-500 hover:text-red-400" />
@@ -199,7 +262,7 @@ export function NoteCard({ note, onEdit, onTogglePin, onArchive, onDelete, onUpd
 
         {/* Backlinks (Zettelkasten) */}
         {!masked && backlinks && backlinks.length > 0 && (
-          <div className="flex items-center gap-1.5 px-4 pb-2 -mt-1 flex-wrap">
+          <div className={`-mt-1 flex flex-wrap items-center gap-1.5 pb-2 ${compact ? "px-3" : "px-4"}`}>
             <Link2 size={10} className="text-amber-400/60 shrink-0" />
             {backlinks.slice(0, 3).map((bl) => (
               <span
@@ -264,7 +327,7 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void, onNavigateToNote?: (title: string) => void) {
+function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void | Promise<void>, onNavigateToNote?: (title: string) => void) {
   const previewLines = allLines.slice(0, 4);
   return previewLines.map((line, previewIdx) => {
     const originalIdx = previewIdx;

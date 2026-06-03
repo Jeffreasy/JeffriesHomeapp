@@ -8,11 +8,13 @@
 
 export interface ModelNote {
   aangemaakt?: string;
+  completed_at?: string;
   deadline?: string;
   gewijzigd?: string;
   id?: string;
   inhoud?: string;
   is_archived?: boolean;
+  is_completed?: boolean;
   is_pinned?: boolean;
   kleur?: string;
   linked_event_id?: string;

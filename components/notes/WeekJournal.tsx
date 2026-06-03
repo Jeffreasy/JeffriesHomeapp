@@ -2,11 +2,12 @@
 
 import { useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
 import { DayColumn } from "./DayColumn";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type DienstRow } from "@/lib/schedule";
+import { getChecklistInfo } from "./NotesUtils";
 
 interface WeekJournalProps {
   notes: NoteRecord[];
@@ -15,6 +16,7 @@ interface WeekJournalProps {
   onWeekChange: (newMonday: Date) => void;
   onEdit: (note: NoteRecord) => void;
   onCreate: (data: NoteCreateData) => Promise<void>;
+  onToggleComplete: (id: string) => void | Promise<void>;
   agendaEvents?: PersonalEvent[];
 }
 
@@ -38,7 +40,7 @@ function getWeekNumber(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart, onWeekChange, onEdit, onCreate }: WeekJournalProps) {
+export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart, onWeekChange, onEdit, onCreate, onToggleComplete }: WeekJournalProps) {
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -79,12 +81,27 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
     return map;
   }, [notes, days]);
 
-  const totalWeek = useMemo(() => {
+  const weekStats = useMemo(() => {
     let total = 0;
+    let completed = 0;
+    let checklistDone = 0;
+    let checklistTotal = 0;
     for (const [, dayNotes] of notesByDate) {
       total += dayNotes.length;
+      for (const note of dayNotes) {
+        if (note.isCompleted || note.is_completed) completed += 1;
+        const checklist = getChecklistInfo(note.inhoud);
+        checklistDone += checklist.done;
+        checklistTotal += checklist.total;
+      }
     }
-    return total;
+    return {
+      total,
+      completed,
+      open: total - completed,
+      checklistDone,
+      checklistTotal,
+    };
   }, [notesByDate]);
 
   const goToPrev = useCallback(() => {
@@ -109,7 +126,7 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
   return (
     <div className="space-y-4">
       {/* Week navigatie header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={goToPrev}
@@ -135,7 +152,7 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!isCurrentWeek && (
             <motion.button
               initial={{ opacity: 0, scale: 0.9 }}
@@ -147,8 +164,17 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
               Vandaag
             </motion.button>
           )}
-          <span className="text-xs text-[var(--color-text-subtle)] bg-white/5 px-2 py-1 rounded">
-            {totalWeek} {totalWeek === 1 ? "notitie" : "notities"}
+          <span className="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-xs text-[var(--color-text-subtle)]">
+            <CalendarDays size={12} />
+            {weekStats.open} open
+          </span>
+          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">
+            <CheckCircle2 size={12} />
+            {weekStats.completed} afgerond
+          </span>
+          <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-2 py-1 text-xs text-sky-300">
+            <ListChecks size={12} />
+            {weekStats.checklistDone}/{weekStats.checklistTotal}
           </span>
         </div>
       </div>
@@ -174,6 +200,7 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
               agendaEvents={dayAgendaEvents}
               onEdit={onEdit}
               onCreate={onCreate}
+              onToggleComplete={onToggleComplete}
             />
           );
         })}

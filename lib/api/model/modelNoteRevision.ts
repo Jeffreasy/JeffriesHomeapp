@@ -6,16 +6,17 @@
  * OpenAPI spec version: 1.0
  */
 
-export interface HandlerNoteUpdateBody {
+export interface ModelNoteRevision {
+  aangemaakt?: string;
   deadline?: string;
+  id?: string;
   inhoud?: string;
-  isArchived?: boolean;
-  isCompleted?: boolean;
-  isPinned?: boolean;
   kleur?: string;
-  linkedEventId?: string;
+  linked_event_id?: string;
+  note_id?: string;
   prioriteit?: string;
   symbol?: string;
   tags?: string[];
   titel?: string;
+  user_id?: string;
 }

@@ -2,12 +2,13 @@
 
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, Plus } from "lucide-react";
+import { CheckCircle2, Clock, ListChecks, Plus, RotateCcw } from "lucide-react";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 import { getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { resolveAppIconName } from "@/lib/symbols";
+import { getChecklistInfo } from "./NotesUtils";
 
 interface DayColumnProps {
   date: Date;
@@ -17,6 +18,7 @@ interface DayColumnProps {
   agendaEvents?: PersonalEvent[];
   onEdit: (note: NoteRecord) => void;
   onCreate: (data: NoteCreateData) => Promise<void>;
+  onToggleComplete: (id: string) => void | Promise<void>;
 }
 
 function formatTime(iso: string): string {
@@ -26,15 +28,18 @@ function formatTime(iso: string): string {
 
 const DAG_NAMEN_LANG = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
 
-export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = [], onEdit, onCreate }: DayColumnProps) {
+export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = [], onEdit, onCreate, onToggleComplete }: DayColumnProps) {
   const [quickText, setQuickText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pendingCompleteId, setPendingCompleteId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const dagNaam = DAG_NAMEN_LANG[date.getDay()];
   const dagNr = date.getDate();
   const maand = date.toLocaleDateString("nl-NL", { month: "short" });
   const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+  const openNotes = notes.filter((note) => !(note.isCompleted || note.is_completed));
+  const completedNotes = notes.filter((note) => note.isCompleted || note.is_completed);
 
   const handleQuickSave = useCallback(async () => {
     const text = quickText.trim();
@@ -61,6 +66,16 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
     if (e.key === "Escape") {
       setQuickText("");
       inputRef.current?.blur();
+    }
+  };
+
+  const handleToggleComplete = async (note: NoteRecord) => {
+    if (pendingCompleteId) return;
+    setPendingCompleteId(note.id);
+    try {
+      await onToggleComplete(note.id);
+    } finally {
+      setPendingCompleteId(null);
     }
   };
 
@@ -93,8 +108,8 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
           </span>
         </div>
         {notes.length > 0 && (
-          <span className="text-[10px] font-medium text-[var(--color-text-subtle)] bg-white/5 px-1.5 py-0.5 rounded">
-            {notes.length}
+          <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-subtle)]">
+            {openNotes.length}/{notes.length}
           </span>
         )}
       </div>
@@ -155,7 +170,7 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
       {/* Notities lijst */}
       <div className="flex-1 px-3 py-2 space-y-1 min-h-[60px]">
         <AnimatePresence mode="popLayout">
-          {notes.length === 0 && !isToday && (
+          {openNotes.length === 0 && completedNotes.length === 0 && !isToday && (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -164,51 +179,37 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
               Geen notities
             </motion.p>
           )}
-          {notes.map((note) => (
-            <motion.button
+          {openNotes.map((note) => (
+            <JournalNoteButton
               key={note.id}
-              layout
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              onClick={() => onEdit(note)}
-              className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group/item"
-            >
-              <div className="flex items-start gap-2">
-                <AppIcon
-                  name={resolveAppIconName(note.symbol, "note")}
-                  tone="amber"
-                  size="xs"
-                  framed
-                  className="mt-0.5 h-6 w-6 rounded-md"
-                  iconClassName={note.kleur ? undefined : "text-[var(--color-text-muted)]"}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-[var(--color-text)] truncate font-medium">
-                    {note.titel || note.inhoud.split("\n")[0].slice(0, 50)}
-                  </p>
-                  {note.titel && note.inhoud !== note.titel && (
-                    <p className="text-xs text-[var(--color-text-muted)] truncate mt-0.5">
-                      {note.inhoud.split("\n")[0].slice(0, 60)}
-                    </p>
-                  )}
-                </div>
-                <span className="text-[10px] text-[var(--color-text-subtle)] shrink-0 mt-0.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                  {formatTime(note.aangemaakt)}
-                </span>
-              </div>
-              {(note.tags?.length ?? 0) > 0 && (
-                <div className="flex gap-1 mt-1 ml-4">
-                  {note.tags!.slice(0, 3).map((tag) => (
-                    <span key={tag} className="text-[10px] text-amber-400/70 bg-amber-400/10 px-1.5 py-0.5 rounded">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </motion.button>
+              note={note}
+              pending={pendingCompleteId === note.id}
+              onEdit={onEdit}
+              onToggleComplete={handleToggleComplete}
+            />
           ))}
         </AnimatePresence>
+
+        {completedNotes.length > 0 && (
+          <div className="mt-2 rounded-lg border border-emerald-500/10 bg-emerald-500/[0.035] p-1.5">
+            <div className="mb-1 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-300/80">
+              <CheckCircle2 size={11} />
+              Afgerond
+            </div>
+            <div className="space-y-1">
+              {completedNotes.map((note) => (
+                <JournalNoteButton
+                  key={note.id}
+                  note={note}
+                  completed
+                  pending={pendingCompleteId === note.id}
+                  onEdit={onEdit}
+                  onToggleComplete={handleToggleComplete}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Quick-add input */}
@@ -231,5 +232,86 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
         </div>
       </div>
     </div>
+  );
+}
+
+function JournalNoteButton({
+  note,
+  completed = false,
+  pending,
+  onEdit,
+  onToggleComplete,
+}: {
+  note: NoteRecord;
+  completed?: boolean;
+  pending: boolean;
+  onEdit: (note: NoteRecord) => void;
+  onToggleComplete: (note: NoteRecord) => void | Promise<void>;
+}) {
+  const checklist = getChecklistInfo(note.inhoud);
+
+  return (
+    <motion.button
+      layout
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      onClick={() => onEdit(note)}
+      className={`group/item w-full cursor-pointer rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5 ${
+        completed ? "opacity-80" : ""
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <AppIcon
+          name={resolveAppIconName(note.symbol, "note")}
+          tone={completed ? "green" : "amber"}
+          size="xs"
+          framed
+          className="mt-0.5 h-6 w-6 rounded-md"
+          iconClassName={note.kleur ? undefined : "text-[var(--color-text-muted)]"}
+        />
+        <div className="min-w-0 flex-1">
+          <p className={`truncate text-sm font-medium ${completed ? "text-slate-500 line-through decoration-emerald-400/50" : "text-[var(--color-text)]"}`}>
+            {note.titel || note.inhoud.split("\n")[0].slice(0, 50)}
+          </p>
+          {note.titel && note.inhoud !== note.titel && (
+            <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+              {note.inhoud.split("\n")[0].slice(0, 60)}
+            </p>
+          )}
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            {checklist.total > 0 && (
+              <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-300">
+                <ListChecks size={9} />
+                {checklist.done}/{checklist.total}
+              </span>
+            )}
+            {(note.tags?.length ?? 0) > 0 && note.tags!.slice(0, 2).map((tag) => (
+              <span key={tag} className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] text-amber-400/70">
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="mt-0.5 text-[10px] text-[var(--color-text-subtle)] opacity-0 transition-opacity group-hover/item:opacity-100">
+            {formatTime(note.aangemaakt)}
+          </span>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              void onToggleComplete(note);
+            }}
+            disabled={pending}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 opacity-100 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40 sm:opacity-0 sm:group-hover/item:opacity-100"
+            aria-label={completed ? "Heropenen" : "Afronden"}
+            title={completed ? "Heropenen" : "Afronden"}
+          >
+            {completed ? <RotateCcw size={13} /> : <CheckCircle2 size={14} />}
+          </button>
+        </div>
+      </div>
+    </motion.button>
   );
 }

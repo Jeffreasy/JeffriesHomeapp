@@ -10,6 +10,7 @@ export type NotesTab = "journal" | "collection";
 export function NotesHeader({
   count,
   archivedCount,
+  completedCount,
   pinnedCount,
   isLoading,
   privacyOn,
@@ -20,6 +21,7 @@ export function NotesHeader({
 }: {
   count: number;
   archivedCount: number;
+  completedCount: number;
   pinnedCount: number;
   isLoading: boolean;
   privacyOn: boolean;
@@ -43,7 +45,7 @@ export function NotesHeader({
             <p className="text-xs text-[var(--color-text-muted)]">
               {isLoading
                 ? "Laden..."
-                : `${count} actief · ${archivedCount} archief · ${pinnedCount} vastgezet`}
+                : `${count} actief · ${completedCount} afgerond · ${archivedCount} archief · ${pinnedCount} vastgezet`}
             </p>
           </div>
 

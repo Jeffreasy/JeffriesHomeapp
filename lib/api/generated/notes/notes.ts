@@ -26,12 +26,15 @@ import type {
 
 import type {
   DeleteNotesId200,
+  GetNotesIdRevisionsParams,
   GetNotesParams,
   GetNotesSearchParams,
   GetNotesTagsParams,
   HandlerNoteCreateBody,
   HandlerNoteUpdateBody,
   ModelNote,
+  ModelNoteRevision,
+  PostNotesIdRevisionsRevisionIDRestoreParams,
   PostNotesParams
 } from '../../model';
 
@@ -979,3 +982,253 @@ export function useGetNotesIdBacklinks<TData = Awaited<ReturnType<typeof getNote
 
 
 
+export type getNotesIdRevisionsResponse200 = {
+  data: ModelNoteRevision[]
+  status: 200
+}
+
+export type getNotesIdRevisionsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type getNotesIdRevisionsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type getNotesIdRevisionsResponseSuccess = (getNotesIdRevisionsResponse200) & {
+  headers: Headers;
+};
+export type getNotesIdRevisionsResponseError = (getNotesIdRevisionsResponse400 | getNotesIdRevisionsResponse500) & {
+  headers: Headers;
+};
+
+export type getNotesIdRevisionsResponse = (getNotesIdRevisionsResponseSuccess | getNotesIdRevisionsResponseError)
+
+export const getGetNotesIdRevisionsUrl = (id: string,
+    params: GetNotesIdRevisionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/notes/${id}/revisions?${stringifiedParams}` : `/notes/${id}/revisions`
+}
+
+/**
+ * Returns recent saved versions for a note
+ * @summary List note revisions
+ */
+export const getNotesIdRevisions = async (id: string,
+    params: GetNotesIdRevisionsParams, options?: RequestInit): Promise<getNotesIdRevisionsResponse> => {
+
+  return customFetch<getNotesIdRevisionsResponse>(getGetNotesIdRevisionsUrl(id,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetNotesIdRevisionsQueryKey = (id: string,
+    params?: GetNotesIdRevisionsParams,) => {
+    return [
+    `/notes/${id}/revisions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetNotesIdRevisionsQueryOptions = <TData = Awaited<ReturnType<typeof getNotesIdRevisions>>, TError = string>(id: string,
+    params: GetNotesIdRevisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotesIdRevisions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetNotesIdRevisionsQueryKey(id,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getNotesIdRevisions>>> = ({ signal }) => getNotesIdRevisions(id,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getNotesIdRevisions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetNotesIdRevisionsQueryResult = NonNullable<Awaited<ReturnType<typeof getNotesIdRevisions>>>
+export type GetNotesIdRevisionsQueryError = string
+
+
+export function useGetNotesIdRevisions<TData = Awaited<ReturnType<typeof getNotesIdRevisions>>, TError = string>(
+ id: string,
+    params: GetNotesIdRevisionsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotesIdRevisions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getNotesIdRevisions>>,
+          TError,
+          Awaited<ReturnType<typeof getNotesIdRevisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetNotesIdRevisions<TData = Awaited<ReturnType<typeof getNotesIdRevisions>>, TError = string>(
+ id: string,
+    params: GetNotesIdRevisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotesIdRevisions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getNotesIdRevisions>>,
+          TError,
+          Awaited<ReturnType<typeof getNotesIdRevisions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetNotesIdRevisions<TData = Awaited<ReturnType<typeof getNotesIdRevisions>>, TError = string>(
+ id: string,
+    params: GetNotesIdRevisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotesIdRevisions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List note revisions
+ */
+
+export function useGetNotesIdRevisions<TData = Awaited<ReturnType<typeof getNotesIdRevisions>>, TError = string>(
+ id: string,
+    params: GetNotesIdRevisionsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotesIdRevisions>>, TError, TData>>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetNotesIdRevisionsQueryOptions(id,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+export type postNotesIdRevisionsRevisionIDRestoreResponse200 = {
+  data: ModelNote
+  status: 200
+}
+
+export type postNotesIdRevisionsRevisionIDRestoreResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postNotesIdRevisionsRevisionIDRestoreResponse404 = {
+  data: string
+  status: 404
+}
+
+export type postNotesIdRevisionsRevisionIDRestoreResponse500 = {
+  data: string
+  status: 500
+}
+
+export type postNotesIdRevisionsRevisionIDRestoreResponseSuccess = (postNotesIdRevisionsRevisionIDRestoreResponse200) & {
+  headers: Headers;
+};
+export type postNotesIdRevisionsRevisionIDRestoreResponseError = (postNotesIdRevisionsRevisionIDRestoreResponse400 | postNotesIdRevisionsRevisionIDRestoreResponse404 | postNotesIdRevisionsRevisionIDRestoreResponse500) & {
+  headers: Headers;
+};
+
+export type postNotesIdRevisionsRevisionIDRestoreResponse = (postNotesIdRevisionsRevisionIDRestoreResponseSuccess | postNotesIdRevisionsRevisionIDRestoreResponseError)
+
+export const getPostNotesIdRevisionsRevisionIDRestoreUrl = (id: string,
+    revisionID: string,
+    params: PostNotesIdRevisionsRevisionIDRestoreParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/notes/${id}/revisions/${revisionID}/restore?${stringifiedParams}` : `/notes/${id}/revisions/${revisionID}/restore`
+}
+
+/**
+ * Replaces a note with a previous saved version
+ * @summary Restore note revision
+ */
+export const postNotesIdRevisionsRevisionIDRestore = async (id: string,
+    revisionID: string,
+    params: PostNotesIdRevisionsRevisionIDRestoreParams, options?: RequestInit): Promise<postNotesIdRevisionsRevisionIDRestoreResponse> => {
+
+  return customFetch<postNotesIdRevisionsRevisionIDRestoreResponse>(getPostNotesIdRevisionsRevisionIDRestoreUrl(id,revisionID,params),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostNotesIdRevisionsRevisionIDRestoreMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postNotesIdRevisionsRevisionIDRestore>>, TError,{id: string;revisionID: string;params: PostNotesIdRevisionsRevisionIDRestoreParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postNotesIdRevisionsRevisionIDRestore>>, TError,{id: string;revisionID: string;params: PostNotesIdRevisionsRevisionIDRestoreParams}, TContext> => {
+
+const mutationKey = ['postNotesIdRevisionsRevisionIDRestore'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postNotesIdRevisionsRevisionIDRestore>>, {id: string;revisionID: string;params: PostNotesIdRevisionsRevisionIDRestoreParams}> = (props) => {
+          const {id,revisionID,params} = props ?? {};
+
+          return  postNotesIdRevisionsRevisionIDRestore(id,revisionID,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostNotesIdRevisionsRevisionIDRestoreMutationResult = NonNullable<Awaited<ReturnType<typeof postNotesIdRevisionsRevisionIDRestore>>>
+
+    export type PostNotesIdRevisionsRevisionIDRestoreMutationError = string
+
+    /**
+ * @summary Restore note revision
+ */
+export const usePostNotesIdRevisionsRevisionIDRestore = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postNotesIdRevisionsRevisionIDRestore>>, TError,{id: string;revisionID: string;params: PostNotesIdRevisionsRevisionIDRestoreParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postNotesIdRevisionsRevisionIDRestore>>,
+        TError,
+        {id: string;revisionID: string;params: PostNotesIdRevisionsRevisionIDRestoreParams},
+        TContext
+      > => {
+      return useMutation(getPostNotesIdRevisionsRevisionIDRestoreMutationOptions(options), queryClient);
+    }

@@ -3,16 +3,19 @@
 import { useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/components/ui/Toast";
 import {
+  getNotesIdRevisions,
   useGetNotes,
   useGetNotesTags,
+  postNotesIdRevisionsRevisionIDRestore,
   usePostNotes,
   usePatchNotesId,
   useDeleteNotesId,
   getGetNotesQueryKey,
   getGetNotesTagsQueryKey,
 } from "@/lib/api/generated/notes/notes";
-import type { HandlerNoteUpdateBody, ModelNote } from "@/lib/api/model";
+import type { HandlerNoteUpdateBody, ModelNote, ModelNoteRevision } from "@/lib/api/model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,8 +29,12 @@ export interface NoteRecord {
   kleur?:          string | null;
   isPinned:        boolean;
   isArchived:      boolean;
+  isCompleted:     boolean;
   is_pinned:       boolean;
   is_archived:     boolean;
+  is_completed:    boolean;
+  completedAt?:    string | null;
+  completed_at?:   string | null;
   deadline?:       string | null;
   linkedEventId?:  string | null;
   linked_event_id?: string | null;
@@ -35,6 +42,22 @@ export interface NoteRecord {
   symbol?:         string | null;
   aangemaakt:      string;
   gewijzigd:       string;
+}
+
+export interface NoteRevisionRecord {
+  id: string;
+  note_id: string;
+  user_id: string;
+  titel?: string | null;
+  inhoud: string;
+  tags?: string[];
+  kleur?: string | null;
+  deadline?: string | null;
+  linkedEventId?: string | null;
+  linked_event_id?: string | null;
+  prioriteit?: string | null;
+  symbol?: string | null;
+  aangemaakt: string;
 }
 
 export type NoteCreateData = {
@@ -59,8 +82,10 @@ export type NoteUpdateData = {
   symbol?: string;
   isPinned?: boolean;
   isArchived?: boolean;
+  isCompleted?: boolean;
   is_pinned?: boolean;
   is_archived?: boolean;
+  is_completed?: boolean;
 };
 
 type NotesCache = {
@@ -80,8 +105,12 @@ function toRecord(row: ModelNote): NoteRecord {
     kleur: row.kleur,
     isPinned: row.is_pinned ?? false,
     isArchived: row.is_archived ?? false,
+    isCompleted: row.is_completed ?? false,
     is_pinned: row.is_pinned ?? false,
     is_archived: row.is_archived ?? false,
+    is_completed: row.is_completed ?? false,
+    completedAt: row.completed_at,
+    completed_at: row.completed_at,
     deadline: row.deadline,
     linkedEventId: row.linked_event_id,
     linked_event_id: row.linked_event_id,
@@ -89,6 +118,24 @@ function toRecord(row: ModelNote): NoteRecord {
     symbol: row.symbol,
     aangemaakt: row.aangemaakt ?? new Date().toISOString(),
     gewijzigd: row.gewijzigd ?? new Date().toISOString(),
+  };
+}
+
+function toRevisionRecord(row: ModelNoteRevision): NoteRevisionRecord {
+  return {
+    id: row.id ?? "",
+    note_id: row.note_id ?? "",
+    user_id: row.user_id ?? "",
+    titel: row.titel,
+    inhoud: row.inhoud ?? "",
+    tags: row.tags ?? [],
+    kleur: row.kleur,
+    deadline: row.deadline,
+    linkedEventId: row.linked_event_id,
+    linked_event_id: row.linked_event_id,
+    prioriteit: row.prioriteit,
+    symbol: row.symbol,
+    aangemaakt: row.aangemaakt ?? new Date().toISOString(),
   };
 }
 
@@ -106,10 +153,13 @@ function toModelPatch(data: Partial<NoteUpdateData>): Partial<ModelNote> {
     patch.is_archived = data.isArchived;
     delete (patch as Record<string, unknown>).isArchived;
   }
+  if ("isCompleted" in data) {
+    patch.is_completed = data.isCompleted;
+    patch.completed_at = data.isCompleted ? new Date().toISOString() : undefined;
+    delete (patch as Record<string, unknown>).isCompleted;
+  }
   return patch;
 }
-
-import { useToast } from "@/components/ui/Toast";
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -136,20 +186,23 @@ export function useNotes() {
     return Array.isArray(tagsRaw.data) ? (tagsRaw.data as string[]) : [];
   }, [tagsRaw]);
 
-  const { active, archived, pinned } = useMemo(() => {
-    if (!raw) return { active: [], archived: [], pinned: [] };
+  const { active, archived, completed, pinned } = useMemo(() => {
+    if (!raw) return { active: [], archived: [], completed: [], pinned: [] };
     const act: NoteRecord[] = [];
     const arch: NoteRecord[] = [];
+    const done: NoteRecord[] = [];
     const pin: NoteRecord[] = [];
     for (const n of raw) {
       if (n.isArchived || n.is_archived) {
         arch.push(n);
+      } else if (n.isCompleted || n.is_completed) {
+        done.push(n);
       } else {
         act.push(n);
         if (n.isPinned || n.is_pinned) pin.push(n);
       }
     }
-    return { active: act, archived: arch, pinned: pin };
+    return { active: act, archived: arch, completed: done, pinned: pin };
   }, [raw]);
 
   // Mutations
@@ -169,6 +222,7 @@ export function useNotes() {
           kleur: variables.data.kleur ?? undefined,
           is_pinned: false,
           is_archived: false,
+          is_completed: false,
           deadline: variables.data.deadline ?? undefined,
           linked_event_id: variables.data.linkedEventId ?? undefined,
           prioriteit: variables.data.prioriteit ?? "normaal",
@@ -263,6 +317,7 @@ export function useNotes() {
     notes: raw,
     active,
     archived,
+    completed,
     pinned,
     allTags,
     isLoading: loadingNotes || loadingTags,
@@ -283,6 +338,37 @@ export function useNotes() {
     archive: async (id: string) => {
       const note = raw?.find(n => n.id === id);
       await updateMut.mutateAsync({ id, data: { isArchived: !(note?.isArchived || note?.is_archived) } });
+    },
+    toggleComplete: async (id: string) => {
+      const note = raw?.find(n => n.id === id);
+      if (note) {
+        await updateMut.mutateAsync({ id, data: { isCompleted: !(note.isCompleted || note.is_completed) } });
+      }
+    },
+    revisions: async (id: string, limit = 20) => {
+      if (!userId) return [];
+      const result = await getNotesIdRevisions(id, { userId, limit });
+      const rows = Array.isArray(result.data) ? result.data : [];
+      return rows.map(toRevisionRecord);
+    },
+    restoreRevision: async (id: string, revisionId: string) => {
+      if (!userId) throw new Error("Gebruiker ontbreekt");
+      const result = await postNotesIdRevisionsRevisionIDRestore(id, revisionId, { userId });
+      if (!result.data || typeof result.data === "string") {
+        throw new Error("Herstellen mislukt");
+      }
+      const row = result.data;
+      const restored = toRecord(row);
+      queryClient.setQueryData<NotesCache>(queryKey, (old) => {
+        if (!old?.data) return old;
+        return {
+          ...old,
+          data: old.data.map((note: ModelNote) => note.id === id ? row : note),
+        };
+      });
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: tagsQueryKey });
+      return restored;
     },
     remove: async (id: string) => {
       await deleteMut.mutateAsync({ id });

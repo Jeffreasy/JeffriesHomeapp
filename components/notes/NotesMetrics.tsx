@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarClock, Hash, ListChecks, Pin, ShieldCheck, StickyNote } from "lucide-react";
+import { AlertTriangle, CalendarClock, Link2, ListChecks, Pin, ShieldCheck, StickyNote } from "lucide-react";
 import { formatDate } from "./NotesUtils";
 import { MetricTile, SectionTitle } from "./NotesPrimitives";
 import type { NoteRecord } from "@/hooks/useNotes";
@@ -38,9 +38,11 @@ export function NotesSignals({
 export function NotesMetricsRow({
   totalCount,
   activeCount,
+  completedCount,
   archivedCount,
   checklistDone,
   checklistTotal,
+  attentionCount,
   deadlineSoon,
   deadlineOverdue,
   deadlineNext,
@@ -49,9 +51,11 @@ export function NotesMetricsRow({
 }: {
   totalCount: number;
   activeCount: number;
+  completedCount: number;
   archivedCount: number;
   checklistDone: number;
   checklistTotal: number;
+  attentionCount: number;
   deadlineSoon: number;
   deadlineOverdue: number;
   deadlineNext: NoteRecord | null;
@@ -64,14 +68,21 @@ export function NotesMetricsRow({
         icon={StickyNote}
         label="Totaal"
         value={`${totalCount}`}
-        meta={`${activeCount} actief, ${archivedCount} gearchiveerd`}
+        meta={`${activeCount} actief, ${completedCount} afgerond, ${archivedCount} archief`}
         tone="amber"
+      />
+      <MetricTile
+        icon={AlertTriangle}
+        label="Aandacht"
+        value={`${attentionCount}`}
+        meta={attentionCount > 0 ? "Hoog, vandaag of verlopen" : "Geen urgente notities"}
+        tone={attentionCount > 0 ? "rose" : "green"}
       />
       <MetricTile
         icon={ListChecks}
         label="Checklists"
         value={`${checklistDone}/${checklistTotal}`}
-        meta={checklistTotal > 0 ? "Afgevinkte items in actieve notities" : "Geen checklist-items actief"}
+        meta={checklistTotal > 0 ? "Open checklist-items in actieve notities" : "Geen checklist-items actief"}
         tone={checklistTotal > 0 && checklistDone === checklistTotal ? "green" : "sky"}
       />
       <MetricTile
@@ -82,10 +93,10 @@ export function NotesMetricsRow({
         tone={deadlineOverdue > 0 ? "rose" : deadlineSoon > 0 ? "amber" : "slate"}
       />
       <MetricTile
-        icon={Hash}
-        label="Tags"
-        value={`${tagsCount}`}
-        meta={linkedCount > 0 ? `${linkedCount} gekoppeld aan agenda` : "Labels voor snelle selectie"}
+        icon={Link2}
+        label="Koppelingen"
+        value={`${linkedCount}`}
+        meta={tagsCount > 0 ? `${tagsCount} tags beschikbaar` : "Nog geen tags actief"}
         tone="indigo"
       />
     </section>
