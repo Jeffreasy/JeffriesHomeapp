@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Backend API
+
+Start with [`docs/backend-api-overview.md`](docs/backend-api-overview.md) when working on API calls. The frontend calls the Go backend through `/api/backend`, and the Next.js proxy injects the backend API key server-side.
+
 ## Getting Started
 
 First, run the development server:

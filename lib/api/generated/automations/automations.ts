@@ -376,6 +376,101 @@ export const useDeleteAutomationsGroup = <TError = string,
       > => {
       return useMutation(getDeleteAutomationsGroupMutationOptions(options), queryClient);
     }
+    export type putAutomationsIdResponse200 = {
+  data: ModelAutomationRow
+  status: 200
+}
+
+export type putAutomationsIdResponse400 = {
+  data: string
+  status: 400
+}
+
+export type putAutomationsIdResponse500 = {
+  data: string
+  status: 500
+}
+
+export type putAutomationsIdResponseSuccess = (putAutomationsIdResponse200) & {
+  headers: Headers;
+};
+export type putAutomationsIdResponseError = (putAutomationsIdResponse400 | putAutomationsIdResponse500) & {
+  headers: Headers;
+};
+
+export type putAutomationsIdResponse = (putAutomationsIdResponseSuccess | putAutomationsIdResponseError)
+
+export const getPutAutomationsIdUrl = (id: string,) => {
+
+
+
+
+  return `/automations/${id}`
+}
+
+/**
+ * Modifies a home automation rule
+ * @summary Update automation
+ */
+export const putAutomationsId = async (id: string,
+    modelAutomationRow: ModelAutomationRow, options?: RequestInit): Promise<putAutomationsIdResponse> => {
+
+  return customFetch<putAutomationsIdResponse>(getPutAutomationsIdUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(modelAutomationRow)
+  }
+);}
+
+
+
+
+export const getPutAutomationsIdMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAutomationsId>>, TError,{id: string;data: ModelAutomationRow}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAutomationsId>>, TError,{id: string;data: ModelAutomationRow}, TContext> => {
+
+const mutationKey = ['putAutomationsId'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAutomationsId>>, {id: string;data: ModelAutomationRow}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  putAutomationsId(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAutomationsIdMutationResult = NonNullable<Awaited<ReturnType<typeof putAutomationsId>>>
+    export type PutAutomationsIdMutationBody = ModelAutomationRow
+    export type PutAutomationsIdMutationError = string
+
+    /**
+ * @summary Update automation
+ */
+export const usePutAutomationsId = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAutomationsId>>, TError,{id: string;data: ModelAutomationRow}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putAutomationsId>>,
+        TError,
+        {id: string;data: ModelAutomationRow},
+        TContext
+      > => {
+      return useMutation(getPutAutomationsIdMutationOptions(options), queryClient);
+    }
     export type deleteAutomationsIdResponse200 = {
   data: DeleteAutomationsId200
   status: 200

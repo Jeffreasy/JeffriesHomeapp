@@ -6,4 +6,4 @@
  * OpenAPI spec version: 1.0
  */
 
-export type PatchPrivacy200 = {[key: string]: string};
+export type PutPrivacy200 = {[key: string]: string};

@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0
  */
 
-export type PatchPrivacyParams = {
+export type PutPrivacyParams = {
 /**
  * User ID
  */

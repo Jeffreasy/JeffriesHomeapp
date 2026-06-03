@@ -38,6 +38,7 @@ import type {
   ModelLCLeadCreate,
   ModelLCLeadUpdate,
   ModelLCProject,
+  ModelLCProjectCreate,
   ModelLCProjectUpdate,
   ModelLCSeedResult,
   PatchLaventecareActionsIdStatus200,
@@ -1257,7 +1258,101 @@ export function useGetLaventecareProjects<TData = Awaited<ReturnType<typeof getL
 
 
 
-export type patchLaventecareProjectsIdResponse200 = {
+export type postLaventecareProjectsResponse201 = {
+  data: ModelLCProject
+  status: 201
+}
+
+export type postLaventecareProjectsResponse400 = {
+  data: string
+  status: 400
+}
+
+export type postLaventecareProjectsResponse500 = {
+  data: string
+  status: 500
+}
+
+export type postLaventecareProjectsResponseSuccess = (postLaventecareProjectsResponse201) & {
+  headers: Headers;
+};
+export type postLaventecareProjectsResponseError = (postLaventecareProjectsResponse400 | postLaventecareProjectsResponse500) & {
+  headers: Headers;
+};
+
+export type postLaventecareProjectsResponse = (postLaventecareProjectsResponseSuccess | postLaventecareProjectsResponseError)
+
+export const getPostLaventecareProjectsUrl = () => {
+
+
+
+
+  return `/laventecare/projects`
+}
+
+/**
+ * Creates a new CRM project directly
+ * @summary Create Project
+ */
+export const postLaventecareProjects = async (modelLCProjectCreate: ModelLCProjectCreate, options?: RequestInit): Promise<postLaventecareProjectsResponse> => {
+
+  return customFetch<postLaventecareProjectsResponse>(getPostLaventecareProjectsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(modelLCProjectCreate)
+  }
+);}
+
+
+
+
+export const getPostLaventecareProjectsMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLaventecareProjects>>, TError,{data: ModelLCProjectCreate}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postLaventecareProjects>>, TError,{data: ModelLCProjectCreate}, TContext> => {
+
+const mutationKey = ['postLaventecareProjects'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postLaventecareProjects>>, {data: ModelLCProjectCreate}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postLaventecareProjects(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostLaventecareProjectsMutationResult = NonNullable<Awaited<ReturnType<typeof postLaventecareProjects>>>
+    export type PostLaventecareProjectsMutationBody = ModelLCProjectCreate
+    export type PostLaventecareProjectsMutationError = string
+
+    /**
+ * @summary Create Project
+ */
+export const usePostLaventecareProjects = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLaventecareProjects>>, TError,{data: ModelLCProjectCreate}, TContext>, request?: SecondParameter<typeof customFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postLaventecareProjects>>,
+        TError,
+        {data: ModelLCProjectCreate},
+        TContext
+      > => {
+      return useMutation(getPostLaventecareProjectsMutationOptions(options), queryClient);
+    }
+    export type patchLaventecareProjectsIdResponse200 = {
   data: PatchLaventecareProjectsId200
   status: 200
 }

@@ -44,7 +44,7 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
               {formatLevel(level.level, level.titel)}
             </h3>
           </div>
-          <span className="text-xs font-bold text-orange-400">{formatXP(stats.totaalXP)}</span>
+          <span className="text-xs font-bold text-orange-400">{formatXP(stats.totaalXP ?? 0)}</span>
         </div>
 
         {/* XP Progress bar */}

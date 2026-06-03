@@ -90,6 +90,7 @@ export type HabitWithLog = HabitWithLogRecord;
 
 export interface HabitStatsRecord {
   totaal_xp?: number;
+  totaalXP?: number;
   activeHabits?: number;
   totaalVoltooid?: number;
   perfectDays?: number;
@@ -222,6 +223,32 @@ function toBadge(row: ModelHabitBadge): HabitBadgeRecord {
   };
 }
 
+function numberFrom(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+}
+
+function toStats(data: unknown): HabitStatsRecord | undefined {
+  if (!data || typeof data !== "object") return undefined;
+  const row = data as Record<string, unknown>;
+  const totalXP = numberFrom(row.totaal_xp ?? row.totaalXP);
+
+  return {
+    ...row,
+    totaal_xp: totalXP,
+    totaalXP: totalXP,
+    activeHabits: numberFrom(row.activeHabits),
+    totaalVoltooid: numberFrom(row.totaalVoltooid),
+    perfectDays: numberFrom(row.perfectDays),
+    currentStreak: numberFrom(row.currentStreak),
+    longestStreak: numberFrom(row.longestStreak),
+  };
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useHabits(datum?: string) {
@@ -240,7 +267,7 @@ export function useHabits(datum?: string) {
   const { data: forDateRaw, isLoading: loadingForDate } = useGetHabitsForDate(queryParams, { query: { enabled: !!userId } });
 
   const allHabits = useMemo<HabitRecord[]>(() => (Array.isArray(allHabitsRaw?.data) ? allHabitsRaw.data as ModelHabit[] : []).map(toRecord), [allHabitsRaw]);
-  const stats = statsRaw?.data as HabitStatsRecord | undefined;
+  const stats = useMemo(() => toStats(statsRaw?.data), [statsRaw]);
   const badges = useMemo<HabitBadgeRecord[]>(() => (Array.isArray(badgesRaw?.data) ? badgesRaw.data as ModelHabitBadge[] : []).map(toBadge), [badgesRaw]);
   
   const todayHabits = useMemo<HabitWithLogRecord[]>(() => {

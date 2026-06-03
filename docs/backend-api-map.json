@@ -1,0 +1,207 @@
+{
+  "name": "Jeffries Homeapp Backend API",
+  "updated": "2026-06-03",
+  "frontendBasePath": "/api/backend",
+  "directBackendBasePath": "/api/v1",
+  "renderBackendUrl": "https://jeffriesbackend.onrender.com/api/v1",
+  "publicRoutes": [
+    { "method": "GET", "path": "/" },
+    { "method": "HEAD", "path": "/" },
+    { "method": "GET", "path": "/health" },
+    { "method": "GET", "path": "/swagger/*" }
+  ],
+  "auth": {
+    "directBackend": "Private /api/v1 routes require X-API-Key.",
+    "frontend": "Browser code calls /api/backend. The Next.js proxy injects X-API-Key server-side.",
+    "serverEnvVars": ["BACKEND_API_URL", "BACKEND_API_KEY", "APP_SECRET_KEY"],
+    "legacyFallbackEnvVars": ["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_API_KEY"]
+  },
+  "sourceFiles": {
+    "frontendProxy": "app/api/backend/[...path]/route.ts",
+    "manualClient": "lib/api.ts",
+    "generatedClients": "lib/api/generated",
+    "generatedModels": "lib/api/model",
+    "orvalConfig": "orval.config.ts",
+    "backendRoutesCandidates": [
+      "../JeffriesBackend-render-fix/backend/internal/server/routes.go",
+      "../JeffriesBackend/backend/internal/server/routes.go"
+    ],
+    "backendSwaggerCandidates": [
+      "BACKEND_SWAGGER_PATH",
+      "../JeffriesBackend-render-fix/backend/docs/swagger.json",
+      "../JeffriesBackend/backend/docs/swagger.json"
+    ]
+  },
+  "groups": [
+    {
+      "name": "system",
+      "endpoints": [
+        { "methods": ["GET"], "path": "/health", "public": true }
+      ]
+    },
+    {
+      "name": "rooms",
+      "queryParams": ["skip", "limit"],
+      "endpoints": [
+        { "methods": ["GET", "POST"], "path": "/rooms" },
+        { "methods": ["GET", "PATCH", "DELETE"], "path": "/rooms/{roomID}" }
+      ]
+    },
+    {
+      "name": "devices",
+      "queryParams": ["skip", "limit"],
+      "endpoints": [
+        { "methods": ["GET"], "path": "/devices" },
+        { "methods": ["GET", "PATCH", "DELETE"], "path": "/devices/{deviceID}" },
+        { "methods": ["POST"], "path": "/devices/register" },
+        { "methods": ["POST"], "path": "/devices/{deviceID}/command" }
+      ]
+    },
+    {
+      "name": "scenes",
+      "queryParams": ["skip", "limit"],
+      "endpoints": [
+        { "methods": ["GET", "POST"], "path": "/scenes" },
+        { "methods": ["GET", "DELETE"], "path": "/scenes/{sceneID}" },
+        { "methods": ["POST"], "path": "/scenes/{sceneID}/activate" }
+      ]
+    },
+    {
+      "name": "automations",
+      "queryParams": ["userId", "group"],
+      "endpoints": [
+        { "methods": ["GET", "POST"], "path": "/automations" },
+        { "methods": ["PUT", "DELETE"], "path": "/automations/{id}" },
+        { "methods": ["POST"], "path": "/automations/{id}/toggle" },
+        { "methods": ["DELETE"], "path": "/automations/group" }
+      ]
+    },
+    {
+      "name": "schedule",
+      "queryParams": ["userId"],
+      "endpoints": [
+        { "methods": ["GET"], "path": "/schedule" },
+        { "methods": ["GET"], "path": "/schedule/meta" },
+        { "methods": ["GET"], "path": "/schedule/date/{date}" },
+        { "methods": ["POST"], "path": "/schedule/import" }
+      ]
+    },
+    {
+      "name": "transactions",
+      "queryParams": ["userId", "ibanFilter", "jaarFilter", "categorieFilter", "richting", "datumVan", "datumTot", "zoekterm", "limit", "offset"],
+      "endpoints": [
+        { "methods": ["GET"], "path": "/transactions" },
+        { "methods": ["GET"], "path": "/transactions/stats" },
+        { "methods": ["POST"], "path": "/transactions/import" },
+        { "methods": ["PATCH"], "path": "/transactions/{txID}" }
+      ]
+    },
+    {
+      "name": "salary",
+      "queryParams": ["userId", "periode"],
+      "endpoints": [
+        { "methods": ["GET", "POST"], "path": "/salary" },
+        { "methods": ["GET"], "path": "/salary/periode" }
+      ]
+    },
+    {
+      "name": "loonstroken",
+      "queryParams": ["userId"],
+      "endpoints": [
+        { "methods": ["GET"], "path": "/loonstroken" },
+        { "methods": ["POST"], "path": "/loonstroken/import" }
+      ]
+    },
+    {
+      "name": "personal-events",
+      "queryParams": ["userId"],
+      "endpoints": [
+        { "methods": ["GET", "POST"], "path": "/personal-events" },
+        { "methods": ["GET"], "path": "/personal-events/upcoming" },
+        { "methods": ["GET"], "path": "/personal-events/date/{date}" },
+        { "methods": ["PATCH"], "path": "/personal-events/{eventID}/status" }
+      ]
+    },
+    {
+      "name": "emails",
+      "queryParams": ["user_id", "limit", "offset", "categorie", "q"],
+      "endpoints": [
+        { "methods": ["GET"], "path": "/emails" },
+        { "methods": ["GET"], "path": "/emails/search" },
+        { "methods": ["GET"], "path": "/emails/stats" },
+        { "methods": ["PATCH"], "path": "/emails/read" },
+        { "methods": ["PATCH"], "path": "/emails/delete" }
+      ]
+    },
+    {
+      "name": "privacy",
+      "queryParams": ["userId"],
+      "endpoints": [
+        { "methods": ["GET", "PUT"], "path": "/privacy" }
+      ]
+    },
+    {
+      "name": "notes",
+      "queryParams": ["userId", "q", "limit"],
+      "endpoints": [
+        { "methods": ["GET", "POST"], "path": "/notes" },
+        { "methods": ["GET"], "path": "/notes/search" },
+        { "methods": ["GET"], "path": "/notes/tags" },
+        { "methods": ["GET", "PATCH", "DELETE"], "path": "/notes/{id}" },
+        { "methods": ["GET"], "path": "/notes/{id}/backlinks" }
+      ]
+    },
+    {
+      "name": "habits",
+      "queryParams": ["userId", "datum", "days"],
+      "endpoints": [
+        { "methods": ["GET", "POST"], "path": "/habits" },
+        { "methods": ["GET"], "path": "/habits/for-date" },
+        { "methods": ["GET"], "path": "/habits/stats" },
+        { "methods": ["GET"], "path": "/habits/heatmap" },
+        { "methods": ["GET"], "path": "/habits/badges" },
+        { "methods": ["GET", "PATCH", "DELETE"], "path": "/habits/{id}" },
+        { "methods": ["POST"], "path": "/habits/{id}/toggle" },
+        { "methods": ["POST"], "path": "/habits/{id}/incident" },
+        { "methods": ["POST"], "path": "/habits/{id}/pause" },
+        { "methods": ["POST"], "path": "/habits/{id}/archive" },
+        { "methods": ["POST"], "path": "/habits/reorder" }
+      ]
+    },
+    {
+      "name": "laventecare",
+      "queryParams": ["limit", "q"],
+      "endpoints": [
+        { "methods": ["GET"], "path": "/laventecare/cockpit" },
+        { "methods": ["GET"], "path": "/laventecare/documents" },
+        { "methods": ["GET", "POST"], "path": "/laventecare/leads" },
+        { "methods": ["PATCH"], "path": "/laventecare/leads/{id}" },
+        { "methods": ["POST"], "path": "/laventecare/leads/{id}/convert" },
+        { "methods": ["GET", "POST"], "path": "/laventecare/projects" },
+        { "methods": ["PATCH"], "path": "/laventecare/projects/{id}" },
+        { "methods": ["GET", "POST"], "path": "/laventecare/actions" },
+        { "methods": ["PATCH"], "path": "/laventecare/actions/{id}/status" },
+        { "methods": ["POST"], "path": "/laventecare/signals/convert-lead" },
+        { "methods": ["POST"], "path": "/laventecare/documents/seed" }
+      ]
+    },
+    {
+      "name": "settings",
+      "queryParams": ["userId"],
+      "endpoints": [
+        { "methods": ["GET"], "path": "/settings/overview" },
+        { "methods": ["GET"], "path": "/settings/backup" },
+        { "methods": ["GET"], "path": "/settings/telegram/status" }
+      ]
+    },
+    {
+      "name": "sync",
+      "queryParams": ["userId"],
+      "endpoints": [
+        { "methods": ["GET"], "path": "/sync/status" },
+        { "methods": ["POST"], "path": "/sync/calendar" },
+        { "methods": ["POST"], "path": "/sync/gmail" }
+      ]
+    }
+  ]
+}

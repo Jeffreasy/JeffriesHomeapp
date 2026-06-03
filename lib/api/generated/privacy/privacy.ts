@@ -27,8 +27,8 @@ import type {
 import type {
   GetPrivacyParams,
   ModelPrivacySettings,
-  PatchPrivacy200,
-  PatchPrivacyParams
+  PutPrivacy200,
+  PutPrivacyParams
 } from '../../model';
 
 import { customFetch } from '../../../orvalMutator';
@@ -170,31 +170,31 @@ export function useGetPrivacy<TData = Awaited<ReturnType<typeof getPrivacy>>, TE
 
 
 
-export type patchPrivacyResponse200 = {
-  data: PatchPrivacy200
+export type putPrivacyResponse200 = {
+  data: PutPrivacy200
   status: 200
 }
 
-export type patchPrivacyResponse400 = {
+export type putPrivacyResponse400 = {
   data: string
   status: 400
 }
 
-export type patchPrivacyResponse500 = {
+export type putPrivacyResponse500 = {
   data: string
   status: 500
 }
 
-export type patchPrivacyResponseSuccess = (patchPrivacyResponse200) & {
+export type putPrivacyResponseSuccess = (putPrivacyResponse200) & {
   headers: Headers;
 };
-export type patchPrivacyResponseError = (patchPrivacyResponse400 | patchPrivacyResponse500) & {
+export type putPrivacyResponseError = (putPrivacyResponse400 | putPrivacyResponse500) & {
   headers: Headers;
 };
 
-export type patchPrivacyResponse = (patchPrivacyResponseSuccess | patchPrivacyResponseError)
+export type putPrivacyResponse = (putPrivacyResponseSuccess | putPrivacyResponseError)
 
-export const getPatchPrivacyUrl = (params: PatchPrivacyParams,) => {
+export const getPutPrivacyUrl = (params: PutPrivacyParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -213,13 +213,13 @@ export const getPatchPrivacyUrl = (params: PatchPrivacyParams,) => {
  * Updates the privacy settings for the user
  * @summary Update privacy settings
  */
-export const patchPrivacy = async (modelPrivacySettings: ModelPrivacySettings,
-    params: PatchPrivacyParams, options?: RequestInit): Promise<patchPrivacyResponse> => {
+export const putPrivacy = async (modelPrivacySettings: ModelPrivacySettings,
+    params: PutPrivacyParams, options?: RequestInit): Promise<putPrivacyResponse> => {
 
-  return customFetch<patchPrivacyResponse>(getPatchPrivacyUrl(params),
+  return customFetch<putPrivacyResponse>(getPutPrivacyUrl(params),
   {
     ...options,
-    method: 'PATCH',
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(modelPrivacySettings)
   }
@@ -228,11 +228,11 @@ export const patchPrivacy = async (modelPrivacySettings: ModelPrivacySettings,
 
 
 
-export const getPatchPrivacyMutationOptions = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPrivacy>>, TError,{data: ModelPrivacySettings;params: PatchPrivacyParams}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchPrivacy>>, TError,{data: ModelPrivacySettings;params: PatchPrivacyParams}, TContext> => {
+export const getPutPrivacyMutationOptions = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPrivacy>>, TError,{data: ModelPrivacySettings;params: PutPrivacyParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof putPrivacy>>, TError,{data: ModelPrivacySettings;params: PutPrivacyParams}, TContext> => {
 
-const mutationKey = ['patchPrivacy'];
+const mutationKey = ['putPrivacy'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -242,10 +242,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchPrivacy>>, {data: ModelPrivacySettings;params: PatchPrivacyParams}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPrivacy>>, {data: ModelPrivacySettings;params: PutPrivacyParams}> = (props) => {
           const {data,params} = props ?? {};
 
-          return  patchPrivacy(data,params,requestOptions)
+          return  putPrivacy(data,params,requestOptions)
         }
 
 
@@ -255,20 +255,20 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PatchPrivacyMutationResult = NonNullable<Awaited<ReturnType<typeof patchPrivacy>>>
-    export type PatchPrivacyMutationBody = ModelPrivacySettings
-    export type PatchPrivacyMutationError = string
+    export type PutPrivacyMutationResult = NonNullable<Awaited<ReturnType<typeof putPrivacy>>>
+    export type PutPrivacyMutationBody = ModelPrivacySettings
+    export type PutPrivacyMutationError = string
 
     /**
  * @summary Update privacy settings
  */
-export const usePatchPrivacy = <TError = string,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPrivacy>>, TError,{data: ModelPrivacySettings;params: PatchPrivacyParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const usePutPrivacy = <TError = string,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPrivacy>>, TError,{data: ModelPrivacySettings;params: PutPrivacyParams}, TContext>, request?: SecondParameter<typeof customFetch>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof patchPrivacy>>,
+        Awaited<ReturnType<typeof putPrivacy>>,
         TError,
-        {data: ModelPrivacySettings;params: PatchPrivacyParams},
+        {data: ModelPrivacySettings;params: PutPrivacyParams},
         TContext
       > => {
-      return useMutation(getPatchPrivacyMutationOptions(options), queryClient);
+      return useMutation(getPutPrivacyMutationOptions(options), queryClient);
     }
