@@ -31,7 +31,7 @@ export default function NotitiesPage() {
   } = useNotes();
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("notes");
   const { diensten } = useSchedule();
-  const { events: agendaEvents, upcoming: upcomingAgendaEvents, history: agendaHistory } = usePersonalEvents({ diensten });
+  const { events: agendaEvents, upcoming: upcomingAgendaEvents } = usePersonalEvents({ diensten });
 
   // ── Tab state ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<NotesTab>("journal");
@@ -128,10 +128,6 @@ export default function NotitiesPage() {
   }, [search, sortMode, sourceNotes, tagFilter, viewMode]);
 
   const activeFilters = [search.trim(), tagFilter, viewMode === "archived", sortMode !== "recent"].filter(Boolean).length;
-  const agendaLinkOptions = useMemo(
-    () => [...upcomingAgendaEvents, ...agendaHistory.slice(0, 25)],
-    [agendaHistory, upcomingAgendaEvents],
-  );
   const eventLabelById = useMemo(() => {
     const map = new Map<string, string>();
     for (const event of agendaEvents) {
@@ -269,7 +265,7 @@ export default function NotitiesPage() {
             onDelete={remove}
             onArchive={archive}
             onTogglePin={togglePin}
-            eventOptions={agendaLinkOptions}
+            eventOptions={agendaEvents}
           />
         )}
       </AnimatePresence>

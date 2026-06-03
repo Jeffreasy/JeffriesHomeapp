@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Tag, Palette, ListChecks, Clock, CalendarDays, AlertTriangle, Link2, Check, Trash2, Archive, Pin } from "lucide-react";
 import { getNotesSearch } from "@/lib/api/generated/notes/notes";
@@ -21,6 +21,12 @@ const PRIORITEITEN = [
 type LinkSearchItem = {
   id?: string;
   titel?: string | null;
+};
+
+type EventOptionGroup = {
+  id: string;
+  label: string;
+  events: PersonalEvent[];
 };
 
 interface NoteEditorProps {
@@ -64,6 +70,16 @@ export function NoteEditor({
   const [linkedEventId, setLinkedEventId] = useState(note?.linkedEventId ?? note?.linked_event_id ?? initialLinkedEventId ?? "");
   const [prioriteit, setPrioriteit] = useState(note?.prioriteit ?? "normaal");
   const [showMeta, setShowMeta]     = useState(!!(note?.deadline || initialDeadline || linkedEventId || (note?.prioriteit && note.prioriteit !== "normaal")));
+
+  const eventOptionGroups = useMemo(
+    () => buildEventOptionGroups(eventOptions),
+    [eventOptions],
+  );
+  const linkedEventExists = useMemo(
+    () => Boolean(linkedEventId && eventOptionGroups.some((group) => group.events.some((event) => event.eventId === linkedEventId))),
+    [eventOptionGroups, linkedEventId],
+  );
+  const showEventSelector = eventOptionGroups.length > 0 || Boolean(linkedEventId);
 
   // ── Zettelkasten [[link]] autocomplete ──────────────────────────────
   const [linkSearch, setLinkSearch]     = useState("");
@@ -539,7 +555,7 @@ export function NoteEditor({
                     </div>
                   </div>
 
-                  {eventOptions.length > 0 && (
+                  {showEventSelector && (
                     <div className="flex items-center gap-2">
                       <CalendarDays size={14} className="text-[var(--color-text-subtle)] shrink-0" />
                       <select
@@ -548,10 +564,19 @@ export function NoteEditor({
                         className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-base text-[var(--color-text)] outline-none [color-scheme:dark] sm:text-sm"
                       >
                         <option value="">Geen afspraak gekoppeld</option>
-                        {eventOptions.slice(0, 80).map((event) => (
-                          <option key={event.eventId} value={event.eventId}>
-                            {formatEventOption(event)}
+                        {linkedEventId && !linkedEventExists && (
+                          <option value={linkedEventId}>
+                            Huidige koppeling ({shortEventId(linkedEventId)})
                           </option>
+                        )}
+                        {eventOptionGroups.map((group) => (
+                          <optgroup key={group.id} label={group.label}>
+                            {group.events.map((event) => (
+                              <option key={event.eventId} value={event.eventId}>
+                                {formatEventOption(event)}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                       {linkedEventId && (
@@ -663,6 +688,50 @@ export function NoteEditor({
 function formatEventOption(event: PersonalEvent) {
   const source = event.kalender === "Rooster" ? "Dienst" : event.kalender;
   return `${formatDateRange(event)} - ${getTimeLabel(event)} - ${event.titel} (${source})`;
+}
+
+function buildEventOptionGroups(events: PersonalEvent[]): EventOptionGroup[] {
+  const unique = new Map<string, PersonalEvent>();
+  for (const event of events) {
+    if (!event.eventId || isDeletedEvent(event)) continue;
+    unique.set(event.eventId, event);
+  }
+
+  const personal: PersonalEvent[] = [];
+  const roster: PersonalEvent[] = [];
+  const history: PersonalEvent[] = [];
+
+  for (const event of unique.values()) {
+    if (event.kalender !== "Rooster") {
+      personal.push(event);
+    } else if (event.status === "Voorbij") {
+      history.push(event);
+    } else {
+      roster.push(event);
+    }
+  }
+
+  return [
+    { id: "personal", label: "Eigen afspraken", events: personal.sort(compareEventOptions) },
+    { id: "roster", label: "Diensten", events: roster.sort(compareEventOptions) },
+    { id: "history", label: "Voorbij", events: history.sort(compareEventOptions).reverse() },
+  ].filter((group) => group.events.length > 0);
+}
+
+function compareEventOptions(a: PersonalEvent, b: PersonalEvent) {
+  return eventOptionSortKey(a).localeCompare(eventOptionSortKey(b)) || a.titel.localeCompare(b.titel, "nl");
+}
+
+function eventOptionSortKey(event: PersonalEvent) {
+  return `${event.startDatum || "9999-12-31"}T${event.startTijd || "00:00"}`;
+}
+
+function isDeletedEvent(event: PersonalEvent) {
+  return event.status === "VERWIJDERD" || event.status === "cancelled" || event.status === "PendingDelete";
+}
+
+function shortEventId(eventId: string) {
+  return eventId.length > 12 ? `${eventId.slice(0, 12)}...` : eventId;
 }
 
 function getLinkSearchItems(results: unknown): LinkSearchItem[] {
