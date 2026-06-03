@@ -1,7 +1,7 @@
 "use client";
 
 import { HexColorPicker } from "react-colorful";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Thermometer, Sun, Palette, RefreshCw } from "lucide-react";
 import { type Device } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";

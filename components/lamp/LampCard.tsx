@@ -51,7 +51,7 @@ export function LampCard({ device, onSelect }: LampCardProps) {
     sendCommand({ id: device.id, cmd: { on: !isOn } });
   };
 
-  const handleCardClick = () => {
+  const handleDetailsOpen = () => {
     if (!isOnline) return;
     if (isMobile) {
       setSheetOpen(true);
@@ -62,12 +62,11 @@ export function LampCard({ device, onSelect }: LampCardProps) {
 
   return (
     <>
-      {/* Card */}
-      <div
+      <article
         data-testid={`lamp-card-${device.id}`}
         className={cn(
           "glass rounded-2xl overflow-hidden select-none transition-all duration-200",
-          isOnline && "cursor-pointer hover:bg-[var(--color-surface-hover)] hover:border-[var(--color-border-hover)]",
+          isOnline && "hover:bg-[var(--color-surface-hover)] hover:border-[var(--color-border-hover)]",
           !isOnline && "opacity-60"
         )}
         style={{
@@ -76,47 +75,53 @@ export function LampCard({ device, onSelect }: LampCardProps) {
             : "0 4px 24px rgba(0,0,0,0.4)",
           transition: "box-shadow 0.5s ease, opacity 0.2s",
         }}
-        onClick={handleCardClick}
-        role="button"
-        tabIndex={0}
-        aria-label={`${device.name} — ${isOn ? "aan" : "uit"}, details bekijken`}
-        onKeyDown={(e) => e.key === "Enter" && handleCardClick()}
       >
         {/* Card header */}
         <div className="p-4 flex items-center gap-3">
-          {/* Lamp icon with glow */}
-          <div
-            className="relative flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center"
-            style={{
-              background: isOn ? `${glowColor}22` : "rgba(255,255,255,0.05)",
-              boxShadow: isOn ? `0 0 20px -4px ${glowColor}` : "none",
-              transition: "background 0.4s, box-shadow 0.4s",
-              ...(isRgbMode && {
-                outline: `2px solid ${glowColor}80`,
-                outlineOffset: "2px",
-              }),
-            }}
+          <button
+            type="button"
+            onClick={handleDetailsOpen}
+            disabled={!isOnline}
+            className={cn(
+              "group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent",
+              isOnline ? "cursor-pointer" : "cursor-not-allowed"
+            )}
+            aria-label={`${device.name} details openen`}
           >
-            <Lightbulb
-              size={20}
-              style={{ color: isOn ? glowColor : "#64748b", transition: "color 0.4s" }}
-            />
-          </div>
-
-          {/* Device info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-100 truncate">{device.name}</p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              {isOnline ? (
-                <Wifi size={11} className="text-green-400" aria-hidden="true" />
-              ) : (
-                <WifiOff size={11} className="text-red-400" aria-hidden="true" />
-              )}
-              <span className="text-xs text-slate-500">
-                {isOnline ? (isOn ? `${brightness}% · ${colorTemp}K` : "Uit") : "Offline"}
-              </span>
+            {/* Lamp icon with glow */}
+            <div
+              className="relative flex-shrink-0 w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-[1.03]"
+              style={{
+                background: isOn ? `${glowColor}22` : "rgba(255,255,255,0.05)",
+                boxShadow: isOn ? `0 0 20px -4px ${glowColor}` : "none",
+                transition: "background 0.4s, box-shadow 0.4s, transform 0.2s",
+                ...(isRgbMode && {
+                  outline: `2px solid ${glowColor}80`,
+                  outlineOffset: "2px",
+                }),
+              }}
+            >
+              <Lightbulb
+                size={20}
+                style={{ color: isOn ? glowColor : "#64748b", transition: "color 0.4s" }}
+              />
             </div>
-          </div>
+
+            {/* Device info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-100 truncate">{device.name}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {isOnline ? (
+                  <Wifi size={11} className="text-green-400" aria-hidden="true" />
+                ) : (
+                  <WifiOff size={11} className="text-red-400" aria-hidden="true" />
+                )}
+                <span className="text-xs text-slate-500">
+                  {isOnline ? (isOn ? `${brightness}% · ${colorTemp}K` : "Uit") : "Offline"}
+                </span>
+              </div>
+            </div>
+          </button>
 
           {/* Power toggle */}
           <button
@@ -151,7 +156,7 @@ export function LampCard({ device, onSelect }: LampCardProps) {
             </div>
           </div>
         )}
-      </div>
+      </article>
 
       {/* Mobile BottomSheet */}
       {isMobile && (
@@ -160,7 +165,15 @@ export function LampCard({ device, onSelect }: LampCardProps) {
           onClose={() => setSheetOpen(false)}
           title={device.name}
         >
-          <LampControl device={device} />
+          {isOnline ? (
+            <LampControl device={device} />
+          ) : (
+            <div className="flex flex-col items-center justify-center px-5 py-12 text-center">
+              <WifiOff size={28} className="mb-3 text-slate-600" />
+              <p className="text-sm font-medium text-slate-400">Lamp is offline</p>
+              <p className="mt-1 text-xs text-slate-600">Controleer de netwerkverbinding.</p>
+            </div>
+          )}
         </BottomSheet>
       )}
     </>

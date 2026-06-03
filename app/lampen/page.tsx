@@ -261,12 +261,10 @@ export default function LampenPage() {
         </main>
       </div>
 
-      {selectedDevice && (
-        <LampDetailPanel
-          device={selectedDevice}
-          onClose={() => setSelectedDeviceId(null)}
-        />
-      )}
+      <LampDetailPanel
+        device={selectedDevice}
+        onClose={() => setSelectedDeviceId(null)}
+      />
     </div>
   );
 }

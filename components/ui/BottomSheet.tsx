@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { useSwipe } from "@/hooks/useSwipe";
 
 interface BottomSheetProps {
@@ -21,6 +22,7 @@ interface BottomSheetProps {
  */
 export function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   const { onTouchStart, onTouchEnd, onTouchCancel } = useSwipe({
     onSwipeDown: onClose,
@@ -62,7 +64,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     };
   }, [open]);
 
-  return (
+  const sheet = (
     <AnimatePresence>
       {open && (
         <>
@@ -82,21 +84,24 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
             ref={sheetRef}
             role="dialog"
             aria-modal="true"
-            aria-label={title ?? "Lampbediening"}
+            aria-label={title ? undefined : "Lampbediening"}
+            aria-labelledby={title ? titleId : undefined}
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[81] flex flex-col bg-[var(--color-surface)] border-t border-[var(--color-border)] rounded-t-[20px] max-h-[85vh]"
+            className="fixed bottom-0 left-0 right-0 z-[81] flex max-h-[min(88dvh,720px)] flex-col rounded-t-[20px] border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-24px_70px_rgba(0,0,0,0.45)]"
             style={{
               paddingBottom: "env(safe-area-inset-bottom, 16px)",
             }}
-            onTouchStart={onTouchStart}
-            onTouchEnd={onTouchEnd}
-            onTouchCancel={onTouchCancel}
           >
             {/* Drag handle + header */}
-            <div className="flex-shrink-0">
+            <div
+              className="flex-shrink-0"
+              onTouchStart={onTouchStart}
+              onTouchEnd={onTouchEnd}
+              onTouchCancel={onTouchCancel}
+            >
               {/* Drag pill */}
               <div className="flex justify-center pt-3 pb-2">
                 <div
@@ -111,7 +116,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
                 <div
                   className="flex items-center justify-between px-5 pb-3 border-b border-[var(--color-border)]"
                 >
-                  <h2 className="text-base font-semibold text-white">{title}</h2>
+                  <h2 id={titleId} className="min-w-0 truncate text-base font-semibold text-white">{title}</h2>
                   <button
                     onClick={onClose}
                     aria-label="Sheet sluiten"
@@ -132,4 +137,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       )}
     </AnimatePresence>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(sheet, document.body);
 }
