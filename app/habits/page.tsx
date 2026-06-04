@@ -13,7 +13,12 @@ import { HabitHeatmap } from "@/components/habits/HabitHeatmap";
 import { HabitStats } from "@/components/habits/HabitStats";
 import { BadgeShowcase } from "@/components/habits/BadgeShowcase";
 
-import { type TabId, TABS, todayStr, shiftDate } from "@/components/habits/HabitsUtils";
+import {
+  type TabId,
+  TABS,
+  todayStr,
+  shiftDate,
+} from "@/components/habits/HabitsUtils";
 import { HabitsHeader } from "@/components/habits/HabitsHeader";
 import { HabitsDashboardSummary } from "@/components/habits/HabitsDashboardSummary";
 import { HabitsVandaagTab } from "@/components/habits/HabitsVandaagTab";
@@ -51,10 +56,14 @@ export default function HabitsPage() {
     isLoading,
   } = useHabits(selectedDate || undefined);
 
-  const currentToday = useMemo(() => (selectedDate ? todayStr() : ""), [selectedDate]);
+  const currentToday = useMemo(
+    () => (selectedDate ? todayStr() : ""),
+    [selectedDate],
+  );
   const activeDate = selectedDate || currentToday;
   const isToday = !!selectedDate && selectedDate === currentToday;
-  const disableNext = !!selectedDate && !!currentToday && selectedDate >= currentToday;
+  const disableNext =
+    !!selectedDate && !!currentToday && selectedDate >= currentToday;
   const completionPct = Math.round(todaySummary.rate * 100);
 
   const groupedHabits = useMemo(() => {
@@ -65,13 +74,20 @@ export default function HabitsPage() {
 
   const dayHealth = useMemo(() => {
     const incidents = todayHabits.filter((h) => h.log?.isIncident).length;
-    const negativeClear = todayHabits.filter((h) => h.type === "negatief" && !h.log?.isIncident).length;
-    const openPositive = todayHabits.filter((h) => h.type === "positief" && !h.log?.voltooid).length;
+    const negativeClear = todayHabits.filter(
+      (h) => h.type === "negatief" && !h.log?.isIncident,
+    ).length;
+    const openPositive = todayHabits.filter(
+      (h) => h.type === "positief" && !h.log?.voltooid,
+    ).length;
     return { incidents, negativeClear, openPositive };
   }, [todayHabits]);
 
   const editingInitial = useMemo(
-    () => habits.find((h) => h._id === editingHabit) as Partial<HabitCreateData> | undefined,
+    () =>
+      habits.find((h) => h._id === editingHabit) as
+        | Partial<HabitCreateData>
+        | undefined,
     [editingHabit, habits],
   );
 
@@ -141,9 +157,13 @@ export default function HabitsPage() {
               key={id}
               type="button"
               onClick={() => setActiveTab(id)}
+              aria-pressed={activeTab === id}
+              aria-label={`Tab ${label}`}
               className={cn(
                 "relative flex h-10 min-w-36 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors",
-                activeTab === id ? "text-amber-200" : "text-slate-500 hover:text-slate-300",
+                activeTab === id
+                  ? "text-amber-200"
+                  : "text-slate-500 hover:text-slate-300",
               )}
             >
               {activeTab === id && (
@@ -271,8 +291,12 @@ export default function HabitsPage() {
                   <AlertTriangle size={20} className="text-rose-300" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">Habit verwijderen?</h3>
-                  <p className="mt-1 text-xs text-slate-500">Logs, streaks en badges worden verwijderd.</p>
+                  <h3 className="text-sm font-bold text-white">
+                    Habit verwijderen?
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Logs, streaks en badges worden verwijderd.
+                  </p>
                 </div>
               </div>
               <div className="mt-5 grid grid-cols-2 gap-2">
@@ -296,7 +320,11 @@ export default function HabitsPage() {
         )}
       </AnimatePresence>
 
-      <HabitForm open={showForm} onClose={() => setShowForm(false)} onSubmit={handleCreate} />
+      <HabitForm
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        onSubmit={handleCreate}
+      />
 
       {editingHabit && (
         <HabitForm

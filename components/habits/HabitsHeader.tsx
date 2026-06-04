@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatLevel, formatXP } from "@/lib/habit-constants";
 import { AppIcon } from "@/components/ui/AppIcon";
+import type { HabitStatsRecord } from "@/hooks/useHabits";
 
 export function HabitsHeader({
   level,
@@ -13,7 +14,7 @@ export function HabitsHeader({
   setShowForm,
 }: {
   level: { level: number; titel: string };
-  stats: any;
+  stats?: HabitStatsRecord;
   privacyOn: boolean;
   togglePrivacy: () => void;
   setShowForm: (show: boolean) => void;
@@ -30,37 +31,46 @@ export function HabitsHeader({
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Zelfregie
               </p>
-              <h1 className="mt-1 truncate text-2xl font-bold text-white">Habits</h1>
+              <h1 className="mt-1 truncate text-2xl font-bold text-white">
+                Habits
+              </h1>
               <p className="mt-1 text-sm text-slate-500">
-                {formatLevel(level.level, level.titel)} - {formatXP(stats?.totaalXP ?? 0)}
+                {formatLevel(level.level, level.titel)} -{" "}
+                {formatXP(stats?.totaalXP ?? 0)}
               </p>
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:shrink-0 sm:items-center">
             <button
               type="button"
               onClick={togglePrivacy}
               title={privacyOn ? "Habits tonen" : "Habits verbergen"}
               aria-label={privacyOn ? "Habits tonen" : "Habits verbergen"}
               className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors",
+                "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors",
                 privacyOn
                   ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
               )}
             >
-              <AppIcon name={privacyOn ? "hide" : "show"} tone={privacyOn ? "indigo" : "slate"} size="sm" />
-              <span className="hidden sm:inline">{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
+              <AppIcon
+                name={privacyOn ? "hide" : "show"}
+                tone={privacyOn ? "indigo" : "slate"}
+                size="sm"
+              />
+              <span>{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
             </button>
             <motion.button
               type="button"
               whileTap={{ scale: 0.94 }}
               onClick={() => setShowForm(true)}
-              className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+              aria-label="Nieuwe habit toevoegen"
+              title="Nieuwe habit toevoegen"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
             >
               <AppIcon name="add" tone="amber" size="sm" />
-              <span className="hidden sm:inline">Nieuw</span>
+              <span>Nieuw</span>
             </motion.button>
           </div>
         </div>

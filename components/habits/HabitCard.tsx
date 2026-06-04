@@ -2,8 +2,29 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, AlertTriangle, Pause, MoreVertical, Trash2, Archive, Edit3, Plus, Minus, ChevronDown, Trophy, Calendar, Target, Zap, TrendingUp } from "lucide-react";
-import { formatStreak, formatXP, MOEILIJKHEID_LABELS, FREQUENTIE_LABELS } from "@/lib/habit-constants";
+import {
+  Check,
+  AlertTriangle,
+  Pause,
+  MoreVertical,
+  Trash2,
+  Archive,
+  Edit3,
+  Plus,
+  Minus,
+  ChevronDown,
+  Trophy,
+  Calendar,
+  Target,
+  Zap,
+  TrendingUp,
+} from "lucide-react";
+import {
+  formatStreak,
+  formatXP,
+  MOEILIJKHEID_LABELS,
+  FREQUENTIE_LABELS,
+} from "@/lib/habit-constants";
 import { getLevel } from "@/lib/habit-constants";
 import { DEFAULT_STAP, INCIDENT_TRIGGERS } from "@/lib/habit-constants";
 import type { HabitWithLog } from "@/hooks/useHabits";
@@ -16,11 +37,11 @@ import { AppIcon } from "@/components/ui/AppIcon";
  */
 
 const ROOSTER_LABELS: Record<string, string> = {
-  alle:         "Altijd",
-  werkdagen:    "Alleen werkdagen",
-  vrijeDagen:   "Alleen vrije dagen",
+  alle: "Altijd",
+  werkdagen: "Alleen werkdagen",
+  vrijeDagen: "Alleen vrije dagen",
   vroegeDienst: "Vroege diensten",
-  lateDienst:   "Late diensten",
+  lateDienst: "Late diensten",
 };
 
 interface HabitCardProps {
@@ -35,7 +56,17 @@ interface HabitCardProps {
   masked?: boolean;
 }
 
-export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, onArchive, onRemove, onEdit, masked = false }: HabitCardProps) {
+export function HabitCard({
+  habit,
+  onToggle,
+  onIncrement,
+  onIncident,
+  onPause,
+  onArchive,
+  onRemove,
+  onEdit,
+  masked = false,
+}: HabitCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
   const [showTriggerModal, setShowTriggerModal] = useState(false);
@@ -63,11 +94,15 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
 
   const stap = DEFAULT_STAP[habit.eenheid ?? "x"] ?? 1;
   const currentWaarde = habit.log?.waarde ?? 0;
-  const progress = isQuantitative ? Math.min(1, currentWaarde / habit.doelWaarde!) : 0;
+  const progress = isQuantitative
+    ? Math.min(1, currentWaarde / habit.doelWaarde!)
+    : 0;
   const displayName = masked ? "Verborgen habit" : habit.naam;
   const displayEmoji = masked ? "•" : habit.emoji;
   const typeLabel = masked ? "Afgeschermd" : "Vermijden";
-  const frequencyLabel = masked ? "Schema" : FREQUENTIE_LABELS[habit.frequentie] ?? habit.frequentie;
+  const frequencyLabel = masked
+    ? "Schema"
+    : (FREQUENTIE_LABELS[habit.frequentie] ?? habit.frequentie);
 
   const handleIncidentSubmit = () => {
     onIncident(selectedTrigger, triggerNotitie || undefined);
@@ -100,8 +135,12 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
           <div
             className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
             style={{
-              background: hasIncident ? "rgba(239,68,68,0.12)" : "rgba(34,197,94,0.10)",
-              border: hasIncident ? "1px solid rgba(239,68,68,0.20)" : `1px solid rgba(34,197,94,0.20)`,
+              background: hasIncident
+                ? "rgba(239,68,68,0.12)"
+                : "rgba(34,197,94,0.10)",
+              border: hasIncident
+                ? "1px solid rgba(239,68,68,0.20)"
+                : `1px solid rgba(34,197,94,0.20)`,
             }}
           >
             {hasIncident ? (
@@ -127,7 +166,14 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
           </div>
         ) : (
           <button
+            type="button"
             onClick={onToggle}
+            aria-label={
+              isCompleted
+                ? `${displayName} heropenen`
+                : `${displayName} voltooien`
+            }
+            title={isCompleted ? "Heropenen" : "Voltooien"}
             className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer"
             style={{
               background: isCompleted ? color : "rgba(255,255,255,0.03)",
@@ -143,16 +189,24 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
         )}
 
         {/* Content — tap to expand details */}
-        <div
-          className="flex-1 min-w-0 cursor-pointer"
+        <button
+          type="button"
+          className="min-w-0 flex-1 cursor-pointer text-left"
           onClick={() => setShowDetail(!showDetail)}
+          aria-expanded={showDetail}
+          aria-label={`${displayName} details ${showDetail ? "sluiten" : "openen"}`}
         >
           <div className="flex items-center gap-2">
             <span
               className="text-sm font-semibold truncate"
               style={{
-                color: isSuccess ? "rgba(255,255,255,0.4)" : hasIncident ? "#f87171" : "rgba(255,255,255,0.9)",
-                textDecoration: isSuccess && !isNegative ? "line-through" : "none",
+                color: isSuccess
+                  ? "rgba(255,255,255,0.4)"
+                  : hasIncident
+                    ? "#f87171"
+                    : "rgba(255,255,255,0.9)",
+                textDecoration:
+                  isSuccess && !isNegative ? "line-through" : "none",
               }}
             >
               {displayName}
@@ -165,7 +219,9 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
             <ChevronDown
               size={14}
               className="text-slate-600 shrink-0 transition-transform duration-200"
-              style={{ transform: showDetail ? "rotate(180deg)" : "rotate(0deg)" }}
+              style={{
+                transform: showDetail ? "rotate(180deg)" : "rotate(0deg)",
+              }}
             />
           </div>
 
@@ -176,7 +232,9 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
               </span>
             )}
             {habit.log?.xpVerdiend ? (
-              <span className="text-[10px] text-green-400/60">+{habit.log.xpVerdiend} XP</span>
+              <span className="text-[10px] text-green-400/60">
+                +{habit.log.xpVerdiend} XP
+              </span>
             ) : null}
             <span className="text-[10px] text-slate-600">
               {MOEILIJKHEID_LABELS[habit.moeilijkheid as string]}
@@ -188,12 +246,14 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
               </span>
             )}
           </div>
-        </div>
+        </button>
 
         {/* Incident button (negatieve habits) — apart van stepper */}
         {isNegative && !hasIncident && (
           <button
+            type="button"
             onClick={() => setShowTriggerModal(true)}
+            aria-label={`Incident loggen voor ${displayName}`}
             className="w-10 h-10 rounded-xl bg-red-500/8 border border-red-500/12 flex items-center justify-center shrink-0 active:scale-90 transition-transform cursor-pointer"
             title="Incident loggen"
           >
@@ -203,7 +263,10 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
 
         {/* More menu */}
         <button
+          type="button"
           onClick={() => setShowMenu(!showMenu)}
+          aria-label={`Acties voor ${displayName}`}
+          title="Acties"
           className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer"
         >
           <MoreVertical size={16} className="text-slate-500" />
@@ -226,8 +289,10 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
           <div className="flex items-center gap-2">
             {/* Minus button */}
             <button
+              type="button"
               onClick={() => onIncrement(-stap)}
               disabled={currentWaarde <= 0}
+              aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verminderen`}
               className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-20"
               style={{
                 background: "rgba(255,255,255,0.03)",
@@ -239,18 +304,24 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
 
             {/* Current value display */}
             <div className="flex-1 text-center">
-              <span className="text-sm font-bold" style={{ color: isCompleted ? color : "rgba(255,255,255,0.8)" }}>
+              <span
+                className="text-sm font-bold"
+                style={{ color: isCompleted ? color : "rgba(255,255,255,0.8)" }}
+              >
                 {masked ? "••" : currentWaarde}
               </span>
               <span className="text-[10px] text-slate-500">
-                {" "}/ {masked ? "••" : `${habit.doelWaarde} ${habit.eenheid ?? ""}`}
+                {" "}
+                / {masked ? "••" : `${habit.doelWaarde} ${habit.eenheid ?? ""}`}
               </span>
             </div>
 
             {/* Plus button */}
             <button
+              type="button"
               onClick={() => onIncrement(stap)}
               disabled={isCompleted}
+              aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verhogen`}
               className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-30"
               style={{
                 background: `${color}15`,
@@ -307,18 +378,30 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
               {(() => {
                 const levelInfo = getLevel(habit.totaalXP);
                 return (
-                  <div className="rounded-xl p-2.5" style={{ background: `${color}06`, border: `1px solid ${color}10` }}>
+                  <div
+                    className="rounded-xl p-2.5"
+                    style={{
+                      background: `${color}06`,
+                      border: `1px solid ${color}10`,
+                    }}
+                  >
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-1.5">
                         <Zap size={12} style={{ color }} />
-                        <span className="text-[11px] font-bold" style={{ color }}>
+                        <span
+                          className="text-[11px] font-bold"
+                          style={{ color }}
+                        >
                           Lv.{levelInfo.level} {levelInfo.titel}
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-500">
                         {formatXP(habit.totaalXP)}
                         {levelInfo.nextXP > 0 && (
-                          <span className="text-slate-600"> · nog {levelInfo.nextXP}</span>
+                          <span className="text-slate-600">
+                            {" "}
+                            · nog {levelInfo.nextXP}
+                          </span>
                         )}
                       </span>
                     </div>
@@ -327,7 +410,11 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                         className="h-full rounded-full"
                         style={{ background: color }}
                         animate={{ width: `${levelInfo.progress * 100}%` }}
-                        transition={{ type: "spring", damping: 20, stiffness: 200 }}
+                        transition={{
+                          type: "spring",
+                          damping: 20,
+                          stiffness: 200,
+                        }}
                       />
                     </div>
                   </div>
@@ -339,7 +426,8 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                 <div className="flex items-center gap-1.5 mt-2.5">
                   <TrendingUp size={11} className="text-cyan-400/60" />
                   <span className="text-[10px] text-cyan-400/70">
-                    Rooster: {ROOSTER_LABELS[habit.roosterFilter] ?? habit.roosterFilter}
+                    Rooster:{" "}
+                    {ROOSTER_LABELS[habit.roosterFilter] ?? habit.roosterFilter}
                   </span>
                 </div>
               )}
@@ -347,7 +435,12 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
               {/* Aangemaakt datum */}
               <div className="flex items-center gap-1.5 mt-2">
                 <span className="text-[10px] text-slate-600">
-                  Aangemaakt {new Date(habit.aangemaakt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })}
+                  Aangemaakt{" "}
+                  {new Date(habit.aangemaakt).toLocaleDateString("nl-NL", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </span>
               </div>
             </div>
@@ -365,18 +458,36 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
             className="border-t border-red-500/10 overflow-hidden"
           >
             <div className="p-3.5">
-              <p className="text-[11px] text-slate-400 font-medium mb-2.5">Wat was de trigger?</p>
+              <p className="text-[11px] text-slate-400 font-medium mb-2.5">
+                Wat was de trigger?
+              </p>
 
               <div className="grid grid-cols-2 gap-1.5 mb-3">
                 {INCIDENT_TRIGGERS.map((t, index) => (
                   <button
+                    type="button"
                     key={t.value}
-                    onClick={() => setSelectedTrigger(selectedTrigger === t.value ? undefined : t.value)}
+                    onClick={() =>
+                      setSelectedTrigger(
+                        selectedTrigger === t.value ? undefined : t.value,
+                      )
+                    }
+                    aria-pressed={selectedTrigger === t.value}
+                    aria-label={
+                      masked ? `Trigger ${index + 1}` : `Trigger ${t.label}`
+                    }
                     className="py-2.5 px-3 rounded-xl text-[11px] text-left font-medium transition-all min-h-[44px] cursor-pointer active:scale-95"
                     style={{
-                      background: selectedTrigger === t.value ? "rgba(239,68,68,0.10)" : "rgba(255,255,255,0.03)",
-                      border: selectedTrigger === t.value ? "1px solid rgba(239,68,68,0.20)" : "1px solid rgba(255,255,255,0.05)",
-                      color: selectedTrigger === t.value ? "#f87171" : "#94a3b8",
+                      background:
+                        selectedTrigger === t.value
+                          ? "rgba(239,68,68,0.10)"
+                          : "rgba(255,255,255,0.03)",
+                      border:
+                        selectedTrigger === t.value
+                          ? "1px solid rgba(239,68,68,0.20)"
+                          : "1px solid rgba(255,255,255,0.05)",
+                      color:
+                        selectedTrigger === t.value ? "#f87171" : "#94a3b8",
                     }}
                   >
                     {masked ? `Trigger ${index + 1}` : `${t.emoji} ${t.label}`}
@@ -390,23 +501,37 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
                   type="text"
                   value={triggerNotitie}
                   onChange={(e) => setTriggerNotitie(e.target.value)}
-                  placeholder={selectedTrigger === "anders" ? "Beschrijf de trigger..." : "Optionele notitie..."}
+                  placeholder={
+                    selectedTrigger === "anders"
+                      ? "Beschrijf de trigger..."
+                      : "Optionele notitie..."
+                  }
                   className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500/30 min-h-[44px] mb-3"
                 />
               )}
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setShowTriggerModal(false); setSelectedTrigger(undefined); setTriggerNotitie(""); }}
+                  type="button"
+                  onClick={() => {
+                    setShowTriggerModal(false);
+                    setSelectedTrigger(undefined);
+                    setTriggerNotitie("");
+                  }}
                   className="flex-1 py-2.5 rounded-xl text-xs font-medium text-slate-400 bg-[rgba(255,255,255,0.03)] border border-[var(--color-border)] min-h-[44px] cursor-pointer active:scale-95 transition-transform"
                 >
                   Annuleren
                 </button>
                 <button
+                  type="button"
                   onClick={handleIncidentSubmit}
-                  disabled={selectedTrigger === "anders" && !triggerNotitie.trim()}
+                  disabled={
+                    selectedTrigger === "anders" && !triggerNotitie.trim()
+                  }
                   className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white min-h-[44px] cursor-pointer active:scale-95 transition-transform disabled:opacity-30"
-                  style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}
+                  style={{
+                    background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                  }}
                 >
                   Incident loggen
                 </button>
@@ -424,10 +549,39 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
           className="border-t border-[var(--color-border)] overflow-hidden"
         >
           <div className="p-2.5 flex gap-2">
-            <MenuBtn icon={<Edit3 size={15} />} label="Bewerken" onClick={() => { onEdit(); setShowMenu(false); }} />
-            <MenuBtn icon={<Pause size={15} />} label={habit.isPauze ? "Hervatten" : "Pauzeren"} onClick={() => { onPause(); setShowMenu(false); }} />
-            <MenuBtn icon={<Archive size={15} />} label="Archiveer" onClick={() => { onArchive(); setShowMenu(false); }} />
-            <MenuBtn icon={<Trash2 size={15} />} label="Verwijder" onClick={() => { onRemove(); setShowMenu(false); }} danger />
+            <MenuBtn
+              icon={<Edit3 size={15} />}
+              label="Bewerken"
+              onClick={() => {
+                onEdit();
+                setShowMenu(false);
+              }}
+            />
+            <MenuBtn
+              icon={<Pause size={15} />}
+              label={habit.isPauze ? "Hervatten" : "Pauzeren"}
+              onClick={() => {
+                onPause();
+                setShowMenu(false);
+              }}
+            />
+            <MenuBtn
+              icon={<Archive size={15} />}
+              label="Archiveer"
+              onClick={() => {
+                onArchive();
+                setShowMenu(false);
+              }}
+            />
+            <MenuBtn
+              icon={<Trash2 size={15} />}
+              label="Verwijder"
+              onClick={() => {
+                onRemove();
+                setShowMenu(false);
+              }}
+              danger
+            />
           </div>
         </motion.div>
       )}
@@ -435,12 +589,22 @@ export function HabitCard({ habit, onToggle, onIncrement, onIncident, onPause, o
   );
 }
 
-function MenuBtn({ icon, label, onClick, danger }: {
-  icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean;
+function MenuBtn({
+  icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-label={label}
       className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl transition-all active:scale-95 min-h-[52px] cursor-pointer"
       style={{
         background: danger ? "rgba(239,68,68,0.06)" : "rgba(255,255,255,0.03)",
@@ -453,12 +617,25 @@ function MenuBtn({ icon, label, onClick, danger }: {
   );
 }
 
-function DetailStat({ icon, label, value, color }: {
-  icon: React.ReactNode; label: string; value: string; color: string;
+function DetailStat({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color: string;
 }) {
   return (
-    <div className="rounded-lg p-2 text-center" style={{ background: `${color}08`, border: `1px solid ${color}12` }}>
-      <div className="flex justify-center mb-1" style={{ color }}>{icon}</div>
+    <div
+      className="rounded-lg p-2 text-center"
+      style={{ background: `${color}08`, border: `1px solid ${color}12` }}
+    >
+      <div className="flex justify-center mb-1" style={{ color }}>
+        {icon}
+      </div>
       <div className="text-[11px] font-bold text-slate-200">{value}</div>
       <div className="text-[9px] text-slate-500 mt-0.5">{label}</div>
     </div>

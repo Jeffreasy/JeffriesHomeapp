@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
-import { useHabits, type HabitBadgeRecord } from "@/hooks/useHabits";
+import { useHabits } from "@/hooks/useHabits";
 import { BADGE_DEFINITIONS } from "@/lib/habit-constants";
 
 /**
@@ -42,8 +42,12 @@ export function BadgeShowcase() {
           <div className="flex items-center gap-2">
             <span className="text-2xl">{recentBadge.emoji}</span>
             <div>
-              <p className="text-sm font-bold text-slate-200">{recentBadge.naam}</p>
-              <p className="text-[10px] text-slate-500">{recentBadge.beschrijving}</p>
+              <p className="text-sm font-bold text-slate-200">
+                {recentBadge.naam}
+              </p>
+              <p className="text-[10px] text-slate-500">
+                {recentBadge.beschrijving}
+              </p>
             </div>
           </div>
         </motion.div>
@@ -75,21 +79,29 @@ export function BadgeShowcase() {
               {/* Emoji or lock */}
               <span
                 className="text-2xl mb-1"
-                style={{ filter: unlocked ? "none" : "grayscale(1) opacity(0.3)" }}
+                style={{
+                  filter: unlocked ? "none" : "grayscale(1) opacity(0.3)",
+                }}
               >
                 {unlocked ? def.emoji : "🔒"}
               </span>
 
               <span
                 className="text-[9px] font-medium text-center leading-tight"
-                style={{ color: unlocked ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.2)" }}
+                style={{
+                  color: unlocked
+                    ? "rgba(255,255,255,0.7)"
+                    : "rgba(255,255,255,0.2)",
+                }}
               >
                 {def.naam}
               </span>
 
               {/* XP bonus */}
               {unlocked && (
-                <span className="text-[8px] text-orange-400/50 mt-0.5">+{def.xpBonus} XP</span>
+                <span className="text-[8px] text-orange-400/50 mt-0.5">
+                  +{def.xpBonus} XP
+                </span>
               )}
 
               {/* New badge glow */}
@@ -97,7 +109,8 @@ export function BadgeShowcase() {
                 <motion.div
                   className="absolute inset-0 rounded-xl pointer-events-none"
                   style={{
-                    background: "radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 70%)",
+                    background:
+                      "radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 70%)",
                   }}
                   animate={{ opacity: [0.5, 1, 0.5, 0] }}
                   transition={{ duration: 2, repeat: 0 }}

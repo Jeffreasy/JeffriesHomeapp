@@ -2,9 +2,23 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Zap, Clock, CalendarDays, Timer, Hash, Ruler } from "lucide-react";
+import {
+  X,
+  Plus,
+  Zap,
+  Clock,
+  CalendarDays,
+  Timer,
+  Hash,
+  Ruler,
+} from "lucide-react";
 import { HABIT_EMOJIS, ROOSTER_FILTER_OPTIONS } from "@/lib/habit-constants";
-import { HABIT_COLORS, FREQUENTIE_LABELS, MOEILIJKHEID_LABELS, DAG_LABELS } from "@/lib/habit-constants";
+import {
+  HABIT_COLORS,
+  FREQUENTIE_LABELS,
+  MOEILIJKHEID_LABELS,
+  DAG_LABELS,
+} from "@/lib/habit-constants";
 import type { HabitCreateData } from "@/hooks/useHabits";
 import { AppIcon } from "@/components/ui/AppIcon";
 
@@ -20,21 +34,42 @@ interface HabitFormProps {
   initial?: Partial<HabitCreateData>;
 }
 
-export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) {
+export function HabitForm({
+  open,
+  onClose,
+  onSubmit,
+  initial,
+}: HabitFormProps) {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [naam, setNaam] = useState(initial?.naam ?? "");
   const [emoji, setEmoji] = useState(initial?.emoji ?? "🎯");
-  const [type, setType] = useState<"positief" | "negatief">(initial?.type ?? "positief");
-  const [frequentie, setFrequentie] = useState<HabitCreateData["frequentie"]>(initial?.frequentie ?? "dagelijks");
-  const [aangepasteDagen, setAangepasteDagen] = useState<number[]>(initial?.aangepasteDagen ?? []);
-  const [moeilijkheid, setMoeilijkheid] = useState<"makkelijk" | "normaal" | "moeilijk">(initial?.moeilijkheid ?? "normaal");
-  const [roosterFilter, setRoosterFilter] = useState<HabitCreateData["roosterFilter"]>(initial?.roosterFilter ?? "alle");
+  const [type, setType] = useState<"positief" | "negatief">(
+    initial?.type ?? "positief",
+  );
+  const [frequentie, setFrequentie] = useState<HabitCreateData["frequentie"]>(
+    initial?.frequentie ?? "dagelijks",
+  );
+  const [aangepasteDagen, setAangepasteDagen] = useState<number[]>(
+    initial?.aangepasteDagen ?? [],
+  );
+  const [moeilijkheid, setMoeilijkheid] = useState<
+    "makkelijk" | "normaal" | "moeilijk"
+  >(initial?.moeilijkheid ?? "normaal");
+  const [roosterFilter, setRoosterFilter] = useState<
+    HabitCreateData["roosterFilter"]
+  >(initial?.roosterFilter ?? "alle");
   const [kleur, setKleur] = useState(initial?.kleur ?? HABIT_COLORS[0]);
   const [beschrijving, setBeschrijving] = useState(initial?.beschrijving ?? "");
-  const [isKwantitatief, setIsKwantitatief] = useState(initial?.isKwantitatief ?? false);
-  const [doelWaarde, setDoelWaarde] = useState<number | undefined>(initial?.doelWaarde);
+  const [isKwantitatief, setIsKwantitatief] = useState(
+    initial?.isKwantitatief ?? false,
+  );
+  const [doelWaarde, setDoelWaarde] = useState<number | undefined>(
+    initial?.doelWaarde,
+  );
   const [eenheid, setEenheid] = useState(initial?.eenheid ?? "");
-  const [doelAantal, setDoelAantal] = useState<number | undefined>(initial?.doelAantal);
+  const [doelAantal, setDoelAantal] = useState<number | undefined>(
+    initial?.doelAantal,
+  );
   const [doelTijd, setDoelTijd] = useState(initial?.doelTijd ?? "");
   const [showEmojis, setShowEmojis] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,7 +115,9 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
   useEffect(() => {
     if (!open) return;
 
-    const canAutofocus = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const canAutofocus = window.matchMedia(
+      "(hover: hover) and (pointer: fine)",
+    ).matches;
     if (!canAutofocus) return;
 
     const timeout = window.setTimeout(() => nameInputRef.current?.focus(), 180);
@@ -99,20 +136,26 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
         emoji,
         type,
         frequentie,
-        aangepasteDagen: frequentie === "aangepast" ? aangepasteDagen : undefined,
+        aangepasteDagen:
+          frequentie === "aangepast" ? aangepasteDagen : undefined,
         moeilijkheid,
         roosterFilter: roosterFilter === "alle" ? undefined : roosterFilter,
         isKwantitatief,
         doelWaarde: isKwantitatief ? doelWaarde : undefined,
         eenheid: isKwantitatief ? eenheid || undefined : undefined,
-        doelAantal: (frequentie === "x_per_week" || frequentie === "x_per_maand") ? doelAantal : undefined,
+        doelAantal:
+          frequentie === "x_per_week" || frequentie === "x_per_maand"
+            ? doelAantal
+            : undefined,
         doelTijd: doelTijd || undefined,
         kleur,
         beschrijving: beschrijving.trim() || undefined,
       });
       onClose();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Habit opslaan is mislukt.");
+      setSubmitError(
+        error instanceof Error ? error.message : "Habit opslaan is mislukt.",
+      );
       setIsSubmitting(false);
     }
   };
@@ -158,7 +201,10 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 {initial ? "Habit bewerken" : "Nieuwe Habit"}
               </h2>
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Habitformulier sluiten"
+                title="Sluiten"
                 className="w-11 h-11 rounded-full bg-[rgba(255,255,255,0.05)] flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-90"
               >
                 <X size={18} />
@@ -170,11 +216,13 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
               className="flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-4"
               style={{ WebkitOverflowScrolling: "touch" }}
             >
-
               {/* Emoji + Naam */}
               <div className="flex gap-3 mb-4">
                 <button
+                  type="button"
                   onClick={() => setShowEmojis(!showEmojis)}
+                  aria-label="Emoji kiezen"
+                  title="Emoji kiezen"
                   className="w-14 h-14 rounded-2xl bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] flex items-center justify-center text-2xl shrink-0 active:scale-95 transition-transform"
                   style={{ borderColor: kleur + "30" }}
                 >
@@ -202,10 +250,19 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                     <div className="grid grid-cols-8 gap-1.5 p-3 bg-[rgba(255,255,255,0.03)] rounded-xl">
                       {HABIT_EMOJIS.map((e) => (
                         <button
+                          type="button"
                           key={e}
-                          onClick={() => { setEmoji(e); setShowEmojis(false); }}
+                          onClick={() => {
+                            setEmoji(e);
+                            setShowEmojis(false);
+                          }}
+                          aria-label={`Emoji ${e} kiezen`}
+                          title={`Emoji ${e}`}
                           className="text-xl p-1.5 rounded-lg hover:bg-[var(--color-surface-hover)] active:scale-90 transition-all min-h-[44px] flex items-center justify-center"
-                          style={{ background: emoji === e ? "rgba(249,115,22,0.12)" : undefined }}
+                          style={{
+                            background:
+                              emoji === e ? "rgba(249,115,22,0.12)" : undefined,
+                          }}
                         >
                           {e}
                         </button>
@@ -226,7 +283,9 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
 
               {/* Type toggle */}
               <div className="mb-4">
-                <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block mb-2">Type</label>
+                <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block mb-2">
+                  Type
+                </label>
                 <div className="grid grid-cols-2 gap-2">
                   {(["positief", "negatief"] as const).map((t) => (
                     <button
@@ -235,12 +294,29 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                       onClick={() => setType(t)}
                       className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-all"
                       style={{
-                        background: type === t ? (t === "positief" ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)") : "rgba(255,255,255,0.03)",
-                        border: type === t ? `1px solid ${t === "positief" ? "rgba(34,197,94,0.20)" : "rgba(239,68,68,0.20)"}` : "1px solid rgba(255,255,255,0.05)",
-                        color: type === t ? (t === "positief" ? "#4ade80" : "#f87171") : "#94a3b8",
+                        background:
+                          type === t
+                            ? t === "positief"
+                              ? "rgba(34,197,94,0.10)"
+                              : "rgba(239,68,68,0.10)"
+                            : "rgba(255,255,255,0.03)",
+                        border:
+                          type === t
+                            ? `1px solid ${t === "positief" ? "rgba(34,197,94,0.20)" : "rgba(239,68,68,0.20)"}`
+                            : "1px solid rgba(255,255,255,0.05)",
+                        color:
+                          type === t
+                            ? t === "positief"
+                              ? "#4ade80"
+                              : "#f87171"
+                            : "#94a3b8",
                       }}
                     >
-                      <AppIcon name={t === "positief" ? "check" : "warning"} tone={t === "positief" ? "green" : "red"} size="sm" />
+                      <AppIcon
+                        name={t === "positief" ? "check" : "warning"}
+                        tone={t === "positief" ? "green" : "red"}
+                        size="sm"
+                      />
                       {t === "positief" ? "Doen" : "Vermijden"}
                     </button>
                   ))}
@@ -255,12 +331,22 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 <div className="grid grid-cols-2 gap-1.5">
                   {Object.entries(FREQUENTIE_LABELS).map(([key, label]) => (
                     <button
+                      type="button"
                       key={key}
-                      onClick={() => setFrequentie(key as HabitCreateData["frequentie"])}
+                      onClick={() =>
+                        setFrequentie(key as HabitCreateData["frequentie"])
+                      }
+                      aria-pressed={frequentie === key}
                       className="py-2.5 px-3 rounded-lg text-xs font-medium transition-all min-h-[44px]"
                       style={{
-                        background: frequentie === key ? "rgba(249,115,22,0.10)" : "rgba(255,255,255,0.03)",
-                        border: frequentie === key ? "1px solid rgba(249,115,22,0.20)" : "1px solid rgba(255,255,255,0.05)",
+                        background:
+                          frequentie === key
+                            ? "rgba(249,115,22,0.10)"
+                            : "rgba(255,255,255,0.03)",
+                        border:
+                          frequentie === key
+                            ? "1px solid rgba(249,115,22,0.20)"
+                            : "1px solid rgba(255,255,255,0.05)",
                         color: frequentie === key ? "#f97316" : "#94a3b8",
                       }}
                     >
@@ -275,17 +361,28 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 <div className="mb-4 flex gap-1.5">
                   {DAG_LABELS.map((d, i) => (
                     <button
+                      type="button"
                       key={i}
                       onClick={() => {
                         setAangepasteDagen((prev) =>
-                          prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i]
+                          prev.includes(i)
+                            ? prev.filter((x) => x !== i)
+                            : [...prev, i],
                         );
                       }}
+                      aria-pressed={aangepasteDagen.includes(i)}
+                      aria-label={`${d} ${aangepasteDagen.includes(i) ? "uitschakelen" : "inschakelen"}`}
                       className="flex-1 py-2 rounded-lg text-xs font-medium transition-all min-h-[40px]"
                       style={{
-                        background: aangepasteDagen.includes(i) ? "rgba(249,115,22,0.12)" : "rgba(255,255,255,0.03)",
-                        border: aangepasteDagen.includes(i) ? "1px solid rgba(249,115,22,0.20)" : "1px solid rgba(255,255,255,0.05)",
-                        color: aangepasteDagen.includes(i) ? "#f97316" : "#64748b",
+                        background: aangepasteDagen.includes(i)
+                          ? "rgba(249,115,22,0.12)"
+                          : "rgba(255,255,255,0.03)",
+                        border: aangepasteDagen.includes(i)
+                          ? "1px solid rgba(249,115,22,0.20)"
+                          : "1px solid rgba(255,255,255,0.05)",
+                        color: aangepasteDagen.includes(i)
+                          ? "#f97316"
+                          : "#64748b",
                       }}
                     >
                       {d}
@@ -302,12 +399,20 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 <div className="grid grid-cols-2 gap-1.5">
                   {ROOSTER_FILTER_OPTIONS.map(({ value, label }) => (
                     <button
+                      type="button"
                       key={value}
                       onClick={() => setRoosterFilter(value)}
+                      aria-pressed={roosterFilter === value}
                       className="py-2 px-3 rounded-lg text-xs font-medium transition-all min-h-[40px]"
                       style={{
-                        background: roosterFilter === value ? "rgba(59,130,246,0.10)" : "rgba(255,255,255,0.03)",
-                        border: roosterFilter === value ? "1px solid rgba(59,130,246,0.20)" : "1px solid rgba(255,255,255,0.05)",
+                        background:
+                          roosterFilter === value
+                            ? "rgba(59,130,246,0.10)"
+                            : "rgba(255,255,255,0.03)",
+                        border:
+                          roosterFilter === value
+                            ? "1px solid rgba(59,130,246,0.20)"
+                            : "1px solid rgba(255,255,255,0.05)",
                         color: roosterFilter === value ? "#60a5fa" : "#94a3b8",
                       }}
                     >
@@ -318,20 +423,33 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
               </div>
 
               {/* Doel per week/maand (alleen bij x_per_week/x_per_maand) */}
-              {(frequentie === "x_per_week" || frequentie === "x_per_maand") && (
+              {(frequentie === "x_per_week" ||
+                frequentie === "x_per_maand") && (
                 <div className="mb-4">
                   <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider flex items-center gap-1 mb-2">
-                    <Hash size={10} /> Hoe vaak per {frequentie === "x_per_week" ? "week" : "maand"}?
+                    <Hash size={10} /> Hoe vaak per{" "}
+                    {frequentie === "x_per_week" ? "week" : "maand"}?
                   </label>
                   <div className="flex gap-2">
-                    {(frequentie === "x_per_week" ? [2, 3, 4, 5] : [5, 10, 15, 20]).map((n) => (
+                    {(frequentie === "x_per_week"
+                      ? [2, 3, 4, 5]
+                      : [5, 10, 15, 20]
+                    ).map((n) => (
                       <button
+                        type="button"
                         key={n}
                         onClick={() => setDoelAantal(n)}
+                        aria-pressed={doelAantal === n}
                         className="flex-1 py-2.5 rounded-lg text-xs font-medium transition-all min-h-[44px]"
                         style={{
-                          background: doelAantal === n ? "rgba(249,115,22,0.10)" : "rgba(255,255,255,0.03)",
-                          border: doelAantal === n ? "1px solid rgba(249,115,22,0.20)" : "1px solid rgba(255,255,255,0.05)",
+                          background:
+                            doelAantal === n
+                              ? "rgba(249,115,22,0.10)"
+                              : "rgba(255,255,255,0.03)",
+                          border:
+                            doelAantal === n
+                              ? "1px solid rgba(249,115,22,0.20)"
+                              : "1px solid rgba(255,255,255,0.05)",
                           color: doelAantal === n ? "#f97316" : "#94a3b8",
                         }}
                       >
@@ -345,11 +463,17 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
               {/* Kwantitatief / Meetbaar */}
               <div className="mb-4">
                 <button
+                  type="button"
                   onClick={() => setIsKwantitatief(!isKwantitatief)}
+                  aria-pressed={isKwantitatief}
                   className="w-full flex items-center justify-between py-3 px-4 rounded-xl text-xs font-medium transition-all min-h-[48px]"
                   style={{
-                    background: isKwantitatief ? "rgba(14,165,233,0.08)" : "rgba(255,255,255,0.03)",
-                    border: isKwantitatief ? "1px solid rgba(14,165,233,0.15)" : "1px solid rgba(255,255,255,0.05)",
+                    background: isKwantitatief
+                      ? "rgba(14,165,233,0.08)"
+                      : "rgba(255,255,255,0.03)",
+                    border: isKwantitatief
+                      ? "1px solid rgba(14,165,233,0.15)"
+                      : "1px solid rgba(255,255,255,0.05)",
                     color: isKwantitatief ? "#0ea5e9" : "#94a3b8",
                   }}
                 >
@@ -359,7 +483,11 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                   </span>
                   <div
                     className="w-9 h-5 rounded-full transition-all relative"
-                    style={{ background: isKwantitatief ? "#0ea5e9" : "rgba(255,255,255,0.08)" }}
+                    style={{
+                      background: isKwantitatief
+                        ? "#0ea5e9"
+                        : "rgba(255,255,255,0.08)",
+                    }}
                   >
                     <div
                       className="w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all"
@@ -373,7 +501,11 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                     <input
                       type="number"
                       value={doelWaarde ?? ""}
-                      onChange={(e) => setDoelWaarde(e.target.value ? Number(e.target.value) : undefined)}
+                      onChange={(e) =>
+                        setDoelWaarde(
+                          e.target.value ? Number(e.target.value) : undefined,
+                        )
+                      }
                       placeholder="Doel"
                       className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500/30 min-h-[44px]"
                       inputMode="numeric"
@@ -381,12 +513,21 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                     <div className="flex gap-1">
                       {["min", "ml", "km", "pg", "x"].map((u) => (
                         <button
+                          type="button"
                           key={u}
                           onClick={() => setEenheid(u)}
+                          aria-pressed={eenheid === u}
+                          aria-label={`Eenheid ${u}`}
                           className="px-2.5 py-2 rounded-lg text-[10px] font-medium transition-all min-h-[44px]"
                           style={{
-                            background: eenheid === u ? "rgba(14,165,233,0.10)" : "rgba(255,255,255,0.03)",
-                            border: eenheid === u ? "1px solid rgba(14,165,233,0.20)" : "1px solid rgba(255,255,255,0.05)",
+                            background:
+                              eenheid === u
+                                ? "rgba(14,165,233,0.10)"
+                                : "rgba(255,255,255,0.03)",
+                            border:
+                              eenheid === u
+                                ? "1px solid rgba(14,165,233,0.20)"
+                                : "1px solid rgba(255,255,255,0.05)",
                             color: eenheid === u ? "#0ea5e9" : "#64748b",
                           }}
                         >
@@ -411,6 +552,7 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 />
                 {doelTijd && (
                   <button
+                    type="button"
                     onClick={() => setDoelTijd("")}
                     className="mt-1.5 px-3 py-2 text-xs text-red-400/70 bg-red-500/8 border border-red-500/10 rounded-lg hover:bg-red-500/15 transition-colors cursor-pointer min-h-[40px]"
                   >
@@ -429,17 +571,27 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                     const xpVals = { makkelijk: 5, normaal: 10, moeilijk: 20 };
                     return (
                       <button
+                        type="button"
                         key={m}
                         onClick={() => setMoeilijkheid(m)}
+                        aria-pressed={moeilijkheid === m}
                         className="py-2.5 rounded-lg text-xs font-medium transition-all min-h-[44px] flex flex-col items-center gap-0.5"
                         style={{
-                          background: moeilijkheid === m ? "rgba(249,115,22,0.10)" : "rgba(255,255,255,0.03)",
-                          border: moeilijkheid === m ? "1px solid rgba(249,115,22,0.20)" : "1px solid rgba(255,255,255,0.05)",
+                          background:
+                            moeilijkheid === m
+                              ? "rgba(249,115,22,0.10)"
+                              : "rgba(255,255,255,0.03)",
+                          border:
+                            moeilijkheid === m
+                              ? "1px solid rgba(249,115,22,0.20)"
+                              : "1px solid rgba(255,255,255,0.05)",
                           color: moeilijkheid === m ? "#f97316" : "#94a3b8",
                         }}
                       >
                         <span>{MOEILIJKHEID_LABELS[m]}</span>
-                        <span className="text-[9px] opacity-60">{xpVals[m]} XP</span>
+                        <span className="text-[9px] opacity-60">
+                          {xpVals[m]} XP
+                        </span>
                       </button>
                     );
                   })}
@@ -448,16 +600,25 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
 
               {/* Kleur */}
               <div className="mb-6">
-                <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block mb-2">Kleur</label>
+                <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block mb-2">
+                  Kleur
+                </label>
                 <div className="flex gap-2.5 flex-wrap">
                   {HABIT_COLORS.map((c) => (
                     <button
+                      type="button"
                       key={c}
                       onClick={() => setKleur(c)}
+                      aria-label={`Kleur ${c}`}
+                      aria-pressed={kleur === c}
+                      title={`Kleur ${c}`}
                       className="w-10 h-10 rounded-full transition-all active:scale-90 cursor-pointer"
                       style={{
                         background: c,
-                        border: kleur === c ? "3px solid white" : "2px solid rgba(255,255,255,0.1)",
+                        border:
+                          kleur === c
+                            ? "3px solid white"
+                            : "2px solid rgba(255,255,255,0.1)",
                         transform: kleur === c ? "scale(1.15)" : "scale(1)",
                       }}
                     />
@@ -469,7 +630,9 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
             {/* Submit button — above mobile nav, outside the scroll area */}
             <div
               className="shrink-0 border-t border-[var(--color-border)] bg-[rgba(15,15,20,0.98)] p-4"
-              style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))" }}
+              style={{
+                paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
+              }}
             >
               {submitError && (
                 <p className="mb-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-200">
@@ -477,16 +640,23 @@ export function HabitForm({ open, onClose, onSubmit, initial }: HabitFormProps) 
                 </p>
               )}
               <button
+                type="button"
                 onClick={handleSubmit}
                 disabled={!naam.trim() || isSubmitting}
                 className="w-full py-4 rounded-2xl text-sm font-bold transition-all min-h-[56px] active:scale-[0.97] disabled:opacity-30 cursor-pointer"
                 style={{
-                  background: naam.trim() ? "linear-gradient(135deg, #f97316, #f59e0b)" : "rgba(255,255,255,0.05)",
+                  background: naam.trim()
+                    ? "linear-gradient(135deg, #f97316, #f59e0b)"
+                    : "rgba(255,255,255,0.05)",
                   color: naam.trim() ? "white" : "#64748b",
                 }}
               >
                 <Plus size={16} className="inline mr-2" />
-                {isSubmitting ? "Opslaan..." : initial ? "Opslaan" : "Habit toevoegen"}
+                {isSubmitting
+                  ? "Opslaan..."
+                  : initial
+                    ? "Opslaan"
+                    : "Habit toevoegen"}
               </button>
             </div>
           </motion.div>

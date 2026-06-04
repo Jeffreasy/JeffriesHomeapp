@@ -115,7 +115,13 @@ export type HabitCreateData = {
   emoji: string;
   type: "positief" | "negatief";
   beschrijving?: string;
-  frequentie: "dagelijks" | "weekdagen" | "weekenddagen" | "aangepast" | "x_per_week" | "x_per_maand";
+  frequentie:
+    | "dagelijks"
+    | "weekdagen"
+    | "weekenddagen"
+    | "aangepast"
+    | "x_per_week"
+    | "x_per_maand";
   aangepaste_dagen?: number[];
   aangepasteDagen?: number[];
   doel_aantal?: number;
@@ -249,6 +255,40 @@ function toStats(data: unknown): HabitStatsRecord | undefined {
   };
 }
 
+const HABIT_QUERY_KEYS = [
+  ["/habits"],
+  ["/habits/for-date"],
+  ["/habits/stats"],
+  ["/habits/badges"],
+  ["/habits/heatmap"],
+] as const;
+
+function toApiPayload(data: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined),
+  );
+}
+
+function toHabitPayload(data: Partial<HabitCreateData>): ModelHabit {
+  return toApiPayload({
+    naam: data.naam,
+    emoji: data.emoji,
+    type: data.type,
+    beschrijving: data.beschrijving,
+    frequentie: data.frequentie,
+    aangepaste_dagen: data.aangepaste_dagen ?? data.aangepasteDagen,
+    doel_aantal: data.doel_aantal ?? data.doelAantal,
+    rooster_filter: data.rooster_filter ?? data.roosterFilter,
+    is_kwantitatief: data.is_kwantitatief ?? data.isKwantitatief,
+    doel_waarde: data.doel_waarde ?? data.doelWaarde,
+    eenheid: data.eenheid,
+    doel_tijd: data.doel_tijd ?? data.doelTijd,
+    moeilijkheid: data.moeilijkheid,
+    financie_categorie: data.financie_categorie ?? data.financieCategorie,
+    kleur: data.kleur,
+  }) as ModelHabit;
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useHabits(datum?: string) {
@@ -258,38 +298,71 @@ export function useHabits(datum?: string) {
 
   const queryParams = useMemo(
     () => ({ userId, datum: datum ?? new Date().toISOString().slice(0, 10) }),
-    [userId, datum]
+    [userId, datum],
   );
-  
-  const { data: allHabitsRaw, isLoading: loadingHabits } = useGetHabits({ userId }, { query: { enabled: !!userId } });
-  const { data: statsRaw, isLoading: loadingStats } = useGetHabitsStats({ userId }, { query: { enabled: !!userId } });
-  const { data: badgesRaw, isLoading: loadingBadges } = useGetHabitsBadges({ userId }, { query: { enabled: !!userId } });
-  const { data: forDateRaw, isLoading: loadingForDate } = useGetHabitsForDate(queryParams, { query: { enabled: !!userId } });
 
-  const allHabits = useMemo<HabitRecord[]>(() => (Array.isArray(allHabitsRaw?.data) ? allHabitsRaw.data as ModelHabit[] : []).map(toRecord), [allHabitsRaw]);
+  const { data: allHabitsRaw, isLoading: loadingHabits } = useGetHabits(
+    { userId },
+    { query: { enabled: !!userId } },
+  );
+  const { data: statsRaw, isLoading: loadingStats } = useGetHabitsStats(
+    { userId },
+    { query: { enabled: !!userId } },
+  );
+  const { data: badgesRaw, isLoading: loadingBadges } = useGetHabitsBadges(
+    { userId },
+    { query: { enabled: !!userId } },
+  );
+  const { data: forDateRaw, isLoading: loadingForDate } = useGetHabitsForDate(
+    queryParams,
+    { query: { enabled: !!userId } },
+  );
+
+  const allHabits = useMemo<HabitRecord[]>(
+    () =>
+      (Array.isArray(allHabitsRaw?.data)
+        ? (allHabitsRaw.data as ModelHabit[])
+        : []
+      ).map(toRecord),
+    [allHabitsRaw],
+  );
   const stats = useMemo(() => toStats(statsRaw?.data), [statsRaw]);
-  const badges = useMemo<HabitBadgeRecord[]>(() => (Array.isArray(badgesRaw?.data) ? badgesRaw.data as ModelHabitBadge[] : []).map(toBadge), [badgesRaw]);
-  
+  const badges = useMemo<HabitBadgeRecord[]>(
+    () =>
+      (Array.isArray(badgesRaw?.data)
+        ? (badgesRaw.data as ModelHabitBadge[])
+        : []
+      ).map(toBadge),
+    [badgesRaw],
+  );
+
   const todayHabits = useMemo<HabitWithLogRecord[]>(() => {
-    const forDateData = forDateRaw?.data as { habits?: HabitWithLogApiRow[] } | undefined;
-    return Array.isArray(forDateData?.habits) ? forDateData.habits.map(toWithLog) : [];
+    const forDateData = forDateRaw?.data as
+      | { habits?: HabitWithLogApiRow[] }
+      | undefined;
+    return Array.isArray(forDateData?.habits)
+      ? forDateData.habits.map(toWithLog)
+      : [];
   }, [forDateRaw]);
 
   const level = useMemo(() => {
-    if (!stats) return { level: 1, xp: 0, nextXP: 100, progress: 0, titel: "Beginner" };
+    if (!stats)
+      return { level: 1, xp: 0, nextXP: 100, progress: 0, titel: "Beginner" };
     return getLevel(stats.totaal_xp || 0);
   }, [stats]);
 
   const todaySummary = useMemo(() => {
     const due = todayHabits.length;
-    const completed = todayHabits.filter((h) =>
-      h.log?.voltooid || (h.type === "negatief" && !h.log?.isIncident)
+    const completed = todayHabits.filter(
+      (h) => h.log?.voltooid || (h.type === "negatief" && !h.log?.isIncident),
     ).length;
     return { due, completed, rate: due > 0 ? completed / due : 0 };
   }, [todayHabits]);
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ["/habits"] });
+    for (const queryKey of HABIT_QUERY_KEYS) {
+      queryClient.invalidateQueries({ queryKey });
+    }
   };
 
   return {
@@ -303,35 +376,41 @@ export function useHabits(datum?: string) {
     isLoading: loadingHabits || loadingStats || loadingBadges || loadingForDate,
 
     create: async (data: HabitCreateData) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await postHabits(data as any, { userId });
+      await postHabits(toHabitPayload(data), { userId });
       invalidateAll();
     },
     update: async (id: string, data: Partial<HabitCreateData>) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await patchHabitsId(id, data as any);
+      await patchHabitsId(id, toHabitPayload(data) as Record<string, unknown>);
       invalidateAll();
     },
     toggle: async (habitId: string, waarde?: number, notitie?: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await postHabitsIdToggle(habitId, { datum: queryParams.datum, waarde, notitie } as any, { userId });
+      await postHabitsIdToggle(
+        habitId,
+        toApiPayload({ datum: queryParams.datum, waarde, notitie }),
+        { userId },
+      );
       invalidateAll();
     },
     increment: async (habitId: string, stap: number) => {
-      const habit = todayHabits.find((h: HabitWithLogRecord) => h.id === habitId);
+      const habit = todayHabits.find(
+        (h: HabitWithLogRecord) => h.id === habitId,
+      );
       const currentVal = habit?.log?.waarde ?? 0;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await postHabitsIdToggle(habitId, { datum: queryParams.datum, waarde: currentVal + stap } as any, { userId });
+      await postHabitsIdToggle(
+        habitId,
+        toApiPayload({ datum: queryParams.datum, waarde: currentVal + stap }),
+        { userId },
+      );
       invalidateAll();
     },
     incident: async (habitId: string, trigger?: string, notitie?: string) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await postHabitsIdIncident(habitId, { trigger, notitie } as any, { userId });
+      await postHabitsIdIncident(habitId, toApiPayload({ trigger, notitie }), {
+        userId,
+      });
       invalidateAll();
     },
     reorder: async (items: Array<{ id: string; volgorde: number }>) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await postHabitsReorder({ items } as any);
+      await postHabitsReorder({ items });
       invalidateAll();
     },
     pause: async (id: string) => {

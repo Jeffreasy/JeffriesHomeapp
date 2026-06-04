@@ -1,10 +1,36 @@
 "use client";
 
-import { AlertTriangle, ChevronLeft, ChevronRight, Flame, LayoutGrid, ShieldCheck, Target } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Flame,
+  LayoutGrid,
+  ShieldCheck,
+  Target,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { formatDateLabel } from "./HabitsUtils";
 import { MetricCard } from "./HabitsCards";
+import type { HabitRecord } from "@/hooks/useHabits";
+
+type TodaySummary = {
+  due: number;
+  completed: number;
+  rate: number;
+};
+
+type GroupedHabits = {
+  actief: HabitRecord[];
+  gepauzeerd: HabitRecord[];
+};
+
+type DayHealth = {
+  incidents: number;
+  negativeClear: number;
+  openPositive: number;
+};
 
 export function HabitsDashboardSummary({
   activeDate,
@@ -26,12 +52,12 @@ export function HabitsDashboardSummary({
   disableNext: boolean;
   moveDate: (days: number) => void;
   resetDate: () => void;
-  todaySummary: any;
+  todaySummary: TodaySummary;
   completionPct: number;
   privacyOn: boolean;
-  groupedHabits: any;
-  dayHealth: any;
-  habits: any[];
+  groupedHabits: GroupedHabits;
+  dayHealth: DayHealth;
+  habits: HabitRecord[];
 }) {
   return (
     <>
@@ -39,7 +65,9 @@ export function HabitsDashboardSummary({
         <div className="glass p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-500">Dagstatus</p>
+              <p className="text-xs font-semibold uppercase text-slate-500">
+                Dagstatus
+              </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
@@ -53,6 +81,7 @@ export function HabitsDashboardSummary({
                 <button
                   type="button"
                   onClick={resetDate}
+                  aria-label="Terug naar vandaag"
                   className={cn(
                     "inline-flex h-10 min-w-36 items-center justify-center rounded-lg border px-4 text-sm font-semibold transition-colors",
                     isToday
@@ -80,13 +109,23 @@ export function HabitsDashboardSummary({
                 <span className="font-semibold text-slate-400">
                   {todaySummary.completed}/{todaySummary.due} voltooid
                 </span>
-                <span className={cn("font-bold", completionPct === 100 ? "text-emerald-300" : "text-amber-300")}>
+                <span
+                  className={cn(
+                    "font-bold",
+                    completionPct === 100
+                      ? "text-emerald-300"
+                      : "text-amber-300",
+                  )}
+                >
                   {completionPct}%
                 </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.06)]">
                 <motion.div
-                  className={cn("h-full rounded-full", completionPct === 100 ? "bg-emerald-400" : "bg-amber-400")}
+                  className={cn(
+                    "h-full rounded-full",
+                    completionPct === 100 ? "bg-emerald-400" : "bg-amber-400",
+                  )}
                   initial={{ width: 0 }}
                   animate={{ width: `${completionPct}%` }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
@@ -102,8 +141,12 @@ export function HabitsDashboardSummary({
               <ShieldCheck size={18} className="text-indigo-200" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-indigo-200/70">Privacy</p>
-              <p className="mt-1 text-lg font-bold text-white">{privacyOn ? "Verborgen" : "Zichtbaar"}</p>
+              <p className="text-xs font-semibold uppercase text-indigo-200/70">
+                Privacy
+              </p>
+              <p className="mt-1 text-lg font-bold text-white">
+                {privacyOn ? "Verborgen" : "Zichtbaar"}
+              </p>
               <p className="mt-1 text-sm text-indigo-100/60">
                 {privacyOn ? "Prive modus actief" : "Details zichtbaar"}
               </p>
@@ -113,10 +156,30 @@ export function HabitsDashboardSummary({
       </section>
 
       <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Target} label="Vandaag" value={`${todaySummary.completed}/${todaySummary.due}`} tone="amber" />
-        <MetricCard icon={LayoutGrid} label="Actief" value={groupedHabits.actief.length.toString()} tone="sky" />
-        <MetricCard icon={AlertTriangle} label="Incidenten" value={dayHealth.incidents.toString()} tone={dayHealth.incidents > 0 ? "rose" : "green"} />
-        <MetricCard icon={Flame} label="Record" value={`${Math.max(0, ...habits.map(h => h.langsteStreak))}d`} tone="green" />
+        <MetricCard
+          icon={Target}
+          label="Vandaag"
+          value={`${todaySummary.completed}/${todaySummary.due}`}
+          tone="amber"
+        />
+        <MetricCard
+          icon={LayoutGrid}
+          label="Actief"
+          value={groupedHabits.actief.length.toString()}
+          tone="sky"
+        />
+        <MetricCard
+          icon={AlertTriangle}
+          label="Incidenten"
+          value={dayHealth.incidents.toString()}
+          tone={dayHealth.incidents > 0 ? "rose" : "green"}
+        />
+        <MetricCard
+          icon={Flame}
+          label="Record"
+          value={`${Math.max(0, ...habits.map((h) => h.langsteStreak))}d`}
+          tone="green"
+        />
       </section>
     </>
   );
