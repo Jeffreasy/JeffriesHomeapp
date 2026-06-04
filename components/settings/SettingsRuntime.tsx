@@ -3,6 +3,7 @@
 import { Activity, AlertTriangle, CheckCircle2, Gauge, Hourglass, Lightbulb, Loader2, Network, PlugZap, RadioTower, Smartphone } from "lucide-react";
 import { EmptyState, Panel, SectionHeader, StatusMetric, StatusPill, StatusRow } from "./SettingsCards";
 import { formatDateTime } from "./SettingsUtils";
+import type { PendingAIAction } from "@/lib/api";
 
 export function SettingsRuntime({
   overview,
@@ -67,7 +68,7 @@ export function SettingsPendingActions({
   handleCancelPending,
   handleConfirmPending,
 }: {
-  pendingActions: any[];
+  pendingActions: PendingAIAction[];
   pendingBusyId: string | null;
   handleCancelPending: (id: string) => void;
   handleConfirmPending: (id: string) => void;
@@ -85,7 +86,7 @@ export function SettingsPendingActions({
           <EmptyState icon={CheckCircle2} title="Geen openstaande Grok-acties" />
         ) : (
           pendingActions.map((action) => (
-            <div key={action._id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 min-w-0">
+            <div key={action.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 min-w-0">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase text-amber-200">{action.code}</p>
@@ -97,19 +98,19 @@ export function SettingsPendingActions({
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleCancelPending(action._id)}
-                    disabled={pendingBusyId === action._id}
+                    onClick={() => handleCancelPending(action.id)}
+                    disabled={pendingBusyId === action.id}
                     className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-bold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
                   >
                     Annuleer
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleConfirmPending(action._id)}
-                    disabled={pendingBusyId === action._id}
+                    onClick={() => handleConfirmPending(action.id)}
+                    disabled={pendingBusyId === action.id}
                     className="inline-flex h-9 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 text-xs font-bold text-emerald-200 transition-colors hover:bg-emerald-500/15 disabled:opacity-50"
                   >
-                    {pendingBusyId === action._id && <Loader2 size={13} className="animate-spin" />}
+                    {pendingBusyId === action.id && <Loader2 size={13} className="animate-spin" />}
                     Uitvoeren
                   </button>
                 </div>

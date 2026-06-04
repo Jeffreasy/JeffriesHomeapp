@@ -635,10 +635,46 @@ export const laventecareApi = {
 
 // ─── Settings & Sync ──────────────────────────────────────────────────────────
 
+export interface PendingAIAction {
+  id: string;
+  userId: string;
+  agentId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  summary: string;
+  code: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface PendingAIActionResult {
+  ok: boolean;
+  id: string;
+  agentId: string;
+  toolName: string;
+  summary: string;
+  code: string;
+  status: string;
+  expiresAt: string;
+  result?: string | null;
+  error?: string | null;
+}
+
 export const settingsApi = {
 	overview: () => apiFetch<any>("/settings/overview"),
 	telegramStatus: () => apiFetch<any>("/settings/telegram/status"),
 	aiDiagnostics: () => apiFetch<unknown>("/settings/ai/diagnostics"),
+	pendingActions: (userId: string) =>
+		apiFetch<PendingAIAction[]>(`/ai/pending?userId=${encodeURIComponent(userId)}`),
+	confirmPendingAction: (userId: string, id: string) =>
+		apiFetch<PendingAIActionResult>(`/ai/pending/${encodeURIComponent(id)}/confirm?userId=${encodeURIComponent(userId)}`, {
+			method: "POST",
+		}),
+	cancelPendingAction: (userId: string, id: string) =>
+		apiFetch<PendingAIActionResult>(`/ai/pending/${encodeURIComponent(id)}/cancel?userId=${encodeURIComponent(userId)}`, {
+			method: "POST",
+		}),
 	// Backup returns a Blob, so we can't use apiFetch which assumes JSON if it's not a download.
 	// But apiFetch doesn't handle Blobs yet. For now, we will handle download separately in component or just get JSON.
 	backup: (userId: string) => apiFetch<any>(`/settings/backup?userId=${userId}`),

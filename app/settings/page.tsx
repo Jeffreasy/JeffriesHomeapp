@@ -78,11 +78,15 @@ export default function SettingsPage() {
     refetchInterval: 10000,
   });
 
-  const confirmPendingAction = async (_args: Record<string, unknown>) => ({ summary: "Functie nog niet gemigreerd" });
+  const { data: pendingActions = [], refetch: refetchPendingActions } = useQuery({
+    queryKey: ["ai-pending-actions", user?.id],
+    queryFn: () => settingsApi.pendingActions(user!.id),
+    enabled: Boolean(user?.id),
+    refetchInterval: 6000,
+  });
+
   const telegramStatusAction = async () => settingsApi.telegramStatus();
-  const cancelPendingAction = async (_args: Record<string, unknown>) => ({});
   const updatePrivacySettings = async (_args: Record<string, unknown>) => ({});
-  const pendingActions: any[] = [];
   const auditLogs: any[] = [];
   const privacySettings = undefined as any;
 
@@ -210,8 +214,10 @@ export default function SettingsPage() {
   const handleConfirmPending = async (id: string) => {
     setPendingBusyId(id);
     try {
-      const result = await confirmPendingAction({ id }) as { summary?: string };
+      if (!user?.id) throw new Error("Niet ingelogd");
+      const result = await settingsApi.confirmPendingAction(user.id, id);
       success(result.summary ?? "Actie uitgevoerd");
+      await Promise.allSettled([refetchPendingActions()]);
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Bevestigen mislukt");
     } finally {
@@ -222,8 +228,10 @@ export default function SettingsPage() {
   const handleCancelPending = async (id: string) => {
     setPendingBusyId(id);
     try {
-      await cancelPendingAction({ id });
+      if (!user?.id) throw new Error("Niet ingelogd");
+      await settingsApi.cancelPendingAction(user.id, id);
       success("Actie geannuleerd");
+      await refetchPendingActions();
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Annuleren mislukt");
     } finally {
@@ -432,16 +440,14 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {pendingActions.length > 0 ? (
-          <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-            <SettingsPendingActions
-              pendingActions={pendingActions}
-              pendingBusyId={pendingBusyId}
-              handleCancelPending={handleCancelPending}
-              handleConfirmPending={handleConfirmPending}
-            />
-          </section>
-        ) : null}
+        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <SettingsPendingActions
+            pendingActions={pendingActions}
+            pendingBusyId={pendingBusyId}
+            handleCancelPending={handleCancelPending}
+            handleConfirmPending={handleConfirmPending}
+          />
+        </section>
 
         <CollapsibleSection
           title="Apparaat & Kamerbeheer"
