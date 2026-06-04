@@ -196,6 +196,7 @@ export function TimelineDay({
       <div className="space-y-1 ml-0 sm:ml-1">
         {events.map((event) => {
           const linkedNotes = notesByEventId?.get(event.eventId) ?? [];
+          const isRooster = event.kalender === "Rooster";
           return (
             <div key={event.eventId} className="group/event">
               <PersonalEventItem
@@ -225,7 +226,7 @@ export function TimelineDay({
                       className="inline-flex items-center gap-1 rounded-md bg-cyan-500/10 px-1.5 py-1 text-[10px] font-medium text-cyan-200 transition-colors hover:bg-cyan-500/15 cursor-pointer"
                     >
                       <Plus size={10} />
-                      Notitie bij afspraak
+                      Notitie bij {isRooster ? "dienst" : "afspraak"}
                     </button>
                   )}
                 </div>

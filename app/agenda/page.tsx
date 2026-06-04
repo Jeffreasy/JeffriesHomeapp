@@ -22,6 +22,7 @@ import { AnimatePresence } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { syncApi, type SyncStatusResult } from "@/lib/api";
+import { getHistory as getDienstHistory, type DienstRow } from "@/lib/schedule";
 import {
   getDisplayEndDate,
   usePersonalEvents,
@@ -29,6 +30,7 @@ import {
 } from "@/hooks/usePersonalEvents";
 import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
+import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import { getDisplayTitle } from "@/components/notes/NotesUtils";
 import { groupNotesByDate, groupNotesByEventId } from "@/components/notes/NoteAgendaUtils";
@@ -61,6 +63,61 @@ type TimelineGroup = {
 
 function sortByStart(a: PersonalEvent, b: PersonalEvent) {
   return `${a.startTijd || "00:00"}-${a.titel}`.localeCompare(`${b.startTijd || "00:00"}-${b.titel}`);
+}
+
+function dienstToTimelineEvent(dienst: DienstRow): PersonalEvent {
+  const title = dienst.titel || dienst.shiftType || "Dienst";
+  const endDate = dienst.eindDatum || dienst.startDatum;
+  return {
+    _id: dienst.eventId,
+    userId: "",
+    eventId: dienst.eventId,
+    titel: title,
+    startDatum: dienst.startDatum,
+    startTijd: dienst.startTijd || undefined,
+    eindDatum: endDate,
+    eindTijd: dienst.eindTijd || undefined,
+    heledag: dienst.heledag,
+    locatie: dienst.locatie || undefined,
+    beschrijving: dienst.beschrijving || undefined,
+    symbol: "schedule",
+    status: dienst.status === "Gedraaid" ? "Voorbij" : dienst.status === "VERWIJDERD" ? "VERWIJDERD" : "Aankomend",
+    kalender: "Rooster",
+    shiftType: dienst.shiftType,
+    team: dienst.team,
+  };
+}
+
+function mergeTimelineEvents(...groups: PersonalEvent[][]): PersonalEvent[] {
+  const byId = new Map<string, PersonalEvent>();
+  for (const group of groups) {
+    for (const event of group) {
+      const key = `${event.kalender}:${event.eventId}`;
+      if (!byId.has(key)) byId.set(key, event);
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => (
+    `${a.startDatum || "9999-12-31"}T${a.startTijd || "00:00"}`.localeCompare(`${b.startDatum || "9999-12-31"}T${b.startTijd || "00:00"}`) ||
+    a.titel.localeCompare(b.titel)
+  ));
+}
+
+function splitEventCounts(events: PersonalEvent[]) {
+  let appointments = 0;
+  let shifts = 0;
+  for (const event of events) {
+    if (event.kalender === "Rooster") shifts += 1;
+    else appointments += 1;
+  }
+  return { appointments, shifts };
+}
+
+function formatSplitCounts(events: PersonalEvent[]) {
+  const { appointments, shifts } = splitEventCounts(events);
+  const parts = [];
+  if (appointments > 0) parts.push(`${appointments} ${appointments === 1 ? "afspraak" : "afspraken"}`);
+  if (shifts > 0) parts.push(`${shifts} ${shifts === 1 ? "dienst" : "diensten"}`);
+  return parts.length > 0 ? parts.join(" · ") : "geen items";
 }
 
 function groupByDate(events: PersonalEvent[], todayIso: string, direction: "asc" | "desc" = "asc", forcedDate?: string): TimelineGroup[] {
@@ -97,7 +154,13 @@ function viewEmptyCopy(view: AgendaView) {
 export default function AgendaPage() {
   const { user } = useUser();
   const { success, error: toastError, toast } = useToast();
-  const { diensten, refetch: refetchDiensten } = useSchedule();
+  const {
+    diensten,
+    nextDienst,
+    upcoming: upcomingDiensten,
+    isLoading: scheduleLoading,
+    refetch: refetchDiensten,
+  } = useSchedule();
   const {
     active: activeNotes,
     create: createNote,
@@ -114,6 +177,7 @@ export default function AgendaPage() {
     upcoming,
     pending,
     history,
+    eventsByDate,
     withConflicts,
     conflictMap,
     nextAppointment,
@@ -142,31 +206,64 @@ export default function AgendaPage() {
 
   // ─── Computed data ──────────────────────────────────────────────────────
 
+  const upcomingDienstEvents = useMemo(
+    () => upcomingDiensten.map(dienstToTimelineEvent),
+    [upcomingDiensten],
+  );
+  const historyDienstEvents = useMemo(
+    () => getDienstHistory(diensten, 30).map(dienstToTimelineEvent),
+    [diensten],
+  );
+
   const todayEvents = useMemo(
     () => upcoming.filter((e) => eventCoversDate(e, todayIso)),
     [todayIso, upcoming],
+  );
+  const todayDienstEvents = useMemo(
+    () => upcomingDienstEvents.filter((event) => eventCoversDate(event, todayIso)),
+    [todayIso, upcomingDienstEvents],
+  );
+  const todayTimelineEvents = useMemo(
+    () => mergeTimelineEvents(todayDienstEvents, todayEvents),
+    [todayDienstEvents, todayEvents],
+  );
+  const upcomingTimelineEvents = useMemo(
+    () => mergeTimelineEvents(upcomingDienstEvents, upcoming),
+    [upcomingDienstEvents, upcoming],
+  );
+  const historyTimelineEvents = useMemo(
+    () => mergeTimelineEvents(history, historyDienstEvents).sort((a, b) => (
+      `${getDisplayEndDate(b) || b.startDatum || "0000-00-00"}T${b.eindTijd || "23:59"}`.localeCompare(`${getDisplayEndDate(a) || a.startDatum || "0000-00-00"}T${a.eindTijd || "23:59"}`) ||
+      b.titel.localeCompare(a.titel)
+    )),
+    [history, historyDienstEvents],
   );
   const notesByDate = useMemo(() => groupNotesByDate(activeNotes), [activeNotes]);
   const notesByEventId = useMemo(() => groupNotesByEventId(activeNotes), [activeNotes]);
   const todayNotes = notesByDate.get(todayIso) ?? [];
 
   const monthEvents = useMemo(
-    () => upcoming.filter((e) => getDisplayEndDate(e) >= todayIso && e.startDatum <= monthEndIso),
-    [monthEndIso, todayIso, upcoming],
+    () => upcomingTimelineEvents.filter((e) => getDisplayEndDate(e) >= todayIso && e.startDatum <= monthEndIso),
+    [monthEndIso, todayIso, upcomingTimelineEvents],
+  );
+
+  const noteEventOptions = useMemo(
+    () => mergeTimelineEvents(agendaEvents, upcomingDienstEvents, historyDienstEvents),
+    [agendaEvents, historyDienstEvents, upcomingDienstEvents],
   );
 
   const viewEvents = useMemo(() => {
     switch (activeView) {
       case "today":
-        return todayEvents;
+        return todayTimelineEvents;
       case "pending":
         return pending;
       case "history":
-        return history.slice(0, 30);
+        return historyTimelineEvents.slice(0, 60);
       default:
-        return upcoming;
+        return upcomingTimelineEvents;
     }
-  }, [activeView, history, pending, todayEvents, upcoming]);
+  }, [activeView, historyTimelineEvents, pending, todayTimelineEvents, upcomingTimelineEvents]);
 
   const timelineGroups = useMemo(() => {
     const groups = groupByDate(viewEvents, todayIso, activeView === "history" ? "desc" : "asc", activeView === "today" ? todayIso : undefined);
@@ -182,14 +279,16 @@ export default function AgendaPage() {
   }, [activeView, todayIso, todayNotes.length, viewEvents]);
 
   const viewTabs = useMemo(() => [
-    { id: "today" as const, label: "Vandaag", count: todayEvents.length, icon: CalendarDays },
-    { id: "upcoming" as const, label: "Komend", count: upcoming.length, icon: ListChecks },
+    { id: "today" as const, label: "Vandaag", count: todayTimelineEvents.length, icon: CalendarDays },
+    { id: "upcoming" as const, label: "Komend", count: upcomingTimelineEvents.length, icon: ListChecks },
     { id: "pending" as const, label: "Wachtrij", count: pending.length, icon: Zap },
-    { id: "history" as const, label: "Historie", count: history.length, icon: Archive },
-  ], [history.length, pending.length, todayEvents.length, upcoming.length]);
+    { id: "history" as const, label: "Historie", count: historyTimelineEvents.length, icon: Archive },
+  ], [historyTimelineEvents.length, pending.length, todayTimelineEvents.length, upcomingTimelineEvents.length]);
 
   const emptyCopy = viewEmptyCopy(activeView);
   const activeViewMeta = viewTabs.find((tab) => tab.id === activeView) ?? viewTabs[0];
+  const todaySplit = splitEventCounts(todayTimelineEvents);
+  const monthSplit = splitEventCounts(monthEvents);
 
   // ─── Actions ────────────────────────────────────────────────────────────
 
@@ -210,12 +309,13 @@ export default function AgendaPage() {
   };
 
   const openNewNoteForEvent = (event: PersonalEvent) => {
+    const isRooster = event.kalender === "Rooster";
     setEditNote(null);
     setNoteDefaults({
       deadline: `${event.startDatum}T${event.startTijd || "09:00"}`,
       linkedEventId: event.eventId,
-      tags: ["agenda"],
-      title: `Notitie bij ${event.titel}`,
+      tags: isRooster ? ["agenda", "dienst"] : ["agenda"],
+      title: isRooster ? `Notitie bij dienst: ${event.shiftType || event.titel}` : `Notitie bij ${event.titel}`,
     });
     setNoteEditorOpen(true);
   };
@@ -266,7 +366,9 @@ export default function AgendaPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-base font-semibold text-white sm:text-lg">Agenda</h1>
-              <p className="mt-0.5 truncate text-xs text-slate-500">{formatDateLabel(todayIso)}</p>
+              <p className="mt-0.5 truncate text-xs text-slate-500">
+                {formatDateLabel(todayIso)} · {formatSplitCounts(todayTimelineEvents)}
+              </p>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
@@ -326,7 +428,10 @@ export default function AgendaPage() {
             className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors hover:bg-white/[0.045] cursor-pointer"
           >
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Vandaag</p>
-            <p className="mt-1 text-lg font-semibold text-white tabular-nums">{todayEvents.length}</p>
+            <p className="mt-1 text-lg font-semibold text-white tabular-nums">{todayTimelineEvents.length}</p>
+            <p className="mt-0.5 truncate text-[10px] text-slate-600">
+              {todaySplit.appointments} afspraken · {todaySplit.shifts} diensten
+            </p>
           </button>
           <button
             onClick={() => setActiveView("upcoming")}
@@ -334,6 +439,9 @@ export default function AgendaPage() {
           >
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">30 dagen</p>
             <p className="mt-1 text-lg font-semibold text-white tabular-nums">{monthEvents.length}</p>
+            <p className="mt-0.5 truncate text-[10px] text-slate-600">
+              {monthSplit.appointments} afspraken · {monthSplit.shifts} diensten
+            </p>
           </button>
           <button
             onClick={() => setActiveView(withConflicts.length > 0 ? "upcoming" : activeView)}
@@ -361,7 +469,7 @@ export default function AgendaPage() {
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold text-white">{activeViewMeta.label}</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  {viewEvents.length} {viewEvents.length === 1 ? "item" : "items"}
+                  {formatSplitCounts(viewEvents)}
                 </p>
               </div>
               {activeView !== "today" && (
@@ -384,7 +492,7 @@ export default function AgendaPage() {
                   </div>
                 </div>
               </Panel>
-            ) : isLoading ? (
+            ) : isLoading || scheduleLoading ? (
               <div className="space-y-4">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="space-y-2">
@@ -439,6 +547,13 @@ export default function AgendaPage() {
 
           {/* ── Sidebar ──────────────────────────────────────────────── */}
           <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+
+            <NextShiftCard
+              dienst={nextDienst}
+              compact
+              afspraken={nextDienst ? (eventsByDate[nextDienst.startDatum] ?? []) : []}
+              conflictMap={conflictMap}
+            />
 
             <NextEventCard event={nextAppointment} />
 
@@ -602,7 +717,7 @@ export default function AgendaPage() {
             onToggleComplete={toggleCompleteNote}
             onLoadRevisions={noteRevisions}
             onRestoreRevision={restoreNoteRevision}
-            eventOptions={agendaEvents}
+            eventOptions={noteEventOptions}
             initialDeadline={noteDefaults.deadline}
             initialLinkedEventId={noteDefaults.linkedEventId}
             initialTags={noteDefaults.tags}
