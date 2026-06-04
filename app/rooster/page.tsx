@@ -364,7 +364,7 @@ export default function RoosterPage() {
             {tab === "salaris" && (
               <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5">
                 <ErrorBoundary>
-                  <SalarisView />
+                  <SalarisView diensten={diensten} />
                 </ErrorBoundary>
               </div>
             )}

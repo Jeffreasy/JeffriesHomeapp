@@ -29,6 +29,14 @@ export interface SalarisRecord {
   ortDetail?:      string;
   eenmaligDetail?: string;
   berekendOp:      string;
+  generatedFromSchedule?: boolean;
+  totaalUren?: number;
+  contractUren?: number;
+  contractUrenPerWeek?: number;
+  extraUren?: number;
+  ortUren?: number;
+  ortUrenDetail?: string;
+  salarisCalibratie?: string;
 }
 
 function fromRow(r: ModelSalary): SalarisRecord {

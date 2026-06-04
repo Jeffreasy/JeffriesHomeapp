@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SalarisRecord } from "@/hooks/useSalary";
 import type { LoonstrookRecord } from "@/hooks/useLoonstroken";
@@ -17,21 +18,33 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
   const ort: Record<string, number> = useMemo(() => {
     try { return record.ortDetail ? JSON.parse(record.ortDetail) : {}; } catch { return {}; }
   }, [record.ortDetail]);
+  const ortHours: Record<string, number> = useMemo(() => {
+    try { return record.ortUrenDetail ? JSON.parse(record.ortUrenDetail) : {}; } catch { return {}; }
+  }, [record.ortUrenDetail]);
+  const isRoosterForecast = Boolean(record.generatedFromSchedule);
+  const hasHourMetrics = typeof record.totaalUren === "number";
 
   return (
     <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4 min-w-0">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] text-amber-400/70 uppercase tracking-wider">
-            {isWerkelijk ? "Werkelijke loonstrook" : "Lopende maand prognose"}
+            {isWerkelijk ? "Werkelijke loonstrook" : isRoosterForecast ? "Roosterprognose" : "Lopende maand prognose"}
           </p>
           <p className="text-lg font-bold text-amber-300">
             {MAANDEN[record.maand - 1]} {record.jaar}
           </p>
         </div>
-        <span className="text-[10px] text-slate-600 bg-[var(--color-surface)] px-2 py-1 rounded-lg">
-          uurloon ORT €{record.uurloonORT.toFixed(2)}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-[10px] text-slate-500 bg-[var(--color-surface)] px-2 py-1 rounded-lg">
+            uurloon ORT €{record.uurloonORT.toFixed(2)}
+          </span>
+          {record.salarisCalibratie && (
+            <span className="text-[9px] text-slate-600">
+              {record.salarisCalibratie}
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -45,9 +58,20 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
         </div>
       </div>
 
+      {hasHourMetrics && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <MetricPill label="Gewerkt" value={`${formatHours(record.totaalUren ?? 0)}u`} />
+          <MetricPill label="Contract" value={`${formatHours(record.contractUren ?? 0)}u`} />
+          <MetricPill label="Extra" value={`${formatHours(record.extraUren ?? 0)}u`} accent={(record.extraUren ?? 0) > 0} />
+          <MetricPill label="ORT" value={`${formatHours(record.ortUren ?? 0)}u`} accent={(record.ortUren ?? 0) > 0} />
+        </div>
+      )}
+
       <div className="space-y-1.5 text-xs">
         <BreakdownRow label="Basisalaris (44,44%)" bedrag={record.basisLoon} />
         <BreakdownRow label="Amt Zeerintensief (5%)" bedrag={record.amtZeerintensief} />
+        {record.toeslagBalansvif > 0 && <BreakdownRow label="Balansverlof toeslag" bedrag={record.toeslagBalansvif} />}
+        {record.toeslagVakatieUren > 0 && <BreakdownRow label="Vakantie-uren toeslag" bedrag={record.toeslagVakatieUren} />}
         <BreakdownRow label="ORT toeslagen" bedrag={record.ortTotaal} />
         {record.extraUrenBedrag > 0 && <BreakdownRow label="Extra uren" bedrag={record.extraUrenBedrag} />}
         <BreakdownRow label="Reiskosten" bedrag={record.reiskosten} />
@@ -63,13 +87,33 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
         <div className="bg-[var(--color-surface)] rounded-lg p-3 border border-[var(--color-border)] space-y-1">
           <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-2">ORT detail</p>
           {Object.entries(ort).map(([k, v]) => (
-            <div key={k} className="flex justify-between text-[11px]">
+            <div key={k} className="flex justify-between gap-4 text-[11px]">
               <span className="text-slate-500">{k}</span>
-              <span className="text-slate-400">{fmt(v)}</span>
+              <span className="text-right text-slate-400">
+                {ortHours[k] ? `${formatHours(ortHours[k])}u · ` : ""}{fmt(v)}
+              </span>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function formatHours(value: number) {
+  return String(Math.round(value * 10) / 10).replace(".", ",");
+}
+
+function MetricPill({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className={cn(
+      "rounded-xl border px-3 py-2",
+      accent
+        ? "border-amber-400/20 bg-amber-400/10"
+        : "border-[var(--color-border)] bg-[var(--color-surface)]"
+    )}>
+      <p className="text-[9px] uppercase tracking-wider text-slate-500">{label}</p>
+      <p className={cn("mt-0.5 text-sm font-bold tabular-nums", accent ? "text-amber-200" : "text-slate-200")}>{value}</p>
     </div>
   );
 }
@@ -160,12 +204,21 @@ export function MaandRij({ record: r }: { record: SalarisDisplayRecord }) {
     try { return r.eenmaligDetail ? JSON.parse(r.eenmaligDetail) : []; } catch { return []; }
   }, [r.eenmaligDetail]);
   const isWerkelijk = r.bron === "werkelijk";
+  const isRoosterForecast = Boolean(r.generatedFromSchedule);
 
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--color-surface-hover)] transition-colors">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="flex flex-col gap-2 px-4 py-3 hover:bg-[var(--color-surface-hover)] transition-colors sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-2 min-w-0">
         <span className="text-xs font-medium text-slate-400 w-8">{MAANDEN[r.maand - 1]}</span>
         <span className="text-[10px] text-slate-600">{r.aantalDiensten} diensten</span>
+        {typeof r.totaalUren === "number" && (
+          <span className="text-[10px] text-slate-600">{formatHours(r.totaalUren)}u</span>
+        )}
+        {isRoosterForecast && (
+          <span className="text-[9px] bg-sky-500/15 text-sky-300 px-1.5 py-0.5 rounded-full">
+            rooster
+          </span>
+        )}
         {isWerkelijk && (
           <span className="text-[9px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full">
             werkelijk
@@ -177,7 +230,7 @@ export function MaandRij({ record: r }: { record: SalarisDisplayRecord }) {
           </span>
         ))}
       </div>
-      <div className="flex items-center gap-4 text-xs tabular-nums shrink-0">
+      <div className="flex items-center justify-between gap-4 text-xs tabular-nums shrink-0 sm:justify-end">
         <span className="text-slate-500 hidden sm:block">{fmt(r.brutoBetaling)}</span>
         <span className="text-red-500/80 text-[11px] hidden sm:block">-{fmt(r.pensioenpremie)}</span>
         <span className="text-emerald-400 font-semibold">{fmt(r.nettoPrognose)}</span>
@@ -187,7 +240,7 @@ export function MaandRij({ record: r }: { record: SalarisDisplayRecord }) {
 }
 
 export function TotaalCard({ icon: Icon, label, value, accent }: {
-  icon: any; label: string; value: string; accent: string;
+  icon: LucideIcon; label: string; value: string; accent: string;
 }) {
   return (
     <div className="glass rounded-xl p-3 border border-[var(--color-border)] min-w-0" style={{ borderColor: accent + "20" }}>

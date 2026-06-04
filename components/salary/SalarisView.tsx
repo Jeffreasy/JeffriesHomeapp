@@ -1,28 +1,67 @@
 "use client";
 
 import { useMemo } from "react";
-import { TrendingUp, Euro, Landmark, Briefcase, FileUp, ArrowRight } from "lucide-react";
+import { TrendingUp, Euro, Briefcase, FileUp, ArrowRight, Clock3, Moon } from "lucide-react";
 import Link from "next/link";
 
-import { useSalary } from "@/hooks/useSalary";
-import { useLoonstroken } from "@/hooks/useLoonstroken";
+import { useSalary, type SalarisRecord } from "@/hooks/useSalary";
+import { useLoonstroken, type LoonstrookRecord } from "@/hooks/useLoonstroken";
+import type { DienstRow } from "@/lib/schedule";
+import { calculateScheduleSalaryRecords } from "@/lib/salaryForecast";
 import { LoonstrookUploader } from "./LoonstrookUploader";
 import { type SalarisDisplayRecord } from "./SalaryTypes";
 import { displayRecordVanLoonstrook, displayRecord, fmt } from "./SalaryUtils";
 import { PrognoseCard, JaarSectie, TotaalCard, VergelijkingSectie } from "./SalaryCards";
 
-export function SalarisView() {
+type SalarisViewProps = {
+  diensten?: DienstRow[];
+};
+
+function mergeWithScheduleMetrics(scheduleRecord: SalarisRecord | undefined, apiRecord: SalarisRecord) {
+  if (!scheduleRecord) return apiRecord;
+  return {
+    ...scheduleRecord,
+    ...apiRecord,
+    generatedFromSchedule: scheduleRecord.generatedFromSchedule,
+    totaalUren: scheduleRecord.totaalUren,
+    contractUren: scheduleRecord.contractUren,
+    contractUrenPerWeek: scheduleRecord.contractUrenPerWeek,
+    extraUren: scheduleRecord.extraUren,
+    ortUren: scheduleRecord.ortUren,
+    ortUrenDetail: scheduleRecord.ortUrenDetail,
+    salarisCalibratie: scheduleRecord.salarisCalibratie,
+  };
+}
+
+export function SalarisView({ diensten = [] }: SalarisViewProps) {
   const { records, isLoading } = useSalary();
   const loonstroken = useLoonstroken();
 
+  const scheduleRecords = useMemo(
+    () => calculateScheduleSalaryRecords(diensten, {
+      salaryRecords: records,
+      loonstroken: loonstroken.records,
+    }),
+    [diensten, loonstroken.records, records]
+  );
+
+  const forecastRecords = useMemo(() => {
+    const byPeriode = new Map<string, SalarisRecord>();
+    for (const record of scheduleRecords) byPeriode.set(record.periode, record);
+    for (const record of records) {
+      byPeriode.set(record.periode, mergeWithScheduleMetrics(byPeriode.get(record.periode), record));
+    }
+    return Array.from(byPeriode.values()).sort((a, b) => a.jaar - b.jaar || a.maand - b.maand);
+  }, [records, scheduleRecords]);
+
   const displayRecords = useMemo(() => {
-    const merged = records.map((r) => displayRecord(r, loonstroken.byPeriode));
+    const merged = forecastRecords.map((r) => displayRecord(r, loonstroken.byPeriode));
     const existing = new Set(merged.map((r) => r.periode));
     const actualOnly = loonstroken.records
-      .filter((w: any) => !existing.has(w.periodeLabel))
-      .map((w: any) => displayRecordVanLoonstrook(w));
+      .filter((w: LoonstrookRecord) => !existing.has(w.periodeLabel))
+      .map((w: LoonstrookRecord) => displayRecordVanLoonstrook(w));
     return [...merged, ...actualOnly].sort((a, b) => a.jaar - b.jaar || a.maand - b.maand);
-  }, [loonstroken.byPeriode, loonstroken.records, records]);
+  }, [forecastRecords, loonstroken.byPeriode, loonstroken.records]);
 
   const displayPerJaar = useMemo(() => {
     const map: Record<number, SalarisDisplayRecord[]> = {};
@@ -41,6 +80,10 @@ export function SalarisView() {
   const totaalBruto = displayRecords.reduce((s, r) => s + r.brutoBetaling, 0);
   const totaalNetto = displayRecords.reduce((s, r) => s + r.nettoPrognose, 0);
   const totaalPensioen = displayRecords.reduce((s, r) => s + r.pensioenpremie, 0);
+  const totaalUren = displayRecords.reduce((s, r) => s + (r.totaalUren ?? 0), 0);
+  const totaalOrtUren = displayRecords.reduce((s, r) => s + (r.ortUren ?? 0), 0);
+  const totaalExtraUren = displayRecords.reduce((s, r) => s + (r.extraUren ?? 0), 0);
+  const scheduleForecastCount = displayRecords.filter((r) => r.generatedFromSchedule).length;
   
   const isLoadingData = isLoading || loonstroken.isLoading;
 
@@ -58,8 +101,8 @@ export function SalarisView() {
         <Euro size={36} className="text-slate-600 mx-auto mb-4" />
         <h3 className="text-base font-semibold text-slate-300 mb-1">Geen salarisdata</h3>
         <p className="text-sm text-slate-500">
-          Synchroniseer je rooster via de Sync-knop zodat diensten beschikbaar zijn.<br />
-          De salarisberekening wordt daarna automatisch gegenereerd.
+          Importeer of synchroniseer je rooster zodat diensten beschikbaar zijn.<br />
+          Daarna rekent deze tab automatisch uren, contracturen en ORT door.
         </p>
       </div>
     );
@@ -68,11 +111,35 @@ export function SalarisView() {
   return (
     <div className="space-y-6">
       {/* Totalen banner */}
-      <div className="grid grid-cols-3 gap-3">
-        <TotaalCard icon={Briefcase} label="Totaal Bruto" value={fmt(totaalBruto)} accent="#f59e0b" />
-        <TotaalCard icon={Landmark}  label="Pensioen PFZW" value={fmt(totaalPensioen)} accent="#ef4444" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <TotaalCard icon={Clock3} label="Roosteruren" value={`${Math.round(totaalUren * 10) / 10}u`} accent="#38bdf8" />
+        <TotaalCard icon={Moon} label="ORT uren" value={`${Math.round(totaalOrtUren * 10) / 10}u`} accent="#a78bfa" />
+        <TotaalCard icon={Briefcase} label="Totaal bruto" value={fmt(totaalBruto)} accent="#f59e0b" />
         <TotaalCard icon={TrendingUp} label="Netto totaal" value={fmt(totaalNetto)} accent="#34d399" />
       </div>
+
+      {scheduleForecastCount > 0 && (
+        <div className="rounded-2xl border border-sky-400/15 bg-sky-400/8 p-4 text-xs text-sky-100/80">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-sky-300/80">Roosterberekening actief</p>
+              <p className="mt-1 leading-relaxed text-slate-400">
+                {scheduleForecastCount} maand(en) worden direct uit je diensten berekend. Loonstroken blijven leidend zodra ze geimporteerd zijn.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-right sm:min-w-52">
+              <span className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                <span className="block text-[10px] uppercase text-slate-500">Extra</span>
+                <span className="font-bold text-amber-200">{Math.round(totaalExtraUren * 10) / 10}u</span>
+              </span>
+              <span className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+                <span className="block text-[10px] uppercase text-slate-500">Pensioen</span>
+                <span className="font-bold text-red-300">{fmt(totaalPensioen)}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Huidige maand prognose */}
       {huidig && <PrognoseCard record={huidig} />}
@@ -93,7 +160,7 @@ export function SalarisView() {
 
       {/* Werkelijk vs Berekend vergelijking */}
       {loonstroken.count > 0 && (
-        <VergelijkingSectie berekend={records} werkelijkByPeriode={loonstroken.byPeriode} />
+        <VergelijkingSectie berekend={forecastRecords} werkelijkByPeriode={loonstroken.byPeriode} />
       )}
 
       {/* Disclaimer + Finance link */}

@@ -17,12 +17,12 @@ import { DailyChecklist } from "@/components/habits/DailyChecklist";
 
 import {
   type DashboardDateInfo,
-  calculateScheduleSalaryForecast,
   formatCurrency,
   formatEventMeta,
   formatRelativeDateLabel,
   getDashboardDateInfo,
 } from "@/components/dashboard/DashboardUtils";
+import { calculateScheduleSalaryForecast } from "@/lib/salaryForecast";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { EmptyState, MetricTile, Panel, RouteTile, SectionHeader, StatusRow } from "@/components/dashboard/DashboardPrimitives";
 import { OverviewPanel } from "@/components/dashboard/DashboardOverviewPanel";
@@ -87,8 +87,11 @@ export default function DashboardPage() {
   const actionableConflicts = personalUpcomingEvents.filter((event) => getDashboardConflict(event)).length;
   
   const scheduleForecast = useMemo(
-    () => calculateScheduleSalaryForecast(diensten, dateInfo?.period),
-    [diensten, dateInfo?.period]
+    () => calculateScheduleSalaryForecast(diensten, dateInfo?.period, {
+      salaryRecords: salarisHuidig ? [salarisHuidig] : [],
+      loonstroken: loonstroken.records,
+    }),
+    [diensten, dateInfo?.period, loonstroken.records, salarisHuidig]
   );
   const werkelijkNetto = dateInfo ? loonstroken.byPeriode.get(dateInfo.period)?.netto : undefined;
   const salaryForecast = salarisHuidig && salarisHuidig.nettoPrognose > 0
