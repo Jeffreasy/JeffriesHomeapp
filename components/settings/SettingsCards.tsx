@@ -12,7 +12,7 @@ export function Panel({ children, className = "" }: { children: ReactNode; class
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn("rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 backdrop-blur-xl sm:p-5 min-w-0", className)}
+      className={cn("min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 backdrop-blur-xl sm:p-5", className)}
     >
       {children}
     </motion.div>
@@ -44,7 +44,7 @@ export function SectionHeader({
           {sub && <p className="mt-0.5 truncate text-xs text-slate-500">{sub}</p>}
         </div>
       </div>
-      {action}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -65,13 +65,13 @@ export function StatusMetric({
   const classes = toneClasses[tone];
 
   return (
-    <div className="min-h-[128px] min-w-0 bg-[var(--color-surface)] p-4">
-      <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg border", classes.border, classes.surface)}>
-        <Icon size={16} className={classes.icon} />
+    <div className="min-h-[96px] min-w-0 bg-[var(--color-surface)] p-3 sm:min-h-[124px] sm:p-4">
+      <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg border sm:h-9 sm:w-9", classes.border, classes.surface)}>
+        <Icon size={15} className={classes.icon} />
       </div>
-      <p className="mt-4 text-xs font-semibold uppercase text-slate-500">{label}</p>
+      <p className="mt-2 line-clamp-1 text-xs font-semibold uppercase text-slate-500 sm:mt-4">{label}</p>
       <p className={cn("mt-1 truncate text-base font-bold", classes.text)}>{value}</p>
-      <p className="mt-1 truncate text-xs text-slate-500">{sub}</p>
+      <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">{sub}</p>
     </div>
   );
 }
@@ -92,14 +92,14 @@ export function MetricCard({
   const classes = toneClasses[tone];
 
   return (
-    <div className={cn("rounded-lg border bg-[var(--color-surface)] p-4 min-w-0", classes.border)}>
+    <div className={cn("min-w-0 rounded-lg border bg-[var(--color-surface)] p-3 sm:p-4", classes.border)}>
       <div className="flex items-start gap-3">
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
-          <Icon size={18} className={classes.icon} />
+        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10", classes.surface)}>
+          <Icon size={17} className={classes.icon} />
         </div>
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-          <p className={cn("mt-2 truncate text-2xl font-bold", classes.text)}>{value}</p>
+          <p className={cn("mt-1 truncate text-xl font-bold sm:mt-2 sm:text-2xl", classes.text)}>{value}</p>
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{meta}</p>
         </div>
       </div>
@@ -121,13 +121,13 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 min-w-0">
+    <div className="flex min-w-0 items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
       <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         <Icon size={15} className={classes.icon} />
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-0.5 truncate text-sm font-semibold text-slate-200">{value}</p>
+        <p className="mt-0.5 line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-200">{value}</p>
       </div>
     </div>
   );
@@ -142,7 +142,7 @@ export function StatusPill({ ok, label, tone }: { ok: boolean; label: string; to
   return (
     <span
       className={cn(
-        "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-bold",
+        "inline-flex h-7 max-w-full shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-bold",
         resolvedTone === "ok" && "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
         resolvedTone === "warn" && "border-amber-500/20 bg-amber-500/10 text-amber-200",
         resolvedTone === "neutral" && "border-slate-500/20 bg-slate-500/10 text-slate-300",
@@ -150,7 +150,7 @@ export function StatusPill({ ok, label, tone }: { ok: boolean; label: string; to
       )}
     >
       <Icon size={13} />
-      {label}
+      <span className="truncate">{label}</span>
     </span>
   );
 }
@@ -161,7 +161,7 @@ export function RouteTile({ href, label, meta, icon: Icon, tone }: { href: strin
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 transition-colors hover:bg-[var(--color-surface-hover)] min-w-0"
+      className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 transition-colors hover:bg-[var(--color-surface-hover)]"
     >
       <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         <Icon size={16} className={classes.icon} />
@@ -177,7 +177,7 @@ export function RouteTile({ href, label, meta, icon: Icon, tone }: { href: strin
 
 export function EmptyState({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-8 text-center min-w-0">
+    <div className="min-w-0 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-5 text-center">
       <Icon size={28} className="mx-auto text-slate-700" />
       <p className="mt-3 text-sm font-semibold text-slate-400">{title}</p>
     </div>

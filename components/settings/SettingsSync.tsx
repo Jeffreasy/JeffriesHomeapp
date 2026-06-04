@@ -79,14 +79,14 @@ function SyncButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex min-h-24 items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-55 min-w-0"
+      className="flex min-h-[96px] min-w-0 flex-col items-start gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:min-h-24 sm:flex-row sm:gap-3 sm:p-4"
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-300">
         {loading ? <Loader2 size={17} className="animate-spin" /> : <Icon size={17} />}
       </div>
       <span className="min-w-0">
         <span className="block text-sm font-bold text-white">{title}</span>
-        <span className="mt-1 block text-xs leading-5 text-slate-500">{meta}</span>
+        <span className="mt-1 block line-clamp-2 text-xs leading-4 text-slate-500 sm:leading-5">{meta}</span>
       </span>
     </button>
   );
@@ -114,19 +114,8 @@ export function SettingsSync({
         label="Sync"
         title="Databronnen"
         sub={syncing ? "bezig" : "gereed"}
-        action={
-          <button
-            type="button"
-            onClick={handleAllSync}
-            disabled={syncing !== null}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50"
-          >
-            <RefreshCw size={15} className={syncing === "all" ? "animate-spin" : ""} />
-            Alles
-          </button>
-        }
       />
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
+      <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
         <SyncButton
           icon={CalendarClock}
           title="Agenda"
@@ -152,7 +141,7 @@ export function SettingsSync({
           onClick={handleAllSync}
         />
       </div>
-      <div className="mt-3 grid gap-2 md:grid-cols-3">
+      <div className="mt-3 grid gap-2 lg:grid-cols-3">
         <SyncStatusRow label="Rooster" status={syncMap.schedule} />
         <SyncStatusRow label="Persoonlijk" status={syncMap.personal} />
         <SyncStatusRow label="Gmail" status={syncMap.gmail} />

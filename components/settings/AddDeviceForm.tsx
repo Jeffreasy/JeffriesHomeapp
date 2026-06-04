@@ -34,7 +34,7 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-lg border border-dashed border-[var(--color-border)] text-slate-500 text-sm hover:border-amber-500/30 hover:text-amber-400 transition-all"
+        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--color-border)] px-3 py-3 text-sm text-slate-500 transition-all hover:border-amber-500/30 hover:text-amber-400"
       >
         <Plus size={15} />
         Lamp registreren (IP-adres)
@@ -48,7 +48,7 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
         <Wifi size={14} className="text-amber-400" />
         Nieuwe WiZ lamp registreren
       </p>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         <div>
           <label htmlFor="device-ip" className="text-xs text-slate-500 mb-1 block">
             IP-adres *
@@ -92,11 +92,11 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
           ))}
         </select>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="submit"
           disabled={isPending}
-          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-colors"
+          className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-400 transition-colors hover:bg-amber-500/25"
         >
           {isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
           Registreren
@@ -104,7 +104,7 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="px-4 py-2 rounded-lg bg-[var(--color-surface)] text-slate-400 border border-[var(--color-border)] text-sm hover:bg-[var(--color-surface-hover)] transition-colors"
+          className="min-h-10 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)]"
         >
           Annuleren
         </button>

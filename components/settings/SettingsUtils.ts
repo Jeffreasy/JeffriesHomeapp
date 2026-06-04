@@ -37,6 +37,9 @@ export type TelegramStatusResult = {
   webAppUrl?: string;
   backgroundEngineEnabled?: boolean;
   telegramPollerConfigured?: boolean;
+  grokConfigured?: boolean;
+  grokModel?: string;
+  grokReasoningEffort?: string;
   webhook?: {
     configured: boolean;
     urlHost: string | null;
@@ -49,6 +52,52 @@ export type TelegramStatusResult = {
     lastSyncErrorDate?: string | null;
     longPollingWillBeActive?: boolean;
   };
+};
+
+export type AiDiagnosticStatus = "success" | "warning" | "skipped" | "error";
+
+export type AiDiagnosticCheck = {
+  ok: boolean;
+  status: AiDiagnosticStatus;
+  label: string;
+  detail?: string;
+  latencyMs?: number;
+  error?: string | null;
+};
+
+export type AiAgentCapability = {
+  id: string;
+  naam: string;
+  emoji: string;
+  description: string;
+  tools: number;
+  mutatingTools: number;
+  confirmationTools: number;
+  toolNames: string[];
+};
+
+export type AiDiagnosticsResult = {
+  ok: boolean;
+  generatedAt: string;
+  config: {
+    grokConfigured: boolean;
+    grokModel: string;
+    grokReasoningEffort: string;
+    groqConfigured: boolean;
+    telegramConfigured: boolean;
+  };
+  checks: {
+    grokChat?: AiDiagnosticCheck;
+    grokWebSearch?: AiDiagnosticCheck;
+    groqVoice?: AiDiagnosticCheck;
+  };
+  capabilities: {
+    agents: number;
+    tools: number;
+    mutatingTools: number;
+    confirmationTools: number;
+  };
+  agents: AiAgentCapability[];
 };
 
 export const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string }> = {

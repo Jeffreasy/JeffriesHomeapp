@@ -17,17 +17,17 @@ export function SettingsRuntime({
 }) {
   return (
     <Panel className="overflow-hidden p-0">
-      <div className="border-b border-[var(--color-border)] px-5 py-4 sm:px-6 min-w-0">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+      <div className="min-w-0 border-b border-[var(--color-border)] px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase text-slate-500">Overzicht</p>
-            <h2 className="mt-1 text-xl font-bold text-white">Homeapp runtime</h2>
-            <p className="mt-1 text-sm text-slate-500">{localApiHost}</p>
+            <h2 className="mt-0.5 text-lg font-bold text-white sm:mt-1 sm:text-xl">Homeapp runtime</h2>
+            <p className="mt-1 line-clamp-2 text-sm text-slate-500">{localApiHost}</p>
           </div>
           <StatusPill ok={Boolean(overview?.integrations.backend ?? overview?.integrations.convex)} label="Backend" />
         </div>
       </div>
-      <div className="grid gap-px bg-[var(--color-border)] sm:grid-cols-2 xl:grid-cols-4 min-w-0">
+      <div className="grid min-w-0 grid-cols-2 gap-px bg-[var(--color-border)] xl:grid-cols-4">
         <StatusMetric
           icon={Lightbulb}
           label="Lampen"

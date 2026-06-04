@@ -58,13 +58,13 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white">Scanner</p>
-          <p className="mt-1 text-xs text-slate-500">Leest de lokale WiZ API en toont ontbrekende lampen.</p>
+          <p className="mt-1 text-xs text-slate-500">Controleert bekende WiZ lampen en toont ontbrekende IP-adressen.</p>
         </div>
         <button
           type="button"
           onClick={scan}
           disabled={scanning}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 text-sm font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 disabled:opacity-50"
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 text-sm font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 disabled:opacity-50 sm:w-auto"
         >
           {scanning ? <Loader2 size={15} className="animate-spin" /> : <Radar size={15} />}
           Scan
@@ -75,11 +75,11 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
         <div className="mt-3 space-y-2">
           {candidates.length === 0 ? (
             <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
-              Alle lokaal gevonden lampen staan al in Convex.
+              Alle gevonden lampen staan al geregistreerd.
             </div>
           ) : (
             candidates.map((device) => (
-              <div key={`${device.id}-${device.ip_address}`} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
+              <div key={`${device.id}-${device.ip_address}`} className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
                 <Wifi size={15} className="shrink-0 text-sky-300" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-200">{device.name}</p>
@@ -89,7 +89,7 @@ export function DeviceDiscoveryPanel({ existingDevices }: { existingDevices: Dev
                   type="button"
                   onClick={() => importDevice(device)}
                   disabled={isPending}
-                  className="h-8 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-xs font-bold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50"
+                  className="h-10 shrink-0 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-xs font-bold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50"
                 >
                   Toevoegen
                 </button>

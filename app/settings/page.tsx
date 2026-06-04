@@ -46,6 +46,7 @@ import {
   formatDateTime,
   plural,
   routeTiles,
+  type AiDiagnosticsResult,
   type PrivacyScope,
   type SyncStatusView,
   type SyncTarget,
@@ -83,13 +84,14 @@ export default function SettingsPage() {
   const updatePrivacySettings = async (_args: Record<string, unknown>) => ({});
   const pendingActions: any[] = [];
   const auditLogs: any[] = [];
-  const grokCapabilities = undefined as any;
   const privacySettings = undefined as any;
 
   const [syncing, setSyncing] = useState<SyncTarget | null>(null);
   const [pendingBusyId, setPendingBusyId] = useState<string | null>(null);
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatusResult | null>(null);
   const [telegramChecking, setTelegramChecking] = useState(false);
+  const [aiDiagnostics, setAiDiagnostics] = useState<AiDiagnosticsResult | null>(null);
+  const [aiChecking, setAiChecking] = useState(false);
   const [backupRequested, setBackupRequested] = useState(false);
   const backupData = undefined as any; // TODO: Move backup to Go API
 
@@ -242,6 +244,19 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAICheck = async () => {
+    setAiChecking(true);
+    try {
+      const result = await settingsApi.aiDiagnostics() as unknown as AiDiagnosticsResult;
+      setAiDiagnostics(result);
+      success(result.ok ? "AI diagnose groen" : "AI diagnose heeft aandachtspunten");
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : "AI diagnose mislukt");
+    } finally {
+      setAiChecking(false);
+    }
+  };
+
   const togglePrivacyScope = async (scope: PrivacyScope) => {
     const current = privacySettings?.[scope] ?? true;
     try {
@@ -267,15 +282,15 @@ export default function SettingsPage() {
   return (
     <div className="text-slate-100">
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
           <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10">
-              <Settings size={20} className="text-amber-300" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 sm:h-11 sm:w-11">
+              <Settings size={19} className="text-amber-300" />
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase text-slate-500">System cockpit</p>
-              <h1 className="mt-1 truncate text-2xl font-bold text-white">Instellingen</h1>
-              <p className="mt-1 text-sm text-slate-500">
+              <h1 className="mt-0.5 truncate text-xl font-bold text-white sm:mt-1 sm:text-2xl">Instellingen</h1>
+              <p className="mt-0.5 line-clamp-1 text-sm text-slate-500 sm:mt-1">
                 {isLoading
                   ? "Configuratie laden"
                   : `${plural(overviewDevices.total, "lamp", "lampen")} - ${plural(overviewRooms.total, "kamer", "kamers")} - Go API live`}
@@ -312,7 +327,7 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 pb-24 pt-5 sm:px-6 sm:py-6 lg:px-8">
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <SettingsRuntime
             overview={overview}
@@ -346,7 +361,7 @@ export default function SettingsPage() {
           </Panel>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <MetricCard
             icon={CalendarClock}
             label="Rooster"
@@ -387,49 +402,53 @@ export default function SettingsPage() {
             handleAllSync={handleAllSync}
           />
 
-          <Panel>
-            <SectionHeader icon={Server} label="Endpoints" title="Runtime" sub={localApiHost} />
-            <div className="space-y-3">
-              <StatusRow icon={Cloud} label="Go API" value={localApiHost} tone="green" />
-              <StatusRow
-                icon={Server}
-                label="Go API"
-                value={overview?.integrations.legacyHttpSecret ? "Secret ingesteld" : "Niet actief"}
-                tone={overview?.integrations.legacyHttpSecret ? "sky" : "slate"}
-              />
-              <StatusRow
-                icon={Smartphone}
-                label="Lokale bridge"
-                value={
-                  bridgeQueueActive
-                    ? overview?.integrations.localBridge
-                      ? "Queue beveiligd"
-                      : "Bridge-key mist"
-                    : "Direct LAN"
-                }
-                tone={bridgeQueueActive ? (overview?.integrations.localBridge ? "green" : "rose") : "slate"}
-              />
-            </div>
-          </Panel>
+          <div className="space-y-6">
+            <Panel>
+              <SectionHeader icon={Server} label="Endpoints" title="Runtime" sub={localApiHost} />
+              <div className="space-y-3">
+                <StatusRow icon={Cloud} label="Render API" value={localApiHost} tone="green" />
+                <StatusRow
+                  icon={Server}
+                  label="Legacy secret"
+                  value={overview?.integrations.legacyHttpSecret ? "Ingesteld" : "Niet actief"}
+                  tone={overview?.integrations.legacyHttpSecret ? "sky" : "slate"}
+                />
+                <StatusRow
+                  icon={Smartphone}
+                  label="Lokale bridge"
+                  value={
+                    bridgeQueueActive
+                      ? overview?.integrations.localBridge
+                        ? "Docker bridge online"
+                        : "Geen recente heartbeat"
+                      : "Direct LAN"
+                  }
+                  tone={bridgeQueueActive ? (overview?.integrations.localBridge ? "green" : "rose") : "slate"}
+                />
+              </div>
+            </Panel>
+
+            <SettingsBridge overview={overview} />
+          </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <SettingsPendingActions
-            pendingActions={pendingActions}
-            pendingBusyId={pendingBusyId}
-            handleCancelPending={handleCancelPending}
-            handleConfirmPending={handleConfirmPending}
-          />
-
-          <SettingsBridge overview={overview} />
-        </section>
+        {pendingActions.length > 0 ? (
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <SettingsPendingActions
+              pendingActions={pendingActions}
+              pendingBusyId={pendingBusyId}
+              handleCancelPending={handleCancelPending}
+              handleConfirmPending={handleConfirmPending}
+            />
+          </section>
+        ) : null}
 
         <CollapsibleSection
           title="Apparaat & Kamerbeheer"
           subtitle={`${devices.length} lampen en ${rooms.length} kamers`}
           icon={<Lightbulb size={18} />}
           theme="sky"
-          defaultOpen={true}
+          defaultOpen={false}
         >
           <div className="grid gap-6 xl:grid-cols-2">
             <ErrorBoundary>
@@ -511,7 +530,9 @@ export default function SettingsPage() {
               telegramStatus={telegramStatus}
               telegramChecking={telegramChecking}
               handleTelegramCheck={handleTelegramCheck}
-              grokCapabilities={grokCapabilities}
+              aiDiagnostics={aiDiagnostics}
+              aiChecking={aiChecking}
+              handleAICheck={handleAICheck}
               syncMap={syncMap}
             />
 

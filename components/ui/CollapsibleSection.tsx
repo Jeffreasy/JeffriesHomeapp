@@ -72,7 +72,7 @@ export function CollapsibleSection({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-2xl border bg-[var(--color-surface)]/40 backdrop-blur-md transition-colors duration-300 overflow-hidden",
+        "flex flex-col overflow-hidden rounded-lg border bg-[var(--color-surface)]/40 backdrop-blur-md transition-colors duration-300",
         isOpen ? currentTheme.activeBorder : "border-white/5",
         className
       )}
@@ -81,26 +81,26 @@ export function CollapsibleSection({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex items-center justify-between w-full p-4 sm:px-6 transition-all duration-300 text-left rounded-2xl border",
+          "flex w-full items-center justify-between gap-3 border p-4 text-left transition-all duration-300 sm:px-6",
           isOpen ? "bg-white/[0.02] border-transparent" : currentTheme.header
         )}
       >
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           {icon && (
-            <div className={cn("flex items-center justify-center h-10 w-10 rounded-xl bg-white/5 border border-white/10", currentTheme.icon)}>
+            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5", currentTheme.icon)}>
               {icon}
             </div>
           )}
-          <div className="flex flex-col">
-            <h3 className="text-base font-semibold text-white tracking-tight">{title}</h3>
+          <div className="flex min-w-0 flex-col">
+            <h3 className="truncate text-base font-semibold tracking-tight text-white">{title}</h3>
             {subtitle && (
-              <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{subtitle}</p>
             )}
           </div>
         </div>
         
         <div className={cn(
-          "flex items-center justify-center h-8 w-8 rounded-lg transition-colors",
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
           isOpen ? "bg-white/10 text-white" : "text-slate-400"
         )}>
           <motion.div

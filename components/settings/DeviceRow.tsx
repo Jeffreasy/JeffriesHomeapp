@@ -55,7 +55,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
   };
 
   return (
-    <div className="glass rounded-lg p-4 flex items-center gap-3">
+    <div className="glass flex min-w-0 items-start gap-3 rounded-lg p-4 sm:items-center">
       <div
         className={cn(
           "w-2 h-2 rounded-full flex-shrink-0",
@@ -75,7 +75,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
             className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-amber-500/50"
             autoFocus
           />
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <input
               value={ip}
               onChange={(e) => setIp(e.target.value)}
@@ -105,14 +105,14 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
         </div>
       )}
 
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      <div className="flex flex-shrink-0 items-center gap-1.5">
         {editing ? (
           <>
             <button
               onClick={save}
               disabled={updating}
               aria-label="Opslaan"
-              className="w-8 h-8 rounded-lg bg-green-500/15 text-green-400 border border-green-500/30 flex items-center justify-center hover:bg-green-500/25 transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/15 text-green-400 transition-colors hover:bg-green-500/25"
             >
               {updating ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
             </button>
@@ -124,7 +124,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
                 setIp(device.ip_address ?? "");
               }}
               aria-label="Annuleren"
-              className="w-8 h-8 rounded-lg bg-[var(--color-surface)] text-slate-400 border border-[var(--color-border)] flex items-center justify-center hover:bg-[var(--color-surface-hover)] transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)]"
             >
               <X size={13} />
             </button>
@@ -134,7 +134,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
             <button
               onClick={() => setEditing(true)}
               aria-label={`${device.name} bewerken`}
-              className="w-8 h-8 rounded-lg bg-[var(--color-surface)] text-slate-400 border border-[var(--color-border)] flex items-center justify-center hover:text-amber-400 hover:border-amber-500/30 transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:border-amber-500/30 hover:text-amber-400"
             >
               <Pencil size={13} />
             </button>
@@ -142,7 +142,7 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
               onClick={remove}
               disabled={deleting}
               aria-label={`${device.name} verwijderen`}
-              className="w-8 h-8 rounded-lg bg-[var(--color-surface)] text-slate-400 border border-[var(--color-border)] flex items-center justify-center hover:text-red-400 hover:border-red-500/30 transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:border-red-500/30 hover:text-red-400"
             >
               {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
             </button>
