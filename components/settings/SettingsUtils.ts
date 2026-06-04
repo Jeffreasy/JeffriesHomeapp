@@ -74,6 +74,17 @@ export type AiAgentCapability = {
   mutatingTools: number;
   confirmationTools: number;
   toolNames: string[];
+  liveToolNames?: string[];
+  pendingTools?: number;
+  pendingMutatingTools?: number;
+  pendingConfirmationTools?: number;
+  pendingToolNames?: string[];
+};
+
+export type AiDiagnosticsRecommendation = {
+  priority: "hoog" | "middel" | "laag" | string;
+  title: string;
+  detail: string;
 };
 
 export type AiDiagnosticsResult = {
@@ -96,8 +107,24 @@ export type AiDiagnosticsResult = {
     tools: number;
     mutatingTools: number;
     confirmationTools: number;
+    policyTools?: number;
+    pendingPolicyTools?: number;
+    pendingMutatingTools?: number;
+    pendingConfirmationTools?: number;
+    readOnlyTools?: number;
+  };
+  governance?: {
+    liveToolNames?: string[];
+    policyOnlyToolNames?: string[];
+    mutatingToolNames?: string[];
+    confirmationToolNames?: string[];
+    coveragePercent?: number;
+    liveTools?: number;
+    policyTools?: number;
+    policyOnlyTools?: number;
   };
   agents: AiAgentCapability[];
+  recommendations?: AiDiagnosticsRecommendation[];
 };
 
 export const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string }> = {

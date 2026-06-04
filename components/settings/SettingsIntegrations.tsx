@@ -6,19 +6,23 @@ import {
   Brain,
   CalendarClock,
   Cloud,
+  Gauge,
+  ListChecks,
+  LockKeyhole,
   Loader2,
   Mail,
   Mic,
   Network,
   RadioTower,
   Search,
+  ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { Panel, SectionHeader, StatusPill, type StatusPillTone } from "./SettingsCards";
-import type { AiAgentCapability, AiDiagnosticCheck, AiDiagnosticsResult, SyncStatusView, TelegramStatusResult } from "./SettingsUtils";
+import type { AiAgentCapability, AiDiagnosticCheck, AiDiagnosticsRecommendation, AiDiagnosticsResult, SyncStatusView, TelegramStatusResult } from "./SettingsUtils";
 import { cn } from "@/lib/utils";
 
 type IntegrationRowProps = {
@@ -108,9 +112,83 @@ function DiagnosticTile({ icon: Icon, label, check }: { icon: LucideIcon; label:
   );
 }
 
+function ToolChip({ label, tone = "live" }: { label: string; tone?: "live" | "pending" }) {
+  return (
+    <span
+      className={cn(
+        "max-w-full truncate rounded-md border px-2 py-1 text-[11px] font-semibold",
+        tone === "live" && "border-white/10 bg-white/[0.03] text-slate-400",
+        tone === "pending" && "border-amber-500/20 bg-amber-500/10 text-amber-200"
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function RecommendationCard({ item }: { item: AiDiagnosticsRecommendation }) {
+  const isHigh = item.priority === "hoog";
+
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <div
+          className={cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+            isHigh ? "bg-amber-500/10 text-amber-300" : "bg-sky-500/10 text-sky-300"
+          )}
+        >
+          {isHigh ? <ShieldAlert size={15} /> : <ListChecks size={15} />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-200">{item.title}</p>
+            <StatusPill ok={!isHigh} tone={isHigh ? "warn" : "neutral"} label={item.priority} />
+          </div>
+          <p className="mt-1 line-clamp-3 text-xs leading-4 text-slate-500">{item.detail}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ToolGovernancePanel({ diagnostics }: { diagnostics: AiDiagnosticsResult }) {
+  const pendingPolicyTools = diagnostics.capabilities.pendingPolicyTools ?? diagnostics.governance?.policyOnlyTools ?? 0;
+  const pendingConfirmationTools = diagnostics.capabilities.pendingConfirmationTools ?? 0;
+  const policyTools = diagnostics.capabilities.policyTools ?? diagnostics.governance?.policyTools ?? diagnostics.capabilities.tools;
+  const liveTools = diagnostics.governance?.liveTools ?? diagnostics.capabilities.tools;
+  const coverage = diagnostics.governance?.coveragePercent;
+
+  return (
+    <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-black/10 p-3">
+      <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+        <Gauge size={13} />
+        Tool governance
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <MiniInfo label="Live tools" value={`${liveTools} uitvoerbaar`} />
+        <MiniInfo label="Policy tools" value={`${policyTools} totaal`} />
+        <MiniInfo label="Wachtlaag" value={`${pendingPolicyTools} policy-only`} />
+        <MiniInfo label="Confirmatie" value={`${pendingConfirmationTools} beschermd`} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <StatusPill ok={pendingPolicyTools === 0} tone={pendingPolicyTools === 0 ? "ok" : "warn"} label={pendingPolicyTools === 0 ? "Alles live" : `${pendingPolicyTools} wacht`} />
+        <StatusPill ok={diagnostics.capabilities.mutatingTools > 0} tone={diagnostics.capabilities.mutatingTools > 0 ? "ok" : "neutral"} label={`${diagnostics.capabilities.mutatingTools} live mutaties`} />
+        <StatusPill ok={pendingConfirmationTools > 0} tone={pendingConfirmationTools > 0 ? "warn" : "neutral"} label={coverage == null ? "Coverage onbekend" : `${coverage}% live`} />
+        <StatusPill ok={Boolean(diagnostics.capabilities.readOnlyTools)} tone="neutral" label={`${diagnostics.capabilities.readOnlyTools ?? diagnostics.capabilities.tools} read-only`} />
+      </div>
+    </div>
+  );
+}
+
 function AgentCapabilityCard({ agent }: { agent: AiAgentCapability }) {
-  const visibleTools = agent.toolNames.slice(0, 3);
-  const remaining = Math.max(0, agent.toolNames.length - visibleTools.length);
+  const liveToolNames = agent.liveToolNames ?? agent.toolNames;
+  const pendingToolNames = agent.pendingToolNames ?? [];
+  const visibleTools = liveToolNames.slice(0, 3);
+  const visiblePendingTools = pendingToolNames.slice(0, 2);
+  const remaining = Math.max(0, liveToolNames.length - visibleTools.length);
+  const pendingRemaining = Math.max(0, pendingToolNames.length - visiblePendingTools.length);
+  const pendingTools = agent.pendingTools ?? pendingToolNames.length;
 
   return (
     <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
@@ -120,23 +198,35 @@ function AgentCapabilityCard({ agent }: { agent: AiAgentCapability }) {
             {agent.emoji} {agent.naam}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            {agent.tools} tools - {agent.mutatingTools} mutaties - {agent.confirmationTools} bevestiging
+            {agent.tools} live - {agent.mutatingTools} mutaties
+            {pendingTools > 0 ? ` - ${pendingTools} wacht` : ""}
           </p>
         </div>
-        <StatusPill ok={agent.tools > 0} tone={agent.tools > 0 ? "ok" : "neutral"} label={String(agent.tools)} />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <StatusPill ok={agent.tools > 0} tone={agent.tools > 0 ? "ok" : "neutral"} label={`${agent.tools} live`} />
+          {pendingTools > 0 && <StatusPill ok={false} tone="warn" label={`${pendingTools} wacht`} />}
+        </div>
       </div>
       {visibleTools.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
           {visibleTools.map((tool) => (
-            <span key={tool} className="max-w-full truncate rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] font-semibold text-slate-400">
-              {tool}
-            </span>
+            <ToolChip key={tool} label={tool} />
           ))}
           {remaining > 0 && (
-            <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] font-semibold text-slate-500">
-              +{remaining}
-            </span>
+            <ToolChip label={`+${remaining}`} />
           )}
+        </div>
+      )}
+      {visiblePendingTools.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className="flex h-6 items-center gap-1 text-[11px] font-semibold text-slate-500">
+            <LockKeyhole size={12} />
+            beschermd
+          </span>
+          {visiblePendingTools.map((tool) => (
+            <ToolChip key={tool} label={tool} tone="pending" />
+          ))}
+          {pendingRemaining > 0 && <ToolChip label={`+${pendingRemaining}`} tone="pending" />}
         </div>
       )}
     </div>
@@ -322,6 +412,22 @@ export function SettingsIntegrations({
             <MiniInfo label="Tools" value={`${aiDiagnostics.capabilities.tools} totaal`} />
           </div>
         )}
+
+        {aiDiagnostics && <ToolGovernancePanel diagnostics={aiDiagnostics} />}
+
+        {aiDiagnostics?.recommendations?.length ? (
+          <div className="mt-4">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+              <ShieldCheck size={13} />
+              Volgende optimalisaties
+            </div>
+            <div className="grid gap-2 lg:grid-cols-2">
+              {aiDiagnostics.recommendations.map((item) => (
+                <RecommendationCard key={`${item.priority}-${item.title}`} item={item} />
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {aiDiagnostics?.agents?.length ? (
           <div className="mt-4">
