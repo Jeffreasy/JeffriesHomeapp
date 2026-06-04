@@ -159,6 +159,8 @@ export function LaventeCareFunnelView({
                 <button
                   type="button"
                   onClick={onShowProjectForm}
+                  aria-label="Nieuw LaventeCare project starten"
+                  title="Nieuw project starten"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 transition-colors hover:bg-emerald-500/20"
                 >
                   <Plus size={16} />

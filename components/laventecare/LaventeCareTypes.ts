@@ -93,7 +93,7 @@ export type LeadForm = {
   website: string;
   pijnpunt: string;
   volgendeStap: string;
-  prioriteit: string;
+  prioriteit: "laag" | "normaal" | "hoog";
 };
 
 export const emptyLeadForm: LeadForm = {

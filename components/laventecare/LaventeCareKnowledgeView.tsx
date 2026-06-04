@@ -4,6 +4,8 @@ import { BookOpenText, ClipboardList, FileText, Layers3, Search } from "lucide-r
 import type { Dispatch, SetStateAction } from "react";
 import { LAVENTECARE_LEGAL_STACK, LAVENTECARE_PRICING } from "@/lib/laventecareData";
 import { label } from "./LaventeCareUtils";
+import { EmptyState } from "./LaventeCareCards";
+import type { DocumentItem } from "./LaventeCareTypes";
 
 export function LaventeCareKnowledgeView({
   search,
@@ -12,7 +14,7 @@ export function LaventeCareKnowledgeView({
 }: {
   search: string;
   setSearch: Dispatch<SetStateAction<string>>;
-  documentGroups: [string, any[]][];
+  documentGroups: [string, DocumentItem[]][];
 }) {
   return (
     <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.2fr_0.8fr]">
@@ -34,7 +36,12 @@ export function LaventeCareKnowledgeView({
         </div>
 
         <div className="mt-4 space-y-4">
-          {documentGroups.map(([category, docs]) => (
+          {documentGroups.length === 0 ? (
+            <EmptyState
+              title={search ? "Geen documenten gevonden" : "Documentbasis nog leeg"}
+              body={search ? "Pas je zoekterm aan of initialiseer de documentbasis opnieuw." : "Initialiseer de documentbasis bovenaan om LaventeCare-documentatie doorzoekbaar te maken."}
+            />
+          ) : documentGroups.map(([category, docs]) => (
             <div key={category}>
               <div className="mb-2 flex items-center gap-2">
                 <ClipboardList size={15} className="text-slate-400" />

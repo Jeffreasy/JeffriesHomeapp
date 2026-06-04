@@ -13,8 +13,7 @@ import { LaventeCareFunnelView } from "@/components/laventecare/LaventeCareFunne
 import { LaventeCareOperationsView } from "@/components/laventecare/LaventeCareOperationsView";
 import { LaventeCareKnowledgeView } from "@/components/laventecare/LaventeCareKnowledgeView";
 import { MetricCard } from "@/components/laventecare/LaventeCareCards";
-import { FileText, FolderKanban, Handshake, LifeBuoy, Sparkles, Target, Loader2, Plus, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { FileText, FolderKanban, Handshake, LifeBuoy, Sparkles, Target, Loader2, Plus } from "lucide-react";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { Modal } from "@/components/ui/Modal";
 import { LAVENTECARE_PROFILE } from "@/lib/laventecareData";
@@ -275,17 +274,12 @@ export default function LaventeCarePage() {
     <div className="text-slate-100">
       <LaventeCareHeader
         summary={summary}
-        businessSignals={businessSignals}
         seeding={seeding}
         showLeadForm={showLeadForm}
         setShowLeadForm={setShowLeadForm}
         showProjectForm={showProjectForm}
         setShowProjectForm={setShowProjectForm}
-        leadForm={leadForm}
-        setLeadForm={setLeadForm}
-        savingLead={savingLead}
         handleSeedDocuments={handleSeedDocuments}
-        handleLeadSubmit={handleLeadSubmit}
       />
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
@@ -373,7 +367,7 @@ export default function LaventeCarePage() {
                 <span className="text-xs font-semibold text-slate-400">Prioriteit</span>
                 <select
                   value={leadForm.prioriteit}
-                  onChange={(event) => setLeadForm((form) => ({ ...form, prioriteit: event.target.value as any }))}
+                  onChange={(event) => setLeadForm((form) => ({ ...form, prioriteit: event.target.value as LeadForm["prioriteit"] }))}
                   className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)]"
                 >
                   <option value="laag">Laag</option>

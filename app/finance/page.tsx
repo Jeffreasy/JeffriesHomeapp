@@ -254,7 +254,7 @@ export default function FinancePage() {
                     >
                       Alle rekeningen
                     </SegmentedButton>
-                    {stats.ibannen.map((iban: any) => (
+                    {stats.ibannen.map((iban: string) => (
                       <SegmentedButton
                         key={iban}
                         active={ibanFilter === iban}

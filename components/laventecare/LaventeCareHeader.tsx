@@ -2,36 +2,26 @@
 
 import { BookOpenText, BriefcaseBusiness, Loader2, Plus, X } from "lucide-react";
 import { motion } from "framer-motion";
-import type { FormEvent, Dispatch, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { LAVENTECARE_PROFILE } from "@/lib/laventecareData";
-import type { LeadForm, BusinessSignal } from "./LaventeCareTypes";
+import type { LCCockpit } from "@/lib/api";
 
 export function LaventeCareHeader({
   summary,
-  businessSignals,
   seeding,
   showLeadForm,
   setShowLeadForm,
   showProjectForm,
   setShowProjectForm,
-  leadForm,
-  setLeadForm,
-  savingLead,
   handleSeedDocuments,
-  handleLeadSubmit,
 }: {
-  summary: any;
-  businessSignals: BusinessSignal[];
+  summary: LCCockpit["summary"];
   seeding: boolean;
   showLeadForm: boolean;
   setShowLeadForm: Dispatch<SetStateAction<boolean>>;
   showProjectForm: boolean;
   setShowProjectForm: Dispatch<SetStateAction<boolean>>;
-  leadForm: LeadForm;
-  setLeadForm: Dispatch<SetStateAction<LeadForm>>;
-  savingLead: boolean;
   handleSeedDocuments: () => void;
-  handleLeadSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
     <>
@@ -53,21 +43,23 @@ export function LaventeCareHeader({
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:w-auto sm:flex sm:items-center">
               <button
                 type="button"
                 onClick={handleSeedDocuments}
                 disabled={seeding}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label={summary.documentsSeeded ? "LaventeCare documenten updaten" : "LaventeCare documenten initialiseren"}
+                className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1"
               >
                 {seeding ? <Loader2 size={16} className="animate-spin" /> : <BookOpenText size={16} />}
-                <span className="hidden sm:inline">{summary.documentsSeeded ? "Docs updaten" : "Docs initialiseren"}</span>
+                <span>{summary.documentsSeeded ? "Docs updaten" : "Docs initialiseren"}</span>
               </button>
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.94 }}
                 onClick={() => setShowProjectForm((value) => !value)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-500/15 px-4 text-sm font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/25 border border-emerald-500/30"
+                aria-label={showProjectForm ? "Projectformulier sluiten" : "Nieuw project starten"}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/15 px-3 text-sm font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/25 sm:px-4"
               >
                 {showProjectForm ? <X size={16} /> : <Plus size={16} />}
                 <span>Project starten</span>
@@ -76,7 +68,8 @@ export function LaventeCareHeader({
                 type="button"
                 whileTap={{ scale: 0.94 }}
                 onClick={() => setShowLeadForm((value) => !value)}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-sky-500/15 px-4 text-sm font-semibold text-sky-300 transition-colors hover:bg-sky-500/25 border border-sky-500/30"
+                aria-label={showLeadForm ? "Leadformulier sluiten" : "Nieuwe lead toevoegen"}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/15 px-3 text-sm font-semibold text-sky-300 transition-colors hover:bg-sky-500/25 sm:px-4"
               >
                 {showLeadForm ? <X size={16} /> : <Plus size={16} />}
                 <span>Nieuwe lead</span>
