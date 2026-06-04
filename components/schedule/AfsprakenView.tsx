@@ -8,6 +8,7 @@ import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents
 import { type DienstRow } from "@/lib/schedule";
 import { useToast } from "@/components/ui/Toast";
 import { PersonalEventItem } from "./PersonalEventItem";
+import { syncApi } from "@/lib/api";
 
 interface AfsprakenViewProps {
   diensten?:    DienstRow[];
@@ -16,19 +17,26 @@ interface AfsprakenViewProps {
 }
 
 export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenViewProps) {
-  const { upcoming, history, withConflicts, pending, isLoading } =
+  const { upcoming, history, withConflicts, pending, isLoading, refetch } =
     usePersonalEvents({ diensten });
 
   const { user } = useUser();
-  const { success, error } = useToast();
+  const { success, error, toast } = useToast();
   const [processing, setProcessing] = useState(false);
 
   const handleVerwerk = async () => {
     if (!user?.id) { error("Niet ingelogd"); return; }
     setProcessing(true);
     try {
-      // TODO: Implement calendar sync via Go API when available
-      success("Calendar sync wordt binnenkort via de Go API ondersteund");
+      const result = await syncApi.calendar(user.id);
+      await refetch();
+      if (result.pendingError) {
+        toast(`Agenda opgehaald; wachtrij faalde: ${shortSyncError(result.pendingError)}`, "info");
+      } else {
+        success(result.pendingProcessed
+          ? `${result.pendingProcessed} wachtrij-item(s) verwerkt`
+          : "Agenda gesynchroniseerd");
+      }
     } catch (err) {
       error(`Verwerken mislukt: ${err instanceof Error ? err.message : "onbekende fout"}`);
     } finally {
@@ -174,4 +182,8 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
       )}
     </div>
   );
+}
+
+function shortSyncError(error: string) {
+  return error.length > 140 ? `${error.slice(0, 137)}...` : error;
 }

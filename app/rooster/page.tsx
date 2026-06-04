@@ -140,7 +140,7 @@ export default function RoosterPage() {
     setCalSyncing(true);
     try {
       const result = await syncApi.calendar(user.id);
-      await refetch();
+      await Promise.all([refetch(), refetchEvents()]);
       if (result.pendingError) {
         toast(`Rooster en agenda opgehaald; wachtrij faalde: ${shortSyncError(result.pendingError)}`, "info");
       } else {
