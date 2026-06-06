@@ -30,6 +30,7 @@ import {
 } from "@/hooks/usePersonalEvents";
 import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
+import { AgendaCalendar } from "@/components/schedule/AgendaCalendar";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import { getDisplayTitle } from "@/components/notes/NotesUtils";
@@ -53,6 +54,7 @@ import {
 } from "@/components/schedule/AgendaCards";
 
 type AgendaView = "today" | "upcoming" | "pending" | "history";
+type CalendarMode = "month" | "week";
 
 type TimelineGroup = {
   date: string;
@@ -197,10 +199,15 @@ export default function AgendaPage() {
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
   const [editNote, setEditNote] = useState<NoteRecord | null>(null);
   const [noteDefaults, setNoteDefaults] = useState<{ deadline?: string; linkedEventId?: string; tags?: string[]; title?: string }>({});
+  const [eventInitialDate, setEventInitialDate] = useState<string | undefined>();
+  const [eventInitialTime, setEventInitialTime] = useState<string | undefined>();
   const [syncing, setSyncing] = useState(false);
   const [activeView, setActiveView] = useState<AgendaView>("today");
 
   const todayIso = getAmsterdamTodayIso();
+  const [calendarMode, setCalendarMode] = useState<CalendarMode>("month");
+  const [calendarCursorDate, setCalendarCursorDate] = useState(todayIso);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayIso);
   const monthEndIso = addDaysIso(todayIso, 30);
   const syncStatus = syncStatuses?.personal;
 
@@ -209,6 +216,10 @@ export default function AgendaPage() {
   const upcomingDienstEvents = useMemo(
     () => upcomingDiensten.map(dienstToTimelineEvent),
     [upcomingDiensten],
+  );
+  const allDienstEvents = useMemo(
+    () => diensten.map(dienstToTimelineEvent),
+    [diensten],
   );
   const historyDienstEvents = useMemo(
     () => getDienstHistory(diensten, 30).map(dienstToTimelineEvent),
@@ -251,6 +262,10 @@ export default function AgendaPage() {
     () => mergeTimelineEvents(agendaEvents, upcomingDienstEvents, historyDienstEvents),
     [agendaEvents, historyDienstEvents, upcomingDienstEvents],
   );
+  const calendarEvents = useMemo(
+    () => mergeTimelineEvents(agendaEvents, allDienstEvents).filter((event) => event.status !== "VERWIJDERD"),
+    [agendaEvents, allDienstEvents],
+  );
 
   const viewEvents = useMemo(() => {
     switch (activeView) {
@@ -292,13 +307,17 @@ export default function AgendaPage() {
 
   // ─── Actions ────────────────────────────────────────────────────────────
 
-  const openNewEvent = () => {
+  const openNewEvent = (date = selectedCalendarDate, time?: string) => {
     setEditEvent(null);
+    setEventInitialDate(date);
+    setEventInitialTime(time);
     setModalOpen(true);
   };
 
   const openEditEvent = (event: PersonalEvent) => {
     setEditEvent(event);
+    setEventInitialDate(undefined);
+    setEventInitialTime(undefined);
     setModalOpen(true);
   };
 
@@ -384,7 +403,8 @@ export default function AgendaPage() {
               <StatusPill status={syncStatus?.status} />
 
               <button
-                onClick={openNewEvent}
+                onClick={() => openNewEvent()}
+                aria-label="Nieuwe afspraak"
                 className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-500/12 border border-emerald-500/25 px-3 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/18 transition-colors cursor-pointer"
               >
                 <Plus size={14} />
@@ -459,6 +479,27 @@ export default function AgendaPage() {
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Wachtrij</p>
             <p className={`mt-1 text-lg font-semibold tabular-nums ${pending.length > 0 ? "text-sky-300" : "text-white"}`}>{pending.length}</p>
           </button>
+        </div>
+
+        <div className="mb-5">
+          <AgendaCalendar
+            events={calendarEvents}
+            notesByDate={notesByDate}
+            notesByEventId={notesByEventId}
+            conflictMap={conflictMap}
+            todayIso={todayIso}
+            selectedDate={selectedCalendarDate}
+            cursorDate={calendarCursorDate}
+            mode={calendarMode}
+            onSelectedDateChange={setSelectedCalendarDate}
+            onCursorDateChange={setCalendarCursorDate}
+            onModeChange={setCalendarMode}
+            onCreateEvent={(date, time) => openNewEvent(date, time)}
+            onCreateNoteForDate={openNewNoteForDate}
+            onCreateNoteForEvent={openNewNoteForEvent}
+            onEditEvent={openEditEvent}
+            onEditNote={openEditNote}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -688,10 +729,14 @@ export default function AgendaPage() {
       <CreateEventModal
         open={modalOpen}
         editEvent={editEvent}
+        initialDate={eventInitialDate}
+        initialTime={eventInitialTime}
         onSuccess={() => refetchEvents()}
         onClose={() => {
           setModalOpen(false);
           setEditEvent(null);
+          setEventInitialDate(undefined);
+          setEventInitialTime(undefined);
         }}
       />
 

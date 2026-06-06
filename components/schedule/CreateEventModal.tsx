@@ -53,13 +53,18 @@ interface CreateEventModalProps {
   onClose:    () => void;
   onSuccess?: () => void | Promise<void>;
   editEvent?: PersonalEvent | null;
+  initialDate?: string;
+  initialTime?: string;
 }
 
-export function CreateEventModal({ open, onClose, onSuccess, editEvent }: CreateEventModalProps) {
+export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialDate, initialTime }: CreateEventModalProps) {
   const { user }  = useUser();
   const { success, toast } = useToast();
 
   const today = getAmsterdamTodayIso();
+  const defaultDate = initialDate || today;
+  const defaultStartTime = initialTime || "09:00";
+  const defaultEndTime = initialTime ? addHours(initialTime, 1) : "10:00";
 
   const [titel,        setTitel]        = useState("");
   const [startDatum,   setStartDatum]   = useState(today);
@@ -75,10 +80,10 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
   const [error,        setError]        = useState("");
 
   const reset = useCallback(() => {
-    setTitel(""); setStartDatum(today); setEindDatum(today);
-    setHeledag(true); setStartTijd("09:00"); setEindTijd("10:00");
+    setTitel(""); setStartDatum(defaultDate); setEindDatum(defaultDate);
+    setHeledag(!initialTime); setStartTijd(defaultStartTime); setEindTijd(defaultEndTime);
     setLocatie(""); setBeschrijving(""); setCategorie("overig"); setSymbol(categoryIcon("overig")); setError("");
-  }, [today]);
+  }, [defaultDate, defaultEndTime, defaultStartTime, initialTime]);
 
   useEffect(() => {
     if (open) {
@@ -369,4 +374,12 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent }: Create
       )}
     </AnimatePresence>
   );
+}
+
+function addHours(time: string, hours: number) {
+  const [rawHour, rawMinute] = time.split(":").map(Number);
+  const hour = Number.isFinite(rawHour) ? rawHour : 9;
+  const minute = Number.isFinite(rawMinute) ? rawMinute : 0;
+  const nextHour = Math.min(23, hour + hours);
+  return `${String(nextHour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
