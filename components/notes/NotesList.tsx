@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Archive, CalendarClock, CheckCircle2, Inbox, Link2, NotebookPen, Pin, Plus, RotateCcw, Sparkles } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
-import { NoteCard } from "./NoteCard";
+import { NoteCard, type NoteBacklink } from "./NoteCard";
 import { SectionTitle } from "./NotesPrimitives";
 import type { NoteRecord } from "@/hooks/useNotes";
 import type { BoardMode, ViewMode, SortMode } from "./NotesUtils";
@@ -28,6 +28,7 @@ export function NotesList({
   handleUpdateContent,
   handleNavigateToNote,
   eventLabelById,
+  backlinksById,
 }: {
   displayed: NoteRecord[];
   isLoading: boolean;
@@ -47,6 +48,7 @@ export function NotesList({
   handleUpdateContent: (id: string, inhoud: string) => void | Promise<void>;
   handleNavigateToNote: (title: string) => void;
   eventLabelById?: Map<string, string>;
+  backlinksById?: Map<string, NoteBacklink[]>;
 }) {
   const activeSort = SORT_OPTIONS.find((option) => option.id === sortMode) ?? SORT_OPTIONS[0];
   const boardGroups = buildBoardGroups(displayed, viewMode);
@@ -135,6 +137,7 @@ export function NotesList({
                         onUpdateContent={handleUpdateContent}
                         onNavigateToNote={handleNavigateToNote}
                         linkedEventLabel={getLinkedEventLabel(note, eventLabelById)}
+                        backlinks={backlinksById?.get(note.id)}
                         masked={privacyOn}
                       />
                     ))}
@@ -168,6 +171,7 @@ export function NotesList({
                           onUpdateContent={handleUpdateContent}
                           onNavigateToNote={handleNavigateToNote}
                           linkedEventLabel={getLinkedEventLabel(note, eventLabelById)}
+                          backlinks={backlinksById?.get(note.id)}
                           masked={privacyOn}
                         />
                       ))
@@ -197,6 +201,7 @@ export function NotesList({
                 onUpdateContent={handleUpdateContent}
                 onNavigateToNote={handleNavigateToNote}
                 linkedEventLabel={getLinkedEventLabel(note, eventLabelById)}
+                backlinks={backlinksById?.get(note.id)}
                 masked={privacyOn}
               />
             ))}

@@ -417,13 +417,14 @@ export function NoteEditor({
       const isEditing = Boolean(note);
       const cleanTitle = titel.trim();
       const cleanContent = inhoud.trimEnd();
+      const cleanLinkedEventId = linkedEventId && eventById.has(linkedEventId) ? linkedEventId : "";
       await onSave({
         titel: cleanTitle || (isEditing ? "" : undefined),
         inhoud: cleanContent,
         tags: tags.length > 0 ? tags : isEditing ? [] : undefined,
         kleur: kleur || (isEditing ? "" : undefined),
         deadline: normalizeDeadlineForSave(deadline) || (isEditing ? "" : undefined),
-        linkedEventId: linkedEventId || (isEditing ? "" : undefined),
+        linkedEventId: cleanLinkedEventId || (isEditing ? "" : undefined),
         prioriteit,
         symbol,
       });
@@ -434,7 +435,7 @@ export function NoteEditor({
     } finally {
       setSaving(false);
     }
-  }, [actionBusy, canSave, currentSnapshot, deadline, inhoud, kleur, linkedEventId, note, onClose, onSave, prioriteit, symbol, tags, titel]);
+  }, [actionBusy, canSave, currentSnapshot, deadline, eventById, inhoud, kleur, linkedEventId, note, onClose, onSave, prioriteit, symbol, tags, titel]);
 
   const handleCloseAttempt = useCallback(async () => {
     if (isDirty) {
@@ -1441,6 +1442,22 @@ function EventLinkPicker({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {selectedEventId && !linkedEventExists && (
+        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2">
+          <p className="text-xs font-semibold text-amber-200">Koppeling niet meer beschikbaar</p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
+            Deze notitie verwijst naar een afspraak of dienst die niet meer in de agenda staat. Bij opslaan wordt de koppeling opgeschoond.
+          </p>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="mt-2 inline-flex h-8 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
+          >
+            Nu ontkoppelen
+          </button>
+        </div>
+      )}
     </div>
   );
 }

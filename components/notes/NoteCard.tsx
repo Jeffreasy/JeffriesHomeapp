@@ -3,10 +3,14 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2, CheckCircle2 } from "lucide-react";
-import { useGetNotesIdBacklinks } from "@/lib/api/generated/notes/notes";
 import type { NoteRecord } from "@/hooks/useNotes";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { resolveAppIconName } from "@/lib/symbols";
+
+export type NoteBacklink = {
+  id: string;
+  titel: string;
+};
 
 interface NoteCardProps {
   note: NoteRecord;
@@ -19,6 +23,7 @@ interface NoteCardProps {
   onUpdateContent?: (id: string, inhoud: string) => void | Promise<void>;
   onNavigateToNote?: (title: string) => void;
   linkedEventLabel?: string;
+  backlinks?: NoteBacklink[];
   masked?:     boolean;
 }
 
@@ -43,6 +48,7 @@ export function NoteCard({
   onUpdateContent,
   onNavigateToNote,
   linkedEventLabel,
+  backlinks = [],
   masked,
 }: NoteCardProps) {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
@@ -52,7 +58,6 @@ export function NoteCard({
   const allLines = note.inhoud.split("\n");
   const deadlineInfo = note.deadline ? getDeadlineInfo(note.deadline) : null;
   const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
-  const canLoadBacklinks = !masked && isUuid(note.id);
   const symbol = resolveAppIconName(note.symbol, "note");
   const compact = density === "compact";
   const isCompleted = note.isCompleted || note.is_completed;
@@ -61,10 +66,6 @@ export function NoteCard({
   const actionButtonClass = compact
     ? "flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[40px] sm:min-w-[40px]"
     : "flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-45";
-  
-  const { data: backlinksRaw } = useGetNotesIdBacklinks(note.id, { query: { enabled: canLoadBacklinks, staleTime: 60_000 } });
-  const backlinks = Array.isArray(backlinksRaw?.data) ? backlinksRaw.data : [];
-
   const runAction = async (action: PendingAction, callback: () => void | Promise<void>) => {
     if (pendingAction) return;
     setPendingAction(action);
@@ -333,10 +334,6 @@ function getChecklistInfo(text: string) {
   const total = lines.filter((l) => UNCHECKED.test(l) || CHECKED.test(l)).length;
   const done  = lines.filter((l) => CHECKED.test(l)).length;
   return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void | Promise<void>, onNavigateToNote?: (title: string) => void) {

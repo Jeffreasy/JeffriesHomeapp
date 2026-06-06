@@ -8,6 +8,7 @@ import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes
 import { formatDateRange, getTimeLabel, usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { useSchedule } from "@/hooks/useSchedule";
+import type { DienstRow } from "@/lib/schedule";
 import { NoteEditor } from "@/components/notes/NoteEditor";
 import {
   type BoardMode,
@@ -202,13 +203,25 @@ export default function NotitiesPage() {
     noteScope !== "all",
     sortMode !== "recent",
   ].filter(Boolean).length;
+  const dienstEventOptions = useMemo(
+    () => diensten.map(dienstToNoteEvent),
+    [diensten],
+  );
+  const noteEventOptions = useMemo(
+    () => mergeNoteEventOptions(agendaEvents, dienstEventOptions),
+    [agendaEvents, dienstEventOptions],
+  );
+  const backlinksById = useMemo(
+    () => buildBacklinksById([...active, ...completed, ...archived]),
+    [active, completed, archived],
+  );
   const eventLabelById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const event of agendaEvents) {
+    for (const event of noteEventOptions) {
       map.set(event.eventId, formatEventLabel(event));
     }
     return map;
-  }, [agendaEvents]);
+  }, [noteEventOptions]);
 
   // ── Handlers ───────────────────────────────────────────────
   const handleEdit = (note: NoteRecord) => {
@@ -377,6 +390,7 @@ export default function NotitiesPage() {
               handleUpdateContent={handleUpdateContent}
               handleNavigateToNote={handleNavigateToNote}
               eventLabelById={eventLabelById}
+              backlinksById={backlinksById}
             />
           </>
         )}
@@ -399,7 +413,7 @@ export default function NotitiesPage() {
             onToggleComplete={toggleComplete}
             onLoadRevisions={revisions}
             onRestoreRevision={restoreRevision}
-            eventOptions={agendaEvents}
+            eventOptions={noteEventOptions}
           />
         )}
       </AnimatePresence>
@@ -409,6 +423,90 @@ export default function NotitiesPage() {
 
 function formatEventLabel(event: PersonalEvent) {
   return `${formatDateRange(event)} · ${getTimeLabel(event)} · ${event.titel}`;
+}
+
+function dienstToNoteEvent(dienst: DienstRow): PersonalEvent {
+  const title = dienst.titel || dienst.shiftType || "Dienst";
+  return {
+    _id: dienst.eventId,
+    userId: "",
+    eventId: dienst.eventId,
+    titel: title,
+    startDatum: dienst.startDatum,
+    startTijd: dienst.startTijd || undefined,
+    eindDatum: dienst.eindDatum || dienst.startDatum,
+    eindTijd: dienst.eindTijd || undefined,
+    heledag: dienst.heledag,
+    locatie: dienst.locatie || undefined,
+    beschrijving: dienst.beschrijving || undefined,
+    symbol: "schedule",
+    status: dienst.status === "Gedraaid" ? "Voorbij" : dienst.status === "VERWIJDERD" ? "VERWIJDERD" : "Aankomend",
+    kalender: "Rooster",
+    shiftType: dienst.shiftType,
+    team: dienst.team,
+  };
+}
+
+function mergeNoteEventOptions(...groups: PersonalEvent[][]): PersonalEvent[] {
+  const byKey = new Map<string, PersonalEvent>();
+  for (const group of groups) {
+    for (const event of group) {
+      const key = `${event.kalender}:${event.eventId}`;
+      if (!byKey.has(key)) byKey.set(key, event);
+    }
+  }
+  return Array.from(byKey.values()).sort((a, b) => (
+    `${a.startDatum || "9999-12-31"}T${a.startTijd || "00:00"}`.localeCompare(`${b.startDatum || "9999-12-31"}T${b.startTijd || "00:00"}`) ||
+    a.titel.localeCompare(b.titel, "nl")
+  ));
+}
+
+type LocalBacklink = { id: string; titel: string };
+
+const WIKI_LINK_PATTERN = /\[\[([^\]\n]+)\]\]/g;
+
+function buildBacklinksById(notes: NoteRecord[]): Map<string, LocalBacklink[]> {
+  const byTitle = new Map<string, NoteRecord>();
+  for (const note of notes) {
+    const key = normalizeWikiTitle(getWikiTitle(note));
+    if (key && !byTitle.has(key)) byTitle.set(key, note);
+  }
+
+  const backlinks = new Map<string, LocalBacklink[]>();
+  for (const source of notes) {
+    for (const rawTitle of extractWikiLinkTitles(source.inhoud)) {
+      const target = byTitle.get(normalizeWikiTitle(rawTitle));
+      if (!target || target.id === source.id) continue;
+      const targetBacklinks = backlinks.get(target.id) ?? [];
+      if (!targetBacklinks.some((link) => link.id === source.id)) {
+        targetBacklinks.push({ id: source.id, titel: getDisplayTitle(source) });
+      }
+      backlinks.set(target.id, targetBacklinks);
+    }
+  }
+  return backlinks;
+}
+
+function extractWikiLinkTitles(content: string): string[] {
+  const seen = new Set<string>();
+  const titles: string[] = [];
+  for (const match of content.matchAll(WIKI_LINK_PATTERN)) {
+    const title = match[1]?.trim();
+    const key = normalizeWikiTitle(title);
+    if (!title || seen.has(key)) continue;
+    seen.add(key);
+    titles.push(title);
+  }
+  return titles;
+}
+
+function getWikiTitle(note: NoteRecord): string {
+  const firstLine = note.inhoud.split("\n")[0] ?? "";
+  return (note.titel || firstLine.slice(0, 50)).trim();
+}
+
+function normalizeWikiTitle(value?: string) {
+  return (value ?? "").trim().toLocaleLowerCase("nl-NL");
 }
 
 function NotesCaptureCard({
