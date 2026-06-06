@@ -52,34 +52,51 @@ export function WeekBlock({
   const appointmentCount = week.items.filter((item) => item.type === "afspraak").length;
   const weekNumber = formatWeekNumber(week.weeknr);
   const weekRange = formatDateRange(week.items);
+  const hasToday = todayIso ? week.items.some((item) => item.date === todayIso) : false;
 
   return (
-    <div className="glass min-w-0 overflow-hidden rounded-2xl border border-[var(--color-border)]">
+    <div
+      className={cn(
+        "glass min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] sm:rounded-2xl",
+        hasToday && "border-amber-500/30 bg-amber-500/[0.025]"
+      )}
+    >
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full flex-col gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)] sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-4"
+        aria-label={`Week ${weekNumber} ${open ? "inklappen" : "uitklappen"} (${index + 1})`}
+        className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus:outline-none focus:ring-2 focus:ring-amber-400/35 sm:px-4 sm:py-4"
       >
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] sm:flex">
-            <span className="text-xs font-bold text-slate-300">{index + 1}</span>
+        <div className="flex min-w-0 items-start gap-3">
+          <div
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]",
+              hasToday && "border-amber-500/30 bg-amber-500/10"
+            )}
+          >
+            <span className={cn("text-xs font-bold text-slate-300", hasToday && "text-amber-200")}>
+              W{weekNumber}
+            </span>
           </div>
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <p className="text-sm font-bold text-white">Week {weekNumber}</p>
               {weekRange && <span className="text-xs font-medium text-slate-500">{weekRange}</span>}
+              {hasToday && (
+                <span className="rounded-md border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-200">
+                  Vandaag
+                </span>
+              )}
             </div>
-            <p className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-semibold text-slate-500 sm:text-xs">
-              <span>{pluralize(week.dienstenAantal, "dienst", "diensten")}</span>
-              <span className="text-slate-700">/</span>
-              <span>{formatHours(week.werkUren)}</span>
-              <span className="text-slate-700">/</span>
-              <span>{pluralize(appointmentCount, "afspraak", "afspraken")}</span>
-            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold text-slate-400 sm:text-xs">
+              <span className="rounded-md border border-white/8 bg-white/[0.03] px-2 py-1">{pluralize(week.dienstenAantal, "dienst", "diensten")}</span>
+              <span className="rounded-md border border-white/8 bg-white/[0.03] px-2 py-1">{formatHours(week.werkUren)}</span>
+              <span className="rounded-md border border-white/8 bg-white/[0.03] px-2 py-1">{pluralize(appointmentCount, "afspraak", "afspraken")}</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="hidden rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200 sm:inline-flex">
+        <div className="flex items-center gap-2 pt-0.5">
+          <span className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200 sm:text-xs">
             {pluralize(week.items.length, "item")}
           </span>
           <ChevronDown

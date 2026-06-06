@@ -59,7 +59,7 @@ export function OverviewPanel({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <motion.div variants={itemVariants}>
               <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                Control center
+                Roosterstatus
               </p>
               <h2 className="mt-1 text-xl font-black tracking-tight text-white sm:text-2xl">Werk, agenda en signalen</h2>
             </motion.div>

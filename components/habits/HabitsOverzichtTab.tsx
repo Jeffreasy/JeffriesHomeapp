@@ -52,6 +52,8 @@ export function HabitsOverzichtTab({
   habits: HabitRecord[];
   todayHabits: HabitWithLog[];
 }) {
+  const todayById = new Map(todayHabits.map((habit) => [habit._id, habit]));
+
   return (
     <div className="mt-5 space-y-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -71,27 +73,30 @@ export function HabitsOverzichtTab({
           )}
           {!isLoading && groupedHabits.actief.length > 0 && (
             <div className="space-y-2">
-              {groupedHabits.actief.map((habit) => (
-                <HabitCard
-                  key={habit._id}
-                  habit={{ ...habit, log: null }}
-                  masked={privacyOn}
-                  onToggle={() => toggle(habit._id!)}
-                  onIncrement={(stap) => increment(habit._id!, stap)}
-                  onIncident={(trigger, notitie) =>
-                    incident(habit._id!, trigger, notitie)
-                  }
-                  onPause={() => pause(habit._id!)}
-                  onArchive={() => archive(habit._id!)}
-                  onRemove={() => setConfirmDelete(habit._id!)}
-                  onEdit={() => setEditingHabit(habit._id!)}
-                />
-              ))}
+              {groupedHabits.actief.map((habit) => {
+                const todayVersion = todayById.get(habit._id);
+                return (
+                  <HabitCard
+                    key={habit._id}
+                    habit={{ ...habit, log: todayVersion?.log ?? null }}
+                    masked={privacyOn}
+                    onToggle={() => toggle(habit._id!)}
+                    onIncrement={(stap) => increment(habit._id!, stap)}
+                    onIncident={(trigger, notitie) =>
+                      incident(habit._id!, trigger, notitie)
+                    }
+                    onPause={() => pause(habit._id!)}
+                    onArchive={() => archive(habit._id!)}
+                    onRemove={() => setConfirmDelete(habit._id!)}
+                    onEdit={() => setEditingHabit(habit._id!)}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
 
-        <aside className="space-y-3">
+        <aside className="hidden space-y-3 lg:block">
           <SidePanel title="Verdeling">
             <div className="space-y-2">
               <DistributionRow

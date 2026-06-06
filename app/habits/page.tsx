@@ -151,16 +151,20 @@ export default function HabitsPage() {
           habits={habits}
         />
 
-        <div className="mt-5 flex overflow-x-auto rounded-lg border border-white/10 bg-white/[0.03] p-1">
+        <nav
+          aria-label="Habit onderdelen"
+          className="mt-5 grid grid-cols-3 gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1"
+        >
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
               onClick={() => setActiveTab(id)}
               aria-pressed={activeTab === id}
+              aria-current={activeTab === id ? "page" : undefined}
               aria-label={`Tab ${label}`}
               className={cn(
-                "relative flex h-10 min-w-36 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors",
+                "relative flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40 sm:gap-2 sm:text-sm",
                 activeTab === id
                   ? "text-amber-200"
                   : "text-slate-500 hover:text-slate-300",
@@ -179,7 +183,7 @@ export default function HabitsPage() {
               </span>
             </button>
           ))}
-        </div>
+        </nav>
 
         <AnimatePresence mode="wait">
           {activeTab === "vandaag" && (

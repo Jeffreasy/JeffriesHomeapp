@@ -553,6 +553,7 @@ export default function AgendaPage() {
               compact
               afspraken={nextDienst ? (eventsByDate[nextDienst.startDatum] ?? []) : []}
               conflictMap={conflictMap}
+              todayIso={todayIso}
             />
 
             <NextEventCard event={nextAppointment} />

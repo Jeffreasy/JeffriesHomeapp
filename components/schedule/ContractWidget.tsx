@@ -30,14 +30,12 @@ export function ContractWidget() {
   const overSegments = isOver ? Math.min(3, Math.ceil((currentOrNextWeek.delta / currentOrNextWeek.expectedHours) * segments)) : 0;
 
   const accentColor = isOver ? "#f97316" : isUnder ? "#ef4444" : "#10b981"; // Orange, Red, Green
-  const bgAccentColor = isOver ? "rgba(249,115,22,0.15)" : isUnder ? "rgba(239,68,68,0.15)" : "rgba(16,185,129,0.15)";
-
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-      className="relative mb-6 overflow-hidden bg-black/40 border-l-4 p-5 sm:p-6 shadow-2xl backdrop-blur-xl"
+      className="relative mb-6 overflow-hidden rounded-xl border-l-4 bg-black/40 p-5 shadow-2xl backdrop-blur-xl sm:p-6"
       style={{ 
         borderLeftColor: accentColor,
         borderTop: "1px solid rgba(255,255,255,0.05)",
@@ -45,16 +43,6 @@ export function ContractWidget() {
         borderBottom: "1px solid rgba(255,255,255,0.05)",
       }}
     >
-      {/* Decorative HUD Elements */}
-      <div className="absolute top-0 right-0 p-2 opacity-30 flex gap-1 pointer-events-none">
-        <div className="w-1 h-1 bg-white" />
-        <div className="w-4 h-1 bg-white" />
-        <div className="w-1 h-1 bg-white" />
-      </div>
-      <div className="absolute -right-10 -bottom-10 opacity-5 pointer-events-none select-none">
-        <h1 className="text-9xl font-black italic tracking-tighter">CT-16</h1>
-      </div>
-
       <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
         
         {/* Left Side: Massive Typographic Hours */}
@@ -62,7 +50,7 @@ export function ContractWidget() {
           <div className="flex items-center gap-2 mb-2 opacity-80">
             <Target size={14} className="text-slate-400" />
             <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">
-              Contract Baseline · Wk {currentOrNextWeek.weeknr}
+              Contracturen · week {currentOrNextWeek.weeknr}
             </span>
           </div>
           
@@ -71,7 +59,7 @@ export function ContractWidget() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
-              className="text-6xl md:text-7xl font-black tracking-tighter text-white tabular-nums leading-none"
+              className="text-5xl font-black leading-none tracking-tight text-white tabular-nums md:text-6xl"
             >
               {currentOrNextWeek.actualHours}
               <span className="text-2xl text-slate-600 font-bold ml-1">/{currentOrNextWeek.expectedHours}</span>
@@ -97,9 +85,9 @@ export function ContractWidget() {
           
           {/* Segmented Bar */}
           <div className="space-y-1.5">
-            <div className="flex justify-between text-[10px] uppercase font-bold tracking-widest text-slate-500">
-              <span>0h</span>
-              <span>16h Target</span>
+            <div className="flex justify-between text-[10px] font-bold tracking-widest text-slate-500">
+              <span>0u</span>
+              <span>16u doel</span>
             </div>
             
             <div className="flex h-3 gap-0.5 w-full">
@@ -126,21 +114,21 @@ export function ContractWidget() {
           </div>
 
                     {/* Global Balance */}
-          <div className="flex justify-between items-center bg-black/40 border border-slate-800 p-3">
-            <span className="text-xs uppercase tracking-widest font-semibold text-slate-400">Global Balance</span>
+          <div className="flex justify-between items-center rounded-lg bg-black/40 border border-slate-800 p-3">
+            <span className="text-xs uppercase tracking-widest font-semibold text-slate-400">Totaalbalans</span>
             <span 
               className="text-xl font-black tabular-nums"
               style={{ color: stats.totalDelta > 0 ? "#f97316" : stats.totalDelta < 0 ? "#ef4444" : "#10b981" }}
             >
               {stats.totalDelta > 0 ? "+" : ""}{stats.totalDelta}
-              <span className="text-xs ml-1 opacity-60 uppercase tracking-widest">HRS</span>
+              <span className="ml-1 text-xs opacity-60 tracking-widest">u</span>
             </span>
           </div>
 
           {/* Weekly History Sparkline */}
           <div className="pt-2">
             <div className="flex items-end h-8 gap-1 w-full opacity-80">
-              {stats.weeklyBalances.slice(-15).map((w, i) => {
+              {stats.weeklyBalances.slice(-15).map((w) => {
                 const h = Math.max(2, Math.min(32, Math.abs(w.delta) * 2));
                 const isOver = w.delta > 0;
                 const color = isOver ? "#f97316" : w.delta < 0 ? "#ef4444" : "#10b981";
@@ -158,8 +146,8 @@ export function ContractWidget() {
               })}
             </div>
             <div className="flex justify-between mt-1 text-[8px] uppercase tracking-widest text-slate-500 font-bold">
-              <span>Historical Trend (15w)</span>
-              <span>{stats.weeklyBalances.length}w tracked</span>
+              <span>Trend 15 weken</span>
+              <span>{stats.weeklyBalances.length} weken</span>
             </div>
           </div>
 

@@ -46,15 +46,15 @@ function MonthStreamItem({
     <motion.button
       onClick={onClick}
       whileHover={!empty ? { x: 4 } : {}}
-      className={`w-full text-left relative flex items-center justify-between border-b transition-colors group ${
+      className={`group relative flex w-full min-w-0 items-center justify-between border-b text-left transition-colors ${
         active 
           ? "border-white bg-white/5" 
           : "border-white/10 hover:bg-white/5"
       }`}
     >
-      <div className="py-4 pl-2 pr-4 flex-1">
-        <div className="flex items-center gap-4">
-          <div className="w-16">
+      <div className="min-w-0 flex-1 py-3 pl-2 pr-3 sm:py-4 sm:pr-4">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <div className="w-12 shrink-0 sm:w-16">
             <p className={`text-[10px] font-bold uppercase tracking-widest ${
               empty ? "text-slate-600" : isCurrent ? "text-green-400" : "text-slate-400"
             }`}>
@@ -62,17 +62,17 @@ function MonthStreamItem({
             </p>
           </div>
           
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             {empty ? (
-              <p className="text-slate-700 text-xs tracking-widest font-mono">NO DATA</p>
+              <p className="font-mono text-xs tracking-widest text-slate-700">Geen data</p>
             ) : (
-              <div className="flex items-center gap-4">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                 <p className={`text-xl font-black tabular-nums tracking-tighter ${
                   active ? "text-white" : "text-slate-300 group-hover:text-white"
                 }`}>
                   {stats.totalHours}<span className="text-xs text-slate-500 ml-0.5">h</span>
                 </p>
-                <div className="flex-1 max-w-[100px] opacity-60">
+                <div className="min-w-12 max-w-[100px] flex-1 opacity-60">
                   <ShiftSegment shifts={stats.shifts} total={stats.count} />
                 </div>
               </div>
@@ -80,9 +80,9 @@ function MonthStreamItem({
           </div>
           
           {!empty && (
-            <div className="text-right">
+            <div className="shrink-0 text-right">
               <p className="text-[10px] uppercase text-slate-500 font-bold tracking-widest">
-                {stats.count} SHIFTS
+                {stats.count} diensten
               </p>
             </div>
           )}
@@ -105,14 +105,14 @@ function MonthDetailStream({ stats }: { stats: MonthStats }) {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
-      className="p-6 bg-black/40 border-l border-white/10 h-full"
+      className="h-full border-l border-white/10 bg-black/40 p-4 sm:p-6"
     >
-      <div className="mb-8 pb-4 border-b border-white/10">
-        <h3 className="text-3xl font-black tracking-tighter uppercase text-white mb-2">{stats.label}</h3>
-        <div className="flex gap-4 text-[10px] uppercase font-bold tracking-widest text-slate-500">
-          <span>Total: {stats.totalHours}H</span>
-          <span>Shifts: {stats.count}</span>
-          <span>Avg: {stats.avgDuur}H</span>
+      <div className="mb-6 border-b border-white/10 pb-4 sm:mb-8">
+        <h3 className="mb-2 text-2xl font-black uppercase tracking-tight text-white sm:text-3xl">{stats.label}</h3>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          <span>Totaal: {stats.totalHours}u</span>
+          <span>Diensten: {stats.count}</span>
+          <span>Gem: {stats.avgDuur}u</span>
         </div>
       </div>
 
@@ -124,10 +124,10 @@ function MonthDetailStream({ stats }: { stats: MonthStats }) {
               <div className="absolute -left-[5px] top-1.5 w-2 h-2 bg-slate-800 rounded-none border border-slate-600" />
               
               <div className="flex items-center justify-between mb-3">
-                <p className="text-[10px] text-white uppercase tracking-widest font-black">
-                  WK {weeknr}
+                <p className="text-[10px] font-black uppercase tracking-widest text-white">
+                  Week {weeknr}
                 </p>
-                <p className="text-[10px] text-slate-400 font-bold">{wkHours}H</p>
+                <p className="text-[10px] font-bold text-slate-400">{wkHours}u</p>
               </div>
               
               <div className="space-y-1">
@@ -162,7 +162,7 @@ function DienstregelItem({ dienst }: { dienst: DienstRow }) {
         <p className="text-xs font-mono text-slate-300">
           {dienst.startTijd}<span className="text-slate-600 px-1">-</span>{dienst.eindTijd}
         </p>
-        <p className="text-[10px] font-bold text-slate-500 w-8 text-right">{dienst.duur}H</p>
+        <p className="w-8 text-right text-[10px] font-bold text-slate-500">{dienst.duur}u</p>
       </div>
     </div>
   );
@@ -174,20 +174,20 @@ function YearSummaryHero({ year }: { year: YearStats }) {
       <div>
         <div className="flex items-center gap-2 mb-2">
           <Crosshair size={14} className="text-slate-400" />
-          <p className="text-[10px] text-slate-400 uppercase tracking-[0.2em] font-bold">Annual Volume · {year.year}</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Jaarvolume · {year.year}</p>
         </div>
-        <p className="text-7xl md:text-8xl font-black text-white tracking-tighter leading-none tabular-nums">
-          {year.totalHours}<span className="text-3xl text-slate-600 font-bold ml-2">H</span>
+        <p className="text-5xl font-black leading-none tracking-tight text-white tabular-nums sm:text-7xl md:text-8xl">
+          {year.totalHours}<span className="ml-2 text-2xl font-bold text-slate-600 sm:text-3xl">u</span>
         </p>
       </div>
       
-      <div className="flex gap-8">
+      <div className="flex gap-6 sm:gap-8">
         <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Total Shifts</p>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Diensten</p>
           <p className="text-3xl font-black text-slate-300 tabular-nums">{year.count}</p>
         </div>
         <div>
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Avg Duration</p>
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Gemiddeld</p>
           <p className="text-3xl font-black text-slate-300 tabular-nums">
             {year.count ? Math.round((year.totalHours / year.count) * 10) / 10 : 0}
           </p>
@@ -226,7 +226,7 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center border border-white/5 bg-black/20">
         <TrendingUp size={32} className="text-slate-700 mb-4" />
-        <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">No Data Stream</p>
+        <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Geen roosterdata</p>
       </div>
     );
   }
@@ -235,12 +235,12 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
     <div className="space-y-6">
 
       {/* Year Tabs */}
-      <div className="flex items-center gap-2 mb-8">
+      <div className="mb-6 flex items-center gap-2 overflow-x-auto scrollbar-none sm:mb-8">
         {years.map(y => (
           <button
             key={y.year}
             onClick={() => { setActiveYear(y.year); setActiveMonth(null); }}
-            className={`px-6 py-2 text-[10px] font-black uppercase tracking-widest transition-all ${
+            className={`shrink-0 px-5 py-2 text-[10px] font-black uppercase tracking-widest transition-all sm:px-6 ${
               y.year === activeYear
                 ? "bg-white text-black"
                 : "bg-transparent text-slate-500 hover:text-white border border-white/10"
@@ -260,7 +260,7 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
           
           {/* Left: Month Stream */}
           <div className="w-full md:w-1/3">
-            <p className="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold mb-4">Monthly Stream</p>
+            <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Maanden</p>
             <div className="flex flex-col">
               {allMonths.map(m => (
                 <MonthStreamItem
@@ -278,7 +278,7 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
           </div>
 
           {/* Right: Month Detail Stream */}
-          <div className="w-full md:w-2/3 min-h-[500px]">
+          <div className="min-h-[260px] w-full md:min-h-[500px] md:w-2/3">
             <AnimatePresence mode="wait">
               {monthData && monthData.count > 0 ? (
                 <MonthDetailStream key={monthData.month} stats={monthData} />
@@ -287,10 +287,10 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="h-full flex items-center justify-center border border-white/5 bg-black/20 p-12"
+                  className="flex h-full items-center justify-center border border-white/5 bg-black/20 p-8 text-center sm:p-12"
                 >
                   <p className="text-[10px] uppercase font-bold tracking-widest text-slate-600">
-                    Select a month to view stream details
+                    Kies een maand voor details
                   </p>
                 </motion.div>
               )}

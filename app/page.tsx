@@ -222,6 +222,7 @@ export default function DashboardPage() {
                   dienst={nextDienst}
                   afspraken={nextShiftEvents}
                   conflictMap={conflictMap}
+                  todayIso={todayIso}
                 />
 
                 <Panel className="p-3 sm:p-5">

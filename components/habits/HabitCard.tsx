@@ -129,7 +129,7 @@ export function HabitCard({
             : "1px solid rgba(255,255,255,0.05)",
       }}
     >
-      <div className="flex items-center p-3.5 gap-3">
+      <div className="flex items-center gap-3 p-3 sm:p-3.5">
         {/* Check button (positief, niet-kwantitatief) / Status indicator (negatief) */}
         {isNegative ? (
           <div
@@ -254,7 +254,7 @@ export function HabitCard({
             type="button"
             onClick={() => setShowTriggerModal(true)}
             aria-label={`Incident loggen voor ${displayName}`}
-            className="w-10 h-10 rounded-xl bg-red-500/8 border border-red-500/12 flex items-center justify-center shrink-0 active:scale-90 transition-transform cursor-pointer"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-500/12 bg-red-500/8 transition-transform active:scale-90"
             title="Incident loggen"
           >
             <AlertTriangle size={16} className="text-red-400/70" />
@@ -265,9 +265,10 @@ export function HabitCard({
         <button
           type="button"
           onClick={() => setShowMenu(!showMenu)}
+          aria-expanded={showMenu}
           aria-label={`Acties voor ${displayName}`}
           title="Acties"
-          className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 hover:bg-[var(--color-surface-hover)] transition-colors cursor-pointer"
+          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl transition-colors hover:bg-[var(--color-surface-hover)]"
         >
           <MoreVertical size={16} className="text-slate-500" />
         </button>
@@ -476,7 +477,7 @@ export function HabitCard({
                     aria-label={
                       masked ? `Trigger ${index + 1}` : `Trigger ${t.label}`
                     }
-                    className="py-2.5 px-3 rounded-xl text-[11px] text-left font-medium transition-all min-h-[44px] cursor-pointer active:scale-95"
+                  className="min-h-[44px] cursor-pointer rounded-xl px-3 py-2.5 text-left text-[11px] font-medium transition-all active:scale-95"
                     style={{
                       background:
                         selectedTrigger === t.value

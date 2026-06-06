@@ -26,8 +26,8 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
 
   return (
     <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4 min-w-0">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="text-[10px] text-amber-400/70 uppercase tracking-wider">
             {isWerkelijk ? "Werkelijke loonstrook" : isRoosterForecast ? "Roosterprognose" : "Lopende maand prognose"}
           </p>
@@ -35,7 +35,7 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
             {MAANDEN[record.maand - 1]} {record.jaar}
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-start gap-1 sm:items-end">
           <span className="text-[10px] text-slate-500 bg-[var(--color-surface)] px-2 py-1 rounded-lg">
             uurloon ORT €{record.uurloonORT.toFixed(2)}
           </span>
@@ -169,12 +169,12 @@ export function JaarSectie({ jaar, records }: { jaar: number; records: SalarisDi
 
   return (
     <div className="glass rounded-2xl border border-[var(--color-border)] overflow-hidden min-w-0">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="flex flex-col gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-200">
           <AppIcon name="calendar" tone="slate" size="sm" />
           {jaar}
         </span>
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           {werkelijkAantal > 0 && <span className="text-emerald-400">{werkelijkAantal} werkelijk</span>}
           <span className="text-slate-500">Bruto <span className="text-slate-300 font-medium">{fmt(totBruto)}</span></span>
           <span className="text-slate-500">Netto <span className="text-emerald-400 font-bold">{fmt(totNetto)}</span></span>

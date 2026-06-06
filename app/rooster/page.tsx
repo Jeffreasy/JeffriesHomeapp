@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Calendar, CalendarClock, Clock3, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Briefcase, Calendar, CalendarClock, Clock3, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 
 import { useUser } from "@clerk/nextjs";
 import { useSchedule } from "@/hooks/useSchedule";
@@ -18,20 +18,21 @@ import { calcTotalHours, getHistory, getUpcoming, shiftBreakdown, teamBreakdown 
 import { generateUnifiedTimeline } from "@/lib/unified";
 import { cn } from "@/lib/utils";
 
-import { getAmsterdamTodayIso, formatMetaDate, formatShortDate, type Tab, TABS } from "@/components/schedule/RoosterUtils";
+import { getAmsterdamTodayIso, formatHours, formatMetaDate, formatShortDate, pluralize, type Tab, TABS } from "@/components/schedule/RoosterUtils";
 import { EmptyRoster, SectionHeader } from "@/components/schedule/RoosterCards";
 import { OverviewPanel, OverviewTab } from "@/components/schedule/RoosterOverview";
 
 function TabBar({ active, onChange }: { active: Tab; onChange: (tab: Tab) => void }) {
   return (
-    <div className="flex gap-1 overflow-x-auto scrollbar-none">
+    <nav aria-label="Rooster onderdelen" className="flex gap-1 overflow-x-auto scrollbar-none">
       {TABS.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
           type="button"
           onClick={() => onChange(id)}
+          aria-current={active === id ? "page" : undefined}
           className={cn(
-            "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
+            "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40",
             active === id
               ? "border-amber-500/30 bg-amber-500/12 text-amber-200"
               : "border-transparent text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
@@ -41,6 +42,76 @@ function TabBar({ active, onChange }: { active: Tab; onChange: (tab: Tab) => voi
           {label}
         </button>
       ))}
+    </nav>
+  );
+}
+
+function MobileRosterSnapshot({
+  upcomingHours,
+  upcomingCount,
+  eventCount,
+  todayEventCount,
+  conflicts,
+  hardConflicts,
+}: {
+  upcomingHours: number;
+  upcomingCount: number;
+  eventCount: number;
+  todayEventCount: number;
+  conflicts: number;
+  hardConflicts: number;
+}) {
+  return (
+    <section className="grid grid-cols-2 gap-2 md:hidden" aria-label="Rooster samenvatting">
+      <MobileMetric icon={Clock3} label="Komende uren" value={formatHours(upcomingHours)} sub={pluralize(upcomingCount, "dienst", "diensten")} tone="amber" />
+      <MobileMetric icon={Briefcase} label="Diensten" value={String(upcomingCount)} sub="komende 30 dagen" tone="blue" />
+      <MobileMetric
+        icon={CalendarClock}
+        label="Afspraken"
+        value={todayEventCount > 0 ? `${todayEventCount} vandaag` : String(eventCount)}
+        sub={todayEventCount > 0 ? "vandaag" : "aankomend"}
+        tone="indigo"
+      />
+      <MobileMetric
+        icon={AlertTriangle}
+        label="Conflicten"
+        value={hardConflicts > 0 ? `${hardConflicts} hard` : String(conflicts)}
+        sub={hardConflicts > 0 ? "direct nalopen" : conflicts > 0 ? "aandacht" : "rustig"}
+        tone={hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "green"}
+      />
+    </section>
+  );
+}
+
+function MobileMetric({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  tone,
+}: {
+  icon: typeof Clock3;
+  label: string;
+  value: string;
+  sub: string;
+  tone: "amber" | "blue" | "green" | "indigo" | "rose";
+}) {
+  const toneClass = {
+    amber: "border-amber-500/20 bg-amber-500/8 text-amber-200",
+    blue: "border-sky-500/20 bg-sky-500/8 text-sky-200",
+    green: "border-emerald-500/20 bg-emerald-500/8 text-emerald-200",
+    indigo: "border-indigo-500/20 bg-indigo-500/8 text-indigo-200",
+    rose: "border-rose-500/20 bg-rose-500/8 text-rose-200",
+  }[tone];
+
+  return (
+    <div className={cn("min-w-0 rounded-xl border px-3 py-2.5", toneClass)}>
+      <div className="flex items-center gap-2">
+        <Icon size={13} className="shrink-0 opacity-80" />
+        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
+      </div>
+      <p className="mt-2 truncate text-lg font-bold tracking-tight">{value}</p>
+      <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{sub}</p>
     </div>
   );
 }
@@ -189,17 +260,17 @@ export default function RoosterPage() {
   return (
     <div className="text-slate-100">
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 sm:h-11 sm:w-11">
                 <Calendar size={20} className="text-amber-300" />
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Planning
                 </p>
-                <h1 className="mt-1 truncate text-2xl font-bold text-white">Rooster</h1>
+                <h1 className="mt-1 truncate text-xl font-bold text-white sm:text-2xl">Rooster</h1>
                 <p className="mt-1 text-sm text-slate-500">
                   {meta
                     ? `${meta.totalRows} diensten - gesynct ${formatMetaDate(meta.importedAt)}`
@@ -208,10 +279,10 @@ export default function RoosterPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
               {meta && (
                 confirmClear ? (
-                  <div className="inline-flex h-10 items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3">
+                  <div className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 sm:col-span-1">
                     <span className="text-xs font-semibold text-rose-300">Wissen?</span>
                     <button
                       type="button"
@@ -236,7 +307,7 @@ export default function RoosterPage() {
                       setConfirmClear(true);
                       window.setTimeout(() => setConfirmClear(false), 3500);
                     }}
-                    className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-400 transition-colors hover:border-rose-500/25 hover:bg-rose-500/10 hover:text-rose-300"
+                    className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-400 transition-colors hover:border-rose-500/25 hover:bg-rose-500/10 hover:text-rose-300"
                   >
                     <Trash2 size={15} />
                     <span className="hidden sm:inline">Wissen</span>
@@ -249,7 +320,7 @@ export default function RoosterPage() {
                 aria-label="CSV rooster importeren"
                 onClick={() => fileRef.current?.click()}
                 disabled={isLoading}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Upload size={16} />
                 <span className="hidden sm:inline">CSV</span>
@@ -259,7 +330,7 @@ export default function RoosterPage() {
                 type="button"
                 onClick={handleCalendarSync}
                 disabled={calSyncing}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw size={16} className={calSyncing ? "animate-spin" : ""} />
                 <span>{calSyncing ? "Syncing" : "Sync"}</span>
@@ -269,7 +340,7 @@ export default function RoosterPage() {
                 type="button"
                 aria-label="Nieuwe afspraak"
                 onClick={openNewEvent}
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 text-sm font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/15"
+                className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 text-sm font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/15"
               >
                 <Plus size={16} />
                 <span className="hidden sm:inline">Afspraak</span>
@@ -327,6 +398,15 @@ export default function RoosterPage() {
                   onImport={handleCalendarSync}
                   afspraken={nextShiftEvents}
                   conflictMap={conflictMap}
+                  todayIso={todayIso}
+                />
+                <MobileRosterSnapshot
+                  upcomingHours={upcomingHours}
+                  upcomingCount={upcoming.length}
+                  eventCount={upcomingEvents.length}
+                  todayEventCount={todayEvents.length}
+                  hardConflicts={hardConflicts}
+                  conflicts={withConflicts.length}
                 />
               </div>
             </section>

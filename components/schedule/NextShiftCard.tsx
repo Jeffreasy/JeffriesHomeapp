@@ -15,12 +15,12 @@ function formatDate(iso: string, style: "compact" | "full" = "full"): string {
   return style === "compact" ? `${day}-${month}` : `${day}-${month}-${year}`;
 }
 
-/** Bereken menselijke relatieve datum. */
-function getRelativeDay(iso: string): string {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const target = new Date(iso + "T00:00:00");
-  target.setHours(0, 0, 0, 0);
+/** Bereken menselijke relatieve datum op basis van een stabiele Amsterdam-datum. */
+function getRelativeDay(iso: string, todayIso?: string | null): string | null {
+  if (!todayIso) return null;
+  const today = new Date(`${todayIso}T12:00:00`);
+  const target = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(today.getTime()) || Number.isNaN(target.getTime())) return null;
   const diff = Math.round((target.getTime() - today.getTime()) / 86_400_000);
   if (diff === 0) return "vandaag";
   if (diff === 1) return "morgen";
@@ -39,9 +39,10 @@ interface NextShiftCardProps {
   onImport?:  () => void;
   afspraken?: PersonalEvent[];
   conflictMap?: Map<string, ConflictInfo>;
+  todayIso?: string | null;
 }
 
-export function NextShiftCard({ dienst, compact, onImport, afspraken = [], conflictMap }: NextShiftCardProps) {
+export function NextShiftCard({ dienst, compact, onImport, afspraken = [], conflictMap, todayIso }: NextShiftCardProps) {
   if (!dienst) {
     return (
       <div className={cn(
@@ -65,8 +66,10 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
 
   const colors      = shiftTypeColor(dienst.shiftType);
   const isBezig      = dienst.status === "Bezig";
-  const relativeDay  = getRelativeDay(dienst.startDatum);
-  const relativeDate = `${capitalize(relativeDay)} (${formatDate(dienst.startDatum, "full")})`;
+  const relativeDay  = getRelativeDay(dienst.startDatum, todayIso);
+  const relativeDate = relativeDay
+    ? `${capitalize(relativeDay)} (${formatDate(dienst.startDatum, "full")})`
+    : formatDate(dienst.startDatum, "full");
   const isToday      = relativeDay === "vandaag";
   const isTomorrow   = relativeDay === "morgen";
   const isZondag     = dienst.dag === "Zondag";
@@ -128,7 +131,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
                   size="xs"
                   iconClassName={isToday ? "fill-current" : undefined}
                 />
-                {isToday ? "Vandaag" : relativeDay.charAt(0).toUpperCase() + relativeDay.slice(1)}
+              {isToday ? "Vandaag" : relativeDay ? capitalize(relativeDay) : formatDate(dienst.startDatum, "compact")}
               </p>
             )}
             {isZondag && (
@@ -199,9 +202,9 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
         {isZaterdag && <span className="ml-2 text-yellow-600">weekend</span>}
         <span className="ml-auto font-normal normal-case tracking-normal opacity-70">
           {dienst.shiftType}
-          {!isBezig && (
+          {!isBezig && relativeDay && (
             <span className="ml-2 font-semibold">
-              · {relativeDay}
+              {" "}· {relativeDay}
             </span>
           )}
         </span>

@@ -75,10 +75,14 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
               )}
             </div>
 
-            <p className="mt-2 font-mono text-sm font-semibold tracking-tight text-slate-200">
-              {dienst.startTijd}<span className="mx-1 text-slate-600">-</span>{dienst.eindTijd}
-              <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">{dienst.duur}u</span>
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-mono text-sm font-semibold tracking-tight text-slate-200">
+                {dienst.startTijd}<span className="mx-1 text-slate-600">-</span>{dienst.eindTijd}
+              </span>
+              <span className="rounded-md border border-white/8 bg-white/[0.03] px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-slate-500">
+                {dienst.duur}u
+              </span>
+            </div>
 
             {dienst.locatie && (
               <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-[10px] font-semibold uppercase tracking-wider text-slate-500">

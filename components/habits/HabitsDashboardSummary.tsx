@@ -62,7 +62,7 @@ export function HabitsDashboardSummary({
   return (
     <>
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="glass p-4 sm:p-5">
+        <div className="glass p-3.5 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">
@@ -74,7 +74,7 @@ export function HabitsDashboardSummary({
                   onClick={() => moveDate(-1)}
                   aria-label="Vorige dag"
                   title="Vorige dag"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
                 >
                   <ChevronLeft size={18} />
                 </button>
@@ -83,7 +83,7 @@ export function HabitsDashboardSummary({
                   onClick={resetDate}
                   aria-label="Terug naar vandaag"
                   className={cn(
-                    "inline-flex h-10 min-w-36 items-center justify-center rounded-lg border px-4 text-sm font-semibold transition-colors",
+                    "inline-flex h-11 min-w-36 items-center justify-center rounded-lg border px-4 text-sm font-semibold transition-colors",
                     isToday
                       ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
                       : "border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 hover:bg-[rgba(255,255,255,0.06)]",
@@ -97,7 +97,7 @@ export function HabitsDashboardSummary({
                   disabled={disableNext}
                   aria-label="Volgende dag"
                   title="Volgende dag"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)] disabled:cursor-not-allowed disabled:opacity-35"
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)] disabled:cursor-not-allowed disabled:opacity-35"
                 >
                   <ChevronRight size={18} />
                 </button>
@@ -135,7 +135,7 @@ export function HabitsDashboardSummary({
           </div>
         </div>
 
-        <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-4">
+        <div className="hidden rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-4 md:block">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-500/25 bg-indigo-500/15">
               <ShieldCheck size={18} className="text-indigo-200" />
@@ -155,7 +155,7 @@ export function HabitsDashboardSummary({
         </div>
       </section>
 
-      <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
         <MetricCard
           icon={Target}
           label="Vandaag"

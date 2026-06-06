@@ -103,18 +103,18 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
           </h4>
           <div className="space-y-2">
           {topStreaks.map((s, i) => (
-              <div key={i} className="flex items-center justify-between py-1.5">
-                <div className="flex items-center gap-2">
+              <div key={i} className="flex items-center justify-between gap-3 py-1.5">
+                <div className="flex min-w-0 items-center gap-2">
                   <span className="text-xs font-bold text-slate-500 w-4">#{i + 1}</span>
                   <span className="text-sm">{masked ? "•" : s.emoji}</span>
-                  <span className="text-xs text-slate-300">{masked ? `Habit ${i + 1}` : s.naam}</span>
+                  <span className="truncate text-xs text-slate-300">{masked ? `Habit ${i + 1}` : s.naam}</span>
                   {s.type === "negatief" && (
-                    <span className="text-[8px] px-1 py-0.5 rounded bg-green-500/10 text-green-400/70 border border-green-500/10">
+                    <span className="shrink-0 rounded border border-green-500/10 bg-green-500/10 px-1 py-0.5 text-[8px] text-green-400/70">
                       {masked ? "Prive" : "Auto"}
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-bold text-orange-400">
+                <span className="shrink-0 text-xs font-bold text-orange-400">
                   {formatStreak(s.streak)}
                 </span>
               </div>

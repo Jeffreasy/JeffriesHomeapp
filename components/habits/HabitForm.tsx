@@ -247,7 +247,7 @@ export function HabitForm({
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden mb-4"
                   >
-                    <div className="grid grid-cols-8 gap-1.5 p-3 bg-[rgba(255,255,255,0.03)] rounded-xl">
+                    <div className="grid grid-cols-6 gap-1.5 rounded-xl bg-[rgba(255,255,255,0.03)] p-3 sm:grid-cols-8">
                       {HABIT_EMOJIS.map((e) => (
                         <button
                           type="button"
@@ -258,7 +258,7 @@ export function HabitForm({
                           }}
                           aria-label={`Emoji ${e} kiezen`}
                           title={`Emoji ${e}`}
-                          className="text-xl p-1.5 rounded-lg hover:bg-[var(--color-surface-hover)] active:scale-90 transition-all min-h-[44px] flex items-center justify-center"
+                          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-1.5 text-xl transition-all hover:bg-[var(--color-surface-hover)] active:scale-90"
                           style={{
                             background:
                               emoji === e ? "rgba(249,115,22,0.12)" : undefined,
@@ -372,7 +372,7 @@ export function HabitForm({
                       }}
                       aria-pressed={aangepasteDagen.includes(i)}
                       aria-label={`${d} ${aangepasteDagen.includes(i) ? "uitschakelen" : "inschakelen"}`}
-                      className="flex-1 py-2 rounded-lg text-xs font-medium transition-all min-h-[40px]"
+                      className="min-h-[44px] flex-1 rounded-lg py-2 text-xs font-medium transition-all"
                       style={{
                         background: aangepasteDagen.includes(i)
                           ? "rgba(249,115,22,0.12)"
@@ -403,7 +403,7 @@ export function HabitForm({
                       key={value}
                       onClick={() => setRoosterFilter(value)}
                       aria-pressed={roosterFilter === value}
-                      className="py-2 px-3 rounded-lg text-xs font-medium transition-all min-h-[40px]"
+                      className="min-h-[44px] rounded-lg px-3 py-2 text-xs font-medium transition-all"
                       style={{
                         background:
                           roosterFilter === value
@@ -510,7 +510,7 @@ export function HabitForm({
                       className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-sky-500/30 min-h-[44px]"
                       inputMode="numeric"
                     />
-                    <div className="flex gap-1">
+                    <div className="grid grid-cols-5 gap-1 sm:flex">
                       {["min", "ml", "km", "pg", "x"].map((u) => (
                         <button
                           type="button"
@@ -518,7 +518,7 @@ export function HabitForm({
                           onClick={() => setEenheid(u)}
                           aria-pressed={eenheid === u}
                           aria-label={`Eenheid ${u}`}
-                          className="px-2.5 py-2 rounded-lg text-[10px] font-medium transition-all min-h-[44px]"
+                          className="min-h-[44px] rounded-lg px-2.5 py-2 text-[10px] font-medium transition-all"
                           style={{
                             background:
                               eenheid === u
@@ -554,7 +554,7 @@ export function HabitForm({
                   <button
                     type="button"
                     onClick={() => setDoelTijd("")}
-                    className="mt-1.5 px-3 py-2 text-xs text-red-400/70 bg-red-500/8 border border-red-500/10 rounded-lg hover:bg-red-500/15 transition-colors cursor-pointer min-h-[40px]"
+                    className="mt-1.5 min-h-[44px] cursor-pointer rounded-lg border border-red-500/10 bg-red-500/8 px-3 py-2 text-xs text-red-400/70 transition-colors hover:bg-red-500/15"
                   >
                     Tijdstip wissen
                   </button>
@@ -603,7 +603,7 @@ export function HabitForm({
                 <label className="text-[10px] text-slate-500 font-medium uppercase tracking-wider block mb-2">
                   Kleur
                 </label>
-                <div className="flex gap-2.5 flex-wrap">
+                <div className="flex flex-wrap gap-2.5">
                   {HABIT_COLORS.map((c) => (
                     <button
                       type="button"
@@ -612,7 +612,7 @@ export function HabitForm({
                       aria-label={`Kleur ${c}`}
                       aria-pressed={kleur === c}
                       title={`Kleur ${c}`}
-                      className="w-10 h-10 rounded-full transition-all active:scale-90 cursor-pointer"
+                      className="h-11 w-11 cursor-pointer rounded-full transition-all active:scale-90"
                       style={{
                         background: c,
                         border:

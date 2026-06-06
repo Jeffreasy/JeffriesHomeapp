@@ -6,6 +6,7 @@ import { useSchedule } from "@/hooks/useSchedule";
 import { useToast } from "@/components/ui/Toast";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { DienstItem } from "@/components/schedule/DienstItem";
+import { getAmsterdamTodayIso } from "@/components/schedule/RoosterUtils";
 
 export function RoosterPanel() {
   const {
@@ -19,7 +20,7 @@ export function RoosterPanel() {
   } = useSchedule();
   const { success, error } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getAmsterdamTodayIso();
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,7 +80,7 @@ export function RoosterPanel() {
       )}
 
       {/* NextShiftCard zonder onImport — Sync Agenda staat op de Rooster pagina */}
-      <NextShiftCard dienst={nextDienst} />
+      <NextShiftCard dienst={nextDienst} todayIso={today} />
 
       {!meta && !nextDienst && (
         <div className="rounded-xl p-6 text-center border border-dashed border-[var(--color-border)]">

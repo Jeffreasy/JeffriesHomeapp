@@ -56,17 +56,31 @@ export function HabitsVandaagTab({
   stats?: HabitStatsRecord;
   habits: HabitRecord[];
 }) {
+  const activeCount = habits.filter((h) => h.isActief && !h.isPauze).length;
+  const emptyTitle = isToday
+    ? activeCount > 0
+      ? "Niets gepland vandaag"
+      : "Geen habits vandaag"
+    : "Geen habits op deze dag";
+  const emptyText = activeCount > 0
+    ? `${activeCount} actieve habit${activeCount === 1 ? "" : "s"}, maar niet op deze datum.`
+    : "Maak je eerste habit aan om vandaag te kunnen afvinken.";
+
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0 space-y-3">
-        <SectionHeader title="Vandaag" meta={`${todayHabits.length} gepland`} />
+        <SectionHeader
+          title={isToday ? "Vandaag" : "Gekozen dag"}
+          meta={todayHabits.length > 0 ? `${todayHabits.length} gepland` : `${activeCount} actief`}
+        />
         <HabitListSkeleton loading={isLoading} />
         {!isLoading && todayHabits.length === 0 && (
           <EmptyState
             icon={Target}
-            title={isToday ? "Geen habits vandaag" : "Geen habits op deze dag"}
-            actionLabel={isToday ? "Habit toevoegen" : undefined}
-            onAction={isToday ? () => setShowForm(true) : undefined}
+            title={emptyTitle}
+            text={emptyText}
+            actionLabel={isToday && activeCount === 0 ? "Habit toevoegen" : undefined}
+            onAction={isToday && activeCount === 0 ? () => setShowForm(true) : undefined}
           />
         )}
         {!isLoading && todayHabits.length > 0 && (
@@ -91,7 +105,7 @@ export function HabitsVandaagTab({
         )}
       </div>
 
-      <aside className="space-y-3">
+      <aside className="hidden space-y-3 lg:block">
         <SidePanel title="Focus">
           <div className="grid grid-cols-3 gap-2">
             <MiniStat

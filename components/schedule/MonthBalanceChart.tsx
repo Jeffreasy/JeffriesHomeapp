@@ -40,8 +40,8 @@ export function MonthBalanceChart() {
     >
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-sm uppercase tracking-[0.2em] font-bold text-slate-300">Monthly Performance</h3>
-          <p className="text-xs text-slate-500 mt-1">Total hours per month vs 69.3h expected</p>
+          <h3 className="text-sm uppercase tracking-[0.2em] font-bold text-slate-300">Maandbalans</h3>
+          <p className="mt-1 text-xs text-slate-500">Uren per maand tegenover 69,3u norm</p>
         </div>
       </div>
       
@@ -69,13 +69,13 @@ export function MonthBalanceChart() {
                     <div className="bg-black/90 border border-slate-800 p-3 shadow-2xl">
                       <p className="text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">{d.name}</p>
                       <div className="flex justify-between items-center gap-4">
-                        <span className="text-slate-500 text-xs">Hours</span>
-                        <span className="font-bold">{d.hours}h</span>
+                        <span className="text-slate-500 text-xs">Uren</span>
+                        <span className="font-bold">{d.hours}u</span>
                       </div>
                       <div className="flex justify-between items-center gap-4 mt-1">
                         <span className="text-slate-500 text-xs">Delta</span>
                         <span className="font-bold" style={{ color: d.color }}>
-                          {d.delta > 0 ? "+" : ""}{d.delta}h
+                          {d.delta > 0 ? "+" : ""}{d.delta}u
                         </span>
                       </div>
                     </div>

@@ -8,11 +8,11 @@ import { type Tone, toneClasses, maskHabitName } from "./HabitsUtils";
 export function MetricCard({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: string; tone: Tone }) {
   const classes = toneClasses[tone];
   return (
-    <div className={cn("rounded-lg border p-4", classes.border, classes.surface)}>
+    <div className={cn("rounded-lg border p-3 sm:p-4", classes.border, classes.surface)}>
       <div className="flex items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-          <p className={cn("mt-2 text-2xl font-bold", classes.text)}>{value}</p>
+          <p className={cn("mt-1.5 truncate text-xl font-bold sm:mt-2 sm:text-2xl", classes.text)}>{value}</p>
         </div>
         <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-black/15", classes.icon)}>
           <Icon size={19} />
@@ -102,11 +102,13 @@ export function DistributionRow({ label, value, total, tone }: { label: string; 
 export function EmptyState({
   icon: Icon,
   title,
+  text,
   actionLabel,
   onAction,
 }: {
   icon: LucideIcon;
   title: string;
+  text?: string;
   actionLabel?: string;
   onAction?: () => void;
 }) {
@@ -114,11 +116,12 @@ export function EmptyState({
     <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-4 py-10 text-center">
       <Icon size={34} className="mx-auto text-slate-700" />
       <p className="mt-3 text-sm font-semibold text-slate-400">{title}</p>
+      {text && <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">{text}</p>}
       {actionLabel && onAction && (
         <button
           type="button"
           onClick={onAction}
-          className="mt-4 inline-flex h-10 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
+          className="mt-4 inline-flex h-11 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
         >
           <Plus size={15} />
           {actionLabel}
