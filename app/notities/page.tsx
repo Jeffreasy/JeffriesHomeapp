@@ -28,6 +28,7 @@ import { NotesList } from "@/components/notes/NotesList";
 import { NotesMetricsRow } from "@/components/notes/NotesMetrics";
 import { WeekJournal, getMonday } from "@/components/notes/WeekJournal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
 
 export default function NotitiesPage() {
   const { user } = useUser();
@@ -241,10 +242,15 @@ export default function NotitiesPage() {
 
     setQuickSaving(true);
     try {
+      const enriched = enrichNoteDraft({ title: cleanText, content: cleanText, tags: extractedTags });
       await create({
         titel: cleanText.length > 80 ? `${cleanText.slice(0, 77)}...` : cleanText,
         inhoud: cleanText,
-        tags: extractedTags.length > 0 ? extractedTags : undefined,
+        tags: enriched.tags.length > 0 ? enriched.tags : undefined,
+        symbol: enriched.symbol,
+        businessContextType: enriched.businessContext?.type ?? undefined,
+        businessContextId: enriched.businessContext?.id ?? undefined,
+        businessContextTitle: enriched.businessContext?.title ?? undefined,
       });
       setQuickText("");
     } finally {
@@ -522,8 +528,9 @@ function NotesCaptureCard({
   onSave: () => void | Promise<void>;
   onOpenEditor: () => void;
 }) {
-  const { extractedTags } = parseHashTags(value);
-  const canSave = Boolean(parseHashTags(value).cleanText);
+  const parsed = parseHashTags(value);
+  const quickContext = getPrimaryWorkspaceContext(value, parsed.extractedTags);
+  const canSave = Boolean(parsed.cleanText);
 
   return (
     <section className="glass border-amber-500/20 bg-amber-500/[0.045] p-3 sm:p-4">
@@ -573,30 +580,21 @@ function NotesCaptureCard({
         </button>
       </div>
 
-      {extractedTags.length > 0 && (
+      {(parsed.extractedTags.length > 0 || quickContext) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          {extractedTags.map((tag) => (
+          {parsed.extractedTags.map((tag) => (
             <span key={tag} className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200">
               #{tag}
             </span>
           ))}
+          {quickContext && (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-200">
+              {quickContext.label}
+              <span className="text-cyan-300/70">#{quickContext.tag}</span>
+            </span>
+          )}
         </div>
       )}
     </section>
   );
-}
-
-function parseHashTags(value: string) {
-  const extractedTags: string[] = [];
-  const cleanText = value
-    .trim()
-    .replace(/#([a-zA-Z\u00C0-\u024F0-9_-]+)/g, (_match, rawTag: string) => {
-      const tag = rawTag.trim().toLowerCase();
-      if (tag && !extractedTags.includes(tag)) extractedTags.push(tag);
-      return "";
-    })
-    .replace(/\s{2,}/g, " ")
-    .trim();
-
-  return { cleanText, extractedTags };
 }

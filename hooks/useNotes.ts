@@ -15,7 +15,7 @@ import {
   getGetNotesQueryKey,
   getGetNotesTagsQueryKey,
 } from "@/lib/api/generated/notes/notes";
-import type { HandlerNoteUpdateBody, ModelNote, ModelNoteRevision } from "@/lib/api/model";
+import type { HandlerNoteCreateBody, HandlerNoteUpdateBody, ModelNote, ModelNoteRevision } from "@/lib/api/model";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +40,12 @@ export interface NoteRecord {
   linked_event_id?: string | null;
   prioriteit?:     string | null;
   symbol?:         string | null;
+  businessContextType?: string | null;
+  businessContextId?: string | null;
+  businessContextTitle?: string | null;
+  business_context_type?: string | null;
+  business_context_id?: string | null;
+  business_context_title?: string | null;
   aangemaakt:      string;
   gewijzigd:       string;
 }
@@ -57,6 +63,12 @@ export interface NoteRevisionRecord {
   linked_event_id?: string | null;
   prioriteit?: string | null;
   symbol?: string | null;
+  businessContextType?: string | null;
+  businessContextId?: string | null;
+  businessContextTitle?: string | null;
+  business_context_type?: string | null;
+  business_context_id?: string | null;
+  business_context_title?: string | null;
   aangemaakt: string;
 }
 
@@ -69,6 +81,9 @@ export type NoteCreateData = {
   linkedEventId?: string;
   prioriteit?: string;
   symbol?: string;
+  businessContextType?: string;
+  businessContextId?: string;
+  businessContextTitle?: string;
 };
 
 export type NoteUpdateData = {
@@ -80,6 +95,9 @@ export type NoteUpdateData = {
   linkedEventId?: string;
   prioriteit?: string;
   symbol?: string;
+  businessContextType?: string;
+  businessContextId?: string;
+  businessContextTitle?: string;
   isPinned?: boolean;
   isArchived?: boolean;
   isCompleted?: boolean;
@@ -93,7 +111,27 @@ type NotesCache = {
   status?: number;
 };
 
+type BusinessContextFields = {
+  business_context_type?: string | null;
+  business_context_id?: string | null;
+  business_context_title?: string | null;
+};
+
+type ModelNoteWithBusinessContext = ModelNote & BusinessContextFields;
+type ModelNoteRevisionWithBusinessContext = ModelNoteRevision & BusinessContextFields;
+type NoteCreateBodyWithBusinessContext = HandlerNoteCreateBody & {
+  businessContextType?: string;
+  businessContextId?: string;
+  businessContextTitle?: string;
+};
+type NoteUpdateBodyWithBusinessContext = HandlerNoteUpdateBody & {
+  businessContextType?: string;
+  businessContextId?: string;
+  businessContextTitle?: string;
+};
+
 function toRecord(row: ModelNote): NoteRecord {
+  const source = row as ModelNoteWithBusinessContext;
   return {
     ...row,
     id: row.id ?? "",
@@ -116,12 +154,19 @@ function toRecord(row: ModelNote): NoteRecord {
     linked_event_id: row.linked_event_id,
     prioriteit: row.prioriteit,
     symbol: row.symbol,
+    businessContextType: source.business_context_type ?? null,
+    businessContextId: source.business_context_id ?? null,
+    businessContextTitle: source.business_context_title ?? null,
+    business_context_type: source.business_context_type ?? null,
+    business_context_id: source.business_context_id ?? null,
+    business_context_title: source.business_context_title ?? null,
     aangemaakt: row.aangemaakt ?? new Date().toISOString(),
     gewijzigd: row.gewijzigd ?? new Date().toISOString(),
   };
 }
 
 function toRevisionRecord(row: ModelNoteRevision): NoteRevisionRecord {
+  const source = row as ModelNoteRevisionWithBusinessContext;
   return {
     id: row.id ?? "",
     note_id: row.note_id ?? "",
@@ -135,6 +180,12 @@ function toRevisionRecord(row: ModelNoteRevision): NoteRevisionRecord {
     linked_event_id: row.linked_event_id,
     prioriteit: row.prioriteit,
     symbol: row.symbol,
+    businessContextType: source.business_context_type ?? null,
+    businessContextId: source.business_context_id ?? null,
+    businessContextTitle: source.business_context_title ?? null,
+    business_context_type: source.business_context_type ?? null,
+    business_context_id: source.business_context_id ?? null,
+    business_context_title: source.business_context_title ?? null,
     aangemaakt: row.aangemaakt ?? new Date().toISOString(),
   };
 }
@@ -157,6 +208,18 @@ function toModelPatch(data: Partial<NoteUpdateData>): Partial<ModelNote> {
     patch.is_completed = data.isCompleted;
     patch.completed_at = data.isCompleted ? new Date().toISOString() : undefined;
     delete (patch as Record<string, unknown>).isCompleted;
+  }
+  if ("businessContextType" in data) {
+    (patch as ModelNoteWithBusinessContext).business_context_type = data.businessContextType || undefined;
+    delete (patch as Record<string, unknown>).businessContextType;
+  }
+  if ("businessContextId" in data) {
+    (patch as ModelNoteWithBusinessContext).business_context_id = data.businessContextId || undefined;
+    delete (patch as Record<string, unknown>).businessContextId;
+  }
+  if ("businessContextTitle" in data) {
+    (patch as ModelNoteWithBusinessContext).business_context_title = data.businessContextTitle || undefined;
+    delete (patch as Record<string, unknown>).businessContextTitle;
   }
   return patch;
 }
@@ -213,7 +276,7 @@ export function useNotes() {
         const previousNotes = queryClient.getQueryData<NotesCache>(queryKey);
         
         // Optimistic UI Update
-        const newNote: ModelNote = {
+        const newNote: ModelNoteWithBusinessContext = {
           id: `temp-${Date.now()}`,
           user_id: userId,
           titel: variables.data.titel ?? undefined,
@@ -227,6 +290,9 @@ export function useNotes() {
           linked_event_id: variables.data.linkedEventId ?? undefined,
           prioriteit: variables.data.prioriteit ?? "normaal",
           symbol: variables.data.symbol ?? "note",
+          business_context_type: (variables.data as NoteCreateBodyWithBusinessContext).businessContextType ?? undefined,
+          business_context_id: (variables.data as NoteCreateBodyWithBusinessContext).businessContextId ?? undefined,
+          business_context_title: (variables.data as NoteCreateBodyWithBusinessContext).businessContextTitle ?? undefined,
           aangemaakt: new Date().toISOString(),
           gewijzigd: new Date().toISOString(),
         };
@@ -324,10 +390,10 @@ export function useNotes() {
     count: active.length,
 
     create: async (data: NoteCreateData) => {
-      await createMut.mutateAsync({ data, params: { userId } });
+      await createMut.mutateAsync({ data: data as NoteCreateBodyWithBusinessContext, params: { userId } });
     },
     update: async (id: string, data: Partial<NoteUpdateData>) => {
-      await updateMut.mutateAsync({ id, data: data as HandlerNoteUpdateBody });
+      await updateMut.mutateAsync({ id, data: data as NoteUpdateBodyWithBusinessContext });
     },
     togglePin: async (id: string) => {
       const note = raw?.find(n => n.id === id);

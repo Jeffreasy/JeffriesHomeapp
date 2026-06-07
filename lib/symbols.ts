@@ -192,6 +192,7 @@ export const EVENT_CATEGORY_SYMBOLS = [
 
 export const NOTE_SYMBOL_OPTIONS = [
   { id: "note", icon: "note", label: "Notitie" },
+  { id: "laventecare", icon: "business", label: "LaventeCare" },
   { id: "pageNote", icon: "pageNote", label: "Pagina" },
   { id: "book", icon: "book", label: "Logboek" },
   { id: "list", icon: "list", label: "Lijst" },
@@ -210,6 +211,7 @@ export const NOTE_SYMBOL_OPTIONS = [
 
 export const EVENT_SYMBOL_OPTIONS = [
   { id: "agenda", icon: "agenda", label: "Afspraak" },
+  { id: "laventecare", icon: "business", label: "LaventeCare" },
   { id: "calendar", icon: "calendar", label: "Kalender" },
   { id: "time", icon: "time", label: "Tijd" },
   { id: "location", icon: "location", label: "Locatie" },

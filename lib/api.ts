@@ -295,6 +295,9 @@ export interface PersonalEventRow {
   beschrijving: string | null;
   conflict_met_dienst: string | null;
   symbol?: string | null;
+  business_context_type?: string | null;
+  business_context_id?: string | null;
+  business_context_title?: string | null;
   status: string;
   kalender: string;
 }
@@ -773,6 +776,9 @@ export interface NoteRow {
   linked_event_id: string | null;
   prioriteit: string | null;
   symbol?: string | null;
+  business_context_type?: string | null;
+  business_context_id?: string | null;
+  business_context_title?: string | null;
   triage_flag: boolean | null;
   aangemaakt: string;
   gewijzigd: string;

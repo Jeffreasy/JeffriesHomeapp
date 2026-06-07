@@ -9,6 +9,7 @@ import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
 import { useToast } from "@/components/ui/Toast";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
+import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
 import {
   EVENT_CATEGORY_SYMBOLS,
   EVENT_SYMBOL_OPTIONS,
@@ -16,30 +17,29 @@ import {
   resolveAppIconName,
   type AppIconName,
 } from "@/lib/symbols";
+import {
+  businessContextFromEvent,
+  businessContextFromWorkspaceContext,
+  buildEventDescription,
+  enrichEventDraft,
+  extractHashTags,
+  getPrimaryWorkspaceContext,
+  mergeTags,
+  parseEventMetadata,
+  stripEventMetadata,
+  type BusinessContextValue,
+} from "@/lib/workspace-context";
 
 const CATEGORIES = EVENT_CATEGORY_SYMBOLS;
 
 type CategoryId = typeof CATEGORIES[number]["id"];
 
-function parseCategoryFromDescription(desc?: string): CategoryId {
-  const match = desc?.match(/\[categorie:([a-z0-9_-]+)\]/i);
-  return (match?.[1] as CategoryId) ?? "overig";
-}
-
 function parseSymbolFromDescription(desc?: string): string | undefined {
-  return desc?.match(/\[symbol:([a-z0-9_-]+)\]/i)?.[1];
-}
-
-function stripEventMetadata(desc: string): string {
-  return desc.replace(/\s*\[(categorie|symbol):[a-z0-9_-]+\]/gi, "").trim();
+  return parseEventMetadata(desc).symbol;
 }
 
 function categoryIcon(category: CategoryId): AppIconName {
   return getEventCategoryIcon(category);
-}
-
-function buildDescription(description: string, category: CategoryId, symbol: AppIconName): string {
-  return `${description.trim()} [categorie:${category}] [symbol:${symbol}]`.trim();
 }
 
 function nextPendingStatus(editEvent?: PersonalEvent | null) {
@@ -76,14 +76,31 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   const [beschrijving, setBeschrijving] = useState("");
   const [categorie,    setCategorie]    = useState<CategoryId>("overig");
   const [symbol,       setSymbol]       = useState<AppIconName>(categoryIcon("overig"));
+  const [eventTags,    setEventTags]    = useState<string[]>([]);
+  const [businessContext, setBusinessContext] = useState<BusinessContextValue | null>(null);
+  const [businessContextTouched, setBusinessContextTouched] = useState(false);
+  const [categoryTouched, setCategoryTouched] = useState(false);
+  const [symbolTouched,   setSymbolTouched]   = useState(false);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
 
   const reset = useCallback(() => {
     setTitel(""); setStartDatum(defaultDate); setEindDatum(defaultDate);
     setHeledag(!initialTime); setStartTijd(defaultStartTime); setEindTijd(defaultEndTime);
-    setLocatie(""); setBeschrijving(""); setCategorie("overig"); setSymbol(categoryIcon("overig")); setError("");
+    setLocatie(""); setBeschrijving(""); setCategorie("overig"); setSymbol(categoryIcon("overig"));
+    setEventTags([]); setBusinessContext(null); setBusinessContextTouched(false); setCategoryTouched(false); setSymbolTouched(false); setError("");
   }, [defaultDate, defaultEndTime, defaultStartTime, initialTime]);
+
+  const detectedContext = getPrimaryWorkspaceContext(`${titel} ${beschrijving} ${locatie}`, mergeTags(eventTags, extractHashTags(`${titel} ${beschrijving}`)));
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -95,9 +112,15 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
         setStartTijd(editEvent.startTijd ?? "09:00");
         setEindTijd(editEvent.eindTijd ?? "10:00");
         setLocatie(editEvent.locatie ?? "");
-        const nextCategory = parseCategoryFromDescription(editEvent.beschrijving);
+        const metadata = parseEventMetadata(editEvent.beschrijving);
+        const nextCategory = (metadata.category as CategoryId) ?? "overig";
         setCategorie(nextCategory);
-        setSymbol(resolveAppIconName(editEvent.symbol ?? parseSymbolFromDescription(editEvent.beschrijving), categoryIcon(nextCategory)));
+        setSymbol(resolveAppIconName(editEvent.symbol ?? metadata.symbol ?? parseSymbolFromDescription(editEvent.beschrijving), categoryIcon(nextCategory)));
+        setEventTags(mergeTags(metadata.tags, metadata.contextIds));
+        setBusinessContext(businessContextFromEvent(editEvent));
+        setBusinessContextTouched(false);
+        setCategoryTouched(false);
+        setSymbolTouched(false);
         setBeschrijving(stripEventMetadata(editEvent.beschrijving ?? ""));
         setError("");
       } else {
@@ -106,9 +129,27 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
     }
   }, [open, editEvent, reset]);
 
+  useEffect(() => {
+    if (!detectedContext) return;
+    setEventTags((current) => {
+      const next = mergeTags(current, [detectedContext.tag]);
+      return next.join("|") === current.join("|") ? current : next;
+    });
+    if (!categoryTouched && categorie === "overig") {
+      setCategorie(detectedContext.eventCategory as CategoryId);
+    }
+    if (!symbolTouched && (symbol === categoryIcon("overig") || symbol === categoryIcon("werk") || symbol === "agenda")) {
+      setSymbol(detectedContext.eventSymbol);
+    }
+    if (!businessContextTouched && !businessContext) {
+      setBusinessContext(businessContextFromWorkspaceContext(detectedContext));
+    }
+  }, [businessContext, businessContextTouched, categorie, categoryTouched, detectedContext, symbol, symbolTouched]);
+
   const handleClose = () => { reset(); onClose(); };
 
   const handleCategoryChange = (nextCategory: CategoryId) => {
+    setCategoryTouched(true);
     const previousIcon = categoryIcon(categorie);
     if (symbol === previousIcon) {
       setSymbol(categoryIcon(nextCategory));
@@ -130,7 +171,23 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
     setError("");
     try {
       const rawDesc = beschrijving.trim();
-      const fullDesc = buildDescription(rawDesc, categorie, symbol);
+      const enriched = enrichEventDraft({
+        title: titel,
+        description: rawDesc,
+        location: locatie,
+        tags: eventTags,
+        category: categorie,
+        symbol,
+        businessContext,
+      });
+      const fullDesc = buildEventDescription({
+        description: rawDesc,
+        category: enriched.category,
+        symbol: enriched.symbol,
+        context: enriched.context,
+        businessContext: enriched.businessContext,
+        tags: enriched.tags,
+      });
 
       const row: PersonalEventRow = {
         user_id:      user.id,
@@ -144,7 +201,10 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
         locatie:      locatie.trim() || null,
         beschrijving: fullDesc || null,
         conflict_met_dienst: null,
-        symbol,
+        symbol:       enriched.symbol,
+        business_context_type: enriched.businessContext?.type ?? null,
+        business_context_id: enriched.businessContext?.id ?? null,
+        business_context_title: enriched.businessContext?.title ?? null,
         status:       nextPendingStatus(editEvent),
         kalender:     editEvent?.kalender ?? "Main",
       };
@@ -174,7 +234,8 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
           {/* Overlay */}
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+            data-app-modal="agenda-event"
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
             onClick={handleClose}
           />
 
@@ -184,9 +245,10 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
             animate={{ opacity: 1, scale: 1,    y: 0   }}
             exit={{   opacity: 0, scale: 0.95, y: 16  }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-x-3 top-1/2 z-50 mx-auto max-w-lg -translate-y-1/2 sm:inset-x-4"
+            data-app-modal="agenda-event"
+            className="fixed inset-x-0 bottom-0 z-[101] mx-auto max-w-lg sm:inset-x-4 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2"
           >
-            <div className="glass flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden rounded-2xl border border-[var(--color-border)] shadow-2xl">
+            <div className="glass flex max-h-[calc(100dvh-0.5rem)] flex-col overflow-hidden rounded-t-2xl border border-[var(--color-border)] shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl">
 
               {/* Header */}
               <div className="flex shrink-0 items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
@@ -204,7 +266,8 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto px-5 py-4">
+              <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
 
                 {/* Titel */}
                 <div>
@@ -219,6 +282,15 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     required
                     className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
+                  {detectedContext && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-200">
+                        <AppIcon name={detectedContext.eventSymbol} tone="cyan" size="xs" />
+                        {detectedContext.label}
+                        <span className="text-cyan-300/70">#{detectedContext.tag}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Hele dag toggle */}
@@ -290,6 +362,18 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   />
                 </div>
 
+                <BusinessContextPicker
+                  value={businessContext}
+                  onChange={(value) => {
+                    setBusinessContextTouched(true);
+                    setBusinessContext(value);
+                    if (value?.type?.startsWith("laventecare")) {
+                      setEventTags((current) => mergeTags(current, ["laventecare"]));
+                    }
+                  }}
+                  compact
+                />
+
                 {/* Categorie */}
                 <div>
                   <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
@@ -322,7 +406,10 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   <SymbolPicker
                     value={symbol}
                     options={EVENT_SYMBOL_OPTIONS}
-                    onChange={setSymbol}
+                    onChange={(value) => {
+                      setSymbolTouched(true);
+                      setSymbol(value);
+                    }}
                     tone="indigo"
                     fallback={categoryIcon(categorie)}
                     gridClassName="grid-cols-2 sm:grid-cols-3"
@@ -354,15 +441,16 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     : "Afspraak wordt direct naar Google Calendar gepusht. Als Google niet reageert, blijft de actie in de Render-wachtrij."
                   }
                 </p>
+                </div>
 
                 {/* Actions */}
-                <div className="flex gap-2 pt-1">
+                <div className="flex shrink-0 gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))]">
                   <button type="button" onClick={handleClose}
-                    className="flex-1 py-2 rounded-xl text-sm text-slate-500 hover:text-slate-300 border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] transition-all cursor-pointer">
+                    className="min-h-[44px] flex-1 rounded-xl border border-[var(--color-border)] text-sm font-semibold text-slate-500 transition-all hover:bg-[var(--color-surface-hover)] hover:text-slate-300 cursor-pointer">
                     Annuleren
                   </button>
                   <button type="submit" disabled={loading}
-                    className="flex-1 py-2 rounded-xl text-sm font-medium text-indigo-300 bg-indigo-500/15 border border-indigo-500/30 hover:bg-indigo-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50">
+                    className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/15 text-sm font-semibold text-indigo-300 transition-all hover:bg-indigo-500/25 cursor-pointer disabled:opacity-50">
                     <AppIcon name={editEvent ? "save" : "add"} tone="indigo" size="xs" />
                     {loading ? "Bezig..." : (editEvent ? "Opslaan" : "Aanmaken")}
                   </button>

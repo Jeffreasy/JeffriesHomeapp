@@ -7,6 +7,7 @@ import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { type DienstRow } from "@/lib/schedule";
 import { analyzeConflicts, type ConflictInfo } from "@/lib/conflictDetection";
 import { getEventCategoryIcon, resolveAppIconName, type AppIconName } from "@/lib/symbols";
+import { parseEventMetadata } from "@/lib/workspace-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,9 @@ export interface PersonalEvent {
   locatie?:          string;
   beschrijving?:     string;
   symbol?:           AppIconName;
+  businessContextType?: string;
+  businessContextId?: string;
+  businessContextTitle?: string;
   status:            "Aankomend" | "Voorbij" | "VERWIJDERD" | string;
   kalender:          string;
   shiftType?:        string;
@@ -40,6 +44,7 @@ type AmsterdamNow = {
 function fromRow(r: PersonalEventRow): PersonalEvent {
   const category = parseCategoryMetadata(r.beschrijving);
   const metadataSymbol = parseSymbolMetadata(r.beschrijving);
+  const metadata = parseEventMetadata(r.beschrijving);
   return {
     _id:          r.id ?? "",
     userId:       r.user_id,
@@ -53,6 +58,9 @@ function fromRow(r: PersonalEventRow): PersonalEvent {
     locatie:      r.locatie ?? undefined,
     beschrijving: r.beschrijving ?? undefined,
     symbol:       resolveAppIconName(r.symbol ?? metadataSymbol, getEventCategoryIcon(category)),
+    businessContextType: r.business_context_type ?? metadata.businessContext?.type ?? undefined,
+    businessContextId: r.business_context_id ?? metadata.businessContext?.id ?? undefined,
+    businessContextTitle: r.business_context_title ?? metadata.businessContext?.title ?? undefined,
     status:       r.status,
     kalender:     r.kalender,
   };

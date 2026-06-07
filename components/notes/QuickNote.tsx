@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { resolveAppIconName } from "@/lib/symbols";
+import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
 
 export function QuickNote() {
   const { notes, create, isLoading } = useNotes();
@@ -19,9 +20,14 @@ export function QuickNote() {
     setSaving(true);
     try {
       const { cleanText, extractedTags } = parseHashTags(text.trim());
+      const enriched = enrichNoteDraft({ content: cleanText, tags: extractedTags });
       await create({
         inhoud: cleanText,
-        tags: extractedTags.length > 0 ? extractedTags : undefined,
+        tags: enriched.tags.length > 0 ? enriched.tags : undefined,
+        symbol: enriched.symbol,
+        businessContextType: enriched.businessContext?.type ?? undefined,
+        businessContextId: enriched.businessContext?.id ?? undefined,
+        businessContextTitle: enriched.businessContext?.title ?? undefined,
       });
       setText("");
     } finally {
@@ -31,6 +37,8 @@ export function QuickNote() {
 
   const recent = notes.slice(0, 3);
   const totalPinned = notes.filter((n) => n.isPinned).length;
+  const quickParsed = parseHashTags(text);
+  const quickContext = getPrimaryWorkspaceContext(text, quickParsed.extractedTags);
 
   return (
     <section>
@@ -89,11 +97,20 @@ export function QuickNote() {
         {/* Show extracted tags preview */}
         {text.includes("#") && (
           <div className="px-3 pb-2 flex items-center gap-1">
-            {parseHashTags(text).extractedTags.map((t) => (
+            {quickParsed.extractedTags.map((t) => (
               <span key={t} className="text-[10px] text-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 rounded">
                 #{t}
               </span>
             ))}
+          </div>
+        )}
+        {quickContext && (
+          <div className="px-3 pb-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold text-cyan-200">
+              <AppIcon name={quickContext.noteSymbol} tone="cyan" size="xs" />
+              {quickContext.label}
+              <span className="text-cyan-300/70">#{quickContext.tag}</span>
+            </span>
           </div>
         )}
       </div>
@@ -143,20 +160,6 @@ function RecentNoteRow({ note }: { note: NoteRecord }) {
       </motion.div>
     </Link>
   );
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function parseHashTags(text: string) {
-  const tagPattern = /#([a-zA-Z\u00C0-\u024F0-9_-]+)/g;
-  const extractedTags: string[] = [];
-  let match;
-  while ((match = tagPattern.exec(text)) !== null) {
-    const tag = match[1].toLowerCase();
-    if (!extractedTags.includes(tag)) extractedTags.push(tag);
-  }
-  const cleanText = text.replace(tagPattern, "").replace(/\s{2,}/g, " ").trim();
-  return { cleanText, extractedTags };
 }
 
 function getQuickChecklistInfo(text: string): string | null {

@@ -148,6 +148,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
   padding-bottom: env(safe-area-inset-bottom, 16px);
 }
 
+body:has([data-app-modal]) nav[aria-label="Mobiele hoofdnavigatie"] {
+  display: none;
+}
+
 /* Hide scrollbar while keeping scroll functionality */
 .scrollbar-none {
   -ms-overflow-style: none;

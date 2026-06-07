@@ -35,7 +35,19 @@ import { formatDateRange, getTimeLabel, type PersonalEvent } from "@/hooks/usePe
 import { AppIcon } from "@/components/ui/AppIcon";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
+import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
 import { NOTE_SYMBOL_OPTIONS, resolveAppIconName, type AppIconName } from "@/lib/symbols";
+import {
+  businessContextFromEvent,
+  businessContextFromWorkspaceContext,
+  contextTagsFromEvent,
+  detectWorkspaceContexts,
+  enrichNoteDraft,
+  extractHashTags,
+  mergeTags,
+  normalizeBusinessContext,
+  type BusinessContextValue,
+} from "@/lib/workspace-context";
 
 const KLEUREN = [
   "#f59e0b",
@@ -107,6 +119,9 @@ type NoteEditorSnapshot = {
   linkedEventId: string;
   prioriteit: string;
   symbol: AppIconName;
+  businessContextType: string;
+  businessContextId: string;
+  businessContextTitle: string;
 };
 
 interface NoteEditorProps {
@@ -125,6 +140,7 @@ interface NoteEditorProps {
   initialLinkedEventId?: string;
   initialTags?: string[];
   initialTitle?: string;
+  initialBusinessContext?: BusinessContextValue | null;
 }
 
 export function NoteEditor({
@@ -143,6 +159,7 @@ export function NoteEditor({
   initialLinkedEventId,
   initialTags,
   initialTitle,
+  initialBusinessContext,
 }: NoteEditorProps) {
   const titleId = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -162,6 +179,11 @@ export function NoteEditor({
   const [linkedEventId, setLinkedEventId] = useState(note?.linkedEventId ?? note?.linked_event_id ?? initialLinkedEventId ?? "");
   const [prioriteit, setPrioriteit] = useState(note?.prioriteit ?? "normaal");
   const [symbol, setSymbol] = useState<AppIconName>(() => resolveAppIconName(note?.symbol, "note"));
+  const [businessContext, setBusinessContext] = useState<BusinessContextValue | null>(() =>
+    noteBusinessContext(note) ?? normalizeBusinessContext(initialBusinessContext),
+  );
+  const [businessContextTouched, setBusinessContextTouched] = useState(false);
+  const [symbolTouched, setSymbolTouched] = useState(false);
   const [activePanel, setActivePanel] = useState<EditorPanel>("details");
   const [showTemplates, setShowTemplates] = useState(false);
 
@@ -179,6 +201,7 @@ export function NoteEditor({
     initialLinkedEventId,
     initialTags,
     initialTitle,
+    initialBusinessContext,
   }));
 
   const resolvedUserId = userId || note?.user_id;
@@ -204,6 +227,13 @@ export function NoteEditor({
     [eventOptionGroups, linkedEventId],
   );
   const selectedEvent = linkedEventId ? eventById.get(linkedEventId) : undefined;
+  const selectedEventContextTags = useMemo(() => contextTagsFromEvent(selectedEvent), [selectedEvent]);
+  const selectedEventBusinessContext = useMemo(() => businessContextFromEvent(selectedEvent), [selectedEvent]);
+  const detectedContexts = useMemo(() => detectWorkspaceContexts(
+    `${titel} ${inhoud} ${selectedEvent?.titel ?? ""} ${selectedEvent?.beschrijving ?? ""}`,
+    mergeTags(tags, selectedEventContextTags, extractHashTags(`${titel} ${inhoud}`)),
+  ), [inhoud, selectedEvent?.beschrijving, selectedEvent?.titel, selectedEventContextTags, tags, titel]);
+  const primaryContext = detectedContexts[0] ?? null;
   const showEventSelector = eventOptionGroups.length > 0 || Boolean(linkedEventId);
   const actionBusy = saving || pendingAction !== null || restoringId !== null;
 
@@ -216,7 +246,10 @@ export function NoteEditor({
     linkedEventId,
     prioriteit,
     symbol,
-  }), [deadline, inhoud, kleur, linkedEventId, prioriteit, symbol, tags, titel]);
+    businessContextType: businessContext?.type ?? "",
+    businessContextId: businessContext?.id ?? "",
+    businessContextTitle: businessContext?.title ?? "",
+  }), [businessContext?.id, businessContext?.title, businessContext?.type, deadline, inhoud, kleur, linkedEventId, prioriteit, symbol, tags, titel]);
   const isDirty = useMemo(
     () => !sameEditorSnapshot(currentSnapshot, baseline),
     [baseline, currentSnapshot],
@@ -312,6 +345,27 @@ export function NoteEditor({
   useEffect(() => {
     autoResize();
   }, [autoResize, inhoud]);
+
+  useEffect(() => {
+    const contextTags = primaryContext ? [primaryContext.tag] : [];
+    const nextTags = mergeTags(tags, selectedEventContextTags, extractHashTags(`${titel} ${inhoud}`), contextTags);
+    if (tagsKey(nextTags) !== tagsKey(tags)) {
+      setTags(nextTags);
+    }
+  }, [inhoud, primaryContext, selectedEventContextTags, tags, titel]);
+
+  useEffect(() => {
+    if (businessContextTouched || businessContext) return;
+    const nextContext = selectedEventBusinessContext ?? businessContextFromWorkspaceContext(primaryContext);
+    if (nextContext) setBusinessContext(nextContext);
+  }, [businessContext, businessContextTouched, primaryContext, selectedEventBusinessContext]);
+
+  useEffect(() => {
+    if (!primaryContext || symbolTouched) return;
+    if (symbol !== primaryContext.noteSymbol) {
+      setSymbol(primaryContext.noteSymbol);
+    }
+  }, [primaryContext, symbol, symbolTouched]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -418,15 +472,25 @@ export function NoteEditor({
       const cleanTitle = titel.trim();
       const cleanContent = inhoud.trimEnd();
       const cleanLinkedEventId = linkedEventId && eventById.has(linkedEventId) ? linkedEventId : "";
+      const enriched = enrichNoteDraft({
+        title: cleanTitle,
+        content: `${cleanContent} ${selectedEvent?.titel ?? ""} ${selectedEvent?.beschrijving ?? ""}`,
+        tags: mergeTags(tags, selectedEventContextTags),
+        symbol,
+        businessContext,
+      });
       await onSave({
         titel: cleanTitle || (isEditing ? "" : undefined),
         inhoud: cleanContent,
-        tags: tags.length > 0 ? tags : isEditing ? [] : undefined,
+        tags: enriched.tags.length > 0 ? enriched.tags : isEditing ? [] : undefined,
         kleur: kleur || (isEditing ? "" : undefined),
         deadline: normalizeDeadlineForSave(deadline) || (isEditing ? "" : undefined),
         linkedEventId: cleanLinkedEventId || (isEditing ? "" : undefined),
         prioriteit,
-        symbol,
+        symbol: enriched.symbol,
+        businessContextType: enriched.businessContext?.type || (isEditing ? "" : undefined),
+        businessContextId: enriched.businessContext?.id || (isEditing ? "" : undefined),
+        businessContextTitle: enriched.businessContext?.title || (isEditing ? "" : undefined),
       });
       setBaseline(currentSnapshot);
       onClose();
@@ -435,7 +499,7 @@ export function NoteEditor({
     } finally {
       setSaving(false);
     }
-  }, [actionBusy, canSave, currentSnapshot, deadline, eventById, inhoud, kleur, linkedEventId, note, onClose, onSave, prioriteit, symbol, tags, titel]);
+  }, [actionBusy, businessContext, canSave, currentSnapshot, deadline, eventById, inhoud, kleur, linkedEventId, note, onClose, onSave, prioriteit, selectedEvent?.beschrijving, selectedEvent?.titel, selectedEventContextTags, symbol, tags, titel]);
 
   const handleCloseAttempt = useCallback(async () => {
     if (isDirty) {
@@ -519,6 +583,12 @@ export function NoteEditor({
     setLinkedEventId(snapshot.linkedEventId);
     setPrioriteit(snapshot.prioriteit);
     setSymbol(snapshot.symbol);
+    setBusinessContext(normalizeBusinessContext({
+      type: snapshot.businessContextType,
+      id: snapshot.businessContextId,
+      title: snapshot.businessContextTitle,
+    }));
+    setBusinessContextTouched(false);
     requestAnimationFrame(() => {
       textRef.current?.focus();
       autoResize();
@@ -657,8 +727,10 @@ export function NoteEditor({
 
   const handleEventChange = (nextEventId: string) => {
     setLinkedEventId(nextEventId);
+    const event = eventById.get(nextEventId);
+    const eventContext = businessContextFromEvent(event);
+    if (eventContext && !businessContextTouched) setBusinessContext(eventContext);
     if (!deadline && nextEventId) {
-      const event = eventById.get(nextEventId);
       const eventDeadline = event ? eventToDeadline(event) : "";
       if (eventDeadline) setDeadline(eventDeadline);
     }
@@ -669,6 +741,7 @@ export function NoteEditor({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      data-app-modal="note-editor"
       className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
     >
       <div
@@ -686,6 +759,7 @@ export function NoteEditor({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-app-modal="note-editor"
         className="relative flex h-[100dvh] w-full flex-col overflow-hidden rounded-none border-0 border-[var(--color-border)] shadow-2xl shadow-black/40 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-5xl sm:rounded-2xl sm:border"
         style={{
           maxHeight: "100dvh",
@@ -708,6 +782,15 @@ export function NoteEditor({
               <h2 id={titleId} className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg">
                 {titel.trim() || note?.titel || "Naamloze notitie"}
               </h2>
+              {primaryContext && (
+                <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
+                    <AppIcon name={primaryContext.noteSymbol} tone="cyan" size="xs" />
+                    <span className="truncate">{primaryContext.label}</span>
+                    <span className="text-cyan-300/70">#{primaryContext.tag}</span>
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -924,6 +1007,17 @@ export function NoteEditor({
                       </div>
                     </PanelSection>
 
+                    <PanelSection title="Zakelijk">
+                      <BusinessContextPicker
+                        value={businessContext}
+                        onChange={(value) => {
+                          setBusinessContextTouched(true);
+                          setBusinessContext(value);
+                        }}
+                        compact
+                      />
+                    </PanelSection>
+
                     <PanelSection title="Afspraak">
                       {showEventSelector ? (
                         <EventLinkPicker
@@ -954,7 +1048,10 @@ export function NoteEditor({
                       <SymbolPicker
                         value={symbol}
                         options={NOTE_SYMBOL_OPTIONS}
-                        onChange={setSymbol}
+                        onChange={(value) => {
+                          setSymbolTouched(true);
+                          setSymbol(value);
+                        }}
                         tone="amber"
                         fallback="note"
                         className="border-0 bg-transparent p-0"
@@ -1132,7 +1229,7 @@ export function NoteEditor({
           </div>
         </div>
 
-        <footer className="relative z-10 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
+        <footer className="relative z-10 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:px-6">
           {saveError && (
             <p role="alert" className="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
               {saveError}
@@ -1707,9 +1804,11 @@ function buildInitialSnapshot(
     initialLinkedEventId?: string;
     initialTags?: string[];
     initialTitle?: string;
+    initialBusinessContext?: BusinessContextValue | null;
   },
 ): NoteEditorSnapshot {
   if (note) return snapshotFromNote(note);
+  const initialContext = normalizeBusinessContext(options.initialBusinessContext);
   return normalizeEditorSnapshot({
     titel: options.initialTitle ?? "",
     inhoud: "",
@@ -1719,10 +1818,14 @@ function buildInitialSnapshot(
     linkedEventId: options.initialLinkedEventId ?? "",
     prioriteit: "normaal",
     symbol: "note",
+    businessContextType: initialContext?.type ?? "",
+    businessContextId: initialContext?.id ?? "",
+    businessContextTitle: initialContext?.title ?? "",
   });
 }
 
 function snapshotFromNote(note: NoteRecord): NoteEditorSnapshot {
+  const context = noteBusinessContext(note);
   return normalizeEditorSnapshot({
     titel: note.titel ?? "",
     inhoud: note.inhoud ?? "",
@@ -1732,6 +1835,9 @@ function snapshotFromNote(note: NoteRecord): NoteEditorSnapshot {
     linkedEventId: note.linkedEventId ?? note.linked_event_id ?? "",
     prioriteit: note.prioriteit ?? "normaal",
     symbol: resolveAppIconName(note.symbol, "note"),
+    businessContextType: context?.type ?? "",
+    businessContextId: context?.id ?? "",
+    businessContextTitle: context?.title ?? "",
   });
 }
 
@@ -1744,7 +1850,10 @@ function sameEditorSnapshot(a: NoteEditorSnapshot, b: NoteEditorSnapshot) {
     a.deadline === b.deadline &&
     a.linkedEventId === b.linkedEventId &&
     a.prioriteit === b.prioriteit &&
-    a.symbol === b.symbol
+    a.symbol === b.symbol &&
+    a.businessContextType === b.businessContextType &&
+    a.businessContextId === b.businessContextId &&
+    a.businessContextTitle === b.businessContextTitle
   );
 }
 
@@ -1762,7 +1871,18 @@ function normalizeEditorSnapshot(snapshot: NoteEditorSnapshot): NoteEditorSnapsh
     linkedEventId: snapshot.linkedEventId,
     prioriteit: snapshot.prioriteit || "normaal",
     symbol: snapshot.symbol,
+    businessContextType: snapshot.businessContextType,
+    businessContextId: snapshot.businessContextId,
+    businessContextTitle: snapshot.businessContextTitle,
   };
+}
+
+function noteBusinessContext(note?: NoteRecord | null): BusinessContextValue | null {
+  return normalizeBusinessContext({
+    type: note?.businessContextType ?? note?.business_context_type,
+    id: note?.businessContextId ?? note?.business_context_id,
+    title: note?.businessContextTitle ?? note?.business_context_title,
+  });
 }
 
 function normalizeTags(values: string[]) {

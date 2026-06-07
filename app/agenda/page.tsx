@@ -36,6 +36,7 @@ import { NoteEditor } from "@/components/notes/NoteEditor";
 import { getDisplayTitle } from "@/components/notes/NotesUtils";
 import { groupNotesByDate, groupNotesByEventId } from "@/components/notes/NoteAgendaUtils";
 import { useToast } from "@/components/ui/Toast";
+import { businessContextFromEvent, contextTagsFromEvent, mergeTags, type BusinessContextValue } from "@/lib/workspace-context";
 
 import {
   getAmsterdamTodayIso,
@@ -198,7 +199,13 @@ export default function AgendaPage() {
   const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
   const [noteEditorOpen, setNoteEditorOpen] = useState(false);
   const [editNote, setEditNote] = useState<NoteRecord | null>(null);
-  const [noteDefaults, setNoteDefaults] = useState<{ deadline?: string; linkedEventId?: string; tags?: string[]; title?: string }>({});
+  const [noteDefaults, setNoteDefaults] = useState<{
+    deadline?: string;
+    linkedEventId?: string;
+    tags?: string[];
+    title?: string;
+    businessContext?: BusinessContextValue | null;
+  }>({});
   const [eventInitialDate, setEventInitialDate] = useState<string | undefined>();
   const [eventInitialTime, setEventInitialTime] = useState<string | undefined>();
   const [syncing, setSyncing] = useState(false);
@@ -333,8 +340,9 @@ export default function AgendaPage() {
     setNoteDefaults({
       deadline: `${event.startDatum}T${event.startTijd || "09:00"}`,
       linkedEventId: event.eventId,
-      tags: isRooster ? ["agenda", "dienst"] : ["agenda"],
+      tags: mergeTags(isRooster ? ["agenda", "dienst"] : ["agenda"], contextTagsFromEvent(event)),
       title: isRooster ? `Notitie bij dienst: ${event.shiftType || event.titel}` : `Notitie bij ${event.titel}`,
+      businessContext: businessContextFromEvent(event),
     });
     setNoteEditorOpen(true);
   };
@@ -747,6 +755,8 @@ export default function AgendaPage() {
               noteDefaults.linkedEventId ?? "new-note",
               noteDefaults.deadline ?? "",
               noteDefaults.title ?? "",
+              noteDefaults.businessContext?.type ?? "",
+              noteDefaults.businessContext?.id ?? "",
               ...(noteDefaults.tags ?? []),
             ].join(":")}
             note={editNote}
@@ -768,6 +778,7 @@ export default function AgendaPage() {
             initialLinkedEventId={noteDefaults.linkedEventId}
             initialTags={noteDefaults.tags}
             initialTitle={noteDefaults.title}
+            initialBusinessContext={noteDefaults.businessContext}
           />
         )}
       </AnimatePresence>
