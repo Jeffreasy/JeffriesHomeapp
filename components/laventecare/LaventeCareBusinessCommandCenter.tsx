@@ -9,6 +9,8 @@ import {
   getLaventeCarePdfTemplateProfile,
   getLaventeCarePdfStructuredSections,
   getLaventeCarePdfUrl,
+  getLaventeCarePdfViewerUrl,
+  isLaventeCarePdfTheme,
   LAVENTECARE_PDF_REGISTRY,
   LAVENTECARE_PROCESS_STAGES,
   LAVENTECARE_PROFILE,
@@ -250,6 +252,11 @@ export function LaventeCareBusinessCommandCenter({
                 delivery: "inline",
                 context: selectedContext,
               });
+              const previewPageUrl = getLaventeCarePdfViewerUrl({
+                documentKey: document.key,
+                theme: "screen",
+                context: selectedContext,
+              });
               const printUrl = getLaventeCarePdfUrl({
                 documentKey: document.key,
                 theme: "print",
@@ -270,9 +277,7 @@ export function LaventeCareBusinessCommandCenter({
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
                       <a
-                        href={previewUrl}
-                        target="_blank"
-                        rel="noreferrer"
+                        href={previewPageUrl}
                         className="flex h-8 w-8 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-300 transition hover:bg-sky-500/20"
                         aria-label={`${document.title} preview openen`}
                         title="Preview"
@@ -323,20 +328,26 @@ export function LaventeCareBusinessCommandCenter({
               </div>
               {dossierDocuments.length > 0 ? (
                 <div className="mt-3 space-y-2">
-                  {dossierDocuments.slice(0, 4).map((item) => (
-                    <a
-                      key={item.id}
-                      href={item.pdf_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition hover:bg-white/[0.06]"
-                    >
-                      <span className="block truncate text-xs font-semibold text-slate-200">{item.titel}</span>
-                      <span className="mt-0.5 block truncate text-[11px] text-slate-500">
-                        {item.context_title ?? label(item.context_type)} - {formatDate(item.created_at)}
-                      </span>
-                    </a>
-                  ))}
+                  {dossierDocuments.slice(0, 4).map((item) => {
+                    const theme = isLaventeCarePdfTheme(item.theme) ? item.theme : "screen";
+                    const href = getLaventeCarePdfViewerUrl({
+                      documentKey: item.document_key,
+                      theme,
+                    });
+
+                    return (
+                      <a
+                        key={item.id}
+                        href={href}
+                        className="block rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition hover:bg-white/[0.06]"
+                      >
+                        <span className="block truncate text-xs font-semibold text-slate-200">{item.titel}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                          {item.context_title ?? label(item.context_type)} - {formatDate(item.created_at)}
+                        </span>
+                      </a>
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="mt-3 text-xs leading-5 text-slate-500">

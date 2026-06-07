@@ -78,3 +78,22 @@ export function getLaventeCarePdfUrl({
 
   return `/api/laventecare/pdf/${encodeURIComponent(documentKey)}?${params.toString()}`;
 }
+
+export function getLaventeCarePdfViewerUrl({
+  documentKey,
+  theme = "screen",
+  context,
+}: {
+  documentKey: string;
+  theme?: LaventeCarePdfTheme;
+  context?: LaventeCarePdfDossierContext | null;
+}) {
+  const params = new URLSearchParams({ theme });
+  const contextParams = encodeLaventeCarePdfDossierContext(context);
+
+  for (const [key, value] of Object.entries(contextParams)) {
+    params.set(key, value);
+  }
+
+  return `/laventecare/documenten/${encodeURIComponent(documentKey)}?${params.toString()}`;
+}

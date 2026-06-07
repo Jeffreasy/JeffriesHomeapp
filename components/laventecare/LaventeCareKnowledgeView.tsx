@@ -2,7 +2,12 @@
 
 import { ArrowUpRight, BookOpenText, ClipboardList, Download, FileText, Layers3, Printer, Search } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
-import { getLaventeCarePdfUrl, LAVENTECARE_LEGAL_STACK, LAVENTECARE_PRICING } from "@/lib/laventecare";
+import {
+  getLaventeCarePdfUrl,
+  getLaventeCarePdfViewerUrl,
+  LAVENTECARE_LEGAL_STACK,
+  LAVENTECARE_PRICING,
+} from "@/lib/laventecare";
 import { label } from "./LaventeCareUtils";
 import { EmptyState } from "./LaventeCareCards";
 import type { DocumentItem } from "./LaventeCareTypes";
@@ -69,9 +74,7 @@ export function LaventeCareKnowledgeView({
                     {documentKey && (
                       <div className="mt-4 flex flex-wrap gap-2 border-t border-white/5 pt-3">
                         <a
-                          href={getLaventeCarePdfUrl({ documentKey, theme: "screen", delivery: "inline" })}
-                          target="_blank"
-                          rel="noreferrer"
+                          href={getLaventeCarePdfViewerUrl({ documentKey, theme: "screen" })}
                           className="inline-flex h-9 items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 text-xs font-semibold text-sky-300 transition hover:bg-sky-500/20"
                         >
                           <ArrowUpRight size={14} />
