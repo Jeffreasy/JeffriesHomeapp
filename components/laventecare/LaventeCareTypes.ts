@@ -3,6 +3,7 @@ import {
   type LCProject,
   type LCActionItem,
   type LCDocument,
+  type LCDossierDocument,
 } from "@/lib/api";
 
 export type Tone = "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
@@ -10,6 +11,8 @@ export type Tone = "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
 export type DocumentItem = LCDocument & {
   documentKey?: string;
 };
+
+export type DossierDocumentItem = LCDossierDocument;
 
 export type LeadItem = LCLead & {
   _id?: string;

@@ -56,6 +56,13 @@ type CalendarDay = {
 };
 
 const WEEKDAYS = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
+const CALENDAR_LEGEND = [
+  { label: "Dienst", dot: "bg-indigo-300" },
+  { label: "Afspraak", dot: "bg-emerald-300" },
+  { label: "Wachtrij", dot: "bg-sky-300" },
+  { label: "Conflict", dot: "bg-rose-300" },
+  { label: "Notitie", dot: "bg-amber-300" },
+];
 
 export function AgendaCalendar({
   events,
@@ -83,6 +90,7 @@ export function AgendaCalendar({
   const title = mode === "month" ? formatMonthTitle(cursorDate) : formatWeekTitle(days);
   const activeEventCount = days.reduce((sum, day) => sum + day.events.length, 0);
   const activeNoteCount = days.reduce((sum, day) => sum + day.notes.length, 0);
+  const selectedSummary = formatDaySummary(selectedDay);
   const selectedLinkedNotes = new Set<string>();
   for (const event of selectedDay.events) {
     for (const note of notesByEventId.get(event.eventId) ?? []) {
@@ -92,11 +100,11 @@ export function AgendaCalendar({
   const dayNotes = selectedDay.notes.filter((note) => !getLinkedEventId(note) && !selectedLinkedNotes.has(note.id));
 
   const goPrevious = () => {
-    onCursorDateChange(addDaysIso(cursorDate, mode === "month" ? -28 : -7));
+    onCursorDateChange(mode === "month" ? addMonthsIso(cursorDate, -1) : addDaysIso(cursorDate, -7));
   };
 
   const goNext = () => {
-    onCursorDateChange(addDaysIso(cursorDate, mode === "month" ? 28 : 7));
+    onCursorDateChange(mode === "month" ? addMonthsIso(cursorDate, 1) : addDaysIso(cursorDate, 7));
   };
 
   const goToday = () => {
@@ -111,6 +119,11 @@ export function AgendaCalendar({
     }
   };
 
+  const setMode = (nextMode: CalendarMode) => {
+    onModeChange(nextMode);
+    onCursorDateChange(selectedDate);
+  };
+
   return (
     <section className="rounded-xl border border-[var(--color-border)] bg-white/[0.025] shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
       <div className="border-b border-[var(--color-border)] px-3 py-3 sm:px-4">
@@ -123,9 +136,17 @@ export function AgendaCalendar({
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold text-white">Kalender</h2>
                 <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {title} · {activeEventCount} items · {activeNoteCount} notities
+                  {title} · {activeEventCount} zichtbare items · {activeNoteCount} notities
                 </p>
               </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              {CALENDAR_LEGEND.map((item) => (
+                <span key={item.label} className="inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
+                  <span className={cn("h-1.5 w-1.5 rounded-full", item.dot)} />
+                  {item.label}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -133,7 +154,7 @@ export function AgendaCalendar({
             <div className="flex h-9 rounded-lg border border-[var(--color-border)] bg-black/15 p-0.5">
               <button
                 type="button"
-                onClick={() => onModeChange("month")}
+                onClick={() => setMode("month")}
                 aria-pressed={mode === "month"}
                 className={cn(
                   "inline-flex min-w-[4.5rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
@@ -144,7 +165,7 @@ export function AgendaCalendar({
               </button>
               <button
                 type="button"
-                onClick={() => onModeChange("week")}
+                onClick={() => setMode("week")}
                 aria-pressed={mode === "week"}
                 className={cn(
                   "inline-flex min-w-[4.5rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
@@ -185,11 +206,37 @@ export function AgendaCalendar({
               type="button"
               onClick={() => onCreateEvent(selectedDate)}
               className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/12 px-3 text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/18"
+              aria-label={`Afspraak maken op ${formatCompactDate(selectedDate)}`}
             >
               <Plus size={14} />
               Afspraak
             </button>
           </div>
+        </div>
+        <div className="mt-3 rounded-lg border border-white/[0.04] bg-black/10 px-3 py-2 sm:hidden">
+          <p className="truncate text-xs font-semibold text-white">{formatFullDate(selectedDay.date)}</p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-500">{selectedSummary}</p>
+          {selectedDay.events.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {selectedDay.events.slice(0, 3).map((event) => (
+                <MobileSelectedEventRow
+                  key={`${event.kalender}:${event.eventId}:mobile-summary`}
+                  event={event}
+                  hasConflict={conflictMap.has(event.eventId)}
+                  onClick={() => onEditEvent(event)}
+                />
+              ))}
+              {selectedDay.events.length > 3 && (
+                <button
+                  type="button"
+                  onClick={() => selectDate(selectedDay.date)}
+                  className="w-full rounded-md px-2 py-1 text-left text-[10px] font-semibold text-slate-500 transition-colors hover:bg-white/[0.04] hover:text-slate-300"
+                >
+                  +{selectedDay.events.length - 3} meer op deze dag
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -203,7 +250,7 @@ export function AgendaCalendar({
             ))}
           </div>
 
-          <div className={cn("grid grid-cols-7", mode === "month" ? "auto-rows-[minmax(78px,1fr)] sm:auto-rows-[minmax(104px,1fr)]" : "auto-rows-[minmax(118px,1fr)] sm:auto-rows-[minmax(132px,1fr)]")}>
+          <div className={cn("grid grid-cols-7", mode === "month" ? "auto-rows-[minmax(112px,1fr)] sm:auto-rows-[minmax(104px,1fr)]" : "auto-rows-[minmax(126px,1fr)] sm:auto-rows-[minmax(132px,1fr)]")}>
             {days.map((day) => (
               <CalendarDayCell
                 key={day.date}
@@ -277,6 +324,8 @@ function CalendarDayCell({
                   : "text-slate-600 hover:bg-white/[0.04]",
           )}
           aria-label={`${formatCompactDate(day.date)} selecteren`}
+          aria-current={day.isToday ? "date" : undefined}
+          aria-pressed={day.isSelected}
         >
           {Number(day.date.slice(8, 10))}
         </button>
@@ -357,29 +406,87 @@ function CalendarEventBar({
 }) {
   const tone = getEventTone(event, hasConflict);
   const isRoster = event.kalender === "Rooster";
+  const label = `${isRoster ? "Dienst" : "Afspraak"}: ${event.titel}, ${getTimeLabel(event)}, ${formatCompactDate(event.startDatum)}`;
+  const displayTitle = isRoster && event.shiftType ? event.shiftType : event.titel;
+  const isCompactMonth = compact && mode === "month";
+
+  if (isCompactMonth) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        className={cn(
+          "relative flex min-h-9 w-full min-w-0 flex-col items-start justify-center rounded-md border px-1 py-1 text-left transition-colors",
+          tone.cell,
+        )}
+        title={label}
+      >
+        {!event.heledag && event.startTijd && (
+          <span className="w-full truncate text-[9px] font-bold leading-none tabular-nums">
+            {event.startTijd}
+          </span>
+        )}
+        <span className="w-full truncate text-[9px] font-semibold leading-tight">
+          {event.heledag ? displayTitle : displayTitle}
+        </span>
+        {noteCount > 0 && <StickyNote size={8} className="absolute right-0.5 top-0.5 opacity-70" />}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className={cn(
+        "flex w-full min-w-0 items-center rounded-md border text-left text-[10px] font-semibold transition-colors",
+        compact ? "min-h-7 gap-1 px-1" : "min-h-[26px] gap-1.5 px-1.5",
+        tone.cell,
+      )}
+      title={label}
+    >
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)} />
+      <span className="min-w-0 flex-1 truncate">
+        {!event.heledag && event.startTijd ? `${event.startTijd} ` : ""}
+        {displayTitle}
+      </span>
+      {noteCount > 0 && <StickyNote size={9} className="shrink-0 opacity-70" />}
+    </button>
+  );
+}
+
+function MobileSelectedEventRow({
+  event,
+  hasConflict,
+  onClick,
+}: {
+  event: PersonalEvent;
+  hasConflict: boolean;
+  onClick: () => void;
+}) {
+  const tone = getEventTone(event, hasConflict);
+  const isRoster = event.kalender === "Rooster";
+  const displayTitle = isRoster && event.shiftType ? `${event.shiftType}: ${event.titel}` : event.titel;
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full min-w-0 items-center rounded-md border text-left text-[10px] font-semibold transition-colors",
-        compact ? "min-h-6 gap-1 px-1" : "min-h-[26px] gap-1.5 px-1.5",
+        "flex min-h-8 w-full min-w-0 items-center gap-2 rounded-md border px-2 text-left transition-colors",
         tone.cell,
       )}
-      title={`${event.titel} · ${getTimeLabel(event)}`}
+      aria-label={`${isRoster ? "Dienst" : "Afspraak"} openen: ${event.titel}`}
     >
       <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)} />
-      <span className={cn("min-w-0 flex-1 truncate", compact && mode === "month" && "sr-only sm:not-sr-only")}>
-        {!event.heledag && event.startTijd ? `${event.startTijd} ` : ""}
-        {isRoster && event.shiftType ? event.shiftType : event.titel}
+      <span className="shrink-0 text-[10px] font-semibold tabular-nums text-slate-300">
+        {getTimeLabel(event)}
       </span>
-      {compact && mode === "month" && (
-        <span aria-hidden="true" className="min-w-0 truncate text-[9px] leading-none sm:hidden">
-          {event.heledag ? "Dag" : event.startTijd ?? "Item"}
-        </span>
-      )}
-      {noteCount > 0 && <StickyNote size={9} className="shrink-0 opacity-70" />}
+      <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-white">
+        {displayTitle}
+      </span>
     </button>
   );
 }
@@ -467,6 +574,7 @@ function SelectedDayPanel({
             key={slot.time}
             type="button"
             onClick={() => onCreateEvent(day.date, slot.time)}
+            aria-label={`Afspraak maken op ${formatCompactDate(day.date)} om ${slot.time}`}
             className="min-h-9 rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-2 text-xs font-semibold text-slate-400 transition-colors hover:border-emerald-500/20 hover:bg-emerald-500/[0.06] hover:text-emerald-200"
           >
             {slot.label}
@@ -637,6 +745,16 @@ function linkedNoteCount(events: PersonalEvent[], notesByEventId: Map<string, No
   return ids.size;
 }
 
+function formatDaySummary(day: CalendarDay) {
+  const shifts = day.events.filter((event) => event.kalender === "Rooster").length;
+  const appointments = day.events.length - shifts;
+  const parts = [];
+  if (appointments > 0) parts.push(`${appointments} ${appointments === 1 ? "afspraak" : "afspraken"}`);
+  if (shifts > 0) parts.push(`${shifts} ${shifts === 1 ? "dienst" : "diensten"}`);
+  if (day.notes.length > 0) parts.push(`${day.notes.length} ${day.notes.length === 1 ? "notitie" : "notities"}`);
+  return parts.length > 0 ? parts.join(" · ") : "Geen items gepland";
+}
+
 function getEventTone(event: PersonalEvent, hasConflict: boolean) {
   if (hasConflict) {
     return {
@@ -701,6 +819,12 @@ function diffDays(startIso: string, endIso: string) {
 function addDaysIso(baseIso: string, days: number) {
   const date = new Date(`${baseIso}T12:00:00`);
   date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function addMonthsIso(baseIso: string, months: number) {
+  const date = new Date(`${baseIso.slice(0, 7)}-01T12:00:00`);
+  date.setMonth(date.getMonth() + months);
   return date.toISOString().slice(0, 10);
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowRight, CheckCircle2, Clock3, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck, Plus } from "lucide-react";
-import { LAVENTECARE_FIT_CRITERIA, LAVENTECARE_NO_FIT_SIGNALS, LAVENTECARE_PROCESS_STAGES } from "@/lib/laventecareData";
+import { LAVENTECARE_FIT_CRITERIA, LAVENTECARE_NO_FIT_SIGNALS, LAVENTECARE_PROCESS_STAGES } from "@/lib/laventecare";
 import { cn } from "@/lib/utils";
 import { fitTone, formatDate, formatMoney, label, toneClasses } from "./LaventeCareUtils";
 import { EmptyState } from "./LaventeCareCards";

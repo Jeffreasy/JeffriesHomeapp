@@ -1,11 +1,12 @@
 "use client";
 
-import { BookOpenText, ClipboardList, FileText, Layers3, Search } from "lucide-react";
+import { ArrowUpRight, BookOpenText, ClipboardList, Download, FileText, Layers3, Printer, Search } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
-import { LAVENTECARE_LEGAL_STACK, LAVENTECARE_PRICING } from "@/lib/laventecareData";
+import { getLaventeCarePdfUrl, LAVENTECARE_LEGAL_STACK, LAVENTECARE_PRICING } from "@/lib/laventecare";
 import { label } from "./LaventeCareUtils";
 import { EmptyState } from "./LaventeCareCards";
 import type { DocumentItem } from "./LaventeCareTypes";
+import { LaventeCareDocumentSuitePanel } from "./LaventeCareDocumentSuitePanel";
 
 export function LaventeCareKnowledgeView({
   search,
@@ -51,20 +52,50 @@ export function LaventeCareKnowledgeView({
                 </span>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                {docs.map((doc) => (
-                  <div key={doc.documentKey ?? doc.titel} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
+                {docs.map((doc) => {
+                  const documentKey = doc.document_key || doc.documentKey || "";
+                  return (
+                  <div key={documentKey || doc.titel} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
                     <div className="flex items-start gap-3">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
                         <FileText size={16} className="text-amber-300" />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <h4 className="line-clamp-2 text-sm font-semibold text-white">{doc.titel}</h4>
                         <p className="mt-1 text-xs text-slate-500">{label(doc.fase ?? undefined)} - {doc.versie ?? "2026-04"}</p>
                       </div>
                     </div>
                     <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-400">{doc.samenvatting}</p>
+                    {documentKey && (
+                      <div className="mt-4 flex flex-wrap gap-2 border-t border-white/5 pt-3">
+                        <a
+                          href={getLaventeCarePdfUrl({ documentKey, theme: "screen", delivery: "inline" })}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 text-xs font-semibold text-sky-300 transition hover:bg-sky-500/20"
+                        >
+                          <ArrowUpRight size={14} />
+                          Preview
+                        </a>
+                        <a
+                          href={getLaventeCarePdfUrl({ documentKey, theme: "screen", delivery: "download" })}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.06]"
+                        >
+                          <Download size={14} />
+                          Screen
+                        </a>
+                        <a
+                          href={getLaventeCarePdfUrl({ documentKey, theme: "print", delivery: "download" })}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/20"
+                        >
+                          <Printer size={14} />
+                          Print
+                        </a>
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -72,6 +103,8 @@ export function LaventeCareKnowledgeView({
       </div>
 
       <div className="space-y-5">
+        <LaventeCareDocumentSuitePanel />
+
         <div className="glass min-w-0 p-5">
           <div className="flex items-center gap-2">
             <BookOpenText size={18} className="text-amber-300" />

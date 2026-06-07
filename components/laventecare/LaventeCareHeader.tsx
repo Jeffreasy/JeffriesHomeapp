@@ -3,7 +3,7 @@
 import { BookOpenText, BriefcaseBusiness, Loader2, Plus, X } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Dispatch, SetStateAction } from "react";
-import { LAVENTECARE_PROFILE } from "@/lib/laventecareData";
+import { LAVENTECARE_PROFILE } from "@/lib/laventecare";
 import type { LCCockpit } from "@/lib/api";
 
 export function LaventeCareHeader({

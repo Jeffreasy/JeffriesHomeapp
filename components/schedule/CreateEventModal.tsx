@@ -378,8 +378,11 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
 
 function addHours(time: string, hours: number) {
   const [rawHour, rawMinute] = time.split(":").map(Number);
-  const hour = Number.isFinite(rawHour) ? rawHour : 9;
-  const minute = Number.isFinite(rawMinute) ? rawMinute : 0;
-  const nextHour = Math.min(23, hour + hours);
-  return `${String(nextHour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  const hour = Number.isFinite(rawHour) ? Math.min(Math.max(rawHour, 0), 23) : 9;
+  const minute = Number.isFinite(rawMinute) ? Math.min(Math.max(rawMinute, 0), 59) : 0;
+  const totalMinutes = hour * 60 + minute + hours * 60;
+  const clampedMinutes = Math.min(totalMinutes, 23 * 60 + 59);
+  const nextHour = Math.floor(clampedMinutes / 60);
+  const nextMinute = clampedMinutes % 60;
+  return `${String(nextHour).padStart(2, "0")}:${String(nextMinute).padStart(2, "0")}`;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { Clock3, Sparkles } from "lucide-react";
-import type { BusinessSignal, ActionItem } from "./LaventeCareTypes";
+import type { BusinessSignal, ActionItem, FollowUpSignal } from "./LaventeCareTypes";
 import { ActionItemCard, EmptyState, FollowUpCard, SignalCard } from "./LaventeCareCards";
 
 export function LaventeCareSignalsView({
@@ -16,7 +16,7 @@ export function LaventeCareSignalsView({
 }: {
   businessSignals: BusinessSignal[];
   actionItems: ActionItem[];
-  followUps: any[];
+  followUps: FollowUpSignal[];
   processingSignal: string | null;
   processingAction: string | null;
   handleCreateActionFromSignal: (signal: BusinessSignal) => Promise<void>;

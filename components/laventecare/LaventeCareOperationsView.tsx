@@ -3,15 +3,16 @@
 import { AlertTriangle, ClipboardList, GitPullRequest, ScrollText } from "lucide-react";
 import { formatDate, label } from "./LaventeCareUtils";
 import { EmptyState, OperationCard } from "./LaventeCareCards";
+import type { ChangeRequestItem, DecisionItem, SlaIncidentItem } from "./LaventeCareTypes";
 
 export function LaventeCareOperationsView({
   recentDecisions,
   openChanges,
   openIncidents,
 }: {
-  recentDecisions: any[];
-  openChanges: any[];
-  openIncidents: any[];
+  recentDecisions: DecisionItem[];
+  openChanges: ChangeRequestItem[];
+  openIncidents: SlaIncidentItem[];
 }) {
   return (
     <section className="glass min-w-0 p-5">

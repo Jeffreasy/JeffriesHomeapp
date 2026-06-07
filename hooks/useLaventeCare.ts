@@ -13,6 +13,7 @@ import type {
   DecisionItem,
   ChangeRequestItem,
   SlaIncidentItem,
+  DossierDocumentItem,
 } from "@/components/laventecare/LaventeCareTypes";
 
 export function useLaventeCare() {
@@ -72,7 +73,17 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const createDossierDocumentMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createDossierDocument>[0]) =>
+      laventecareApi.createDossierDocument(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
+  const dossierDocuments = useMemo(
+    () => (cockpit?.dossierDocuments ?? []) as DossierDocumentItem[],
+    [cockpit]
+  );
   const activeLeads = useMemo(
     () =>
       (cockpit?.activeLeads ?? []).map((l) => ({
@@ -154,6 +165,7 @@ export function useLaventeCare() {
     openChanges: 0,
     decisions: 0,
     actionItems: 0,
+    dossierDocuments: 0,
     documentsSeeded: false,
     knowledgeDocuments: 0,
     businessSignals: 0,
@@ -171,6 +183,7 @@ export function useLaventeCare() {
     openIncidents,
     openChanges,
     recentDecisions,
+    dossierDocuments,
     summary,
     
     createLeadMut,
@@ -182,5 +195,6 @@ export function useLaventeCare() {
     convertSignalMut,
     updateActionStatusMut,
     seedDocumentsMut,
+    createDossierDocumentMut,
   };
 }

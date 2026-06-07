@@ -482,6 +482,40 @@ export interface LCDocument {
   updated_at: string;
 }
 
+export interface LCDossierDocument {
+  id: string;
+  user_id: string;
+  document_key: string;
+  titel: string;
+  template_label: string | null;
+  context_type: string;
+  context_id: string | null;
+  context_title: string | null;
+  lead_id: string | null;
+  project_id: string | null;
+  pdf_url: string;
+  theme: string;
+  delivery: string;
+  notes: string | null;
+  generated_at: string;
+  created_at: string;
+}
+
+export type LCDossierDocumentCreate = {
+  document_key: string;
+  titel: string;
+  template_label?: string;
+  context_type: string;
+  context_id?: string;
+  context_title?: string;
+  lead_id?: string;
+  project_id?: string;
+  pdf_url: string;
+  theme: string;
+  delivery: string;
+  notes?: string;
+};
+
 export interface LCSlaIncident {
   id: string;
   titel: string;
@@ -544,6 +578,7 @@ export interface LCCockpit {
     openChanges: number;
     decisions: number;
     actionItems: number;
+    dossierDocuments: number;
     documentsSeeded: boolean;
     businessSignals: number;
     followUps: number;
@@ -555,6 +590,7 @@ export interface LCCockpit {
   openChanges: LCChangeRequest[];
   recentDecisions: LCDecision[];
   documentCatalog: LCDocument[];
+  dossierDocuments: LCDossierDocument[];
   businessSignals: LCBusinessSignal[];
   followUps: LCFollowUpSignal[];
 }
@@ -566,6 +602,19 @@ export const laventecareApi = {
     apiFetch<LCDocument[]>("/laventecare/documents"),
   searchDocuments: (query: string) =>
     apiFetch<LCDocument[]>(`/laventecare/documents?q=${encodeURIComponent(query)}`),
+  listDossierDocuments: (params?: { leadId?: string; projectId?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.leadId) search.set("leadId", params.leadId);
+    if (params?.projectId) search.set("projectId", params.projectId);
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCDossierDocument[]>(`/laventecare/dossier-documents${query ? `?${query}` : ""}`);
+  },
+  createDossierDocument: (data: LCDossierDocumentCreate) =>
+    apiFetch<LCDossierDocument>("/laventecare/dossier-documents", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   createLead: (data: {
     titel: string;
     company_name?: string;

@@ -13,6 +13,9 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.4",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/outfit": "^5.2.8",
+    "@react-pdf/renderer": "^4.5.1",
     "@serwist/next": "^9.5.11",
     "@serwist/precaching": "^9.5.11",
     "@serwist/sw": "^9.5.11",
