@@ -101,6 +101,9 @@ export type AiDiagnosticsResult = {
     grokChat?: AiDiagnosticCheck;
     grokWebSearch?: AiDiagnosticCheck;
     groqVoice?: AiDiagnosticCheck;
+    googleOAuth?: AiDiagnosticCheck;
+    gmailSync?: AiDiagnosticCheck;
+    calendarSync?: AiDiagnosticCheck;
   };
   capabilities: {
     agents: number;

@@ -311,11 +311,17 @@ export function SettingsIntegrations({
   const grokChatCheck = aiDiagnostics?.checks.grokChat;
   const grokWebSearchCheck = aiDiagnostics?.checks.grokWebSearch;
   const groqVoiceCheck = aiDiagnostics?.checks.groqVoice;
+  const googleOAuthCheck = aiDiagnostics?.checks.googleOAuth;
+  const gmailSyncCheck = aiDiagnostics?.checks.gmailSync;
+  const calendarSyncCheck = aiDiagnostics?.checks.calendarSync;
   const grokLiveOK = grokChatCheck?.status === "success" && grokWebSearchCheck?.status === "success";
   const groqLiveOK = groqVoiceCheck?.status === "success";
+  const googleOAuthOK = aiDiagnostics ? googleOAuthCheck?.status === "success" : integrationBool("googleOAuth");
+  const calendarLiveOK = aiDiagnostics ? calendarSyncCheck?.status === "success" : calendarOK;
+  const gmailLiveOK = aiDiagnostics ? gmailSyncCheck?.status === "success" : gmailOK;
   const aiSummary = aiDiagnostics
-    ? `${aiDiagnostics.capabilities.agents} agents - ${aiDiagnostics.capabilities.tools} tools`
-    : "Chat, web-search, voice en tool registry controleren";
+    ? `${aiDiagnostics.capabilities.agents} agents - ${aiDiagnostics.capabilities.tools} tools - Google sync live`
+    : "Chat, web-search, voice, Google sync en tool registry controleren";
 
   return (
     <Panel>
@@ -341,12 +347,30 @@ export function SettingsIntegrations({
           icon={Activity}
           label="Groq voice"
           ok={aiDiagnostics ? groqLiveOK : groqOK}
-          tone={aiDiagnostics ? (groqLiveOK ? "ok" : "bad") : groqOK ? "ok" : groqKnown ? "warn" : "neutral"}
-          statusLabel={aiDiagnostics ? (groqLiveOK ? "Live" : "Check") : groqOK ? "OK" : groqKnown ? "Optioneel" : "Onbekend"}
+          tone={aiDiagnostics ? checkTone(groqVoiceCheck) : groqOK ? "ok" : groqKnown ? "warn" : "neutral"}
+          statusLabel={aiDiagnostics ? checkLabel(groqVoiceCheck) : groqOK ? "OK" : groqKnown ? "Optioneel" : "Onbekend"}
         />
-        <IntegrationRow icon={Cloud} label="Google OAuth" ok={integrationBool("googleOAuth")} />
-        <IntegrationRow icon={CalendarClock} label="Google Calendar" ok={calendarOK} tone={calendarTone} statusLabel={calendarLabel} />
-        <IntegrationRow icon={Mail} label="Gmail" ok={gmailOK} tone={gmailTone} statusLabel={gmailLabel} />
+        <IntegrationRow
+          icon={Cloud}
+          label="Google OAuth"
+          ok={googleOAuthOK}
+          tone={aiDiagnostics ? checkTone(googleOAuthCheck) : undefined}
+          statusLabel={aiDiagnostics ? checkLabel(googleOAuthCheck) : undefined}
+        />
+        <IntegrationRow
+          icon={CalendarClock}
+          label="Google Calendar"
+          ok={calendarLiveOK}
+          tone={aiDiagnostics ? checkTone(calendarSyncCheck) : calendarTone}
+          statusLabel={aiDiagnostics ? checkLabel(calendarSyncCheck) : calendarLabel}
+        />
+        <IntegrationRow
+          icon={Mail}
+          label="Gmail"
+          ok={gmailLiveOK}
+          tone={aiDiagnostics ? checkTone(gmailSyncCheck) : gmailTone}
+          statusLabel={aiDiagnostics ? checkLabel(gmailSyncCheck) : gmailLabel}
+        />
         <IntegrationRow icon={Activity} label="Todoist" ok={integrationBool("todoist")} />
         <IntegrationRow
           icon={Network}
@@ -398,10 +422,13 @@ export function SettingsIntegrations({
           </button>
         </div>
 
-        <div className="mt-3 grid gap-2 lg:grid-cols-3">
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           <DiagnosticTile icon={Brain} label="Grok chat" check={grokChatCheck} />
           <DiagnosticTile icon={Search} label="Web-search" check={grokWebSearchCheck} />
           <DiagnosticTile icon={Mic} label="Groq voice" check={groqVoiceCheck} />
+          <DiagnosticTile icon={Cloud} label="Google OAuth" check={googleOAuthCheck} />
+          <DiagnosticTile icon={Mail} label="Gmail sync" check={gmailSyncCheck} />
+          <DiagnosticTile icon={CalendarClock} label="Calendar sync" check={calendarSyncCheck} />
         </div>
 
         {aiDiagnostics && (
