@@ -39,7 +39,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   try {
-    registerLaventeCarePdfFonts();
+    const fontRegistration = registerLaventeCarePdfFonts();
 
     const buffer = await renderToBuffer(
       <LaventeCarePdfDocument
@@ -47,6 +47,7 @@ export async function GET(request: Request, context: RouteContext) {
         theme={theme}
         generatedAt={new Date()}
         dossierContext={dossierContext}
+        fontFamilies={fontRegistration.families}
       />
     );
     const filename = getLaventeCarePdfFilename(document, theme);
@@ -57,6 +58,8 @@ export async function GET(request: Request, context: RouteContext) {
       theme,
       delivery,
       dossierContext: dossierContext?.kind ?? null,
+      fontSource: fontRegistration.source,
+      missingFontFiles: fontRegistration.missingFiles,
       bytes: buffer.byteLength,
       durationMs: Date.now() - startedAt,
     });
@@ -72,10 +75,26 @@ export async function GET(request: Request, context: RouteContext) {
       requestId,
       documentKey,
       theme,
+      delivery,
+      dossierContext: dossierContext?.kind ?? null,
       durationMs: Date.now() - startedAt,
-      error,
+      error: serializeLaventeCarePdfError(error),
     });
 
     return createLaventeCarePdfErrorResponse("PDF generatie mislukt", 500, requestId);
   }
+}
+
+function serializeLaventeCarePdfError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return {
+    message: String(error),
+  };
 }

@@ -11,8 +11,8 @@ import {
 } from "@/lib/laventecare/pdf/structured";
 import {
   getLaventeCarePdfPalette,
-  LAVENTECARE_PDF_FONTS,
   LAVENTECARE_PDF_SPACING,
+  type LaventeCarePdfFontFamilies,
   type LaventeCarePdfTheme,
 } from "@/lib/laventecare/pdf/theme";
 import type { LaventeCarePdfVisualTone } from "@/lib/laventecare/pdf/templates";
@@ -22,9 +22,15 @@ type Props = {
   theme: LaventeCarePdfTheme;
   generatedAt: Date;
   dossierContext?: LaventeCarePdfDossierContext | null;
+  fontFamilies: LaventeCarePdfFontFamilies;
 };
 
-function createStyles(theme: LaventeCarePdfTheme) {
+type StyledPdfProps = {
+  theme: LaventeCarePdfTheme;
+  fontFamilies: LaventeCarePdfFontFamilies;
+};
+
+function createStyles(theme: LaventeCarePdfTheme, fontFamilies: LaventeCarePdfFontFamilies) {
   const colors = getLaventeCarePdfPalette(theme);
 
   return StyleSheet.create({
@@ -97,13 +103,13 @@ function createStyles(theme: LaventeCarePdfTheme) {
       justifyContent: "center",
     },
     logoMarkText: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 9,
       color: colors.tealSoft,
       fontWeight: 700,
     },
     brand: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 11,
       color: colors.tealSoft,
       fontWeight: 700,
@@ -111,7 +117,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       textTransform: "uppercase",
     },
     docType: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 9,
       color: colors.textMuted,
       fontWeight: 700,
@@ -136,7 +142,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       marginBottom: 22,
     },
     badgeText: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8,
       color: colors.tealSoft,
       letterSpacing: 1.8,
@@ -144,7 +150,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       fontWeight: 700,
     },
     eyebrow: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 10,
       color: colors.tealSoft,
       letterSpacing: 3,
@@ -153,14 +159,14 @@ function createStyles(theme: LaventeCarePdfTheme) {
     },
     title: {
       maxWidth: 470,
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 40,
       color: colors.textPrimary,
       fontWeight: 700,
       lineHeight: 1.14,
     },
     accentTitle: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 40,
       color: colors.teal,
       fontWeight: 700,
@@ -169,7 +175,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
     intro: {
       marginTop: 24,
       maxWidth: 462,
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 11.2,
       color: colors.textSecondary,
       lineHeight: 1.6,
@@ -190,7 +196,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       padding: 13,
     },
     metaLabel: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 7.8,
       color: colors.textMuted,
       letterSpacing: 1.3,
@@ -198,14 +204,14 @@ function createStyles(theme: LaventeCarePdfTheme) {
       marginBottom: 5,
     },
     metaValue: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 10.5,
       color: colors.tealSoft,
       fontWeight: 700,
       marginBottom: 3,
     },
     metaSubtext: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8.2,
       color: colors.textMuted,
       lineHeight: 1.35,
@@ -220,7 +226,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       gap: 16,
     },
     bottomText: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8.5,
       color: colors.textMuted,
     },
@@ -235,20 +241,20 @@ function createStyles(theme: LaventeCarePdfTheme) {
       gap: 16,
     },
     pageTitle: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 22,
       color: colors.textPrimary,
       fontWeight: 700,
     },
     pageSubtitle: {
       marginTop: 5,
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 9.5,
       color: colors.textMuted,
       lineHeight: 1.4,
     },
     pageTag: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8,
       color: colors.tealSoft,
       letterSpacing: 1.2,
@@ -264,7 +270,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       backgroundColor: colors.bgSurface,
     },
     sectionEyebrow: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 7.8,
       color: colors.tealSoft,
       letterSpacing: 1.3,
@@ -273,14 +279,14 @@ function createStyles(theme: LaventeCarePdfTheme) {
       fontWeight: 700,
     },
     sectionTitle: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 13,
       color: colors.textPrimary,
       fontWeight: 700,
       marginBottom: 6,
     },
     sectionBody: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 9.3,
       color: colors.textSecondary,
       lineHeight: 1.52,
@@ -301,7 +307,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
     },
     bulletText: {
       flex: 1,
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8.9,
       color: colors.textSecondary,
       lineHeight: 1.45,
@@ -333,7 +339,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       justifyContent: "center",
     },
     checkMarkText: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       color: colors.tealSoft,
       fontSize: 8,
       fontWeight: 700,
@@ -364,7 +370,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       backgroundColor: colors.bgSurface,
     },
     metricLabel: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 8,
       letterSpacing: 0.9,
       textTransform: "uppercase",
@@ -372,14 +378,14 @@ function createStyles(theme: LaventeCarePdfTheme) {
       fontWeight: 700,
     },
     metricValue: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 14,
       color: colors.textPrimary,
       marginBottom: 4,
       fontWeight: 700,
     },
     metricDetail: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8.4,
       color: colors.textMuted,
       lineHeight: 1.38,
@@ -410,7 +416,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       justifyContent: "center",
     },
     journeyIndex: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 8,
       color: colors.bgBase,
       fontWeight: 700,
@@ -429,14 +435,14 @@ function createStyles(theme: LaventeCarePdfTheme) {
       paddingBottom: 5,
     },
     journeyTitle: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 9.5,
       color: colors.textPrimary,
       fontWeight: 700,
       marginBottom: 2,
     },
     journeyDetail: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8.3,
       color: colors.textMuted,
       lineHeight: 1.4,
@@ -465,21 +471,21 @@ function createStyles(theme: LaventeCarePdfTheme) {
     },
     tableLabel: {
       width: 88,
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 8.5,
       color: colors.tealSoft,
       fontWeight: 700,
     },
     tableValue: {
       width: 105,
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 8.5,
       color: colors.textPrimary,
       fontWeight: 700,
     },
     tableNote: {
       flex: 1,
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8.2,
       color: colors.textSecondary,
       lineHeight: 1.35,
@@ -499,7 +505,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       borderBottomColor: colors.borderSubtle,
     },
     structuredMarker: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 7.5,
       color: colors.tealSoft,
       letterSpacing: 1.1,
@@ -508,14 +514,14 @@ function createStyles(theme: LaventeCarePdfTheme) {
       marginBottom: 3,
     },
     structuredTitle: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 12,
       color: colors.textPrimary,
       fontWeight: 700,
       marginBottom: 4,
     },
     structuredIntro: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8.5,
       color: colors.textMuted,
       lineHeight: 1.4,
@@ -531,14 +537,14 @@ function createStyles(theme: LaventeCarePdfTheme) {
       borderLeftColor: colors.teal,
     },
     detailLabel: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 8.5,
       color: colors.textPrimary,
       fontWeight: 700,
       marginBottom: 3,
     },
     detailText: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 8.25,
       color: colors.textSecondary,
       lineHeight: 1.38,
@@ -565,7 +571,7 @@ function createStyles(theme: LaventeCarePdfTheme) {
       borderWidth: 1,
       borderColor: colors.borderSubtle,
       textAlign: "center",
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 6.8,
       color: colors.tealSoft,
       fontWeight: 700,
@@ -590,13 +596,13 @@ function createStyles(theme: LaventeCarePdfTheme) {
     },
     progressLabel: {
       flex: 1,
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 8.5,
       color: colors.textPrimary,
       fontWeight: 700,
     },
     progressValue: {
-      fontFamily: LAVENTECARE_PDF_FONTS.title,
+      fontFamily: fontFamilies.title,
       fontSize: 8.5,
       color: colors.tealSoft,
       fontWeight: 700,
@@ -614,14 +620,14 @@ function createStyles(theme: LaventeCarePdfTheme) {
       backgroundColor: colors.teal,
     },
     progressDetail: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 7.7,
       color: colors.textMuted,
       lineHeight: 1.35,
     },
     progressBenchmark: {
       marginTop: 2,
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 7.4,
       color: colors.tealSoft,
       lineHeight: 1.25,
@@ -639,12 +645,12 @@ function createStyles(theme: LaventeCarePdfTheme) {
       alignItems: "center",
     },
     footerText: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 7.8,
       color: colors.textMuted,
     },
     footerPage: {
-      fontFamily: LAVENTECARE_PDF_FONTS.body,
+      fontFamily: fontFamilies.body,
       fontSize: 7.8,
       color: colors.tealSoft,
       fontWeight: 700,
@@ -652,8 +658,8 @@ function createStyles(theme: LaventeCarePdfTheme) {
   });
 }
 
-function Footer({ page, theme }: { page: number; theme: LaventeCarePdfTheme }) {
-  const s = createStyles(theme);
+function Footer({ page, theme, fontFamilies }: { page: number } & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
   return (
     <View style={s.footer}>
       <Text style={s.footerText}>{LAVENTECARE_PROFILE.website} - {LAVENTECARE_PROFILE.email}</Text>
@@ -682,11 +688,11 @@ function getToneColor(tone: LaventeCarePdfVisualTone, theme: LaventeCarePdfTheme
 function TemplateMetrics({
   content,
   theme,
+  fontFamilies,
 }: {
   content: ReturnType<typeof getLaventeCarePdfContent>;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
 
   return (
     <View style={s.metricGrid}>
@@ -707,11 +713,11 @@ function TemplateMetrics({
 function TemplateJourney({
   content,
   theme,
+  fontFamilies,
 }: {
   content: ReturnType<typeof getLaventeCarePdfContent>;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
 
   return (
     <View style={s.journeyBox}>
@@ -743,11 +749,11 @@ function TemplateJourney({
 function TemplateTable({
   content,
   theme,
+  fontFamilies,
 }: {
   content: ReturnType<typeof getLaventeCarePdfContent>;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
 
   return (
     <View style={s.templateTable}>
@@ -769,11 +775,11 @@ function TemplateTable({
 function StructuredList({
   block,
   theme,
+  fontFamilies,
 }: {
   block: Extract<LaventeCarePdfStructuredBlock, { type: "list" }>;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
   const isSubtle = block.tone === "subtle";
 
   return (
@@ -791,11 +797,11 @@ function StructuredList({
 function StructuredMetricGrid({
   block,
   theme,
+  fontFamilies,
 }: {
   block: Extract<LaventeCarePdfStructuredBlock, { type: "metric_grid" }>;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
 
   return (
     <View style={s.metricGrid}>
@@ -817,11 +823,11 @@ function StructuredMetricGrid({
 function StructuredProgressBars({
   block,
   theme,
+  fontFamilies,
 }: {
   block: Extract<LaventeCarePdfStructuredBlock, { type: "progress_bars" }>;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
 
   return (
     <View style={s.progressGroup}>
@@ -853,11 +859,11 @@ function StructuredProgressBars({
 function StructuredJourneyFlow({
   block,
   theme,
+  fontFamilies,
 }: {
   block: Extract<LaventeCarePdfStructuredBlock, { type: "journey_flow" }>;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
 
   return (
     <View style={s.journeyBox}>
@@ -887,11 +893,11 @@ function StructuredJourneyFlow({
 function StructuredBlock({
   block,
   theme,
+  fontFamilies,
 }: {
   block: LaventeCarePdfStructuredBlock;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
 
   switch (block.type) {
     case "detail": {
@@ -905,13 +911,13 @@ function StructuredBlock({
       );
     }
     case "list":
-      return <StructuredList block={block} theme={theme} />;
+      return <StructuredList block={block} theme={theme} fontFamilies={fontFamilies} />;
     case "metric_grid":
-      return <StructuredMetricGrid block={block} theme={theme} />;
+      return <StructuredMetricGrid block={block} theme={theme} fontFamilies={fontFamilies} />;
     case "progress_bars":
-      return <StructuredProgressBars block={block} theme={theme} />;
+      return <StructuredProgressBars block={block} theme={theme} fontFamilies={fontFamilies} />;
     case "journey_flow":
-      return <StructuredJourneyFlow block={block} theme={theme} />;
+      return <StructuredJourneyFlow block={block} theme={theme} fontFamilies={fontFamilies} />;
     default:
       return null;
   }
@@ -920,11 +926,11 @@ function StructuredBlock({
 function StructuredSection({
   section,
   theme,
+  fontFamilies,
 }: {
   section: LaventeCarePdfStructuredSection;
-  theme: LaventeCarePdfTheme;
-}) {
-  const s = createStyles(theme);
+} & StyledPdfProps) {
+  const s = createStyles(theme, fontFamilies);
 
   return (
     <View style={s.structuredSection} wrap={false}>
@@ -934,14 +940,25 @@ function StructuredSection({
         {section.intro ? <Text style={s.structuredIntro}>{section.intro}</Text> : null}
       </View>
       {section.blocks.map((block, index) => (
-        <StructuredBlock key={`${section.marker}-${block.type}-${index}`} block={block} theme={theme} />
+        <StructuredBlock
+          key={`${section.marker}-${block.type}-${index}`}
+          block={block}
+          theme={theme}
+          fontFamilies={fontFamilies}
+        />
       ))}
     </View>
   );
 }
 
-export function LaventeCarePdfDocument({ document, theme, generatedAt, dossierContext }: Props) {
-  const s = createStyles(theme);
+export function LaventeCarePdfDocument({
+  document,
+  theme,
+  generatedAt,
+  dossierContext,
+  fontFamilies,
+}: Props) {
+  const s = createStyles(theme, fontFamilies);
   const content = getLaventeCarePdfContent(document, dossierContext);
   const structuredSections = getLaventeCarePdfStructuredSections(document, dossierContext);
   const dateLabel = generatedAt.toLocaleDateString("nl-NL", {
@@ -1028,7 +1045,7 @@ export function LaventeCarePdfDocument({ document, theme, generatedAt, dossierCo
           </View>
         ))}
 
-        <Footer page={2} theme={theme} />
+        <Footer page={2} theme={theme} fontFamilies={fontFamilies} />
       </Page>
 
       <Page size="A4" style={s.page}>
@@ -1053,18 +1070,18 @@ export function LaventeCarePdfDocument({ document, theme, generatedAt, dossierCo
           </Text>
         </View>
 
-        <TemplateMetrics content={content} theme={theme} />
+        <TemplateMetrics content={content} theme={theme} fontFamilies={fontFamilies} />
 
         <View style={s.twoColumnGrid}>
           <View style={s.column}>
-            <TemplateJourney content={content} theme={theme} />
+            <TemplateJourney content={content} theme={theme} fontFamilies={fontFamilies} />
           </View>
           <View style={s.column}>
-            <TemplateTable content={content} theme={theme} />
+            <TemplateTable content={content} theme={theme} fontFamilies={fontFamilies} />
           </View>
         </View>
 
-        <Footer page={3} theme={theme} />
+        <Footer page={3} theme={theme} fontFamilies={fontFamilies} />
       </Page>
 
       <Page size="A4" style={s.page}>
@@ -1081,10 +1098,15 @@ export function LaventeCarePdfDocument({ document, theme, generatedAt, dossierCo
         </View>
 
         {structuredSections.slice(0, 3).map((section) => (
-          <StructuredSection key={section.marker} section={section} theme={theme} />
+          <StructuredSection
+            key={section.marker}
+            section={section}
+            theme={theme}
+            fontFamilies={fontFamilies}
+          />
         ))}
 
-        <Footer page={4} theme={theme} />
+        <Footer page={4} theme={theme} fontFamilies={fontFamilies} />
       </Page>
 
       <Page size="A4" style={s.page}>
@@ -1144,7 +1166,7 @@ export function LaventeCarePdfDocument({ document, theme, generatedAt, dossierCo
           </View>
         </View>
 
-        <Footer page={5} theme={theme} />
+        <Footer page={5} theme={theme} fontFamilies={fontFamilies} />
       </Page>
     </Document>
   );

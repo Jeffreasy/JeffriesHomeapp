@@ -22,6 +22,15 @@ export const LAVENTECARE_PDF_FONTS = {
   body: "Inter",
 } as const;
 
+export const LAVENTECARE_PDF_STANDARD_FONTS = {
+  title: "Helvetica",
+  body: "Helvetica",
+} as const;
+
+export type LaventeCarePdfFontFamilies =
+  | typeof LAVENTECARE_PDF_FONTS
+  | typeof LAVENTECARE_PDF_STANDARD_FONTS;
+
 export const LAVENTECARE_PDF_SPACING = {
   pageX: 44,
   pageY: 38,
@@ -68,4 +77,3 @@ export function getLaventeCarePdfPalette(theme: LaventeCarePdfTheme = "screen"):
     borderAccent: "#0891B2",
   };
 }
-
