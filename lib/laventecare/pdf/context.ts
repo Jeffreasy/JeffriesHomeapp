@@ -1,4 +1,4 @@
-export type LaventeCarePdfDossierKind = "lead" | "project" | "manual";
+export type LaventeCarePdfDossierKind = "company" | "lead" | "workstream" | "project" | "manual";
 
 export type LaventeCarePdfDossierContext = {
   kind: LaventeCarePdfDossierKind;
@@ -45,13 +45,17 @@ function readContextParam(params: URLSearchParams, key: string, maxLength?: numb
 }
 
 function isDossierKind(value: string | undefined): value is LaventeCarePdfDossierKind {
-  return value === "lead" || value === "project" || value === "manual";
+  return value === "company" || value === "lead" || value === "workstream" || value === "project" || value === "manual";
 }
 
 export function getLaventeCarePdfDossierKindLabel(kind: LaventeCarePdfDossierKind) {
   switch (kind) {
+    case "company":
+      return "Klant";
     case "lead":
       return "Lead";
+    case "workstream":
+      return "Opdracht";
     case "project":
       return "Project";
     default:

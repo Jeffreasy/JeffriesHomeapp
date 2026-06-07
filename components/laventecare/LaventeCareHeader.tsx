@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenText, BriefcaseBusiness, Loader2, Plus, X } from "lucide-react";
+import { BookOpenText, BriefcaseBusiness, Building2, Loader2, Plus, Workflow, X } from "lucide-react";
 import { motion } from "framer-motion";
 import type { Dispatch, SetStateAction } from "react";
 import { LAVENTECARE_PROFILE } from "@/lib/laventecare";
@@ -11,16 +11,24 @@ export function LaventeCareHeader({
   seeding,
   showLeadForm,
   setShowLeadForm,
+  showCompanyForm,
+  setShowCompanyForm,
   showProjectForm,
   setShowProjectForm,
+  showWorkstreamForm,
+  setShowWorkstreamForm,
   handleSeedDocuments,
 }: {
   summary: LCCockpit["summary"];
   seeding: boolean;
   showLeadForm: boolean;
   setShowLeadForm: Dispatch<SetStateAction<boolean>>;
+  showCompanyForm: boolean;
+  setShowCompanyForm: Dispatch<SetStateAction<boolean>>;
   showProjectForm: boolean;
   setShowProjectForm: Dispatch<SetStateAction<boolean>>;
+  showWorkstreamForm: boolean;
+  setShowWorkstreamForm: Dispatch<SetStateAction<boolean>>;
   handleSeedDocuments: () => void;
 }) {
   return (
@@ -54,6 +62,26 @@ export function LaventeCareHeader({
                 {seeding ? <Loader2 size={16} className="animate-spin" /> : <BookOpenText size={16} />}
                 <span>{summary.documentsSeeded ? "Docs updaten" : "Docs initialiseren"}</span>
               </button>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                onClick={() => setShowCompanyForm((value) => !value)}
+                aria-label={showCompanyForm ? "Klantformulier sluiten" : "Nieuwe klant toevoegen"}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-300 transition-colors hover:bg-amber-500/25 sm:px-4"
+              >
+                {showCompanyForm ? <X size={16} /> : <Building2 size={16} />}
+                <span>Klant</span>
+              </motion.button>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.94 }}
+                onClick={() => setShowWorkstreamForm((value) => !value)}
+                aria-label={showWorkstreamForm ? "Opdrachtformulier sluiten" : "Nieuwe opdracht toevoegen"}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/15 px-3 text-sm font-semibold text-violet-300 transition-colors hover:bg-violet-500/25 sm:px-4"
+              >
+                {showWorkstreamForm ? <X size={16} /> : <Workflow size={16} />}
+                <span>Opdracht</span>
+              </motion.button>
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.94 }}

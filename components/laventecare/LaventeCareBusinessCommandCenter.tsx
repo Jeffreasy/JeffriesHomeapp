@@ -15,7 +15,7 @@ import {
   LAVENTECARE_PROCESS_STAGES,
   LAVENTECARE_PROFILE,
 } from "@/lib/laventecare";
-import type { DossierDocumentItem, LeadItem, ProjectItem } from "./LaventeCareTypes";
+import type { CompanyItem, DossierDocumentItem, LeadItem, ProjectItem, WorkstreamItem } from "./LaventeCareTypes";
 import { formatDate, formatMoney, label } from "./LaventeCareUtils";
 
 const priorityDocuments = [
@@ -41,6 +41,28 @@ export type LaventeCareDossierDocumentLogPayload = {
   theme: LaventeCarePdfTheme;
   delivery: "inline" | "download";
 };
+
+function buildCompanyContextOption(company: CompanyItem): DossierContextOption {
+  const id = company._id ?? company.id;
+
+  return {
+    key: `company:${id}`,
+    label: company.naam,
+    subtext: `Klant - ${label(company.relatie_type)} - ${label(company.status)}`,
+    context: {
+      kind: "company",
+      id,
+      title: company.naam,
+      company: company.naam,
+      status: company.status,
+      phase: company.relatie_type,
+      source: company.website ?? undefined,
+      summary: company.notities ?? undefined,
+      nextStep: company.volgendeActie ? `Relatie opvolgen: ${formatDate(company.volgendeActie)}` : undefined,
+      dueDate: company.volgendeActie ? formatDate(company.volgendeActie) : undefined,
+    },
+  };
+}
 
 function buildLeadContextOption(lead: LeadItem): DossierContextOption {
   const id = lead._id ?? lead.id;
@@ -85,16 +107,45 @@ function buildProjectContextOption(project: ProjectItem): DossierContextOption {
   };
 }
 
+function buildWorkstreamContextOption(workstream: WorkstreamItem): DossierContextOption {
+  const id = workstream._id ?? workstream.id;
+
+  return {
+    key: `workstream:${id}`,
+    label: workstream.titel,
+    subtext: `Opdracht - ${label(workstream.type)} - ${label(workstream.status)}`,
+    context: {
+      kind: "workstream",
+      id,
+      title: workstream.titel,
+      company: workstream.klantNaam,
+      status: workstream.status,
+      priority: workstream.prioriteit,
+      phase: workstream.type,
+      valueLabel: formatMoney(workstream.waardeIndicatie ?? workstream.waarde_indicatie ?? undefined),
+      source: workstream.bron,
+      summary: workstream.doel ?? workstream.scope ?? undefined,
+      painPoint: workstream.bevindingen ?? undefined,
+      nextStep: workstream.volgendeStap ?? undefined,
+      dueDate: workstream.deadline ? formatDate(workstream.deadline) : undefined,
+    },
+  };
+}
+
 export function LaventeCareBusinessCommandCenter({
   summary,
+  companies,
   activeLeads,
+  activeWorkstreams,
   activeProjects,
   dossierDocuments,
   loggingDocumentKey,
   onLogDossierDocument,
 }: {
   summary: LCCockpit["summary"];
+  companies: CompanyItem[];
   activeLeads: LeadItem[];
+  activeWorkstreams: WorkstreamItem[];
   activeProjects: ProjectItem[];
   dossierDocuments: DossierDocumentItem[];
   loggingDocumentKey?: string | null;
@@ -106,10 +157,12 @@ export function LaventeCareBusinessCommandCenter({
     .filter(Boolean);
   const contextOptions = useMemo(
     () => [
+      ...companies.slice(0, 5).map(buildCompanyContextOption),
+      ...activeWorkstreams.slice(0, 4).map(buildWorkstreamContextOption),
       ...activeProjects.slice(0, 3).map(buildProjectContextOption),
       ...activeLeads.slice(0, 3).map(buildLeadContextOption),
     ],
-    [activeLeads, activeProjects]
+    [activeLeads, activeProjects, activeWorkstreams, companies]
   );
   const selectedContextOption =
     selectedContextKey === "none"
@@ -131,11 +184,21 @@ export function LaventeCareBusinessCommandCenter({
           </div>
         </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Klanten</p>
+              <p className="mt-2 text-2xl font-bold text-white">{summary.companies ?? companies.length}</p>
+              <p className="mt-1 text-xs text-slate-500">dossiers</p>
+            </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Funnel</p>
             <p className="mt-2 text-2xl font-bold text-white">{activeLeads.length}</p>
               <p className="mt-1 text-xs text-slate-500">open leads</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Werkbank</p>
+              <p className="mt-2 text-2xl font-bold text-white">{activeWorkstreams.length}</p>
+              <p className="mt-1 text-xs text-slate-500">actieve opdrachten</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Delivery</p>
@@ -236,7 +299,7 @@ export function LaventeCareBusinessCommandCenter({
                 </div>
               ) : (
                 <p className="mt-3 text-xs leading-5 text-slate-500">
-                  Maak of activeer een lead/project om PDF-documenten automatisch als dossierdocument te renderen.
+                  Maak of activeer een klant, lead, opdracht of project om PDF-documenten automatisch als dossierdocument te renderen.
                 </p>
               )}
             </div>
@@ -351,7 +414,7 @@ export function LaventeCareBusinessCommandCenter({
                 </div>
               ) : (
                 <p className="mt-3 text-xs leading-5 text-slate-500">
-                  Nog geen gegenereerde PDF-documenten vastgelegd bij leads of projecten.
+                  Nog geen gegenereerde PDF-documenten vastgelegd bij klanten, leads, opdrachten of projecten.
                 </p>
               )}
             </div>

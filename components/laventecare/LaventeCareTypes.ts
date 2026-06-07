@@ -1,6 +1,9 @@
 import {
+  type LCCompany,
+  type LCContact,
   type LCLead,
   type LCProject,
+  type LCWorkstream,
   type LCActionItem,
   type LCDocument,
   type LCDossierDocument,
@@ -13,6 +16,18 @@ export type DocumentItem = LCDocument & {
 };
 
 export type DossierDocumentItem = LCDossierDocument;
+
+export type CompanyItem = LCCompany & {
+  _id?: string;
+  laatsteContact?: string;
+  volgendeActie?: string;
+};
+
+export type ContactItem = LCContact & {
+  _id?: string;
+  companyId?: string;
+  isPrimary?: boolean;
+};
 
 export type LeadItem = LCLead & {
   _id?: string;
@@ -28,6 +43,15 @@ export type ProjectItem = LCProject & {
   waardeIndicatie?: number;
 };
 
+export type WorkstreamItem = LCWorkstream & {
+  _id?: string;
+  klantNaam?: string;
+  volgendeStap?: string;
+  geschatteMinuten?: number;
+  waardeIndicatie?: number;
+  stackTags?: string[];
+};
+
 export type BusinessSignal = {
   source: "email" | "agenda" | "notitie";
   id: string;
@@ -40,7 +64,7 @@ export type BusinessSignal = {
 };
 
 export type FollowUpSignal = {
-  source: "lead" | "project";
+  source: "company" | "lead" | "workstream" | "project";
   id: string;
   title: string;
   date: string;
@@ -56,6 +80,8 @@ export type ActionItem = LCActionItem & {
   sourceId?: string;
   linkedLeadId?: string;
   linkedProjectId?: string;
+  linkedWorkstreamId?: string;
+  linkedCompanyId?: string;
   updatedAt?: string;
 };
 
@@ -92,6 +118,8 @@ export type SlaIncidentItem = {
 
 export type LeadForm = {
   titel: string;
+  companyId: string;
+  contactId: string;
   companyName: string;
   website: string;
   pijnpunt: string;
@@ -101,6 +129,8 @@ export type LeadForm = {
 
 export const emptyLeadForm: LeadForm = {
   titel: "",
+  companyId: "",
+  contactId: "",
   companyName: "",
   website: "",
   pijnpunt: "",
@@ -110,6 +140,9 @@ export const emptyLeadForm: LeadForm = {
 
 export type ProjectForm = {
   naam: string;
+  companyId: string;
+  companyName: string;
+  website: string;
   fase: string;
   status: string;
   waardeIndicatie: number | "";
@@ -119,9 +152,83 @@ export type ProjectForm = {
 
 export const emptyProjectForm: ProjectForm = {
   naam: "",
+  companyId: "",
+  companyName: "",
+  website: "",
   fase: "intake",
   status: "actief",
   waardeIndicatie: "",
   deadline: "",
   samenvatting: "",
 };
+
+export type WorkstreamForm = {
+  titel: string;
+  companyId: string;
+  type: string;
+  status: string;
+  prioriteit: "laag" | "normaal" | "hoog";
+  klantNaam: string;
+  doel: string;
+  scope: string;
+  deliverable: string;
+  bevindingen: string;
+  volgendeStap: string;
+  deadline: string;
+  geschatteMinuten: number | "";
+  waardeIndicatie: number | "";
+  stackTags: string;
+  tags: string;
+};
+
+export const emptyWorkstreamForm: WorkstreamForm = {
+  titel: "",
+  companyId: "",
+  type: "advies",
+  status: "nieuw",
+  prioriteit: "normaal",
+  klantNaam: "",
+  doel: "",
+  scope: "",
+  deliverable: "",
+  bevindingen: "",
+  volgendeStap: "",
+  deadline: "",
+  geschatteMinuten: "",
+  waardeIndicatie: "",
+  stackTags: "",
+  tags: "",
+};
+
+export type CompanyForm = {
+  naam: string;
+  website: string;
+  sector: string;
+  status: "actief" | "prospect" | "inactief";
+  relatieType: "prospect" | "klant" | "partner" | "leverancier";
+  notities: string;
+  volgendeActie: string;
+};
+
+export const emptyCompanyForm: CompanyForm = {
+  naam: "",
+  website: "",
+  sector: "",
+  status: "actief",
+  relatieType: "prospect",
+  notities: "",
+  volgendeActie: "",
+};
+
+export const LAVENTECARE_WORKSTREAM_TYPES = [
+  { value: "website_platform", label: "Website / platform" },
+  { value: "integratie", label: "Integratie" },
+  { value: "automatisering", label: "Automatisering" },
+  { value: "ai_workflow", label: "AI / workflow" },
+  { value: "crm_sales", label: "CRM / sales" },
+  { value: "data_reporting", label: "Data / reporting" },
+  { value: "security_privacy", label: "Security / privacy" },
+  { value: "support_beheer", label: "Support / beheer" },
+  { value: "discovery_advies", label: "Discovery / advies" },
+  { value: "advies", label: "Advies" },
+] as const;

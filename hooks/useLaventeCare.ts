@@ -4,9 +4,12 @@ import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { laventecareApi } from "@/lib/api";
 import type {
+  CompanyItem,
+  ContactItem,
   DocumentItem,
   LeadItem,
   ProjectItem,
+  WorkstreamItem,
   BusinessSignal,
   FollowUpSignal,
   ActionItem,
@@ -30,6 +33,22 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const createCompanyMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createCompany>[0]) => laventecareApi.createCompany(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateCompanyMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateCompany>[1]) =>
+      laventecareApi.updateCompany(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const createContactMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createContact>[0]) => laventecareApi.createContact(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const updateLeadMut = useMutation({
     mutationFn: ({ id, ...data }: { id: string; status?: string }) => laventecareApi.updateLead(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
@@ -49,6 +68,23 @@ export function useLaventeCare() {
   const updateProjectMut = useMutation({
     mutationFn: ({ id, ...data }: { id: string; fase?: string; status?: string }) =>
       laventecareApi.updateProject(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const createWorkstreamMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createWorkstream>[0]) => laventecareApi.createWorkstream(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateWorkstreamMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateWorkstream>[1]) =>
+      laventecareApi.updateWorkstream(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const convertWorkstreamMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: string; naam?: string; fase?: string; status?: string; samenvatting?: string }) =>
+      laventecareApi.convertWorkstreamToProject(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
@@ -80,6 +116,26 @@ export function useLaventeCare() {
   });
 
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
+  const companies = useMemo(
+    () =>
+      (cockpit?.companies ?? []).map((c) => ({
+        ...c,
+        _id: c.id,
+        laatsteContact: c.laatste_contact ?? undefined,
+        volgendeActie: c.volgende_actie ?? undefined,
+      })) as CompanyItem[],
+    [cockpit]
+  );
+  const contacts = useMemo(
+    () =>
+      (cockpit?.contacts ?? []).map((c) => ({
+        ...c,
+        _id: c.id,
+        companyId: c.company_id ?? undefined,
+        isPrimary: c.is_primary,
+      })) as ContactItem[],
+    [cockpit]
+  );
   const dossierDocuments = useMemo(
     () => (cockpit?.dossierDocuments ?? []) as DossierDocumentItem[],
     [cockpit]
@@ -104,6 +160,19 @@ export function useLaventeCare() {
       })) as ProjectItem[],
     [cockpit]
   );
+  const activeWorkstreams = useMemo(
+    () =>
+      (cockpit?.activeWorkstreams ?? []).map((w) => ({
+        ...w,
+        _id: w.id,
+        klantNaam: w.klant_naam ?? undefined,
+        volgendeStap: w.volgende_stap ?? undefined,
+        geschatteMinuten: w.geschatte_minuten ?? undefined,
+        waardeIndicatie: w.waarde_indicatie ?? undefined,
+        stackTags: w.stack_tags ?? [],
+      })) as WorkstreamItem[],
+    [cockpit]
+  );
   const businessSignals = useMemo(
     () =>
       (cockpit?.businessSignals ?? []).map((s) => ({
@@ -123,6 +192,8 @@ export function useLaventeCare() {
         sourceId: a.source_id ?? undefined,
         linkedLeadId: a.linked_lead_id ?? undefined,
         linkedProjectId: a.linked_project_id ?? undefined,
+        linkedWorkstreamId: a.linked_workstream_id ?? undefined,
+        linkedCompanyId: a.linked_company_id ?? undefined,
         updatedAt: a.updated_at,
       })) as ActionItem[],
     [cockpit]
@@ -156,8 +227,12 @@ export function useLaventeCare() {
   const recentDecisions = useMemo(() => (cockpit?.recentDecisions ?? []) as DecisionItem[], [cockpit]);
 
   const summary = cockpit?.summary ?? {
+    companies: 0,
+    contacts: 0,
     leads: 0,
     activeLeads: 0,
+    workstreams: 0,
+    activeWorkstreams: 0,
     projects: 0,
     activeProjects: 0,
     documents: 0,
@@ -174,8 +249,11 @@ export function useLaventeCare() {
 
   return {
     cockpitLoading,
+    companies,
+    contacts,
     documents,
     activeLeads,
+    activeWorkstreams,
     activeProjects,
     businessSignals,
     actionItems,
@@ -185,12 +263,18 @@ export function useLaventeCare() {
     recentDecisions,
     dossierDocuments,
     summary,
-    
+
+    createCompanyMut,
+    updateCompanyMut,
+    createContactMut,
     createLeadMut,
     updateLeadMut,
     convertLeadMut,
     createProjectMut,
     updateProjectMut,
+    createWorkstreamMut,
+    updateWorkstreamMut,
+    convertWorkstreamMut,
     createActionMut,
     convertSignalMut,
     updateActionStatusMut,

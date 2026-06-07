@@ -3,13 +3,15 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { Loader2, Plus, Target } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import type { LeadForm } from "./LaventeCareTypes";
+import type { CompanyItem, ContactItem, LeadForm } from "./LaventeCareTypes";
 
 export function LaventeCareLeadModal({
   isOpen,
   onClose,
   leadForm,
   setLeadForm,
+  companies,
+  contacts,
   savingLead,
   onSubmit,
 }: {
@@ -17,9 +19,13 @@ export function LaventeCareLeadModal({
   onClose: () => void;
   leadForm: LeadForm;
   setLeadForm: Dispatch<SetStateAction<LeadForm>>;
+  companies: CompanyItem[];
+  contacts: ContactItem[];
   savingLead: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const companyContacts = contacts.filter((contact) => contact.company_id === leadForm.companyId);
+
   return (
     <Modal
       isOpen={isOpen}
@@ -40,6 +46,47 @@ export function LaventeCareLeadModal({
           />
         </label>
         <label className="block lg:col-span-2">
+          <span className="text-xs font-semibold text-slate-400">Bestaande klant</span>
+          <select
+            value={leadForm.companyId}
+            onChange={(event) => {
+              const selected = companies.find((company) => company.id === event.target.value);
+              setLeadForm((form) => ({
+                ...form,
+                companyId: event.target.value,
+                contactId: "",
+                companyName: selected ? selected.naam : form.companyName,
+                website: selected?.website ?? form.website,
+              }));
+            }}
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)]"
+          >
+            <option value="">Nieuwe/geen klant</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.naam}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block lg:col-span-2">
+          <span className="text-xs font-semibold text-slate-400">Contact</span>
+          <select
+            value={leadForm.contactId}
+            onChange={(event) => setLeadForm((form) => ({ ...form, contactId: event.target.value }))}
+            disabled={!leadForm.companyId || companyContacts.length === 0}
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">Geen contact</option>
+            {companyContacts.map((contact) => (
+              <option key={contact.id} value={contact.id}>
+                {contact.naam}
+                {contact.rol ? ` - ${contact.rol}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block lg:col-span-3">
           <span className="text-xs font-semibold text-slate-400">Bedrijf</span>
           <input
             value={leadForm.companyName}
@@ -48,7 +95,7 @@ export function LaventeCareLeadModal({
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
           />
         </label>
-        <label className="block lg:col-span-2">
+        <label className="block lg:col-span-3">
           <span className="text-xs font-semibold text-slate-400">Website</span>
           <input
             value={leadForm.website}
@@ -101,4 +148,3 @@ export function LaventeCareLeadModal({
     </Modal>
   );
 }
-

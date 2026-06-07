@@ -1,7 +1,7 @@
 import type { AppIconName } from "@/lib/symbols";
 
 export type WorkspaceContextId = "laventecare";
-export type BusinessContextType = "laventecare" | "laventecare_lead" | "laventecare_project";
+export type BusinessContextType = "laventecare" | "laventecare_company" | "laventecare_lead" | "laventecare_workstream" | "laventecare_project";
 
 export type BusinessContextValue = {
   type?: BusinessContextType | string | null;
@@ -31,6 +31,13 @@ export const WORKSPACE_CONTEXTS = [
       "crm",
       "lead",
       "leads",
+      "opdracht",
+      "opdrachten",
+      "werkstream",
+      "werkstreams",
+      "quickscan",
+      "integratie",
+      "automatisering",
       "offerte",
       "offertes",
       "klantdossier",

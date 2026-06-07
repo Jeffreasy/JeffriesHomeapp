@@ -420,6 +420,41 @@ export const automationsApi = {
 
 // ─── LaventeCare CRM ─────────────────────────────────────────────────────────
 
+export interface LCCompany {
+  id: string;
+  user_id: string;
+  naam: string;
+  website: string | null;
+  sector: string | null;
+  status: string;
+  relatie_type: string;
+  notities: string | null;
+  laatste_contact: string | null;
+  volgende_actie: string | null;
+  created_at: string;
+  updated_at: string;
+  contacts: number;
+  leads: number;
+  workstreams: number;
+  projects: number;
+  actionItems: number;
+  dossierDocuments: number;
+}
+
+export interface LCContact {
+  id: string;
+  user_id: string;
+  company_id: string | null;
+  naam: string;
+  email: string | null;
+  telefoon: string | null;
+  rol: string | null;
+  is_primary: boolean;
+  notities: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LCLead {
   id: string;
   user_id: string;
@@ -454,6 +489,34 @@ export interface LCProject {
   updated_at: string;
 }
 
+export interface LCWorkstream {
+  id: string;
+  user_id: string;
+  company_id: string | null;
+  lead_id: string | null;
+  project_id: string | null;
+  titel: string;
+  type: string;
+  status: string;
+  prioriteit: string;
+  klant_naam: string | null;
+  bron: string;
+  source_id: string | null;
+  doel: string | null;
+  scope: string | null;
+  deliverable: string | null;
+  bevindingen: string | null;
+  volgende_stap: string | null;
+  deadline: string | null;
+  geschatte_minuten: number | null;
+  waarde_indicatie: number | null;
+  stack_tags: string[];
+  tags: string[];
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LCActionItem {
   id: string;
   user_id: string;
@@ -467,6 +530,8 @@ export interface LCActionItem {
   due_date: string | null;
   linked_lead_id: string | null;
   linked_project_id: string | null;
+  linked_workstream_id: string | null;
+  linked_company_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -496,6 +561,8 @@ export interface LCDossierDocument {
   context_title: string | null;
   lead_id: string | null;
   project_id: string | null;
+  workstream_id: string | null;
+  company_id: string | null;
   pdf_url: string;
   theme: string;
   delivery: string;
@@ -513,6 +580,8 @@ export type LCDossierDocumentCreate = {
   context_title?: string;
   lead_id?: string;
   project_id?: string;
+  workstream_id?: string;
+  company_id?: string;
   pdf_url: string;
   theme: string;
   delivery: string;
@@ -572,8 +641,12 @@ export interface LCFollowUpSignal {
 
 export interface LCCockpit {
   summary: {
+    companies: number;
+    contacts: number;
     leads: number;
     activeLeads: number;
+    workstreams: number;
+    activeWorkstreams: number;
     projects: number;
     activeProjects: number;
     documents: number;
@@ -586,7 +659,10 @@ export interface LCCockpit {
     businessSignals: number;
     followUps: number;
   };
+  companies: LCCompany[];
+  contacts: LCContact[];
   activeLeads: LCLead[];
+  activeWorkstreams: LCWorkstream[];
   activeProjects: LCProject[];
   actionItems: LCActionItem[];
   openIncidents: LCSlaIncident[];
@@ -601,14 +677,53 @@ export interface LCCockpit {
 export const laventecareApi = {
   cockpit: () =>
     apiFetch<LCCockpit>("/laventecare/cockpit"),
+  listCompanies: (params?: { q?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.q) search.set("q", params.q);
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCCompany[]>(`/laventecare/companies${query ? `?${query}` : ""}`);
+  },
+  createCompany: (data: {
+    naam: string;
+    website?: string;
+    sector?: string;
+    status?: string;
+    relatie_type?: string;
+    notities?: string;
+    laatste_contact?: string;
+    volgende_actie?: string;
+  }) =>
+    apiFetch<LCCompany>("/laventecare/companies", { method: "POST", body: JSON.stringify(data) }),
+  updateCompany: (id: string, data: Partial<LCCompany>) =>
+    apiFetch<{ status: string }>(`/laventecare/companies/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  listContacts: (params?: { companyId?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.companyId) search.set("companyId", params.companyId);
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCContact[]>(`/laventecare/contacts${query ? `?${query}` : ""}`);
+  },
+  createContact: (data: {
+    company_id?: string;
+    naam: string;
+    email?: string;
+    telefoon?: string;
+    rol?: string;
+    is_primary?: boolean;
+    notities?: string;
+  }) =>
+    apiFetch<LCContact>("/laventecare/contacts", { method: "POST", body: JSON.stringify(data) }),
   listDocuments: () =>
     apiFetch<LCDocument[]>("/laventecare/documents"),
   searchDocuments: (query: string) =>
     apiFetch<LCDocument[]>(`/laventecare/documents?q=${encodeURIComponent(query)}`),
-  listDossierDocuments: (params?: { leadId?: string; projectId?: string; limit?: number }) => {
+  listDossierDocuments: (params?: { leadId?: string; projectId?: string; workstreamId?: string; companyId?: string; limit?: number }) => {
     const search = new URLSearchParams();
     if (params?.leadId) search.set("leadId", params.leadId);
     if (params?.projectId) search.set("projectId", params.projectId);
+    if (params?.workstreamId) search.set("workstreamId", params.workstreamId);
+    if (params?.companyId) search.set("companyId", params.companyId);
     if (params?.limit) search.set("limit", String(params.limit));
     const query = search.toString();
     return apiFetch<LCDossierDocument[]>(`/laventecare/dossier-documents${query ? `?${query}` : ""}`);
@@ -620,6 +735,8 @@ export const laventecareApi = {
     }),
   createLead: (data: {
     titel: string;
+    company_id?: string;
+    contact_id?: string;
     company_name?: string;
     website?: string;
     pijnpunt?: string;
@@ -634,10 +751,23 @@ export const laventecareApi = {
     apiFetch<LCProject>(`/laventecare/leads/${id}/convert`, { method: "POST", body: JSON.stringify(data) }),
   listProjects: () =>
     apiFetch<LCProject[]>("/laventecare/projects"),
-  createProject: (data: Partial<LCProject>) =>
+  createProject: (data: Partial<LCProject> & { company_name?: string; website?: string }) =>
     apiFetch<LCProject>("/laventecare/projects", { method: "POST", body: JSON.stringify(data) }),
   updateProject: (id: string, data: { fase?: string; status?: string }) =>
     apiFetch<{ status: string }>(`/laventecare/projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  listWorkstreams: (params?: { includeClosed?: boolean; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.includeClosed) search.set("includeClosed", "true");
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCWorkstream[]>(`/laventecare/workstreams${query ? `?${query}` : ""}`);
+  },
+  createWorkstream: (data: Partial<LCWorkstream>) =>
+    apiFetch<LCWorkstream>("/laventecare/workstreams", { method: "POST", body: JSON.stringify(data) }),
+  updateWorkstream: (id: string, data: Partial<LCWorkstream>) =>
+    apiFetch<{ status: string }>(`/laventecare/workstreams/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  convertWorkstreamToProject: (id: string, data: { naam?: string; fase?: string; status?: string; samenvatting?: string }) =>
+    apiFetch<LCProject>(`/laventecare/workstreams/${id}/convert-project`, { method: "POST", body: JSON.stringify(data) }),
   listActions: () =>
     apiFetch<LCActionItem[]>("/laventecare/actions"),
   createAction: (data: {
@@ -648,6 +778,8 @@ export const laventecareApi = {
     action_type: string;
     priority: string;
     due_date?: string;
+    linked_workstream_id?: string;
+    linked_company_id?: string;
   }) =>
     apiFetch<LCActionItem>("/laventecare/actions", { method: "POST", body: JSON.stringify(data) }),
   updateActionStatus: (id: string, status: string) =>

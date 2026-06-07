@@ -3,13 +3,14 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { FolderKanban, Loader2, Plus } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import type { ProjectForm } from "./LaventeCareTypes";
+import type { CompanyItem, ProjectForm } from "./LaventeCareTypes";
 
 export function LaventeCareProjectModal({
   isOpen,
   onClose,
   projectForm,
   setProjectForm,
+  companies,
   savingProject,
   onSubmit,
 }: {
@@ -17,6 +18,7 @@ export function LaventeCareProjectModal({
   onClose: () => void;
   projectForm: ProjectForm;
   setProjectForm: Dispatch<SetStateAction<ProjectForm>>;
+  companies: CompanyItem[];
   savingProject: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
@@ -30,12 +32,53 @@ export function LaventeCareProjectModal({
       maxWidth="2xl"
     >
       <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+        <label className="block sm:col-span-2">
+          <span className="text-xs font-semibold text-slate-400">Bestaande klant</span>
+          <select
+            value={projectForm.companyId}
+            onChange={(event) => {
+              const selected = companies.find((company) => company.id === event.target.value);
+              setProjectForm((form) => ({
+                ...form,
+                companyId: event.target.value,
+                companyName: selected ? selected.naam : form.companyName,
+                website: selected?.website ?? form.website,
+              }));
+            }}
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
+          >
+            <option value="">Nieuwe/geen klant</option>
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.naam}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="block">
           <span className="text-xs font-semibold text-slate-400">Naam</span>
           <input
             value={projectForm.naam}
             onChange={(event) => setProjectForm((form) => ({ ...form, naam: event.target.value }))}
             placeholder="Naam van het project"
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-slate-400">Nieuwe klantnaam</span>
+          <input
+            value={projectForm.companyName}
+            onChange={(event) => setProjectForm((form) => ({ ...form, companyName: event.target.value }))}
+            placeholder="Alleen invullen bij nieuwe klant"
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-slate-400">Website</span>
+          <input
+            value={projectForm.website}
+            onChange={(event) => setProjectForm((form) => ({ ...form, website: event.target.value }))}
+            placeholder="https://..."
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500"
           />
         </label>
@@ -104,4 +147,3 @@ export function LaventeCareProjectModal({
     </Modal>
   );
 }
-

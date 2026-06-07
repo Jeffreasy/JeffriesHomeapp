@@ -70,7 +70,7 @@ export function Modal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-y-auto p-3 pt-6 sm:items-center sm:p-6">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -88,7 +88,7 @@ export function Modal({
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", bounce: 0, duration: 0.3 }}
             className={cn(
-              "relative w-full glass rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full",
+              "relative flex max-h-[calc(100dvh-4rem)] w-full flex-col overflow-hidden rounded-2xl shadow-2xl glass sm:max-h-[calc(100dvh-3rem)]",
               maxWidthClasses[maxWidth],
               themeClasses[theme],
               className
@@ -97,7 +97,7 @@ export function Modal({
             aria-modal="true"
             aria-labelledby="modal-title"
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+            <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-5 py-4 sm:px-6">
               <div className="flex items-center gap-3">
                 {icon && <div className="text-white/80">{icon}</div>}
                 <h2 id="modal-title" className="text-lg font-bold text-white tracking-tight">
@@ -113,7 +113,7 @@ export function Modal({
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto custom-scrollbar">
+            <div className="min-h-0 flex-1 overflow-y-auto p-5 custom-scrollbar sm:p-6">
               {children}
             </div>
           </motion.div>

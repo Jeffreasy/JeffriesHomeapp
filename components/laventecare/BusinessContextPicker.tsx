@@ -25,11 +25,23 @@ export function BusinessContextPicker({
   label = "Business context",
   compact = false,
 }: BusinessContextPickerProps) {
-  const { activeLeads, activeProjects, cockpitLoading } = useLaventeCare();
+  const { companies, activeLeads, activeWorkstreams, activeProjects, cockpitLoading } = useLaventeCare();
   const normalized = normalizeBusinessContext(value);
   const options: BusinessContextOption[] = [
     { key: "none", label: "Geen zakelijke context", meta: "Persoonlijk of algemeen", value: null },
     { key: "laventecare", label: "LaventeCare algemeen", meta: "Bedrijf, strategie of interne opvolging", value: { type: "laventecare", title: "LaventeCare" } },
+    ...companies
+      .filter((company) => company._id || company.id)
+      .slice(0, 12)
+      .map((company) => {
+        const id = company._id ?? company.id;
+        return {
+          key: `company:${id}`,
+          label: company.naam,
+          meta: `Klant - ${company.relatie_type} - ${company.status}`,
+          value: { type: "laventecare_company", id, title: company.naam },
+        } satisfies BusinessContextOption;
+      }),
     ...activeLeads
       .filter((lead) => lead._id || lead.id)
       .slice(0, 12)
@@ -52,6 +64,18 @@ export function BusinessContextPicker({
           label: project.naam,
           meta: `Project - ${project.fase} - ${project.status}`,
           value: { type: "laventecare_project", id, title: project.naam },
+        } satisfies BusinessContextOption;
+      }),
+    ...activeWorkstreams
+      .filter((workstream) => workstream._id || workstream.id)
+      .slice(0, 12)
+      .map((workstream) => {
+        const id = workstream._id ?? workstream.id;
+        return {
+          key: `workstream:${id}`,
+          label: workstream.titel,
+          meta: `Opdracht - ${workstream.type} - ${workstream.status}`,
+          value: { type: "laventecare_workstream", id, title: workstream.titel },
         } satisfies BusinessContextOption;
       }),
   ];
@@ -88,6 +112,17 @@ export function BusinessContextPicker({
           <option value="none">Geen zakelijke context</option>
           <option value="laventecare">LaventeCare algemeen</option>
           {selectedKey === "custom" && <option value="custom">{selected.label}</option>}
+          {companies.length > 0 && (
+            <optgroup label="Klanten">
+              {companies
+                .filter((company) => company._id || company.id)
+                .slice(0, 12)
+                .map((company) => {
+                  const id = company._id ?? company.id;
+                  return <option key={id} value={`company:${id}`}>{company.naam}</option>;
+                })}
+            </optgroup>
+          )}
           {activeLeads.length > 0 && (
             <optgroup label="Leads">
               {activeLeads
@@ -110,6 +145,17 @@ export function BusinessContextPicker({
                 })}
             </optgroup>
           )}
+          {activeWorkstreams.length > 0 && (
+            <optgroup label="Opdrachten">
+              {activeWorkstreams
+                .filter((workstream) => workstream._id || workstream.id)
+                .slice(0, 12)
+                .map((workstream) => {
+                  const id = workstream._id ?? workstream.id;
+                  return <option key={id} value={`workstream:${id}`}>{workstream.titel}</option>;
+                })}
+            </optgroup>
+          )}
         </select>
       </div>
     </div>
@@ -119,7 +165,9 @@ export function BusinessContextPicker({
 function optionKey(value?: BusinessContextValue | null) {
   const context = normalizeBusinessContext(value);
   if (!context?.type) return "none";
+  if (context.type === "laventecare_company" && context.id) return `company:${context.id}`;
   if (context.type === "laventecare_lead" && context.id) return `lead:${context.id}`;
+  if (context.type === "laventecare_workstream" && context.id) return `workstream:${context.id}`;
   if (context.type === "laventecare_project" && context.id) return `project:${context.id}`;
   if (context.type === "laventecare") return "laventecare";
   return "custom";

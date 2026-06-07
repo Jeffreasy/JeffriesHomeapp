@@ -4,7 +4,22 @@ import { FormEvent, useState, useMemo } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { LAVENTECARE_DOCUMENT_TOTAL, toLaventeCareSeedDocuments } from "@/lib/laventecare";
 import { useLaventeCare } from "@/hooks/useLaventeCare";
-import { type LeadForm, type ProjectForm, type BusinessSignal, type ActionItem, type LeadItem, type ProjectItem, emptyLeadForm, emptyProjectForm } from "@/components/laventecare/LaventeCareTypes";
+import {
+  type CompanyForm,
+  type LeadForm,
+  type ProjectForm,
+  type WorkstreamForm,
+  type BusinessSignal,
+  type ActionItem,
+  type CompanyItem,
+  type LeadItem,
+  type ProjectItem,
+  type WorkstreamItem,
+  emptyCompanyForm,
+  emptyLeadForm,
+  emptyProjectForm,
+  emptyWorkstreamForm,
+} from "@/components/laventecare/LaventeCareTypes";
 import { label, optional } from "@/components/laventecare/LaventeCareUtils";
 
 import { LaventeCareHeader } from "@/components/laventecare/LaventeCareHeader";
@@ -12,20 +27,27 @@ import {
   LaventeCareBusinessCommandCenter,
   type LaventeCareDossierDocumentLogPayload,
 } from "@/components/laventecare/LaventeCareBusinessCommandCenter";
+import { LaventeCareCompanyModal } from "@/components/laventecare/LaventeCareCompanyModal";
 import { LaventeCareLeadModal } from "@/components/laventecare/LaventeCareLeadModal";
 import { LaventeCareProjectModal } from "@/components/laventecare/LaventeCareProjectModal";
+import { LaventeCareWorkstreamModal } from "@/components/laventecare/LaventeCareWorkstreamModal";
 import { LaventeCareSignalsView } from "@/components/laventecare/LaventeCareSignalsView";
+import { LaventeCareCustomersView } from "@/components/laventecare/LaventeCareCustomersView";
 import { LaventeCareFunnelView } from "@/components/laventecare/LaventeCareFunnelView";
+import { LaventeCareWorkstreamsView } from "@/components/laventecare/LaventeCareWorkstreamsView";
 import { LaventeCareOperationsView } from "@/components/laventecare/LaventeCareOperationsView";
 import { LaventeCareKnowledgeView } from "@/components/laventecare/LaventeCareKnowledgeView";
-import { FileText, FolderKanban, LifeBuoy, Sparkles } from "lucide-react";
+import { Building2, FileText, FolderKanban, LifeBuoy, Sparkles, Workflow } from "lucide-react";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 
 export default function LaventeCarePage() {
   const {
     cockpitLoading,
+    companies,
+    contacts,
     documents,
     activeLeads,
+    activeWorkstreams,
     activeProjects,
     businessSignals,
     actionItems,
@@ -35,11 +57,15 @@ export default function LaventeCarePage() {
     recentDecisions,
     dossierDocuments,
     summary,
+    createCompanyMut,
     createLeadMut,
     updateLeadMut,
     convertLeadMut,
     createProjectMut,
     updateProjectMut,
+    createWorkstreamMut,
+    updateWorkstreamMut,
+    convertWorkstreamMut,
     createActionMut,
     convertSignalMut,
     updateActionStatusMut,
@@ -48,17 +74,24 @@ export default function LaventeCarePage() {
   } = useLaventeCare();
 
   const { success, error: toastError } = useToast();
+  const [showCompanyForm, setShowCompanyForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
+  const [showWorkstreamForm, setShowWorkstreamForm] = useState(false);
+  const [companyForm, setCompanyForm] = useState<CompanyForm>(emptyCompanyForm);
   const [leadForm, setLeadForm] = useState<LeadForm>(emptyLeadForm);
   const [projectForm, setProjectForm] = useState<ProjectForm>(emptyProjectForm);
+  const [workstreamForm, setWorkstreamForm] = useState<WorkstreamForm>(emptyWorkstreamForm);
+  const [savingCompany, setSavingCompany] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
+  const [savingWorkstream, setSavingWorkstream] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [processingSignal, setProcessingSignal] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
   const [processingLead, setProcessingLead] = useState<string | null>(null);
   const [processingProject, setProcessingProject] = useState<string | null>(null);
+  const [processingWorkstream, setProcessingWorkstream] = useState<string | null>(null);
   const [loggingDocumentKey, setLoggingDocumentKey] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -82,6 +115,34 @@ export default function LaventeCarePage() {
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredDocuments]);
 
+  const handleCompanySubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!companyForm.naam.trim()) {
+      toastError("Geef de klant een naam");
+      return;
+    }
+
+    setSavingCompany(true);
+    try {
+      await createCompanyMut.mutateAsync({
+        naam: companyForm.naam.trim(),
+        website: optional(companyForm.website),
+        sector: optional(companyForm.sector),
+        status: companyForm.status,
+        relatie_type: companyForm.relatieType,
+        notities: optional(companyForm.notities),
+        volgende_actie: optional(companyForm.volgendeActie),
+      });
+      setCompanyForm(emptyCompanyForm);
+      setShowCompanyForm(false);
+      success("LaventeCare klant aangemaakt");
+    } catch {
+      toastError("Klant aanmaken is mislukt");
+    } finally {
+      setSavingCompany(false);
+    }
+  };
+
   const handleLeadSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!leadForm.titel.trim()) {
@@ -93,8 +154,10 @@ export default function LaventeCarePage() {
     try {
       await createLeadMut.mutateAsync({
         titel: leadForm.titel.trim(),
-        company_name: optional(leadForm.companyName),
-        website: optional(leadForm.website),
+        company_id: optional(leadForm.companyId),
+        contact_id: optional(leadForm.contactId),
+        company_name: leadForm.companyId ? undefined : optional(leadForm.companyName),
+        website: leadForm.companyId ? undefined : optional(leadForm.website),
         pijnpunt: optional(leadForm.pijnpunt),
         volgende_stap: optional(leadForm.volgendeStap),
         prioriteit: leadForm.prioriteit,
@@ -121,6 +184,9 @@ export default function LaventeCarePage() {
     try {
       await createProjectMut.mutateAsync({
         naam: projectForm.naam.trim(),
+        company_id: optional(projectForm.companyId),
+        company_name: projectForm.companyId ? undefined : optional(projectForm.companyName),
+        website: projectForm.companyId ? undefined : optional(projectForm.website),
         fase: projectForm.fase,
         status: projectForm.status,
         waarde_indicatie: projectForm.waardeIndicatie === "" ? undefined : Number(projectForm.waardeIndicatie),
@@ -135,6 +201,44 @@ export default function LaventeCarePage() {
       toastError("Project aanmaken is mislukt");
     } finally {
       setSavingProject(false);
+    }
+  };
+
+  const handleWorkstreamSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!workstreamForm.titel.trim()) {
+      toastError("Geef de opdracht een titel");
+      return;
+    }
+
+    setSavingWorkstream(true);
+    try {
+      await createWorkstreamMut.mutateAsync({
+        titel: workstreamForm.titel.trim(),
+        company_id: optional(workstreamForm.companyId),
+        type: workstreamForm.type,
+        status: workstreamForm.status,
+        prioriteit: workstreamForm.prioriteit,
+        klant_naam: optional(workstreamForm.klantNaam),
+        doel: optional(workstreamForm.doel),
+        scope: optional(workstreamForm.scope),
+        deliverable: optional(workstreamForm.deliverable),
+        bevindingen: optional(workstreamForm.bevindingen),
+        volgende_stap: optional(workstreamForm.volgendeStap),
+        deadline: optional(workstreamForm.deadline),
+        geschatte_minuten: workstreamForm.geschatteMinuten === "" ? undefined : Number(workstreamForm.geschatteMinuten),
+        waarde_indicatie: workstreamForm.waardeIndicatie === "" ? undefined : Number(workstreamForm.waardeIndicatie),
+        stack_tags: parseTagInput(workstreamForm.stackTags),
+        tags: parseTagInput(workstreamForm.tags),
+        bron: "cockpit",
+      });
+      setWorkstreamForm(emptyWorkstreamForm);
+      setShowWorkstreamForm(false);
+      success("LaventeCare opdracht toegevoegd");
+    } catch {
+      toastError("Opdracht aanmaken is mislukt");
+    } finally {
+      setSavingWorkstream(false);
     }
   };
 
@@ -251,6 +355,52 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleWorkstreamStatus = async (workstream: WorkstreamItem, fields: { status?: string }) => {
+    const id = workstream._id ?? workstream.id;
+    if (!id) return;
+    const key = `status:${fields.status}`;
+    setProcessingWorkstream(`${id}:${key}`);
+    try {
+      await updateWorkstreamMut.mutateAsync({ id, ...fields });
+      success("Opdracht bijgewerkt");
+    } catch {
+      toastError("Opdracht bijwerken is mislukt");
+    } finally {
+      setProcessingWorkstream(null);
+    }
+  };
+
+  const handleWorkstreamToProject = async (workstream: WorkstreamItem) => {
+    const id = workstream._id ?? workstream.id;
+    if (!id) return;
+    setProcessingWorkstream(`${id}:project`);
+    try {
+      await convertWorkstreamMut.mutateAsync({
+        id,
+        naam: workstream.titel,
+        fase: "intake",
+        status: "actief",
+        samenvatting: [workstream.doel, workstream.scope, workstream.bevindingen].filter(Boolean).join("\n\n") || undefined,
+      });
+      success("Opdracht omgezet naar project");
+    } catch {
+      toastError("Opdracht converteren is mislukt");
+    } finally {
+      setProcessingWorkstream(null);
+    }
+  };
+
+  const handleStartWorkstreamForCompany = (company: CompanyItem) => {
+    const id = company._id ?? company.id;
+    setWorkstreamForm({
+      ...emptyWorkstreamForm,
+      companyId: id,
+      klantNaam: company.naam,
+      titel: `${company.naam}: opdracht`,
+    });
+    setShowWorkstreamForm(true);
+  };
+
   const handleLogDossierDocument = async (payload: LaventeCareDossierDocumentLogPayload) => {
     setLoggingDocumentKey(payload.documentKey);
     try {
@@ -262,7 +412,9 @@ export default function LaventeCarePage() {
         context_id: payload.context.id,
         context_title: payload.context.title,
         lead_id: payload.context.kind === "lead" ? payload.context.id : undefined,
+        workstream_id: payload.context.kind === "workstream" ? payload.context.id : undefined,
         project_id: payload.context.kind === "project" ? payload.context.id : undefined,
+        company_id: payload.context.kind === "company" ? payload.context.id : undefined,
         pdf_url: payload.pdfUrl,
         theme: payload.theme,
         delivery: payload.delivery,
@@ -296,19 +448,34 @@ export default function LaventeCarePage() {
       <LaventeCareHeader
         summary={summary}
         seeding={seeding}
+        showCompanyForm={showCompanyForm}
+        setShowCompanyForm={setShowCompanyForm}
         showLeadForm={showLeadForm}
         setShowLeadForm={setShowLeadForm}
         showProjectForm={showProjectForm}
         setShowProjectForm={setShowProjectForm}
+        showWorkstreamForm={showWorkstreamForm}
+        setShowWorkstreamForm={setShowWorkstreamForm}
         handleSeedDocuments={handleSeedDocuments}
       />
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
+        <LaventeCareCompanyModal
+          isOpen={showCompanyForm}
+          onClose={() => setShowCompanyForm(false)}
+          companyForm={companyForm}
+          setCompanyForm={setCompanyForm}
+          savingCompany={savingCompany}
+          onSubmit={handleCompanySubmit}
+        />
+
         <LaventeCareLeadModal
           isOpen={showLeadForm}
           onClose={() => setShowLeadForm(false)}
           leadForm={leadForm}
           setLeadForm={setLeadForm}
+          companies={companies}
+          contacts={contacts}
           savingLead={savingLead}
           onSubmit={handleLeadSubmit}
         />
@@ -318,13 +485,26 @@ export default function LaventeCarePage() {
           onClose={() => setShowProjectForm(false)}
           projectForm={projectForm}
           setProjectForm={setProjectForm}
+          companies={companies}
           savingProject={savingProject}
           onSubmit={handleProjectSubmit}
         />
 
+        <LaventeCareWorkstreamModal
+          isOpen={showWorkstreamForm}
+          onClose={() => setShowWorkstreamForm(false)}
+          workstreamForm={workstreamForm}
+          setWorkstreamForm={setWorkstreamForm}
+          companies={companies}
+          savingWorkstream={savingWorkstream}
+          onSubmit={handleWorkstreamSubmit}
+        />
+
         <LaventeCareBusinessCommandCenter
           summary={summary}
+          companies={companies}
           activeLeads={activeLeads}
+          activeWorkstreams={activeWorkstreams}
           activeProjects={activeProjects}
           dossierDocuments={dossierDocuments}
           loggingDocumentKey={loggingDocumentKey}
@@ -332,6 +512,25 @@ export default function LaventeCarePage() {
         />
 
         <div className="flex flex-col gap-6 mt-2">
+          <CollapsibleSection
+            title="Klantenbasis"
+            subtitle={`${companies.length} klanten, ${contacts.length} contactpersonen`}
+            icon={<Building2 size={18} />}
+            theme="amber"
+            defaultOpen={true}
+          >
+            <LaventeCareCustomersView
+              companies={companies}
+              contacts={contacts}
+              activeLeads={activeLeads}
+              activeWorkstreams={activeWorkstreams}
+              activeProjects={activeProjects}
+              dossierDocuments={dossierDocuments}
+              onShowCompanyForm={() => setShowCompanyForm(true)}
+              onStartWorkstream={handleStartWorkstreamForCompany}
+            />
+          </CollapsibleSection>
+
           <CollapsibleSection
             title="Actieve Signalen"
             subtitle={`${businessSignals.length} signalen, ${actionItems?.length || 0} actiepunten open`}
@@ -352,8 +551,24 @@ export default function LaventeCarePage() {
           </CollapsibleSection>
 
           <CollapsibleSection
+            title="Opdrachten Werkbank"
+            subtitle={`${activeWorkstreams.length} actieve opdrachten tussen actie en project`}
+            icon={<Workflow size={18} />}
+            theme="violet"
+            defaultOpen={true}
+          >
+            <LaventeCareWorkstreamsView
+              activeWorkstreams={activeWorkstreams}
+              processingWorkstream={processingWorkstream}
+              onShowWorkstreamForm={() => setShowWorkstreamForm(true)}
+              handleWorkstreamStatus={handleWorkstreamStatus}
+              handleWorkstreamToProject={handleWorkstreamToProject}
+            />
+          </CollapsibleSection>
+
+          <CollapsibleSection
             title="Delivery Funnel"
-            subtitle={`${activeLeads.length} leads en ${activeProjects.length} actieve projecten`}
+            subtitle={`${activeLeads.length} leads, ${activeWorkstreams.length} opdrachten en ${activeProjects.length} actieve projecten`}
             icon={<FolderKanban size={18} />}
             theme="emerald"
             defaultOpen={true}
@@ -401,4 +616,11 @@ export default function LaventeCarePage() {
       </main>
     </div>
   );
+}
+
+function parseTagInput(value: string) {
+  return value
+    .split(/[,\n]/)
+    .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
+    .filter((tag, index, all) => tag && all.indexOf(tag) === index);
 }
