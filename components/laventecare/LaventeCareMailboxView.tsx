@@ -538,6 +538,7 @@ function isDefaultPilotAccessSummary(value?: string) {
   const normalized = value?.trim().toLowerCase() ?? "";
   return (
     normalized === "" ||
+    normalized === "via het afgesproken veilige kanaal" ||
     normalized === "pilottoegang stemmen we voor de start af via het afgesproken kanaal" ||
     normalized === "pilotaccounts staan klaar; gevoelige inloggegevens deel ik via het afgesproken veilige kanaal"
   );
