@@ -44,7 +44,7 @@ export function LaventeCareHeader({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Bedrijfsbrein
                 </p>
-                <h1 className="mt-1 truncate text-2xl font-bold text-white">LaventeCare Cockpit</h1>
+                <h1 className="mt-1 truncate text-2xl font-bold text-white">LaventeCare Portal</h1>
                 <p className="mt-1 line-clamp-1 text-sm text-slate-500">
                   {LAVENTECARE_PROFILE.rol}
                 </p>

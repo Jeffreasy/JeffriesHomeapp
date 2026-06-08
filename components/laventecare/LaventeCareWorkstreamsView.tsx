@@ -15,19 +15,21 @@ const statusFlow = [
 ] as const;
 
 export function LaventeCareWorkstreamsView({
-  activeWorkstreams,
+  workstreams,
+  activeWorkstreamCount,
   processingWorkstream,
   onShowWorkstreamForm,
   handleWorkstreamStatus,
   handleWorkstreamToProject,
 }: {
-  activeWorkstreams: WorkstreamItem[];
+  workstreams: WorkstreamItem[];
+  activeWorkstreamCount: number;
   processingWorkstream: string | null;
   onShowWorkstreamForm: () => void;
   handleWorkstreamStatus: (workstream: WorkstreamItem, fields: { status?: string }) => Promise<void>;
   handleWorkstreamToProject: (workstream: WorkstreamItem) => Promise<void>;
 }) {
-  const grouped = groupWorkstreams(activeWorkstreams);
+  const grouped = groupWorkstreams(workstreams);
 
   return (
     <section className="space-y-4">
@@ -42,7 +44,11 @@ export function LaventeCareWorkstreamsView({
               <h2 className="mt-1 text-lg font-bold text-white">Opdrachten tussen actie en project</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
                 Kleine en middelgrote klussen blijven licht genoeg om snel te sturen, maar krijgen wel scope,
-                deliverable, stack-tags, notities, agenda-context en dossierdocumenten.
+                deliverable, stack-tags, notities, agenda-context en dossierdocumenten. Omgezette opdrachten blijven
+                als historie zichtbaar zodra ze project zijn geworden.
+              </p>
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                {workstreams.length} totaal - {activeWorkstreamCount} actief
               </p>
             </div>
           </div>
@@ -57,7 +63,7 @@ export function LaventeCareWorkstreamsView({
         </div>
       </div>
 
-      {activeWorkstreams.length === 0 ? (
+      {workstreams.length === 0 ? (
         <EmptyState
           title="Nog geen opdrachten"
           body="Maak een opdracht voor kleine klussen zoals een quickscan, integratiecheck, supportvraag, automatisering of adviesmoment."
@@ -159,7 +165,11 @@ function WorkstreamCard({
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-2">
-        {statusFlow.map((status) => {
+        {isClosedWorkstream(workstream.status) ? (
+          <div className="col-span-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-100">
+            {workstream.status === "omgezet_project" ? "Omgezet naar project" : label(workstream.status)}
+          </div>
+        ) : statusFlow.map((status) => {
           const statusBusy = processingWorkstream === `${id}:status:${status.value}`;
           return (
             <button
@@ -179,15 +189,17 @@ function WorkstreamCard({
             </button>
           );
         })}
-        <button
-          type="button"
-          onClick={() => onConvert(workstream)}
-          disabled={Boolean(processingWorkstream)}
-          className="col-span-2 inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {busy && processingWorkstream === `${id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
-          Naar project
-        </button>
+        {!isClosedWorkstream(workstream.status) ? (
+          <button
+            type="button"
+            onClick={() => onConvert(workstream)}
+            disabled={Boolean(processingWorkstream)}
+            className="col-span-2 inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {busy && processingWorkstream === `${id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
+            Naar project
+          </button>
+        ) : null}
       </div>
     </article>
   );
@@ -201,6 +213,10 @@ function groupWorkstreams(workstreams: WorkstreamItem[]) {
     { status: "uitvoering", label: "Uitvoering", items: [] as WorkstreamItem[] },
     { status: "wacht_op_klant", label: "Wachten", items: [] as WorkstreamItem[] },
     { status: "actief", label: "Actief", items: [] as WorkstreamItem[] },
+    { status: "omgezet_project", label: "Omgezet", items: [] as WorkstreamItem[] },
+    { status: "afgerond", label: "Afgerond", items: [] as WorkstreamItem[] },
+    { status: "gesloten", label: "Gesloten", items: [] as WorkstreamItem[] },
+    { status: "gearchiveerd", label: "Archief", items: [] as WorkstreamItem[] },
   ];
 
   for (const item of workstreams) {
@@ -209,4 +225,8 @@ function groupWorkstreams(workstreams: WorkstreamItem[]) {
   }
 
   return groups.filter((group) => group.items.length > 0);
+}
+
+function isClosedWorkstream(status: string) {
+  return ["afgerond", "done", "gesloten", "gearchiveerd", "omgezet_project"].includes(status);
 }

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   CalendarClock,
   CheckCircle2,
@@ -201,12 +202,14 @@ export function OperationCard({
   meta,
   body,
   tone,
+  actions,
 }: {
   icon: LucideIcon;
   title: string;
   meta: string;
   body: string;
   tone: Tone;
+  actions?: ReactNode;
 }) {
   const toneClass = toneClasses[tone];
   return (
@@ -219,6 +222,7 @@ export function OperationCard({
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{meta}</p>
           <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-white">{title}</h3>
           <p className="mt-2 line-clamp-3 text-sm leading-5 text-slate-400">{body}</p>
+          {actions ? <div className="mt-3 flex flex-wrap gap-2">{actions}</div> : null}
         </div>
       </div>
     </div>

@@ -26,6 +26,8 @@ import type {
   InvoiceLineItem,
 } from "@/components/laventecare/LaventeCareTypes";
 
+const closedWorkstreamStatuses = new Set(["afgerond", "done", "gesloten", "gearchiveerd", "omgezet_project"]);
+
 export function useLaventeCare() {
   const queryClient = useQueryClient();
 
@@ -38,6 +40,12 @@ export function useLaventeCare() {
   const { data: billing, isLoading: billingLoading } = useQuery({
     queryKey: ["laventecare", "billing"],
     queryFn: () => laventecareApi.billing({ limit: 80 }),
+    staleTime: 15_000,
+  });
+
+  const { data: allWorkstreamsData } = useQuery({
+    queryKey: ["laventecare", "workstreams", "all"],
+    queryFn: () => laventecareApi.listWorkstreams({ includeClosed: true, limit: 100 }),
     staleTime: 15_000,
   });
 
@@ -140,6 +148,42 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const createDecisionMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createDecision>[0]) =>
+      laventecareApi.createDecision(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateDecisionStatusMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      laventecareApi.updateDecisionStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const createChangeRequestMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createChangeRequest>[0]) =>
+      laventecareApi.createChangeRequest(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateChangeRequestStatusMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      laventecareApi.updateChangeRequestStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const createSlaIncidentMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createSlaIncident>[0]) =>
+      laventecareApi.createSlaIncident(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateSlaIncidentStatusMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      laventecareApi.updateSlaIncidentStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const createQuoteMut = useMutation({
     mutationFn: (data: Parameters<typeof laventecareApi.createQuote>[0]) => laventecareApi.createQuote(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
@@ -231,9 +275,9 @@ export function useLaventeCare() {
       })) as ProjectItem[],
     [cockpit]
   );
-  const activeWorkstreams = useMemo(
+  const workstreams = useMemo(
     () =>
-      (cockpit?.activeWorkstreams ?? []).map((w) => ({
+      (allWorkstreamsData ?? cockpit?.activeWorkstreams ?? []).map((w) => ({
         ...w,
         _id: w.id,
         klantNaam: w.klant_naam ?? undefined,
@@ -242,7 +286,11 @@ export function useLaventeCare() {
         waardeIndicatie: w.waarde_indicatie ?? undefined,
         stackTags: w.stack_tags ?? [],
       })) as WorkstreamItem[],
-    [cockpit]
+    [allWorkstreamsData, cockpit]
+  );
+  const activeWorkstreams = useMemo(
+    () => workstreams.filter((workstream) => !closedWorkstreamStatuses.has(workstream.status)),
+    [workstreams]
   );
   const businessSignals = useMemo(
     () =>
@@ -281,6 +329,7 @@ export function useLaventeCare() {
     () =>
       (cockpit?.openIncidents ?? []).map((i) => ({
         ...i,
+        _id: i.id,
         gemeldOp: i.gemeld_op,
         reactieDeadline: i.reactie_deadline ?? undefined,
       })) as SlaIncidentItem[],
@@ -290,12 +339,16 @@ export function useLaventeCare() {
     () =>
       (cockpit?.openChanges ?? []).map((c) => ({
         ...c,
+        _id: c.id,
         planningImpact: c.planning_impact ?? undefined,
         budgetImpact: c.budget_impact ?? undefined,
       })) as ChangeRequestItem[],
     [cockpit]
   );
-  const recentDecisions = useMemo(() => (cockpit?.recentDecisions ?? []) as DecisionItem[], [cockpit]);
+  const recentDecisions = useMemo(
+    () => (cockpit?.recentDecisions ?? []).map((d) => ({ ...d, _id: d.id })) as DecisionItem[],
+    [cockpit]
+  );
 
   const summary = cockpit?.summary ?? {
     companies: 0,
@@ -326,6 +379,7 @@ export function useLaventeCare() {
     contacts,
     documents,
     activeLeads,
+    workstreams,
     activeWorkstreams,
     activeProjects,
     businessSignals,
@@ -362,6 +416,12 @@ export function useLaventeCare() {
     seedDocumentsMut,
     createDossierDocumentMut,
     createActivityEventMut,
+    createDecisionMut,
+    updateDecisionStatusMut,
+    createChangeRequestMut,
+    updateChangeRequestStatusMut,
+    createSlaIncidentMut,
+    updateSlaIncidentStatusMut,
     createQuoteMut,
     updateQuoteStatusMut,
     createTimeEntryMut,

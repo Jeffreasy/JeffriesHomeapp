@@ -42,9 +42,19 @@ import { LaventeCareFunnelView } from "@/components/laventecare/LaventeCareFunne
 import { LaventeCareWorkstreamsView } from "@/components/laventecare/LaventeCareWorkstreamsView";
 import { LaventeCareOperationsView } from "@/components/laventecare/LaventeCareOperationsView";
 import { LaventeCareKnowledgeView } from "@/components/laventecare/LaventeCareKnowledgeView";
-import { Building2, FileText, FolderKanban, LifeBuoy, ReceiptText, Sparkles, Workflow } from "lucide-react";
-import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { LaventeCareBillingView } from "@/components/laventecare/LaventeCareBillingView";
+import {
+  CapabilityMatrix,
+  LaventeCarePortalHero,
+  PortalInsightRail,
+  PortalNavigation,
+  PortalRoadmapPanel,
+  PortalWorkspaceHeader,
+  portalIcons,
+  type CapabilityRow,
+  type PortalSection,
+  type PortalView,
+} from "@/components/laventecare/LaventeCarePortal";
 
 export default function LaventeCarePage() {
   const {
@@ -54,6 +64,7 @@ export default function LaventeCarePage() {
     contacts,
     documents,
     activeLeads,
+    workstreams,
     activeWorkstreams,
     activeProjects,
     businessSignals,
@@ -87,6 +98,12 @@ export default function LaventeCarePage() {
     seedDocumentsMut,
     createDossierDocumentMut,
     createActivityEventMut,
+    createDecisionMut,
+    updateDecisionStatusMut,
+    createChangeRequestMut,
+    updateChangeRequestStatusMut,
+    createSlaIncidentMut,
+    updateSlaIncidentStatusMut,
     createQuoteMut,
     updateQuoteStatusMut,
     createTimeEntryMut,
@@ -120,12 +137,14 @@ export default function LaventeCarePage() {
   const [processingLead, setProcessingLead] = useState<string | null>(null);
   const [processingProject, setProcessingProject] = useState<string | null>(null);
   const [processingWorkstream, setProcessingWorkstream] = useState<string | null>(null);
+  const [processingOperation, setProcessingOperation] = useState<string | null>(null);
   const [loggingDocumentKey, setLoggingDocumentKey] = useState<string | null>(null);
   const [updatingQuoteId, setUpdatingQuoteId] = useState<string | null>(null);
   const [creatingInvoiceFromQuoteId, setCreatingInvoiceFromQuoteId] = useState<string | null>(null);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [requestingPaymentInvoiceId, setRequestingPaymentInvoiceId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<PortalView>("overview");
   const [search, setSearch] = useState("");
 
   const selectedCompany = useMemo(
@@ -152,6 +171,266 @@ export default function LaventeCarePage() {
     }
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredDocuments]);
+
+  const totalWorkstreams = Math.max(summary.workstreams ?? 0, workstreams.length, activeWorkstreams.length);
+
+  const capabilityRows = useMemo<CapabilityRow[]>(() => {
+    const hasCommercialData = quotes.length > 0 || timeEntries.length > 0 || invoices.length > 0;
+    return [
+      {
+        label: "Klantenbasis",
+        detail: `${companies.length} klanten, ${contacts.length} contactpersonen`,
+        status: companies.length > 0 && contacts.length > 0 ? "ready" : companies.length > 0 ? "attention" : "missing",
+        owner: "CRM",
+        view: "customers",
+        score: companies.length > 0 && contacts.length > 0 ? 100 : companies.length > 0 ? 70 : 25,
+        priority: contacts.length >= companies.length && companies.length > 0 ? "laag" : "middel",
+        nextStep:
+          companies.length > 0 && contacts.length > 0
+            ? "Basis staat. Houd per klant minimaal een primair contact, website en status bij."
+            : "Maak klantrecords en primaire contactpersonen aan voordat offertes en dossiers groeien.",
+        actionLabel: "Open klanten",
+      },
+      {
+        label: "Sales intake",
+        detail: `${activeLeads.length} actieve leads, ${businessSignals.length} signalen`,
+        status: activeLeads.length > 0 || businessSignals.length > 0 ? "ready" : "attention",
+        owner: "Funnel",
+        view: "signals",
+        score: 100,
+        priority: activeLeads.length > 0 || businessSignals.length > 0 ? "laag" : "middel",
+        nextStep:
+          activeLeads.length > 0 || businessSignals.length > 0
+            ? "Triageer signalen en zet kansrijke items om naar lead of actie."
+            : "Zet de eerstvolgende prospect of inbound vraag vast, zodat sales niet alleen ad hoc blijft.",
+        actionLabel: "Open signalen",
+      },
+      {
+        label: "Flex opdrachten",
+        detail: `${totalWorkstreams} opdrachten, ${activeWorkstreams.length} actief`,
+        status: totalWorkstreams > 0 ? "ready" : "attention",
+        owner: "Werkbank",
+        view: "workstreams",
+        score: 100,
+        priority: totalWorkstreams > 0 ? "laag" : "middel",
+        nextStep:
+          totalWorkstreams > 0
+            ? activeWorkstreams.length > 0
+              ? "Koppel opdrachten aan klant, uren en eventueel offerte/factuur."
+              : "Eerste opdracht is vastgelegd en omgezet; maak nieuwe losse opdrachten aan zodra er tussenwerk naast projecten loopt."
+            : "Leg kleine advies- en implementatieklussen als opdracht vast, los van grote projecten.",
+        actionLabel: "Open opdrachten",
+      },
+      {
+        label: "Delivery projecten",
+        detail: `${activeProjects.length} actieve projecten`,
+        status: activeProjects.length > 0 ? "ready" : "attention",
+        owner: "Delivery",
+        view: "delivery",
+        score: 100,
+        priority: activeProjects.length > 0 ? "laag" : "middel",
+        nextStep:
+          activeProjects.length > 0
+            ? "Gebruik projectfase, deadline en waarde om delivery strak te volgen."
+            : "Maak actieve klanttrajecten zichtbaar als project zodra ze langer lopen dan een losse opdracht.",
+        actionLabel: "Open delivery",
+      },
+      {
+        label: "Offerte, uren, factuur",
+        detail: `${quotes.length} offertes, ${timeEntries.length} uren, ${invoices.length} facturen`,
+        status: hasCommercialData ? "ready" : "attention",
+        owner: "Commercie",
+        view: "commerce",
+        score: 100,
+        priority: hasCommercialData ? "laag" : "middel",
+        nextStep:
+          hasCommercialData
+            ? "Controleer open uren, conceptoffertes en verstuurde facturen periodiek."
+            : "Maak de eerste urenregel of offerte voor een bestaande klant en test daarna factuur plus betaalverzoek.",
+        actionLabel: "Open commercie",
+      },
+      {
+        label: "Bunq betalingen",
+        detail: billing?.summary.bunqReady ? "API en rekening staan klaar" : "Render env mist nog providerdata",
+        status: billing?.summary.bunqReady ? "ready" : "missing",
+        owner: "Finance",
+        view: "commerce",
+        score: billing?.summary.bunqReady ? 100 : 20,
+        priority: billing?.summary.bunqReady ? "laag" : "hoog",
+        nextStep: billing?.summary.bunqReady
+          ? "Koppel het eerste betaalverzoek aan een factuur zodra de commerciele flow gevuld is."
+          : "Vul Render env voor Bunq volledig aan voordat betaalverzoeken live kunnen.",
+        actionLabel: "Open betalingen",
+      },
+      {
+        label: "Klantdossier",
+        detail: `${dossierDocuments.length} dossierstukken, ${activityEvents.length} klantmomenten`,
+        status: dossierDocuments.length > 0 || activityEvents.length > 0 ? "ready" : "attention",
+        owner: "Dossier",
+        view: "customers",
+        score: 100,
+        priority: dossierDocuments.length > 0 || activityEvents.length > 0 ? "laag" : "middel",
+        nextStep:
+          dossierDocuments.length > 0 || activityEvents.length > 0
+            ? "Blijf klantmomenten en dossierstukken aan de juiste klant koppelen."
+            : "Log per bestaande klant minimaal een klantmoment of dossierstuk als start van de audit trail.",
+        actionLabel: "Open klantdossiers",
+      },
+      {
+        label: "Governance",
+        detail: `${recentDecisions.length} besluiten, ${openChanges.length} changes, ${openIncidents.length} incidenten`,
+        status: recentDecisions.length > 0 || openChanges.length > 0 || openIncidents.length > 0 ? "ready" : "attention",
+        owner: "Operations",
+        view: "operations",
+        score: 100,
+        priority: recentDecisions.length > 0 || openChanges.length > 0 || openIncidents.length > 0 ? "laag" : "middel",
+        nextStep:
+          recentDecisions.length > 0 || openChanges.length > 0 || openIncidents.length > 0
+            ? "Gebruik besluiten, changes en incidenten als vaste operationele historie."
+            : "Leg de eerste beslissing, change of supportafspraak vast zodat beheer niet in losse notities blijft hangen.",
+        actionLabel: "Open operations",
+      },
+      {
+        label: "Documentbasis",
+        detail: `${summary.documents}/${LAVENTECARE_DOCUMENT_TOTAL} templates geindexeerd`,
+        status: summary.documents >= LAVENTECARE_DOCUMENT_TOTAL ? "ready" : summary.documents > 0 ? "attention" : "missing",
+        owner: "Kennisbank",
+        view: "knowledge",
+        score: summary.documents >= LAVENTECARE_DOCUMENT_TOTAL ? 100 : summary.documents > 0 ? 70 : 20,
+        priority: summary.documents >= LAVENTECARE_DOCUMENT_TOTAL ? "laag" : "middel",
+        nextStep:
+          summary.documents >= LAVENTECARE_DOCUMENT_TOTAL
+            ? "Documentbasis staat. Gebruik templates nu per klant, offerte en projectfase."
+            : "Werk de documentbasis bij zodat alle templates beschikbaar zijn voor dossiers en PDF output.",
+        actionLabel: "Open kennisbank",
+      },
+    ];
+  }, [
+    activeLeads.length,
+    activeProjects.length,
+    activeWorkstreams.length,
+    activityEvents.length,
+    billing?.summary.bunqReady,
+    businessSignals.length,
+    companies.length,
+    contacts.length,
+    dossierDocuments.length,
+    invoices.length,
+    openChanges.length,
+    openIncidents.length,
+    quotes.length,
+    recentDecisions.length,
+    summary.documents,
+    timeEntries.length,
+    totalWorkstreams,
+    workstreams.length,
+  ]);
+
+  const portalSections = useMemo<PortalSection[]>(
+    () => [
+      {
+        id: "overview",
+        label: "Overzicht",
+        eyebrow: "Business cockpit",
+        description: "Bedrijfsfundament, operating model en snelle context.",
+        count: `${companies.length + activeLeads.length + totalWorkstreams + activeProjects.length}`,
+        icon: portalIcons.overview,
+        tone: "sky",
+      },
+      {
+        id: "customers",
+        label: "Klanten",
+        eyebrow: "CRM basis",
+        description: "Bedrijven, contactpersonen en klantdossiers.",
+        count: `${companies.length}`,
+        icon: portalIcons.customers,
+        tone: "amber",
+      },
+      {
+        id: "signals",
+        label: "Signalen",
+        eyebrow: "AI triage",
+        description: "Agenda, mail en notities naar acties en leads.",
+        count: `${businessSignals.length + actionItems.length + followUps.length}`,
+        icon: portalIcons.signals,
+        tone: "violet",
+      },
+      {
+        id: "workstreams",
+        label: "Opdrachten",
+        eyebrow: "Werkbank",
+        description: "Kleine klussen, adviestrajecten en tussenwerk.",
+        count: `${totalWorkstreams}`,
+        icon: portalIcons.workstreams,
+        tone: "violet",
+      },
+      {
+        id: "commerce",
+        label: "Commercie",
+        eyebrow: "Offerte tot betaling",
+        description: "Uren, offertes, facturen en Bunq betaalverzoeken.",
+        count: `${quotes.length + timeEntries.length + invoices.length}`,
+        icon: portalIcons.commerce,
+        tone: "amber",
+      },
+      {
+        id: "delivery",
+        label: "Delivery",
+        eyebrow: "Projecten",
+        description: "Leads naar projecten, fasering en waarde.",
+        count: `${activeLeads.length + activeProjects.length}`,
+        icon: portalIcons.delivery,
+        tone: "emerald",
+      },
+      {
+        id: "operations",
+        label: "Operations",
+        eyebrow: "Governance",
+        description: "Besluiten, changes, SLA en supportsignalering.",
+        count: `${recentDecisions.length + openChanges.length + openIncidents.length}`,
+        icon: portalIcons.operations,
+        tone: openIncidents.length > 0 ? "rose" : "slate",
+      },
+      {
+        id: "knowledge",
+        label: "Kennisbank",
+        eyebrow: "Dossier & PDF",
+        description: "Documenttemplates, zoeklaag en PDF dossierhistorie.",
+        count: `${summary.documents}`,
+        icon: portalIcons.knowledge,
+        tone: "sky",
+      },
+      {
+        id: "gaps",
+        label: "Gatenlijst",
+        eyebrow: "Bedrijfsdekking",
+        description: "Welke bedrijfsfuncties staan live, half live of missen nog.",
+        count: `${capabilityRows.filter((row) => row.status !== "ready").length}`,
+        icon: portalIcons.gaps,
+        tone: "rose",
+      },
+    ],
+    [
+      actionItems.length,
+      activeLeads.length,
+      activeProjects.length,
+      activeWorkstreams.length,
+      businessSignals.length,
+      capabilityRows,
+      companies.length,
+      followUps.length,
+      invoices.length,
+      openChanges.length,
+      openIncidents.length,
+      quotes.length,
+      recentDecisions.length,
+      summary.documents,
+      timeEntries.length,
+      totalWorkstreams,
+    ]
+  );
+
+  const activePortalSection = portalSections.find((section) => section.id === activeView) ?? portalSections[0];
 
   const closeCompanyForm = () => {
     setShowCompanyForm(false);
@@ -584,6 +863,72 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleCreateDecision = async (payload: Parameters<typeof createDecisionMut.mutateAsync>[0]) => {
+    try {
+      await createDecisionMut.mutateAsync(payload);
+      success("Besluit vastgelegd in LaventeCare");
+    } catch {
+      toastError("Besluit vastleggen is mislukt");
+    }
+  };
+
+  const handleCreateChangeRequest = async (payload: Parameters<typeof createChangeRequestMut.mutateAsync>[0]) => {
+    try {
+      await createChangeRequestMut.mutateAsync(payload);
+      success("Change request aangemaakt");
+    } catch {
+      toastError("Change request aanmaken is mislukt");
+    }
+  };
+
+  const handleCreateSlaIncident = async (payload: Parameters<typeof createSlaIncidentMut.mutateAsync>[0]) => {
+    try {
+      await createSlaIncidentMut.mutateAsync(payload);
+      success("SLA-incident geregistreerd");
+    } catch {
+      toastError("SLA-incident registreren is mislukt");
+    }
+  };
+
+  const handleUpdateDecisionStatus = async (id: string, status: string) => {
+    const key = `decision:${id}:${status}`;
+    setProcessingOperation(key);
+    try {
+      await updateDecisionStatusMut.mutateAsync({ id, status });
+      success("Besluitstatus bijgewerkt");
+    } catch {
+      toastError("Besluitstatus bijwerken is mislukt");
+    } finally {
+      setProcessingOperation(null);
+    }
+  };
+
+  const handleUpdateChangeStatus = async (id: string, status: string) => {
+    const key = `change:${id}:${status}`;
+    setProcessingOperation(key);
+    try {
+      await updateChangeRequestStatusMut.mutateAsync({ id, status });
+      success("Change bijgewerkt");
+    } catch {
+      toastError("Change bijwerken is mislukt");
+    } finally {
+      setProcessingOperation(null);
+    }
+  };
+
+  const handleUpdateIncidentStatus = async (id: string, status: string) => {
+    const key = `incident:${id}:${status}`;
+    setProcessingOperation(key);
+    try {
+      await updateSlaIncidentStatusMut.mutateAsync({ id, status });
+      success("Incident bijgewerkt");
+    } catch {
+      toastError("Incident bijwerken is mislukt");
+    } finally {
+      setProcessingOperation(null);
+    }
+  };
+
   const handleCreateQuote = async (payload: Parameters<typeof createQuoteMut.mutateAsync>[0]) => {
     try {
       await createQuoteMut.mutateAsync(payload);
@@ -696,7 +1041,7 @@ export default function LaventeCarePage() {
         handleSeedDocuments={handleSeedDocuments}
       />
 
-      <main className="mx-auto max-w-7xl space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
+      <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
         <LaventeCareCompanyModal
           isOpen={showCompanyForm}
           onClose={closeCompanyForm}
@@ -754,7 +1099,7 @@ export default function LaventeCarePage() {
           company={selectedCompany}
           contacts={contacts}
           leads={activeLeads}
-          workstreams={activeWorkstreams}
+          workstreams={workstreams}
           projects={activeProjects}
           actions={actionItems}
           dossierDocuments={dossierDocuments}
@@ -776,155 +1121,175 @@ export default function LaventeCarePage() {
           onCreateActivity={handleCreateActivityEvent}
         />
 
-        <LaventeCareBusinessCommandCenter
-          summary={summary}
-          companies={companies}
-          activeLeads={activeLeads}
-          activeWorkstreams={activeWorkstreams}
-          activeProjects={activeProjects}
-          dossierDocuments={dossierDocuments}
-          loggingDocumentKey={loggingDocumentKey}
-          onLogDossierDocument={handleLogDossierDocument}
+        <LaventeCarePortalHero
+          capabilityRows={capabilityRows}
+          companies={companies.length}
+          contacts={contacts.length}
+          leads={activeLeads.length}
+          workstreams={totalWorkstreams}
+          projects={activeProjects.length}
+          invoices={invoices.length}
+          documents={summary.documents}
+          onOpenCompany={openNewCompanyForm}
+          onOpenWorkstream={() => setShowWorkstreamForm(true)}
+          onOpenCommerce={() => setActiveView("commerce")}
+          onOpenGaps={() => setActiveView("gaps")}
         />
 
-        <div className="flex flex-col gap-6 mt-2">
-          <CollapsibleSection
-            title="Commercie"
-            subtitle={`${quotes.length} offertes, ${timeEntries.length} urenregels, ${invoices.length} facturen`}
-            icon={<ReceiptText size={18} />}
-            theme="amber"
-            defaultOpen={true}
-          >
-            <LaventeCareBillingView
-              billing={billing}
-              billingLoading={billingLoading}
-              companies={companies}
-              activeProjects={activeProjects}
-              activeWorkstreams={activeWorkstreams}
-              quotes={quotes}
-              timeEntries={timeEntries}
-              invoices={invoices}
-              creatingQuote={createQuoteMut.isPending}
-              creatingTimeEntry={createTimeEntryMut.isPending}
-              creatingInvoice={createInvoiceMut.isPending}
-              updatingQuoteId={updatingQuoteId}
-              creatingInvoiceFromQuoteId={creatingInvoiceFromQuoteId}
-              updatingInvoiceId={updatingInvoiceId}
-              requestingPaymentInvoiceId={requestingPaymentInvoiceId}
-              onCreateQuote={handleCreateQuote}
-              onCreateTimeEntry={handleCreateTimeEntry}
-              onCreateInvoice={handleCreateInvoice}
-              onCreateInvoiceFromQuote={handleCreateInvoiceFromQuote}
-              onUpdateQuoteStatus={handleUpdateQuoteStatus}
-              onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
-              onCreatePaymentRequest={handleCreateInvoicePaymentRequest}
-            />
-          </CollapsibleSection>
+        <PortalNavigation sections={portalSections} activeView={activeView} onChange={setActiveView} />
 
-          <CollapsibleSection
-            title="Klantenbasis"
-            subtitle={`${companies.length} klanten, ${contacts.length} contactpersonen`}
-            icon={<Building2 size={18} />}
-            theme="amber"
-            defaultOpen={true}
-          >
-            <LaventeCareCustomersView
-              companies={companies}
-              contacts={contacts}
-              activeLeads={activeLeads}
-              activeWorkstreams={activeWorkstreams}
-              activeProjects={activeProjects}
-              dossierDocuments={dossierDocuments}
-              onShowCompanyForm={openNewCompanyForm}
-              onEditCompany={handleEditCompany}
-              onAddContact={handleAddContact}
-              onEditContact={handleEditContact}
-              onStartWorkstream={handleStartWorkstreamForCompany}
-              onOpenDossier={(company) => setSelectedCompanyId(company._id ?? company.id)}
+        <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="order-2 xl:order-1">
+            <PortalInsightRail
+              capabilityRows={capabilityRows}
+              sections={portalSections}
+              activeView={activeView}
+              onChange={setActiveView}
+              signals={businessSignals.length}
+              actions={actionItems.length}
+              openInvoices={billing?.summary.openInvoices ?? 0}
+              openIncidents={openIncidents.length}
             />
-          </CollapsibleSection>
+          </div>
 
-          <CollapsibleSection
-            title="Actieve Signalen"
-            subtitle={`${businessSignals.length} signalen, ${actionItems?.length || 0} actiepunten open`}
-            icon={<Sparkles size={18} />}
-            theme="violet"
-            defaultOpen={true}
-          >
-            <LaventeCareSignalsView
-              businessSignals={businessSignals}
-              actionItems={actionItems}
-              followUps={followUps}
-              processingSignal={processingSignal}
-              processingAction={processingAction}
-              handleCreateActionFromSignal={handleCreateActionFromSignal}
-              handleConvertSignalToLead={handleConvertSignalToLead}
-              handleCompleteAction={handleCompleteAction}
-            />
-          </CollapsibleSection>
+          <section className="order-1 min-w-0 space-y-5 xl:order-2">
+            <PortalWorkspaceHeader section={activePortalSection} />
 
-          <CollapsibleSection
-            title="Opdrachten Werkbank"
-            subtitle={`${activeWorkstreams.length} actieve opdrachten tussen actie en project`}
-            icon={<Workflow size={18} />}
-            theme="violet"
-            defaultOpen={true}
-          >
-            <LaventeCareWorkstreamsView
-              activeWorkstreams={activeWorkstreams}
-              processingWorkstream={processingWorkstream}
-              onShowWorkstreamForm={() => setShowWorkstreamForm(true)}
-              handleWorkstreamStatus={handleWorkstreamStatus}
-              handleWorkstreamToProject={handleWorkstreamToProject}
-            />
-          </CollapsibleSection>
+            {activeView === "overview" ? (
+              <div className="space-y-5">
+                <LaventeCareBusinessCommandCenter
+                  summary={summary}
+                  companies={companies}
+                  activeLeads={activeLeads}
+                  activeWorkstreams={activeWorkstreams}
+                  activeProjects={activeProjects}
+                  dossierDocuments={dossierDocuments}
+                  loggingDocumentKey={loggingDocumentKey}
+                  onLogDossierDocument={handleLogDossierDocument}
+                />
+                <CapabilityMatrix capabilityRows={capabilityRows} onOpenView={setActiveView} />
+              </div>
+            ) : null}
 
-          <CollapsibleSection
-            title="Delivery Funnel"
-            subtitle={`${activeLeads.length} leads, ${activeWorkstreams.length} opdrachten en ${activeProjects.length} actieve projecten`}
-            icon={<FolderKanban size={18} />}
-            theme="emerald"
-            defaultOpen={true}
-          >
-            <LaventeCareFunnelView
-              activeLeads={activeLeads}
-              activeProjects={activeProjects}
-              processingLead={processingLead}
-              processingProject={processingProject}
-              handleLeadStatus={handleLeadStatus}
-              handleLeadToProject={handleLeadToProject}
-              handleProjectStatus={handleProjectStatus}
-              onShowProjectForm={() => setShowProjectForm(true)}
-            />
-          </CollapsibleSection>
+            {activeView === "customers" ? (
+              <LaventeCareCustomersView
+                companies={companies}
+                contacts={contacts}
+                activeLeads={activeLeads}
+                activeWorkstreams={workstreams}
+                activeProjects={activeProjects}
+                dossierDocuments={dossierDocuments}
+                onShowCompanyForm={openNewCompanyForm}
+                onEditCompany={handleEditCompany}
+                onAddContact={handleAddContact}
+                onEditContact={handleEditContact}
+                onStartWorkstream={handleStartWorkstreamForCompany}
+                onOpenDossier={(company) => setSelectedCompanyId(company._id ?? company.id)}
+              />
+            ) : null}
 
-          <CollapsibleSection
-            title="SLA Operations"
-            subtitle={`${openIncidents.length} incidenten en ${openChanges.length} open changes`}
-            icon={<LifeBuoy size={18} />}
-            theme={openIncidents.length > 0 ? "rose" : "primary"}
-            defaultOpen={false}
-          >
-            <LaventeCareOperationsView
-              recentDecisions={recentDecisions}
-              openChanges={openChanges}
-              openIncidents={openIncidents}
-            />
-          </CollapsibleSection>
+            {activeView === "signals" ? (
+              <LaventeCareSignalsView
+                businessSignals={businessSignals}
+                actionItems={actionItems}
+                followUps={followUps}
+                processingSignal={processingSignal}
+                processingAction={processingAction}
+                handleCreateActionFromSignal={handleCreateActionFromSignal}
+                handleConvertSignalToLead={handleConvertSignalToLead}
+                handleCompleteAction={handleCompleteAction}
+              />
+            ) : null}
 
-          <CollapsibleSection
-            title="Kennisbank & Documenten"
-            subtitle={`${summary.documents}/${LAVENTECARE_DOCUMENT_TOTAL} documenten geindexeerd`}
-            icon={<FileText size={18} />}
-            theme="amber"
-            defaultOpen={false}
-          >
-            <LaventeCareKnowledgeView
-              search={search}
-              setSearch={setSearch}
-              documentGroups={documentGroups}
-            />
-          </CollapsibleSection>
+            {activeView === "workstreams" ? (
+              <LaventeCareWorkstreamsView
+                workstreams={workstreams}
+                activeWorkstreamCount={activeWorkstreams.length}
+                processingWorkstream={processingWorkstream}
+                onShowWorkstreamForm={() => setShowWorkstreamForm(true)}
+                handleWorkstreamStatus={handleWorkstreamStatus}
+                handleWorkstreamToProject={handleWorkstreamToProject}
+              />
+            ) : null}
+
+            {activeView === "commerce" ? (
+              <LaventeCareBillingView
+                billing={billing}
+                billingLoading={billingLoading}
+                companies={companies}
+                activeProjects={activeProjects}
+                activeWorkstreams={activeWorkstreams}
+                quotes={quotes}
+                timeEntries={timeEntries}
+                invoices={invoices}
+                creatingQuote={createQuoteMut.isPending}
+                creatingTimeEntry={createTimeEntryMut.isPending}
+                creatingInvoice={createInvoiceMut.isPending}
+                updatingQuoteId={updatingQuoteId}
+                creatingInvoiceFromQuoteId={creatingInvoiceFromQuoteId}
+                updatingInvoiceId={updatingInvoiceId}
+                requestingPaymentInvoiceId={requestingPaymentInvoiceId}
+                onCreateQuote={handleCreateQuote}
+                onCreateTimeEntry={handleCreateTimeEntry}
+                onCreateInvoice={handleCreateInvoice}
+                onCreateInvoiceFromQuote={handleCreateInvoiceFromQuote}
+                onUpdateQuoteStatus={handleUpdateQuoteStatus}
+                onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
+                onCreatePaymentRequest={handleCreateInvoicePaymentRequest}
+              />
+            ) : null}
+
+            {activeView === "delivery" ? (
+              <LaventeCareFunnelView
+                activeLeads={activeLeads}
+                activeProjects={activeProjects}
+                processingLead={processingLead}
+                processingProject={processingProject}
+                handleLeadStatus={handleLeadStatus}
+                handleLeadToProject={handleLeadToProject}
+                handleProjectStatus={handleProjectStatus}
+                onShowProjectForm={() => setShowProjectForm(true)}
+              />
+            ) : null}
+
+            {activeView === "operations" ? (
+              <LaventeCareOperationsView
+                recentDecisions={recentDecisions}
+                openChanges={openChanges}
+                openIncidents={openIncidents}
+                activeProjects={activeProjects}
+                creatingDecision={createDecisionMut.isPending}
+                creatingChange={createChangeRequestMut.isPending}
+                creatingIncident={createSlaIncidentMut.isPending}
+                processingOperation={processingOperation}
+                onCreateDecision={handleCreateDecision}
+                onCreateChangeRequest={handleCreateChangeRequest}
+                onCreateSlaIncident={handleCreateSlaIncident}
+                onUpdateDecisionStatus={handleUpdateDecisionStatus}
+                onUpdateChangeStatus={handleUpdateChangeStatus}
+                onUpdateIncidentStatus={handleUpdateIncidentStatus}
+              />
+            ) : null}
+
+            {activeView === "knowledge" ? (
+              <LaventeCareKnowledgeView
+                search={search}
+                setSearch={setSearch}
+                documentGroups={documentGroups}
+              />
+            ) : null}
+
+            {activeView === "gaps" ? (
+              <div className="space-y-5">
+                <CapabilityMatrix capabilityRows={capabilityRows} expanded onOpenView={setActiveView} />
+                <PortalRoadmapPanel
+                  onOpenCommerce={() => setActiveView("commerce")}
+                  onOpenOperations={() => setActiveView("operations")}
+                  onOpenKnowledge={() => setActiveView("knowledge")}
+                />
+              </div>
+            ) : null}
+          </section>
         </div>
       </main>
     </div>

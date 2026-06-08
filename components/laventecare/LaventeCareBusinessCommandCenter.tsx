@@ -205,8 +205,8 @@ export function LaventeCareBusinessCommandCenter({
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Werkbank</p>
-              <p className="mt-2 text-2xl font-bold text-white">{activeWorkstreams.length}</p>
-              <p className="mt-1 text-xs text-slate-500">actieve opdrachten</p>
+              <p className="mt-2 text-2xl font-bold text-white">{summary.workstreams ?? activeWorkstreams.length}</p>
+              <p className="mt-1 text-xs text-slate-500">{activeWorkstreams.length} actief</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Delivery</p>

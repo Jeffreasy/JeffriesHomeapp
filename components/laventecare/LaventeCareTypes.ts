@@ -100,6 +100,7 @@ export type ActionItem = LCActionItem & {
 };
 
 export type DecisionItem = {
+  id?: string;
   _id?: string;
   titel: string;
   besluit: string;
@@ -110,6 +111,7 @@ export type DecisionItem = {
 };
 
 export type ChangeRequestItem = {
+  id?: string;
   _id?: string;
   titel: string;
   impact: string;
@@ -120,6 +122,7 @@ export type ChangeRequestItem = {
 };
 
 export type SlaIncidentItem = {
+  id?: string;
   _id?: string;
   titel: string;
   prioriteit: string;

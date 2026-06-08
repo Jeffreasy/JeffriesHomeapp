@@ -1001,6 +1001,60 @@ export const laventecareApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  createDecision: (data: {
+    project_id?: string;
+    titel: string;
+    besluit: string;
+    reden?: string;
+    impact?: string;
+    status?: string;
+    datum?: string;
+  }) =>
+    apiFetch<LCDecision>("/laventecare/decisions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateDecisionStatus: (id: string, status: string) =>
+    apiFetch<{ status: string }>(`/laventecare/decisions/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  createChangeRequest: (data: {
+    project_id?: string;
+    titel: string;
+    impact: string;
+    planning_impact?: string;
+    budget_impact?: string;
+    status?: string;
+  }) =>
+    apiFetch<LCChangeRequest>("/laventecare/changes", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateChangeRequestStatus: (id: string, status: string) =>
+    apiFetch<{ status: string }>(`/laventecare/changes/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  createSlaIncident: (data: {
+    project_id?: string;
+    titel: string;
+    prioriteit?: string;
+    status?: string;
+    kanaal?: string;
+    gemeld_op?: string;
+    reactie_deadline?: string;
+    samenvatting?: string;
+  }) =>
+    apiFetch<LCSlaIncident>("/laventecare/sla-incidents", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateSlaIncidentStatus: (id: string, status: string) =>
+    apiFetch<{ status: string }>(`/laventecare/sla-incidents/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
   createLead: (data: {
     titel: string;
     company_id?: string;
