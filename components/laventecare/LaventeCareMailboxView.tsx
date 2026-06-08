@@ -76,6 +76,8 @@ export function LaventeCareMailboxView({
   const [variables, setVariables] = useState(
     [
       "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
+      "laventecare.email=jeffrey@laventecare.nl",
+      "laventecare.tagline=Van idee tot werkend systeem",
       "cta.label=Afstemmen",
       "quote.summary=scope, planning en uitvoering volgens afspraak",
       "invoice.amount=zie factuur",
@@ -101,6 +103,18 @@ export function LaventeCareMailboxView({
   const resolvedName = toName.trim() || selectedContact?.naam || "";
   const parsedVariables = useMemo(() => parseVariables(variables), [variables]);
   const variableHints = useMemo(() => extractPlaceholders(selectedTemplate), [selectedTemplate]);
+  const previewHTML = useMemo(() => renderMailPreview(selectedTemplate?.body_html ?? "", parsedVariables), [selectedTemplate, parsedVariables]);
+  const sendReadiness = useMemo(
+    () =>
+      buildSendReadiness({
+        template: selectedTemplate,
+        variables: parsedVariables,
+        previewHTML,
+        resolvedEmail,
+        companyLinked: Boolean(companyId || selectedCompany),
+      }),
+    [selectedTemplate, parsedVariables, previewHTML, resolvedEmail, companyId, selectedCompany]
+  );
 
   const handleSuggest = async () => {
     if (!selectedTemplate) return;
@@ -286,16 +300,18 @@ export function LaventeCareMailboxView({
               <div className="mt-3 rounded-lg border border-white/10 bg-black/25 p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase text-slate-500">AI briefing</p>
+                    <p className="text-xs font-semibold uppercase text-slate-500">Interne AI briefing</p>
                     <p className="mt-1 text-sm leading-6 text-slate-200">{aiSuggestion.briefing}</p>
                     {aiSuggestion.subject_hint ? (
                       <p className="mt-2 text-xs font-semibold text-sky-100">Onderwerp hint: {aiSuggestion.subject_hint}</p>
                     ) : null}
+                    <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Niet meegestuurd naar de klant</p>
                   </div>
                   <span className={`w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold ${confidenceClass(aiSuggestion.confidence)}`}>
                     {label(aiSuggestion.confidence)}
                   </span>
                 </div>
+                <p className="mt-3 text-xs font-semibold uppercase text-slate-500">Bronnen voor jouw controle</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {aiSuggestion.sources.slice(0, 6).map((source, index) => (
                     <div key={`${source.type}-${source.title}-${index}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
@@ -342,9 +358,31 @@ export function LaventeCareMailboxView({
               <iframe
                 title="LaventeCare mail preview"
                 sandbox=""
-                srcDoc={renderMailPreview(selectedTemplate?.body_html ?? "", parsedVariables)}
+                srcDoc={previewHTML}
                 className="h-72 w-full bg-slate-100"
               />
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3 lg:col-span-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-slate-500">Interne verzendcheck</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Controle voor jou. Deze regels worden niet in de mail gezet.</p>
+                </div>
+                <span className={`w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold ${readinessBadgeClass(sendReadiness.status)}`}>
+                  {sendReadiness.status === "ok" ? "Send ready" : sendReadiness.status === "warn" ? "Controleer" : "Niet klaar"}
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {sendReadiness.items.map((item) => (
+                  <div key={item.label} className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-xs font-bold text-white">{item.label}</p>
+                      <span className={`h-2.5 w-2.5 rounded-full ${readinessDotClass(item.status)}`} />
+                    </div>
+                    <p className="mt-1 text-[11px] leading-4 text-slate-500">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -481,6 +519,90 @@ function serializeVariables(values: Record<string, string>, hints: string[]) {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+type ReadinessStatus = "ok" | "warn" | "missing";
+
+function buildSendReadiness({
+  template,
+  variables,
+  previewHTML,
+  resolvedEmail,
+  companyLinked,
+}: {
+  template?: MailTemplateItem;
+  variables: Record<string, string>;
+  previewHTML: string;
+  resolvedEmail: string;
+  companyLinked: boolean;
+}) {
+  const placeholders = extractPlaceholders(template);
+  const unresolved = placeholders.filter((placeholder) => !variables[placeholder]?.trim() && !placeholder.endsWith(".url"));
+  const originalHasCTA = Boolean(template?.body_html.match(/<a\s+href="/i));
+  const renderedCTAUrls = Array.from(previewHTML.matchAll(/<a\s+href="([^"]+)"/gi), (match) => match[1]);
+  const safeCTAs = renderedCTAUrls.filter(isSafePreviewUrl);
+  const hasLogo = previewHTML.includes("ik.imagekit.io/a0oim4e3e") || previewHTML.includes("LaventeCare");
+
+  const items: Array<{ label: string; detail: string; status: ReadinessStatus }> = [
+    {
+      label: "Ontvanger",
+      detail: resolvedEmail ? resolvedEmail : "Nog geen e-mailadres geselecteerd.",
+      status: resolvedEmail ? "ok" : "missing",
+    },
+    {
+      label: "Klantcontext",
+      detail: companyLinked ? "Klant of context gekoppeld." : "Geen klant gekoppeld; controleer aanspreekvorm.",
+      status: companyLinked ? "ok" : "warn",
+    },
+    {
+      label: "Placeholders",
+      detail: unresolved.length === 0 ? "Geen zichtbare ontbrekende velden." : `${unresolved.length} veld(en) missen nog waarde.`,
+      status: unresolved.length === 0 ? "ok" : "warn",
+    },
+    {
+      label: "CTA",
+      detail: !originalHasCTA
+        ? "Template heeft geen knop nodig."
+        : safeCTAs.length > 0
+          ? "Knop heeft een geldige link."
+          : "Knop wordt verborgen omdat er geen echte link is.",
+      status: !originalHasCTA || safeCTAs.length > 0 ? "ok" : "warn",
+    },
+    {
+      label: "Branding",
+      detail: hasLogo ? "LaventeCare branding actief." : "Logo/branding ontbreekt in preview.",
+      status: hasLogo ? "ok" : "warn",
+    },
+  ];
+
+  const status: ReadinessStatus = items.some((item) => item.status === "missing")
+    ? "missing"
+    : items.some((item) => item.status === "warn")
+      ? "warn"
+      : "ok";
+  return { status, items };
+}
+
+function readinessBadgeClass(value: ReadinessStatus) {
+  switch (value) {
+    case "ok":
+      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-100";
+    case "warn":
+      return "border-amber-400/20 bg-amber-400/10 text-amber-100";
+    default:
+      return "border-rose-400/20 bg-rose-400/10 text-rose-100";
+  }
+}
+
+function readinessDotClass(value: ReadinessStatus) {
+  switch (value) {
+    case "ok":
+      return "bg-emerald-300";
+    case "warn":
+      return "bg-amber-300";
+    default:
+      return "bg-rose-300";
+  }
 }
 
 function renderMailPreview(html: string, values: Record<string, string>) {
