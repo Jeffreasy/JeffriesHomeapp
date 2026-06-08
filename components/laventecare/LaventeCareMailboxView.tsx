@@ -85,6 +85,10 @@ export function LaventeCareMailboxView({
       "project.status=in uitvoering",
       "project.update=De voortgang loopt volgens afspraak.",
       "project.risk=geen bijzonderheden",
+      "pilot.scope=de afgesproken testscope",
+      "pilot.criteria=kernfunctionaliteit, gebruiksgemak en betrouwbaarheid",
+      "pilot.feedback_moment=na de eerste testperiode",
+      "pilot.access_summary=pilotaccounts staan klaar; gevoelige inloggegevens deel ik via het afgesproken veilige kanaal",
       "meeting.topic=afstemming",
       "meeting.summary=De besproken punten zijn vastgelegd in het klantdossier.",
       "meeting.actions=de vervolgstap wordt opgepakt",
@@ -542,6 +546,8 @@ function buildSendReadiness({
   const renderedCTAUrls = Array.from(previewHTML.matchAll(/<a\s+href="([^"]+)"/gi), (match) => match[1]);
   const safeCTAs = renderedCTAUrls.filter(isSafePreviewUrl);
   const hasLogo = previewHTML.includes("ik.imagekit.io/a0oim4e3e") || previewHTML.includes("LaventeCare");
+  const hasAccessPlaceholder = placeholders.some((placeholder) => placeholder.startsWith("pilot.access"));
+  const sensitiveAccessDetected = hasSensitiveAccessValue(Object.values(variables).join("\n"));
 
   const items: Array<{ label: string; detail: string; status: ReadinessStatus }> = [
     {
@@ -574,6 +580,15 @@ function buildSendReadiness({
       status: hasLogo ? "ok" : "warn",
     },
   ];
+  if (hasAccessPlaceholder || sensitiveAccessDetected) {
+    items.push({
+      label: "Toegang",
+      detail: sensitiveAccessDetected
+        ? "Gevoelige toegang lijkt aanwezig; deel dit alleen bewust via het juiste kanaal."
+        : "Pilottoegang wordt klantvriendelijk samengevat.",
+      status: sensitiveAccessDetected ? "warn" : "ok",
+    });
+  }
 
   const status: ReadinessStatus = items.some((item) => item.status === "missing")
     ? "missing"
@@ -622,6 +637,10 @@ function isSafePreviewUrl(value: string) {
   if (!trimmed || trimmed.includes("{{") || trimmed.includes("}}")) return false;
   if (trimmed.replace(/\/+$/, "") === "https://www.laventecare.nl/contact" || trimmed.replace(/\/+$/, "") === "http://www.laventecare.nl/contact") return false;
   return trimmed.startsWith("https://") || trimmed.startsWith("http://");
+}
+
+function hasSensitiveAccessValue(value: string) {
+  return /\b(wachtwoord|password|pass|token|api[-_ ]?key|client[-_ ]?secret|secret|refresh[-_ ]?token|bearer|pincode|pin)\b\s*[:=]/i.test(value);
 }
 
 function stripHtml(value: string) {
