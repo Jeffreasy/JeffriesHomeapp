@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  Banknote,
   Bot,
   Brain,
   CalendarClock,
@@ -306,6 +307,15 @@ export function SettingsIntegrations({
           : "Onbekend";
   const groqKnown = hasIntegrationFlag("groq");
   const groqOK = groqKnown ? integrationBool("groq") : false;
+  const bunqKnown = hasIntegrationFlag("bunq");
+  const bunqOK = integrationBool("bunq");
+  const bunqEnvironment = integrationString("bunqEnvironment");
+  const bunqPartial =
+    integrationBool("bunqApiKeyConfigured") ||
+    integrationBool("bunqUserConfigured") ||
+    integrationBool("bunqMonetaryAccount");
+  const bunqTone: StatusPillTone = bunqOK ? "ok" : bunqPartial ? "warn" : bunqKnown ? "bad" : "neutral";
+  const bunqLabel = bunqOK ? bunqEnvironment ?? "Klaar" : bunqPartial ? "Deels" : bunqKnown ? "Ontbreekt" : "Onbekend";
   const grokModel = integrationString("grokModel") ?? telegramStatus?.grokModel;
   const grokReasoningEffort = integrationString("grokReasoningEffort") ?? telegramStatus?.grokReasoningEffort;
   const grokChatCheck = aiDiagnostics?.checks.grokChat;
@@ -370,6 +380,13 @@ export function SettingsIntegrations({
           ok={gmailLiveOK}
           tone={aiDiagnostics ? checkTone(gmailSyncCheck) : gmailTone}
           statusLabel={aiDiagnostics ? checkLabel(gmailSyncCheck) : gmailLabel}
+        />
+        <IntegrationRow
+          icon={Banknote}
+          label="bunq billing"
+          ok={bunqOK}
+          tone={bunqTone}
+          statusLabel={bunqLabel}
         />
         <IntegrationRow icon={Activity} label="Todoist" ok={integrationBool("todoist")} />
         <IntegrationRow

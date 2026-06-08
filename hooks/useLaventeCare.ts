@@ -18,6 +18,12 @@ import type {
   SlaIncidentItem,
   DossierDocumentItem,
   ActivityEventItem,
+  BillingItem,
+  QuoteItem,
+  QuoteLineItem,
+  TimeEntryItem,
+  InvoiceItem,
+  InvoiceLineItem,
 } from "@/components/laventecare/LaventeCareTypes";
 
 export function useLaventeCare() {
@@ -26,6 +32,12 @@ export function useLaventeCare() {
   const { data: cockpit, isLoading: cockpitLoading } = useQuery({
     queryKey: ["laventecare", "cockpit"],
     queryFn: () => laventecareApi.cockpit(),
+    staleTime: 15_000,
+  });
+
+  const { data: billing, isLoading: billingLoading } = useQuery({
+    queryKey: ["laventecare", "billing"],
+    queryFn: () => laventecareApi.billing({ limit: 80 }),
     staleTime: 15_000,
   });
 
@@ -128,6 +140,32 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const createQuoteMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createQuote>[0]) => laventecareApi.createQuote(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateQuoteStatusMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => laventecareApi.updateQuoteStatus(id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const createTimeEntryMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createTimeEntry>[0]) => laventecareApi.createTimeEntry(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const createInvoiceMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createInvoice>[0]) => laventecareApi.createInvoice(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateInvoiceStatusMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateInvoiceStatus>[1]) =>
+      laventecareApi.updateInvoiceStatus(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
   const companies = useMemo(
     () =>
@@ -157,6 +195,12 @@ export function useLaventeCare() {
     () => (cockpit?.activityEvents ?? []) as ActivityEventItem[],
     [cockpit]
   );
+  const billingData = useMemo(() => billing as BillingItem | undefined, [billing]);
+  const quotes = useMemo(() => (billing?.quotes ?? []) as QuoteItem[], [billing]);
+  const quoteLines = useMemo(() => (billing?.quoteLines ?? []) as QuoteLineItem[], [billing]);
+  const timeEntries = useMemo(() => (billing?.timeEntries ?? []) as TimeEntryItem[], [billing]);
+  const invoices = useMemo(() => (billing?.invoices ?? []) as InvoiceItem[], [billing]);
+  const invoiceLines = useMemo(() => (billing?.invoiceLines ?? []) as InvoiceLineItem[], [billing]);
   const activeLeads = useMemo(
     () =>
       (cockpit?.activeLeads ?? []).map((l) => ({
@@ -267,6 +311,7 @@ export function useLaventeCare() {
 
   return {
     cockpitLoading,
+    billingLoading,
     companies,
     contacts,
     documents,
@@ -281,6 +326,12 @@ export function useLaventeCare() {
     recentDecisions,
     dossierDocuments,
     activityEvents,
+    billing: billingData,
+    quotes,
+    quoteLines,
+    timeEntries,
+    invoices,
+    invoiceLines,
     summary,
 
     createCompanyMut,
@@ -301,5 +352,10 @@ export function useLaventeCare() {
     seedDocumentsMut,
     createDossierDocumentMut,
     createActivityEventMut,
+    createQuoteMut,
+    updateQuoteStatusMut,
+    createTimeEntryMut,
+    createInvoiceMut,
+    updateInvoiceStatusMut,
   };
 }

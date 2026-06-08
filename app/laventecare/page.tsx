@@ -42,12 +42,14 @@ import { LaventeCareFunnelView } from "@/components/laventecare/LaventeCareFunne
 import { LaventeCareWorkstreamsView } from "@/components/laventecare/LaventeCareWorkstreamsView";
 import { LaventeCareOperationsView } from "@/components/laventecare/LaventeCareOperationsView";
 import { LaventeCareKnowledgeView } from "@/components/laventecare/LaventeCareKnowledgeView";
-import { Building2, FileText, FolderKanban, LifeBuoy, Sparkles, Workflow } from "lucide-react";
+import { Building2, FileText, FolderKanban, LifeBuoy, ReceiptText, Sparkles, Workflow } from "lucide-react";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { LaventeCareBillingView } from "@/components/laventecare/LaventeCareBillingView";
 
 export default function LaventeCarePage() {
   const {
     cockpitLoading,
+    billingLoading,
     companies,
     contacts,
     documents,
@@ -62,6 +64,10 @@ export default function LaventeCarePage() {
     recentDecisions,
     dossierDocuments,
     activityEvents,
+    billing,
+    quotes,
+    timeEntries,
+    invoices,
     summary,
     createCompanyMut,
     updateCompanyMut,
@@ -81,6 +87,11 @@ export default function LaventeCarePage() {
     seedDocumentsMut,
     createDossierDocumentMut,
     createActivityEventMut,
+    createQuoteMut,
+    updateQuoteStatusMut,
+    createTimeEntryMut,
+    createInvoiceMut,
+    updateInvoiceStatusMut,
   } = useLaventeCare();
 
   const { success, error: toastError } = useToast();
@@ -108,6 +119,8 @@ export default function LaventeCarePage() {
   const [processingProject, setProcessingProject] = useState<string | null>(null);
   const [processingWorkstream, setProcessingWorkstream] = useState<string | null>(null);
   const [loggingDocumentKey, setLoggingDocumentKey] = useState<string | null>(null);
+  const [updatingQuoteId, setUpdatingQuoteId] = useState<string | null>(null);
+  const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -567,6 +580,57 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleCreateQuote = async (payload: Parameters<typeof createQuoteMut.mutateAsync>[0]) => {
+    try {
+      await createQuoteMut.mutateAsync(payload);
+    } catch {
+      toastError("Offerte aanmaken is mislukt");
+      throw new Error("Offerte aanmaken is mislukt");
+    }
+  };
+
+  const handleCreateTimeEntry = async (payload: Parameters<typeof createTimeEntryMut.mutateAsync>[0]) => {
+    try {
+      await createTimeEntryMut.mutateAsync(payload);
+    } catch {
+      toastError("Urenregel opslaan is mislukt");
+      throw new Error("Urenregel opslaan is mislukt");
+    }
+  };
+
+  const handleCreateInvoice = async (payload: Parameters<typeof createInvoiceMut.mutateAsync>[0]) => {
+    try {
+      await createInvoiceMut.mutateAsync(payload);
+    } catch {
+      toastError("Factuur aanmaken is mislukt");
+      throw new Error("Factuur aanmaken is mislukt");
+    }
+  };
+
+  const handleUpdateQuoteStatus = async (id: string, status: string) => {
+    setUpdatingQuoteId(id);
+    try {
+      await updateQuoteStatusMut.mutateAsync({ id, status });
+      success("Offertestatus bijgewerkt");
+    } catch {
+      toastError("Offertestatus bijwerken is mislukt");
+    } finally {
+      setUpdatingQuoteId(null);
+    }
+  };
+
+  const handleUpdateInvoiceStatus = async (id: string, status: string) => {
+    setUpdatingInvoiceId(id);
+    try {
+      await updateInvoiceStatusMut.mutateAsync({ id, status });
+      success("Factuurstatus bijgewerkt");
+    } catch {
+      toastError("Factuurstatus bijwerken is mislukt");
+    } finally {
+      setUpdatingInvoiceId(null);
+    }
+  };
+
   if (cockpitLoading) {
     return (
       <div className="px-4 py-10 sm:px-6 text-slate-100">
@@ -690,6 +754,35 @@ export default function LaventeCarePage() {
         />
 
         <div className="flex flex-col gap-6 mt-2">
+          <CollapsibleSection
+            title="Commercie"
+            subtitle={`${quotes.length} offertes, ${timeEntries.length} urenregels, ${invoices.length} facturen`}
+            icon={<ReceiptText size={18} />}
+            theme="amber"
+            defaultOpen={true}
+          >
+            <LaventeCareBillingView
+              billing={billing}
+              billingLoading={billingLoading}
+              companies={companies}
+              activeProjects={activeProjects}
+              activeWorkstreams={activeWorkstreams}
+              quotes={quotes}
+              timeEntries={timeEntries}
+              invoices={invoices}
+              creatingQuote={createQuoteMut.isPending}
+              creatingTimeEntry={createTimeEntryMut.isPending}
+              creatingInvoice={createInvoiceMut.isPending}
+              updatingQuoteId={updatingQuoteId}
+              updatingInvoiceId={updatingInvoiceId}
+              onCreateQuote={handleCreateQuote}
+              onCreateTimeEntry={handleCreateTimeEntry}
+              onCreateInvoice={handleCreateInvoice}
+              onUpdateQuoteStatus={handleUpdateQuoteStatus}
+              onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
+            />
+          </CollapsibleSection>
+
           <CollapsibleSection
             title="Klantenbasis"
             subtitle={`${companies.length} klanten, ${contacts.length} contactpersonen`}

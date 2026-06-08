@@ -712,9 +712,142 @@ export interface LCCockpit {
   followUps: LCFollowUpSignal[];
 }
 
+export interface LCBillingSummary {
+  quotes: number;
+  openQuotes: number;
+  timeEntries: number;
+  billableMinutes: number;
+  uninvoicedMinutes: number;
+  invoices: number;
+  openInvoices: number;
+  outstandingCents: number;
+  paidCents: number;
+  defaultProvider: string;
+  bunqReady: boolean;
+  nextStepDescription: string;
+}
+
+export interface LCQuote {
+  id: string;
+  user_id: string;
+  company_id: string | null;
+  project_id: string | null;
+  workstream_id: string | null;
+  quote_number: string;
+  titel: string;
+  status: string;
+  issue_date: string;
+  valid_until: string | null;
+  currency: string;
+  subtotal_cents: number;
+  vat_rate_bps: number;
+  vat_cents: number;
+  total_cents: number;
+  accepted_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  company_name?: string | null;
+  project_name?: string | null;
+  workstream_title?: string | null;
+}
+
+export interface LCQuoteLine {
+  id: string;
+  quote_id: string;
+  user_id: string;
+  description: string;
+  quantity: number;
+  unit_amount_cents: number;
+  total_cents: number;
+  sort_order: number;
+}
+
+export interface LCTimeEntry {
+  id: string;
+  user_id: string;
+  company_id: string | null;
+  project_id: string | null;
+  workstream_id: string | null;
+  activity_event_id: string | null;
+  invoice_id: string | null;
+  source_type: string;
+  source_id: string | null;
+  description: string;
+  entry_date: string;
+  minutes: number;
+  hourly_rate_cents: number;
+  billable: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  company_name?: string | null;
+  project_name?: string | null;
+  workstream_title?: string | null;
+}
+
+export interface LCInvoice {
+  id: string;
+  user_id: string;
+  company_id: string | null;
+  project_id: string | null;
+  workstream_id: string | null;
+  invoice_number: string;
+  status: string;
+  issue_date: string;
+  due_date: string | null;
+  currency: string;
+  subtotal_cents: number;
+  vat_rate_bps: number;
+  vat_cents: number;
+  total_cents: number;
+  paid_cents: number;
+  payment_provider: string;
+  provider_request_id: string | null;
+  merchant_reference: string | null;
+  payment_url: string | null;
+  sent_at: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  company_name?: string | null;
+  project_name?: string | null;
+  workstream_title?: string | null;
+}
+
+export interface LCInvoiceLine {
+  id: string;
+  invoice_id: string;
+  user_id: string;
+  source_time_entry_id: string | null;
+  description: string;
+  quantity_minutes: number;
+  unit_amount_cents: number;
+  vat_rate_bps: number;
+  total_cents: number;
+  sort_order: number;
+}
+
+export interface LCBilling {
+  summary: LCBillingSummary;
+  quotes: LCQuote[];
+  quoteLines: LCQuoteLine[];
+  timeEntries: LCTimeEntry[];
+  invoices: LCInvoice[];
+  invoiceLines: LCInvoiceLine[];
+}
+
 export const laventecareApi = {
   cockpit: () =>
     apiFetch<LCCockpit>("/laventecare/cockpit"),
+  billing: (params?: { companyId?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.companyId) search.set("companyId", params.companyId);
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCBilling>(`/laventecare/billing${query ? `?${query}` : ""}`);
+  },
   listCompanies: (params?: { q?: string; limit?: number }) => {
     const search = new URLSearchParams();
     if (params?.q) search.set("q", params.q);
@@ -754,6 +887,71 @@ export const laventecareApi = {
     apiFetch<LCContact>("/laventecare/contacts", { method: "POST", body: JSON.stringify(data) }),
   updateContact: (id: string, data: Partial<LCContact>) =>
     apiFetch<{ status: string }>(`/laventecare/contacts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  createQuote: (data: {
+    company_id?: string;
+    project_id?: string;
+    workstream_id?: string;
+    titel: string;
+    status?: string;
+    issue_date?: string;
+    valid_until?: string;
+    currency?: string;
+    vat_rate_bps?: number;
+    notes?: string;
+    lines: Array<{ description: string; quantity: number; unit_amount_cents: number; sort_order?: number }>;
+  }) =>
+    apiFetch<LCQuote>("/laventecare/quotes", { method: "POST", body: JSON.stringify(data) }),
+  updateQuoteStatus: (id: string, status: string) =>
+    apiFetch<{ status: string }>(`/laventecare/quotes/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  createTimeEntry: (data: {
+    company_id?: string;
+    project_id?: string;
+    workstream_id?: string;
+    activity_event_id?: string;
+    source_type?: string;
+    source_id?: string;
+    description: string;
+    entry_date?: string;
+    minutes: number;
+    hourly_rate_cents?: number;
+    billable?: boolean;
+    status?: string;
+  }) =>
+    apiFetch<LCTimeEntry>("/laventecare/time-entries", { method: "POST", body: JSON.stringify(data) }),
+  createInvoice: (data: {
+    company_id?: string;
+    project_id?: string;
+    workstream_id?: string;
+    status?: string;
+    issue_date?: string;
+    due_date?: string;
+    currency?: string;
+    vat_rate_bps?: number;
+    notes?: string;
+    time_entry_ids?: string[];
+    lines?: Array<{
+      description: string;
+      quantity_minutes: number;
+      unit_amount_cents: number;
+      vat_rate_bps?: number;
+      sort_order?: number;
+    }>;
+  }) =>
+    apiFetch<LCInvoice>("/laventecare/invoices", { method: "POST", body: JSON.stringify(data) }),
+  updateInvoiceStatus: (id: string, data: {
+    status: string;
+    paid_cents?: number;
+    payment_provider?: string;
+    provider_request_id?: string;
+    merchant_reference?: string;
+    payment_url?: string;
+    paid_at?: string;
+    sent_at?: string;
+  }) =>
+    apiFetch<{ status: string }>(`/laventecare/invoices/${id}/status`, { method: "PATCH", body: JSON.stringify(data) }),
   listDocuments: () =>
     apiFetch<LCDocument[]>("/laventecare/documents"),
   searchDocuments: (query: string) =>

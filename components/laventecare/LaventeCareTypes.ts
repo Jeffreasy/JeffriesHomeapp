@@ -8,6 +8,12 @@ import {
   type LCDocument,
   type LCDossierDocument,
   type LCActivityEvent,
+  type LCBilling,
+  type LCQuote,
+  type LCQuoteLine,
+  type LCTimeEntry,
+  type LCInvoice,
+  type LCInvoiceLine,
 } from "@/lib/api";
 
 export type Tone = "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
@@ -18,6 +24,12 @@ export type DocumentItem = LCDocument & {
 
 export type DossierDocumentItem = LCDossierDocument;
 export type ActivityEventItem = LCActivityEvent;
+export type BillingItem = LCBilling;
+export type QuoteItem = LCQuote;
+export type QuoteLineItem = LCQuoteLine;
+export type TimeEntryItem = LCTimeEntry;
+export type InvoiceItem = LCInvoice;
+export type InvoiceLineItem = LCInvoiceLine;
 
 export type CompanyItem = LCCompany & {
   _id?: string;
@@ -289,3 +301,73 @@ export const LAVENTECARE_WORKSTREAM_TYPES = [
   { value: "discovery_advies", label: "Discovery / advies" },
   { value: "advies", label: "Advies" },
 ] as const;
+
+export type BillingTimeForm = {
+  companyId: string;
+  projectId: string;
+  workstreamId: string;
+  description: string;
+  entryDate: string;
+  minutes: number | "";
+  hourlyRate: number | "";
+  billable: boolean;
+};
+
+export const emptyBillingTimeForm: BillingTimeForm = {
+  companyId: "",
+  projectId: "",
+  workstreamId: "",
+  description: "",
+  entryDate: "",
+  minutes: 60,
+  hourlyRate: 75,
+  billable: true,
+};
+
+export type BillingQuoteForm = {
+  companyId: string;
+  projectId: string;
+  workstreamId: string;
+  titel: string;
+  description: string;
+  quantity: number | "";
+  unitAmount: number | "";
+  validUntil: string;
+  notes: string;
+};
+
+export const emptyBillingQuoteForm: BillingQuoteForm = {
+  companyId: "",
+  projectId: "",
+  workstreamId: "",
+  titel: "",
+  description: "",
+  quantity: 1,
+  unitAmount: 250,
+  validUntil: "",
+  notes: "",
+};
+
+export type BillingInvoiceForm = {
+  companyId: string;
+  projectId: string;
+  workstreamId: string;
+  description: string;
+  minutes: number | "";
+  hourlyRate: number | "";
+  dueDate: string;
+  notes: string;
+  selectedTimeEntryIds: string[];
+};
+
+export const emptyBillingInvoiceForm: BillingInvoiceForm = {
+  companyId: "",
+  projectId: "",
+  workstreamId: "",
+  description: "",
+  minutes: 60,
+  hourlyRate: 75,
+  dueDate: "",
+  notes: "",
+  selectedTimeEntryIds: [],
+};

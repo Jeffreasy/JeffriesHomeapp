@@ -60,6 +60,20 @@ export function formatMoney(value?: number) {
   }).format(value);
 }
 
+export function formatCents(value?: number) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "€0";
+  return new Intl.NumberFormat("nl-NL", {
+    style: "currency",
+    currency: "EUR",
+  }).format(value / 100);
+}
+
+export function formatMinutes(minutes?: number) {
+  if (typeof minutes !== "number" || Number.isNaN(minutes)) return "0u";
+  const hours = minutes / 60;
+  return `${new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 1 }).format(hours)}u`;
+}
+
 export function label(value?: string) {
   if (!value) return "Onbekend";
   return value.replace(/_/g, " ");
