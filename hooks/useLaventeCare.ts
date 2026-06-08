@@ -17,6 +17,7 @@ import type {
   ChangeRequestItem,
   SlaIncidentItem,
   DossierDocumentItem,
+  ActivityEventItem,
 } from "@/components/laventecare/LaventeCareTypes";
 
 export function useLaventeCare() {
@@ -121,6 +122,12 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const createActivityEventMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createActivityEvent>[0]) =>
+      laventecareApi.createActivityEvent(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
   const companies = useMemo(
     () =>
@@ -144,6 +151,10 @@ export function useLaventeCare() {
   );
   const dossierDocuments = useMemo(
     () => (cockpit?.dossierDocuments ?? []) as DossierDocumentItem[],
+    [cockpit]
+  );
+  const activityEvents = useMemo(
+    () => (cockpit?.activityEvents ?? []) as ActivityEventItem[],
     [cockpit]
   );
   const activeLeads = useMemo(
@@ -247,6 +258,7 @@ export function useLaventeCare() {
     decisions: 0,
     actionItems: 0,
     dossierDocuments: 0,
+    activityEvents: 0,
     documentsSeeded: false,
     knowledgeDocuments: 0,
     businessSignals: 0,
@@ -268,6 +280,7 @@ export function useLaventeCare() {
     openChanges,
     recentDecisions,
     dossierDocuments,
+    activityEvents,
     summary,
 
     createCompanyMut,
@@ -287,5 +300,6 @@ export function useLaventeCare() {
     updateActionStatusMut,
     seedDocumentsMut,
     createDossierDocumentMut,
+    createActivityEventMut,
   };
 }

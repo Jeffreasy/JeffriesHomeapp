@@ -571,6 +571,42 @@ export interface LCDossierDocument {
   created_at: string;
 }
 
+export interface LCActivityEvent {
+  id: string;
+  user_id: string;
+  company_id: string;
+  contact_id: string | null;
+  lead_id: string | null;
+  project_id: string | null;
+  workstream_id: string | null;
+  action_item_id: string | null;
+  event_type: string;
+  channel: string;
+  title: string;
+  body: string | null;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+  company_name?: string | null;
+  contact_name?: string | null;
+  project_name?: string | null;
+  workstream_name?: string | null;
+}
+
+export type LCActivityEventCreate = {
+  company_id: string;
+  contact_id?: string;
+  lead_id?: string;
+  project_id?: string;
+  workstream_id?: string;
+  action_item_id?: string;
+  event_type: string;
+  channel: string;
+  title: string;
+  body?: string;
+  occurred_at?: string;
+};
+
 export type LCDossierDocumentCreate = {
   document_key: string;
   titel: string;
@@ -655,6 +691,7 @@ export interface LCCockpit {
     decisions: number;
     actionItems: number;
     dossierDocuments: number;
+    activityEvents: number;
     documentsSeeded: boolean;
     businessSignals: number;
     followUps: number;
@@ -670,6 +707,7 @@ export interface LCCockpit {
   recentDecisions: LCDecision[];
   documentCatalog: LCDocument[];
   dossierDocuments: LCDossierDocument[];
+  activityEvents: LCActivityEvent[];
   businessSignals: LCBusinessSignal[];
   followUps: LCFollowUpSignal[];
 }
@@ -732,6 +770,18 @@ export const laventecareApi = {
   },
   createDossierDocument: (data: LCDossierDocumentCreate) =>
     apiFetch<LCDossierDocument>("/laventecare/dossier-documents", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  listActivityEvents: (params?: { companyId?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.companyId) search.set("companyId", params.companyId);
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCActivityEvent[]>(`/laventecare/activity${query ? `?${query}` : ""}`);
+  },
+  createActivityEvent: (data: LCActivityEventCreate) =>
+    apiFetch<LCActivityEvent>("/laventecare/activity", {
       method: "POST",
       body: JSON.stringify(data),
     }),

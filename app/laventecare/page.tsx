@@ -35,6 +35,7 @@ import { LaventeCareContactModal } from "@/components/laventecare/LaventeCareCon
 import { LaventeCareLeadModal } from "@/components/laventecare/LaventeCareLeadModal";
 import { LaventeCareProjectModal } from "@/components/laventecare/LaventeCareProjectModal";
 import { LaventeCareWorkstreamModal } from "@/components/laventecare/LaventeCareWorkstreamModal";
+import { LaventeCareCustomerDossier } from "@/components/laventecare/LaventeCareCustomerDossier";
 import { LaventeCareSignalsView } from "@/components/laventecare/LaventeCareSignalsView";
 import { LaventeCareCustomersView } from "@/components/laventecare/LaventeCareCustomersView";
 import { LaventeCareFunnelView } from "@/components/laventecare/LaventeCareFunnelView";
@@ -60,6 +61,7 @@ export default function LaventeCarePage() {
     openChanges,
     recentDecisions,
     dossierDocuments,
+    activityEvents,
     summary,
     createCompanyMut,
     updateCompanyMut,
@@ -78,6 +80,7 @@ export default function LaventeCarePage() {
     updateActionStatusMut,
     seedDocumentsMut,
     createDossierDocumentMut,
+    createActivityEventMut,
   } = useLaventeCare();
 
   const { success, error: toastError } = useToast();
@@ -105,7 +108,13 @@ export default function LaventeCarePage() {
   const [processingProject, setProcessingProject] = useState<string | null>(null);
   const [processingWorkstream, setProcessingWorkstream] = useState<string | null>(null);
   const [loggingDocumentKey, setLoggingDocumentKey] = useState<string | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+
+  const selectedCompany = useMemo(
+    () => companies.find((company) => (company._id ?? company.id) === selectedCompanyId) ?? null,
+    [companies, selectedCompanyId]
+  );
 
   const filteredDocuments = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -548,6 +557,16 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleCreateActivityEvent = async (payload: Parameters<typeof createActivityEventMut.mutateAsync>[0]) => {
+    try {
+      await createActivityEventMut.mutateAsync(payload);
+      success("Klantmoment vastgelegd");
+    } catch {
+      toastError("Klantmoment vastleggen is mislukt");
+      throw new Error("Klantmoment vastleggen is mislukt");
+    }
+  };
+
   if (cockpitLoading) {
     return (
       <div className="px-4 py-10 sm:px-6 text-slate-100">
@@ -632,6 +651,33 @@ export default function LaventeCarePage() {
           onSubmit={handleWorkstreamSubmit}
         />
 
+        <LaventeCareCustomerDossier
+          isOpen={!!selectedCompany}
+          company={selectedCompany}
+          contacts={contacts}
+          leads={activeLeads}
+          workstreams={activeWorkstreams}
+          projects={activeProjects}
+          actions={actionItems}
+          dossierDocuments={dossierDocuments}
+          activityEvents={activityEvents}
+          savingActivity={createActivityEventMut.isPending}
+          onClose={() => setSelectedCompanyId(null)}
+          onEditCompany={(company) => {
+            setSelectedCompanyId(null);
+            handleEditCompany(company);
+          }}
+          onAddContact={(company) => {
+            setSelectedCompanyId(null);
+            handleAddContact(company);
+          }}
+          onStartWorkstream={(company) => {
+            setSelectedCompanyId(null);
+            handleStartWorkstreamForCompany(company);
+          }}
+          onCreateActivity={handleCreateActivityEvent}
+        />
+
         <LaventeCareBusinessCommandCenter
           summary={summary}
           companies={companies}
@@ -663,6 +709,7 @@ export default function LaventeCarePage() {
               onAddContact={handleAddContact}
               onEditContact={handleEditContact}
               onStartWorkstream={handleStartWorkstreamForCompany}
+              onOpenDossier={(company) => setSelectedCompanyId(company._id ?? company.id)}
             />
           </CollapsibleSection>
 

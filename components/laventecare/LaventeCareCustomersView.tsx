@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarClock, FileText, Mail, Pencil, Phone, Plus, UserRound, Workflow } from "lucide-react";
+import { Building2, CalendarClock, FileText, FolderOpen, Mail, Pencil, Phone, Plus, UserRound, Workflow } from "lucide-react";
 import type { CompanyItem, ContactItem, DossierDocumentItem, LeadItem, ProjectItem, WorkstreamItem } from "./LaventeCareTypes";
 import { formatDate, label } from "./LaventeCareUtils";
 
@@ -16,6 +16,7 @@ export function LaventeCareCustomersView({
   onAddContact,
   onEditContact,
   onStartWorkstream,
+  onOpenDossier,
 }: {
   companies: CompanyItem[];
   contacts: ContactItem[];
@@ -28,6 +29,7 @@ export function LaventeCareCustomersView({
   onAddContact: (company: CompanyItem) => void;
   onEditContact: (contact: ContactItem) => void;
   onStartWorkstream: (company: CompanyItem) => void;
+  onOpenDossier: (company: CompanyItem) => void;
 }) {
   const activeCompanyIds = new Set([
     ...activeLeads.map((item) => item.company_id).filter(Boolean),
@@ -102,6 +104,15 @@ export function LaventeCareCustomersView({
                   </button>
                   <button
                     type="button"
+                    onClick={() => onOpenDossier(company)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300 transition hover:bg-amber-500/20"
+                    aria-label={`${company.naam} dossier openen`}
+                    title="Klantdossier"
+                  >
+                    <FolderOpen size={15} />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => onStartWorkstream(company)}
                     className="flex h-9 w-9 items-center justify-center rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-300 transition hover:bg-violet-500/20"
                     aria-label={`Nieuwe opdracht voor ${company.naam}`}
@@ -117,6 +128,15 @@ export function LaventeCareCustomersView({
                 <MiniStat label="Dossier" value={`${companyDocs.length || company.dossierDocuments} document(en)`} />
                 <MiniStat label="Actie" value={company.volgendeActie ? formatDate(company.volgendeActie) : "Geen datum"} />
               </div>
+
+              <button
+                type="button"
+                onClick={() => onOpenDossier(company)}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20"
+              >
+                <FolderOpen size={15} />
+                Open klantdossier
+              </button>
 
               <div className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
                 <div className="flex items-center justify-between gap-3">

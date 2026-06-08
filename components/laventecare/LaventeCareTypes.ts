@@ -7,6 +7,7 @@ import {
   type LCActionItem,
   type LCDocument,
   type LCDossierDocument,
+  type LCActivityEvent,
 } from "@/lib/api";
 
 export type Tone = "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
@@ -16,6 +17,7 @@ export type DocumentItem = LCDocument & {
 };
 
 export type DossierDocumentItem = LCDossierDocument;
+export type ActivityEventItem = LCActivityEvent;
 
 export type CompanyItem = LCCompany & {
   _id?: string;
@@ -239,6 +241,41 @@ export const emptyContactForm: ContactForm = {
   isPrimary: false,
   notities: "",
 };
+
+export type ActivityForm = {
+  companyId: string;
+  contactId: string;
+  projectId: string;
+  workstreamId: string;
+  eventType: string;
+  channel: string;
+  title: string;
+  body: string;
+  occurredAt: string;
+};
+
+export const emptyActivityForm: ActivityForm = {
+  companyId: "",
+  contactId: "",
+  projectId: "",
+  workstreamId: "",
+  eventType: "contact",
+  channel: "manual",
+  title: "",
+  body: "",
+  occurredAt: "",
+};
+
+export const LAVENTECARE_ACTIVITY_TYPES = [
+  { value: "contact", label: "Contactmoment" },
+  { value: "meeting", label: "Meeting" },
+  { value: "call", label: "Belmoment" },
+  { value: "email", label: "Email" },
+  { value: "notitie", label: "Notitie" },
+  { value: "besluit", label: "Besluit" },
+  { value: "project_update", label: "Project update" },
+  { value: "document", label: "Document" },
+] as const;
 
 export const LAVENTECARE_WORKSTREAM_TYPES = [
   { value: "website_platform", label: "Website / platform" },
