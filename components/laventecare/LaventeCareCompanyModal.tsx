@@ -1,7 +1,7 @@
 "use client";
 
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { Building2, Loader2, Plus } from "lucide-react";
+import { Building2, Loader2, Plus, Save } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import type { CompanyForm } from "./LaventeCareTypes";
 
@@ -11,6 +11,7 @@ export function LaventeCareCompanyModal({
   companyForm,
   setCompanyForm,
   savingCompany,
+  editingCompany,
   onSubmit,
 }: {
   isOpen: boolean;
@@ -18,13 +19,14 @@ export function LaventeCareCompanyModal({
   companyForm: CompanyForm;
   setCompanyForm: Dispatch<SetStateAction<CompanyForm>>;
   savingCompany: boolean;
+  editingCompany: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Nieuwe klant"
+      title={editingCompany ? "Klant bewerken" : "Nieuwe klant"}
       icon={<Building2 size={18} className="text-amber-300" />}
       theme="amber"
       maxWidth="2xl"
@@ -94,10 +96,10 @@ export function LaventeCareCompanyModal({
         <label className="block">
           <span className="text-xs font-semibold text-slate-400">Volgende actie</span>
           <input
-            type="date"
             value={companyForm.volgendeActie}
             onChange={(event) => setCompanyForm((form) => ({ ...form, volgendeActie: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-500"
+            placeholder="Bel, review, offerte opvolgen..."
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
           />
         </label>
 
@@ -125,8 +127,14 @@ export function LaventeCareCompanyModal({
             disabled={savingCompany}
             className="btn border-transparent bg-amber-500 px-6 text-slate-950 hover:bg-amber-400"
           >
-            {savingCompany ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Plus size={16} className="mr-2" />}
-            Klant toevoegen
+            {savingCompany ? (
+              <Loader2 size={16} className="mr-2 animate-spin" />
+            ) : editingCompany ? (
+              <Save size={16} className="mr-2" />
+            ) : (
+              <Plus size={16} className="mr-2" />
+            )}
+            {editingCompany ? "Opslaan" : "Klant toevoegen"}
           </button>
         </div>
       </form>

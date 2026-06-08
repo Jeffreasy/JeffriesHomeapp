@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarClock, FileText, Mail, Phone, Plus, UserRound, Workflow } from "lucide-react";
+import { Building2, CalendarClock, FileText, Mail, Pencil, Phone, Plus, UserRound, Workflow } from "lucide-react";
 import type { CompanyItem, ContactItem, DossierDocumentItem, LeadItem, ProjectItem, WorkstreamItem } from "./LaventeCareTypes";
 import { formatDate, label } from "./LaventeCareUtils";
 
@@ -12,6 +12,9 @@ export function LaventeCareCustomersView({
   activeProjects,
   dossierDocuments,
   onShowCompanyForm,
+  onEditCompany,
+  onAddContact,
+  onEditContact,
   onStartWorkstream,
 }: {
   companies: CompanyItem[];
@@ -21,6 +24,9 @@ export function LaventeCareCustomersView({
   activeProjects: ProjectItem[];
   dossierDocuments: DossierDocumentItem[];
   onShowCompanyForm: () => void;
+  onEditCompany: (company: CompanyItem) => void;
+  onAddContact: (company: CompanyItem) => void;
+  onEditContact: (contact: ContactItem) => void;
   onStartWorkstream: (company: CompanyItem) => void;
 }) {
   const activeCompanyIds = new Set([
@@ -64,7 +70,6 @@ export function LaventeCareCustomersView({
         {companies.map((company) => {
           const id = company._id ?? company.id;
           const companyContacts = contacts.filter((contact) => contact.company_id === id);
-          const primaryContact = companyContacts.find((contact) => contact.is_primary) ?? companyContacts[0];
           const companyDocs = dossierDocuments.filter((doc) => doc.company_id === id);
           const openWork = [
             company.leads ? `${company.leads} lead${company.leads === 1 ? "" : "s"}` : "",
@@ -85,15 +90,26 @@ export function LaventeCareCustomersView({
                     {company.sector ? ` - ${company.sector}` : ""}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onStartWorkstream(company)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-300 transition hover:bg-violet-500/20"
-                  aria-label={`Nieuwe opdracht voor ${company.naam}`}
-                  title="Nieuwe opdracht"
-                >
-                  <Workflow size={15} />
-                </button>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onEditCompany(company)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+                    aria-label={`${company.naam} bewerken`}
+                    title="Klant bewerken"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onStartWorkstream(company)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-300 transition hover:bg-violet-500/20"
+                    aria-label={`Nieuwe opdracht voor ${company.naam}`}
+                    title="Nieuwe opdracht"
+                  >
+                    <Workflow size={15} />
+                  </button>
+                </div>
               </div>
 
               <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -102,45 +118,72 @@ export function LaventeCareCustomersView({
                 <MiniStat label="Actie" value={company.volgendeActie ? formatDate(company.volgendeActie) : "Geen datum"} />
               </div>
 
-              {primaryContact || company.website ? (
-                <div className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
-                  {primaryContact ? (
-                    <div className="flex items-start gap-2">
-                      <UserRound size={15} className="mt-0.5 shrink-0 text-slate-400" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-200">
-                          {primaryContact.naam}
-                          {primaryContact.rol ? ` - ${primaryContact.rol}` : ""}
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                          {primaryContact.email ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Mail size={12} />
-                              {primaryContact.email}
-                            </span>
-                          ) : null}
-                          {primaryContact.telefoon ? (
-                            <span className="inline-flex items-center gap-1">
-                              <Phone size={12} />
-                              {primaryContact.telefoon}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                  {company.website ? (
-                    <a
-                      href={company.website}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-2 block truncate text-xs font-semibold text-sky-300 hover:text-sky-200"
-                    >
-                      {company.website}
-                    </a>
-                  ) : null}
+              <div className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Contacten</p>
+                  <button
+                    type="button"
+                    onClick={() => onAddContact(company)}
+                    className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 text-xs font-semibold text-sky-300 transition hover:bg-sky-500/20"
+                  >
+                    <Plus size={13} />
+                    Contact
+                  </button>
                 </div>
-              ) : null}
+
+                {companyContacts.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {companyContacts.map((contact) => (
+                      <button
+                        key={contact._id ?? contact.id}
+                        type="button"
+                        onClick={() => onEditContact(contact)}
+                        className="flex w-full items-start gap-2 rounded-lg border border-white/5 bg-white/[0.02] p-2 text-left transition hover:border-sky-500/20 hover:bg-sky-500/10"
+                      >
+                        <UserRound size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-200">
+                            <span className="truncate">{contact.naam}</span>
+                            {contact.is_primary ? (
+                              <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-normal text-sky-300">
+                                primair
+                              </span>
+                            ) : null}
+                          </span>
+                          {contact.rol ? <span className="mt-0.5 block truncate text-xs text-slate-500">{contact.rol}</span> : null}
+                          <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                            {contact.email ? (
+                              <span className="inline-flex items-center gap-1">
+                                <Mail size={12} />
+                                {contact.email}
+                              </span>
+                            ) : null}
+                            {contact.telefoon ? (
+                              <span className="inline-flex items-center gap-1">
+                                <Phone size={12} />
+                                {contact.telefoon}
+                              </span>
+                            ) : null}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">Nog geen contactpersoon gekoppeld.</p>
+                )}
+
+                {company.website ? (
+                  <a
+                    href={toExternalHref(company.website)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 block truncate text-xs font-semibold text-sky-300 hover:text-sky-200"
+                  >
+                    {company.website}
+                  </a>
+                ) : null}
+              </div>
 
               {company.notities ? (
                 <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{company.notities}</p>
@@ -151,6 +194,10 @@ export function LaventeCareCustomersView({
       </div>
     </div>
   );
+}
+
+function toExternalHref(url: string) {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
 function Metric({ label, value, sub }: { label: string; value: number; sub: string }) {

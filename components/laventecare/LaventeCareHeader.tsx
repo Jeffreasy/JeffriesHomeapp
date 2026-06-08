@@ -12,7 +12,7 @@ export function LaventeCareHeader({
   showLeadForm,
   setShowLeadForm,
   showCompanyForm,
-  setShowCompanyForm,
+  onToggleCompanyForm,
   showProjectForm,
   setShowProjectForm,
   showWorkstreamForm,
@@ -24,7 +24,7 @@ export function LaventeCareHeader({
   showLeadForm: boolean;
   setShowLeadForm: Dispatch<SetStateAction<boolean>>;
   showCompanyForm: boolean;
-  setShowCompanyForm: Dispatch<SetStateAction<boolean>>;
+  onToggleCompanyForm: () => void;
   showProjectForm: boolean;
   setShowProjectForm: Dispatch<SetStateAction<boolean>>;
   showWorkstreamForm: boolean;
@@ -65,7 +65,7 @@ export function LaventeCareHeader({
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.94 }}
-                onClick={() => setShowCompanyForm((value) => !value)}
+                onClick={onToggleCompanyForm}
                 aria-label={showCompanyForm ? "Klantformulier sluiten" : "Nieuwe klant toevoegen"}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-300 transition-colors hover:bg-amber-500/25 sm:px-4"
               >

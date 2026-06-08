@@ -714,6 +714,8 @@ export const laventecareApi = {
     notities?: string;
   }) =>
     apiFetch<LCContact>("/laventecare/contacts", { method: "POST", body: JSON.stringify(data) }),
+  updateContact: (id: string, data: Partial<LCContact>) =>
+    apiFetch<{ status: string }>(`/laventecare/contacts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   listDocuments: () =>
     apiFetch<LCDocument[]>("/laventecare/documents"),
   searchDocuments: (query: string) =>

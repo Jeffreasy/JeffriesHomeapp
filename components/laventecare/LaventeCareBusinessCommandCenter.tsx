@@ -44,6 +44,7 @@ export type LaventeCareDossierDocumentLogPayload = {
 
 function buildCompanyContextOption(company: CompanyItem): DossierContextOption {
   const id = company._id ?? company.id;
+  const nextActionIsDate = isDateLike(company.volgendeActie);
 
   return {
     key: `company:${id}`,
@@ -58,10 +59,17 @@ function buildCompanyContextOption(company: CompanyItem): DossierContextOption {
       phase: company.relatie_type,
       source: company.website ?? undefined,
       summary: company.notities ?? undefined,
-      nextStep: company.volgendeActie ? `Relatie opvolgen: ${formatDate(company.volgendeActie)}` : undefined,
-      dueDate: company.volgendeActie ? formatDate(company.volgendeActie) : undefined,
+      nextStep: company.volgendeActie
+        ? `Relatie opvolgen: ${nextActionIsDate ? formatDate(company.volgendeActie) : company.volgendeActie}`
+        : undefined,
+      dueDate: nextActionIsDate ? formatDate(company.volgendeActie) : undefined,
     },
   };
+}
+
+function isDateLike(value?: string) {
+  if (!value) return false;
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isNaN(new Date(value).getTime());
 }
 
 function buildLeadContextOption(lead: LeadItem): DossierContextOption {

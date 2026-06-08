@@ -6,16 +6,19 @@ import { LAVENTECARE_DOCUMENT_TOTAL, toLaventeCareSeedDocuments } from "@/lib/la
 import { useLaventeCare } from "@/hooks/useLaventeCare";
 import {
   type CompanyForm,
+  type ContactForm,
   type LeadForm,
   type ProjectForm,
   type WorkstreamForm,
   type BusinessSignal,
   type ActionItem,
   type CompanyItem,
+  type ContactItem,
   type LeadItem,
   type ProjectItem,
   type WorkstreamItem,
   emptyCompanyForm,
+  emptyContactForm,
   emptyLeadForm,
   emptyProjectForm,
   emptyWorkstreamForm,
@@ -28,6 +31,7 @@ import {
   type LaventeCareDossierDocumentLogPayload,
 } from "@/components/laventecare/LaventeCareBusinessCommandCenter";
 import { LaventeCareCompanyModal } from "@/components/laventecare/LaventeCareCompanyModal";
+import { LaventeCareContactModal } from "@/components/laventecare/LaventeCareContactModal";
 import { LaventeCareLeadModal } from "@/components/laventecare/LaventeCareLeadModal";
 import { LaventeCareProjectModal } from "@/components/laventecare/LaventeCareProjectModal";
 import { LaventeCareWorkstreamModal } from "@/components/laventecare/LaventeCareWorkstreamModal";
@@ -58,6 +62,9 @@ export default function LaventeCarePage() {
     dossierDocuments,
     summary,
     createCompanyMut,
+    updateCompanyMut,
+    createContactMut,
+    updateContactMut,
     createLeadMut,
     updateLeadMut,
     convertLeadMut,
@@ -75,14 +82,19 @@ export default function LaventeCarePage() {
 
   const { success, error: toastError } = useToast();
   const [showCompanyForm, setShowCompanyForm] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [showWorkstreamForm, setShowWorkstreamForm] = useState(false);
   const [companyForm, setCompanyForm] = useState<CompanyForm>(emptyCompanyForm);
+  const [contactForm, setContactForm] = useState<ContactForm>(emptyContactForm);
   const [leadForm, setLeadForm] = useState<LeadForm>(emptyLeadForm);
   const [projectForm, setProjectForm] = useState<ProjectForm>(emptyProjectForm);
   const [workstreamForm, setWorkstreamForm] = useState<WorkstreamForm>(emptyWorkstreamForm);
+  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [savingCompany, setSavingCompany] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
   const [savingProject, setSavingProject] = useState(false);
   const [savingWorkstream, setSavingWorkstream] = useState(false);
@@ -115,6 +127,40 @@ export default function LaventeCarePage() {
     return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredDocuments]);
 
+  const closeCompanyForm = () => {
+    setShowCompanyForm(false);
+    setEditingCompanyId(null);
+    setCompanyForm(emptyCompanyForm);
+  };
+
+  const openNewCompanyForm = () => {
+    setEditingCompanyId(null);
+    setCompanyForm(emptyCompanyForm);
+    setShowCompanyForm(true);
+  };
+
+  const handleToggleCompanyForm = () => {
+    if (showCompanyForm) {
+      closeCompanyForm();
+      return;
+    }
+    openNewCompanyForm();
+  };
+
+  const handleEditCompany = (company: CompanyItem) => {
+    setEditingCompanyId(company._id ?? company.id);
+    setCompanyForm({
+      naam: company.naam ?? "",
+      website: company.website ?? "",
+      sector: company.sector ?? "",
+      status: normalizeCompanyStatus(company.status),
+      relatieType: normalizeCompanyRelation(company.relatie_type),
+      notities: company.notities ?? "",
+      volgendeActie: company.volgende_actie ?? company.volgendeActie ?? "",
+    });
+    setShowCompanyForm(true);
+  };
+
   const handleCompanySubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!companyForm.naam.trim()) {
@@ -124,7 +170,7 @@ export default function LaventeCarePage() {
 
     setSavingCompany(true);
     try {
-      await createCompanyMut.mutateAsync({
+      const payload = {
         naam: companyForm.naam.trim(),
         website: optional(companyForm.website),
         sector: optional(companyForm.sector),
@@ -132,14 +178,88 @@ export default function LaventeCarePage() {
         relatie_type: companyForm.relatieType,
         notities: optional(companyForm.notities),
         volgende_actie: optional(companyForm.volgendeActie),
-      });
-      setCompanyForm(emptyCompanyForm);
-      setShowCompanyForm(false);
-      success("LaventeCare klant aangemaakt");
+      };
+      if (editingCompanyId) {
+        await updateCompanyMut.mutateAsync({ id: editingCompanyId, ...payload });
+        success("LaventeCare klant bijgewerkt");
+      } else {
+        await createCompanyMut.mutateAsync(payload);
+        success("LaventeCare klant aangemaakt");
+      }
+      closeCompanyForm();
     } catch {
-      toastError("Klant aanmaken is mislukt");
+      toastError(editingCompanyId ? "Klant bijwerken is mislukt" : "Klant aanmaken is mislukt");
     } finally {
       setSavingCompany(false);
+    }
+  };
+
+  const closeContactForm = () => {
+    setShowContactForm(false);
+    setEditingContactId(null);
+    setContactForm(emptyContactForm);
+  };
+
+  const handleAddContact = (company: CompanyItem) => {
+    const id = company._id ?? company.id;
+    const companyContacts = contacts.filter((contact) => contact.company_id === id);
+    setEditingContactId(null);
+    setContactForm({
+      ...emptyContactForm,
+      companyId: id,
+      isPrimary: companyContacts.length === 0,
+    });
+    setShowContactForm(true);
+  };
+
+  const handleEditContact = (contact: ContactItem) => {
+    setEditingContactId(contact._id ?? contact.id);
+    setContactForm({
+      companyId: contact.company_id ?? contact.companyId ?? "",
+      naam: contact.naam ?? "",
+      email: contact.email ?? "",
+      telefoon: contact.telefoon ?? "",
+      rol: contact.rol ?? "",
+      isPrimary: contact.is_primary ?? contact.isPrimary ?? false,
+      notities: contact.notities ?? "",
+    });
+    setShowContactForm(true);
+  };
+
+  const handleContactSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!contactForm.companyId) {
+      toastError("Koppel de contactpersoon aan een klant");
+      return;
+    }
+    if (!contactForm.naam.trim()) {
+      toastError("Geef de contactpersoon een naam");
+      return;
+    }
+
+    setSavingContact(true);
+    try {
+      const payload = {
+        company_id: contactForm.companyId,
+        naam: contactForm.naam.trim(),
+        email: optional(contactForm.email),
+        telefoon: optional(contactForm.telefoon),
+        rol: optional(contactForm.rol),
+        is_primary: contactForm.isPrimary,
+        notities: optional(contactForm.notities),
+      };
+      if (editingContactId) {
+        await updateContactMut.mutateAsync({ id: editingContactId, ...payload });
+        success("Contactpersoon bijgewerkt");
+      } else {
+        await createContactMut.mutateAsync(payload);
+        success("Contactpersoon toegevoegd");
+      }
+      closeContactForm();
+    } catch {
+      toastError(editingContactId ? "Contactpersoon bijwerken is mislukt" : "Contactpersoon toevoegen is mislukt");
+    } finally {
+      setSavingContact(false);
     }
   };
 
@@ -449,7 +569,7 @@ export default function LaventeCarePage() {
         summary={summary}
         seeding={seeding}
         showCompanyForm={showCompanyForm}
-        setShowCompanyForm={setShowCompanyForm}
+        onToggleCompanyForm={handleToggleCompanyForm}
         showLeadForm={showLeadForm}
         setShowLeadForm={setShowLeadForm}
         showProjectForm={showProjectForm}
@@ -462,11 +582,23 @@ export default function LaventeCarePage() {
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
         <LaventeCareCompanyModal
           isOpen={showCompanyForm}
-          onClose={() => setShowCompanyForm(false)}
+          onClose={closeCompanyForm}
           companyForm={companyForm}
           setCompanyForm={setCompanyForm}
           savingCompany={savingCompany}
+          editingCompany={!!editingCompanyId}
           onSubmit={handleCompanySubmit}
+        />
+
+        <LaventeCareContactModal
+          isOpen={showContactForm}
+          onClose={closeContactForm}
+          contactForm={contactForm}
+          setContactForm={setContactForm}
+          companies={companies}
+          savingContact={savingContact}
+          editingContact={!!editingContactId}
+          onSubmit={handleContactSubmit}
         />
 
         <LaventeCareLeadModal
@@ -526,7 +658,10 @@ export default function LaventeCarePage() {
               activeWorkstreams={activeWorkstreams}
               activeProjects={activeProjects}
               dossierDocuments={dossierDocuments}
-              onShowCompanyForm={() => setShowCompanyForm(true)}
+              onShowCompanyForm={openNewCompanyForm}
+              onEditCompany={handleEditCompany}
+              onAddContact={handleAddContact}
+              onEditContact={handleEditContact}
               onStartWorkstream={handleStartWorkstreamForCompany}
             />
           </CollapsibleSection>
@@ -623,4 +758,14 @@ function parseTagInput(value: string) {
     .split(/[,\n]/)
     .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
     .filter((tag, index, all) => tag && all.indexOf(tag) === index);
+}
+
+function normalizeCompanyStatus(value?: string | null): CompanyForm["status"] {
+  if (value === "actief" || value === "prospect" || value === "inactief") return value;
+  return "actief";
+}
+
+function normalizeCompanyRelation(value?: string | null): CompanyForm["relatieType"] {
+  if (value === "prospect" || value === "klant" || value === "partner" || value === "leverancier") return value;
+  return "prospect";
 }

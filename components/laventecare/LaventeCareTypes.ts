@@ -220,6 +220,26 @@ export const emptyCompanyForm: CompanyForm = {
   volgendeActie: "",
 };
 
+export type ContactForm = {
+  companyId: string;
+  naam: string;
+  email: string;
+  telefoon: string;
+  rol: string;
+  isPrimary: boolean;
+  notities: string;
+};
+
+export const emptyContactForm: ContactForm = {
+  companyId: "",
+  naam: "",
+  email: "",
+  telefoon: "",
+  rol: "",
+  isPrimary: false,
+  notities: "",
+};
+
 export const LAVENTECARE_WORKSTREAM_TYPES = [
   { value: "website_platform", label: "Website / platform" },
   { value: "integratie", label: "Integratie" },

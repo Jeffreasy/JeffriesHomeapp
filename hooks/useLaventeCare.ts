@@ -49,6 +49,12 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const updateContactMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateContact>[1]) =>
+      laventecareApi.updateContact(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const updateLeadMut = useMutation({
     mutationFn: ({ id, ...data }: { id: string; status?: string }) => laventecareApi.updateLead(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
@@ -267,6 +273,7 @@ export function useLaventeCare() {
     createCompanyMut,
     updateCompanyMut,
     createContactMut,
+    updateContactMut,
     createLeadMut,
     updateLeadMut,
     convertLeadMut,
