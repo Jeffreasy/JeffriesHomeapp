@@ -6,13 +6,14 @@ import type { LCMailAISuggestion } from "@/lib/api";
 import type {
   CompanyItem,
   ContactItem,
+  InvoiceItem,
   MailboxItem,
   MailOutboxItem,
   MailTemplateItem,
   ProjectItem,
   WorkstreamItem,
 } from "./LaventeCareTypes";
-import { formatDate, label } from "./LaventeCareUtils";
+import { formatCents, formatDate, label } from "./LaventeCareUtils";
 
 type SendPayload = {
   template_id: string;
@@ -20,6 +21,7 @@ type SendPayload = {
   contact_id?: string;
   project_id?: string;
   workstream_id?: string;
+  invoice_id?: string;
   to_email?: string;
   to_name?: string;
   variables?: Record<string, string>;
@@ -34,7 +36,7 @@ type SuggestPayload = Omit<SendPayload, "cc" | "bcc" | "send"> & {
 };
 
 const inputClass =
-  "w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-500/20";
+  "w-full min-w-0 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-500/20";
 
 export function LaventeCareMailboxView({
   mailbox,
@@ -43,6 +45,8 @@ export function LaventeCareMailboxView({
   contacts,
   activeProjects,
   activeWorkstreams,
+  invoices,
+  prefillInvoiceId,
   templates,
   outbox,
   sending,
@@ -56,6 +60,8 @@ export function LaventeCareMailboxView({
   contacts: ContactItem[];
   activeProjects: ProjectItem[];
   activeWorkstreams: WorkstreamItem[];
+  invoices: InvoiceItem[];
+  prefillInvoiceId?: string;
   templates: MailTemplateItem[];
   outbox: MailOutboxItem[];
   sending: boolean;
@@ -68,6 +74,7 @@ export function LaventeCareMailboxView({
   const [contactId, setContactId] = useState("");
   const [projectId, setProjectId] = useState("");
   const [workstreamId, setWorkstreamId] = useState("");
+  const [invoiceId, setInvoiceId] = useState(prefillInvoiceId ?? "");
   const [toEmail, setToEmail] = useState("");
   const [toName, setToName] = useState("");
   const [aiIntent, setAiIntent] = useState("Maak een klantmail op basis van de gekoppelde LaventeCare context.");
@@ -80,8 +87,6 @@ export function LaventeCareMailboxView({
       "laventecare.tagline=Van idee tot werkend systeem",
       "cta.label=Afstemmen",
       "quote.summary=scope, planning en uitvoering volgens afspraak",
-      "invoice.amount=zie factuur",
-      "invoice.due_date=14 dagen",
       "project.status=in uitvoering",
       "project.update=De voortgang loopt volgens afspraak.",
       "project.risk=geen bijzonderheden",
@@ -100,25 +105,41 @@ export function LaventeCareMailboxView({
     [templates]
   );
   const selectedTemplate = templates.find((template) => template.id === templateId) ?? activeTemplates[0] ?? templates[0];
-  const selectedCompany = companies.find((company) => (company._id ?? company.id) === companyId);
-  const companyContacts = contacts.filter((contact) => !companyId || contact.company_id === companyId || contact.companyId === companyId);
+  const selectedInvoice = invoices.find((invoice) => invoice.id === invoiceId);
+  const effectiveCompanyId = selectedInvoice?.company_id ?? companyId;
+  const effectiveProjectId = selectedInvoice?.project_id ?? projectId;
+  const effectiveWorkstreamId = selectedInvoice?.workstream_id ?? workstreamId;
+  const selectedCompany = companies.find((company) => (company._id ?? company.id) === effectiveCompanyId);
+  const companyContacts = contacts.filter((contact) => !effectiveCompanyId || contact.company_id === effectiveCompanyId || contact.companyId === effectiveCompanyId);
   const selectedContact = contacts.find((contact) => (contact._id ?? contact.id) === contactId);
+  const filteredInvoices = useMemo(
+    () =>
+      invoices
+        .filter((invoice) => invoice.status !== "geannuleerd")
+        .filter((invoice) => !companyId || invoice.company_id === companyId)
+        .filter((invoice) => !projectId || invoice.project_id === projectId)
+        .filter((invoice) => !workstreamId || invoice.workstream_id === workstreamId)
+        .slice(0, 20),
+    [companyId, invoices, projectId, workstreamId]
+  );
   const resolvedEmail = toEmail.trim() || selectedContact?.email || "";
   const resolvedName = toName.trim() || selectedContact?.naam || "";
   const parsedVariables = useMemo(() => parseVariables(variables), [variables]);
-  const outboundVariables = useMemo(() => prepareOutboundVariables(parsedVariables), [parsedVariables]);
+  const previewVariables = useMemo(() => applyInvoicePreviewVariables(parsedVariables, selectedInvoice), [parsedVariables, selectedInvoice]);
+  const outboundVariables = useMemo(() => prepareOutboundVariables(parsedVariables, selectedInvoice), [parsedVariables, selectedInvoice]);
   const variableHints = useMemo(() => extractPlaceholders(selectedTemplate), [selectedTemplate]);
-  const previewHTML = useMemo(() => renderMailPreview(selectedTemplate?.body_html ?? "", parsedVariables), [selectedTemplate, parsedVariables]);
+  const previewHTML = useMemo(() => renderMailPreview(selectedTemplate?.body_html ?? "", previewVariables), [selectedTemplate, previewVariables]);
   const sendReadiness = useMemo(
     () =>
       buildSendReadiness({
         template: selectedTemplate,
-        variables: parsedVariables,
+        variables: previewVariables,
         previewHTML,
         resolvedEmail,
-        companyLinked: Boolean(companyId || selectedCompany),
+        companyLinked: Boolean(effectiveCompanyId || selectedCompany),
+        selectedInvoice,
       }),
-    [selectedTemplate, parsedVariables, previewHTML, resolvedEmail, companyId, selectedCompany]
+    [selectedTemplate, previewVariables, previewHTML, resolvedEmail, effectiveCompanyId, selectedCompany, selectedInvoice]
   );
 
   const handleSuggest = async () => {
@@ -127,10 +148,11 @@ export function LaventeCareMailboxView({
     try {
       suggestion = await onSuggestMailContent({
         template_id: selectedTemplate.id,
-        company_id: companyId || undefined,
+        company_id: effectiveCompanyId || undefined,
         contact_id: contactId || undefined,
-        project_id: projectId || undefined,
-        workstream_id: workstreamId || undefined,
+        project_id: effectiveProjectId || undefined,
+        workstream_id: effectiveWorkstreamId || undefined,
+        invoice_id: invoiceId || undefined,
         to_email: resolvedEmail || undefined,
         to_name: resolvedName || undefined,
         intent: aiIntent,
@@ -149,10 +171,11 @@ export function LaventeCareMailboxView({
     if (!selectedTemplate) return;
     await onSendTemplatedMail({
       template_id: selectedTemplate.id,
-      company_id: companyId || undefined,
+      company_id: effectiveCompanyId || undefined,
       contact_id: contactId || undefined,
-      project_id: projectId || undefined,
-      workstream_id: workstreamId || undefined,
+      project_id: effectiveProjectId || undefined,
+      workstream_id: effectiveWorkstreamId || undefined,
+      invoice_id: invoiceId || undefined,
       to_email: resolvedEmail || undefined,
       to_name: resolvedName || undefined,
       variables: outboundVariables,
@@ -161,8 +184,8 @@ export function LaventeCareMailboxView({
   };
 
   return (
-    <div className="space-y-4">
-      <section className="grid gap-3 lg:grid-cols-4">
+    <div className="min-w-0 space-y-4">
+      <section className="grid min-w-0 gap-3 lg:grid-cols-4">
         <MailboxMetric label="Templates" value={mailbox?.summary.activeTemplates ?? activeTemplates.length} detail="actief" />
         <MailboxMetric label="Outbox" value={mailbox?.summary.outbox ?? outbox.length} detail={`${mailbox?.summary.sent ?? 0} verzonden`} />
         <MailboxMetric label="Concepten" value={mailbox?.summary.drafts ?? 0} detail="klaar voor controle" />
@@ -184,13 +207,13 @@ export function LaventeCareMailboxView({
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
+      <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_430px]">
         <form
           onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             void handleSend(false);
           }}
-          className="glass min-w-0 p-4 sm:p-5"
+          className="glass min-w-0 max-w-full overflow-hidden p-4 sm:p-5"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -203,7 +226,7 @@ export function LaventeCareMailboxView({
             <MailPlus className="hidden h-8 w-8 shrink-0 text-sky-300 sm:block" />
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="Template">
               <select value={selectedTemplate?.id ?? ""} onChange={(event) => setTemplateId(event.target.value)} className={inputClass}>
                 {activeTemplates.map((template) => (
@@ -213,10 +236,14 @@ export function LaventeCareMailboxView({
             </Field>
             <Field label="Klant">
               <select
-                value={companyId}
+                value={effectiveCompanyId ?? ""}
                 onChange={(event) => {
-                  setCompanyId(event.target.value);
+                  const nextCompanyId = event.target.value;
+                  setCompanyId(nextCompanyId);
                   setContactId("");
+                  if (!nextCompanyId || selectedInvoice?.company_id !== nextCompanyId) {
+                    setInvoiceId("");
+                  }
                 }}
                 className={inputClass}
               >
@@ -239,8 +266,21 @@ export function LaventeCareMailboxView({
             <Field label="Ontvanger">
               <input value={resolvedEmail} onChange={(event) => setToEmail(event.target.value)} placeholder="naam@bedrijf.nl" className={inputClass} />
             </Field>
+            <Field label="Naam ontvanger">
+              <input value={resolvedName} onChange={(event) => setToName(event.target.value)} placeholder="Voornaam achternaam" className={inputClass} />
+            </Field>
             <Field label="Project">
-              <select value={projectId} onChange={(event) => setProjectId(event.target.value)} className={inputClass}>
+              <select
+                value={effectiveProjectId ?? ""}
+                onChange={(event) => {
+                  const nextProjectId = event.target.value;
+                  setProjectId(nextProjectId);
+                  if (selectedInvoice && selectedInvoice.project_id !== nextProjectId) {
+                    setInvoiceId("");
+                  }
+                }}
+                className={inputClass}
+              >
                 <option value="">Geen project</option>
                 {activeProjects.map((project) => (
                   <option key={project._id ?? project.id} value={project._id ?? project.id}>{project.naam}</option>
@@ -248,14 +288,37 @@ export function LaventeCareMailboxView({
               </select>
             </Field>
             <Field label="Opdracht">
-              <select value={workstreamId} onChange={(event) => setWorkstreamId(event.target.value)} className={inputClass}>
+              <select
+                value={effectiveWorkstreamId ?? ""}
+                onChange={(event) => {
+                  const nextWorkstreamId = event.target.value;
+                  setWorkstreamId(nextWorkstreamId);
+                  if (selectedInvoice && selectedInvoice.workstream_id !== nextWorkstreamId) {
+                    setInvoiceId("");
+                  }
+                }}
+                className={inputClass}
+              >
                 <option value="">Geen opdracht</option>
                 {activeWorkstreams.map((workstream) => (
                   <option key={workstream._id ?? workstream.id} value={workstream._id ?? workstream.id}>{workstream.titel}</option>
                 ))}
               </select>
             </Field>
+            <Field label="Factuur / Bunq">
+              <select value={invoiceId} onChange={(event) => setInvoiceId(event.target.value)} className={inputClass}>
+                <option value="">Geen factuur gekoppeld</option>
+                {filteredInvoices.map((invoice) => (
+                  <option key={invoice.id} value={invoice.id}>
+                    {invoice.invoice_number} - {formatCents(invoice.total_cents)} - {label(invoice.status)}
+                    {invoice.payment_url ? " - bunq link" : ""}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
+
+          <InvoiceMailStatus invoice={selectedInvoice} template={selectedTemplate} />
 
           <Field label="Variabelen" className="mt-3">
             <textarea
@@ -287,7 +350,7 @@ export function LaventeCareMailboxView({
                 {aiSuggesting ? "AI leest context..." : "AI vullen"}
               </button>
             </div>
-            <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="mt-3 grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
               <input
                 value={aiIntent}
                 onChange={(event) => setAiIntent(event.target.value)}
@@ -336,7 +399,7 @@ export function LaventeCareMailboxView({
             ) : null}
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="mt-4 grid min-w-0 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div className="rounded-lg border border-white/10 bg-black/20 p-3">
               <p className="text-xs font-semibold uppercase text-slate-500">Template context</p>
               <p className="mt-2 text-sm font-bold text-white">{selectedTemplate?.subject_template ?? "Geen template"}</p>
@@ -412,8 +475,8 @@ export function LaventeCareMailboxView({
           </div>
         </form>
 
-        <aside className="space-y-4">
-          <section className="glass p-4">
+        <aside className="min-w-0 space-y-4">
+          <section className="glass min-w-0 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Outbox</p>
             <div className="mt-3 space-y-2">
               {mailboxLoading ? (
@@ -426,7 +489,7 @@ export function LaventeCareMailboxView({
             </div>
           </section>
 
-          <section className="glass p-4">
+          <section className="glass min-w-0 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Templatebibliotheek</p>
             <div className="mt-3 space-y-2">
               {templates.map((template) => (
@@ -468,6 +531,51 @@ function MailboxMetric({ label, value, detail }: { label: string; value: number 
       <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-bold text-white">{value}</p>
       <p className="mt-1 text-xs text-slate-500">{detail}</p>
+    </div>
+  );
+}
+
+function InvoiceMailStatus({ invoice, template }: { invoice?: InvoiceItem; template?: MailTemplateItem }) {
+  const invoiceTemplate = extractPlaceholders(template).some((placeholder) => placeholder.startsWith("invoice."));
+  if (!invoice && !invoiceTemplate) return null;
+
+  if (!invoice) {
+    return (
+      <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.07] p-3">
+        <p className="text-xs font-semibold uppercase text-amber-100">Factuurcontext nodig</p>
+        <p className="mt-1 text-sm leading-5 text-slate-300">
+          Deze template gebruikt factuurvelden. Selecteer een factuur zodat bedrag, vervaldatum en Bunq-link uit de backend komen.
+        </p>
+      </div>
+    );
+  }
+
+  const hasPaymentURL = Boolean(invoice.payment_url);
+  return (
+    <div className={`mt-3 rounded-lg border p-3 ${hasPaymentURL ? "border-emerald-400/20 bg-emerald-400/[0.07]" : "border-amber-400/20 bg-amber-400/[0.07]"}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className={`text-xs font-semibold uppercase ${hasPaymentURL ? "text-emerald-100" : "text-amber-100"}`}>Factuur gekoppeld</p>
+          <p className="mt-1 text-sm font-bold text-white">
+            {invoice.invoice_number} - {formatCents(invoice.total_cents)} - {label(invoice.status)}
+          </p>
+          <p className="mt-1 text-sm leading-5 text-slate-300">
+            {hasPaymentURL
+              ? "Bunq betaal-URL staat klaar en wordt in factuurtemplates gebruikt."
+              : "Nog geen Bunq-link. Maak in Commercie eerst een betaalverzoek en bevestig de pending action via Settings of Telegram."}
+          </p>
+        </div>
+        {invoice.payment_url ? (
+          <a
+            href={invoice.payment_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-300/10 px-3 text-xs font-bold text-emerald-100 transition hover:bg-emerald-300/15"
+          >
+            Link testen
+          </a>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -526,10 +634,35 @@ function serializeVariables(values: Record<string, string>, hints: string[]) {
     .join("\n");
 }
 
-function prepareOutboundVariables(values: Record<string, string>) {
+function prepareOutboundVariables(values: Record<string, string>, invoice?: InvoiceItem) {
   const next = { ...values };
   if (isDefaultPilotAccessSummary(next["pilot.access_summary"])) {
     delete next["pilot.access_summary"];
+  }
+  if (invoice) {
+    if (next["invoice.amount"]?.trim().toLowerCase() === "zie factuur") {
+      delete next["invoice.amount"];
+    }
+    if (next["invoice.due_date"]?.trim().toLowerCase() === "14 dagen") {
+      delete next["invoice.due_date"];
+    }
+    if (next["invoice.number"]?.trim().toLowerCase() === "concept") {
+      delete next["invoice.number"];
+    }
+  }
+  return next;
+}
+
+function applyInvoicePreviewVariables(values: Record<string, string>, invoice?: InvoiceItem) {
+  if (!invoice) return values;
+  const next = { ...values };
+  next["invoice.number"] = invoice.invoice_number;
+  next["invoice.amount"] = formatCents(invoice.total_cents);
+  next["invoice.due_date"] = invoice.due_date ? formatDate(invoice.due_date) : "14 dagen";
+  if (invoice.payment_url) {
+    next["invoice.payment_url"] = invoice.payment_url;
+    if (!next["cta.url"]) next["cta.url"] = invoice.payment_url;
+    if (!next["cta.label"] || next["cta.label"] === "Afstemmen") next["cta.label"] = "Betaal factuur";
   }
   return next;
 }
@@ -552,12 +685,14 @@ function buildSendReadiness({
   previewHTML,
   resolvedEmail,
   companyLinked,
+  selectedInvoice,
 }: {
   template?: MailTemplateItem;
   variables: Record<string, string>;
   previewHTML: string;
   resolvedEmail: string;
   companyLinked: boolean;
+  selectedInvoice?: InvoiceItem;
 }) {
   const placeholders = extractPlaceholders(template);
   const unresolved = placeholders.filter((placeholder) => !variables[placeholder]?.trim() && !placeholder.endsWith(".url"));
@@ -599,6 +734,18 @@ function buildSendReadiness({
       status: hasLogo ? "ok" : "warn",
     },
   ];
+  const invoiceTemplate = placeholders.some((placeholder) => placeholder.startsWith("invoice."));
+  if (invoiceTemplate || selectedInvoice) {
+    items.push({
+      label: "Factuur/Bunq",
+      detail: selectedInvoice
+        ? selectedInvoice.payment_url
+          ? `${selectedInvoice.invoice_number}: betaal-URL gekoppeld.`
+          : `${selectedInvoice.invoice_number}: maak eerst het Bunq betaalverzoek en bevestig de pending action.`
+        : "Deze template verwacht factuurcontext; selecteer een factuur.",
+      status: selectedInvoice ? (selectedInvoice.payment_url ? "ok" : "warn") : "missing",
+    });
+  }
   if (hasAccessPlaceholder || sensitiveAccessDetected) {
     items.push({
       label: "Toegang",

@@ -29,57 +29,76 @@ export function LaventeCareFunnelView({
 }) {
   return (
     <>
-      <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.4fr_0.9fr]">
-        <div className="glass min-w-0 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Proces</p>
-              <h2 className="mt-1 text-lg font-bold text-white">Van intake naar doorontwikkeling</h2>
-            </div>
-            <Layers3 size={20} className="text-slate-400" />
-          </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {LAVENTECARE_PROCESS_STAGES.map((stage, index) => (
-              <div key={stage.key} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm font-bold text-slate-200">
-                    {index + 1}
-                  </span>
-                  <h3 className="font-semibold text-white">{stage.title}</h3>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-slate-400">{stage.summary}</p>
-                <p className="mt-3 text-xs font-semibold text-slate-500">{stage.output}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      <details className="glass min-w-0 overflow-hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 marker:hidden">
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-300">
+              <Layers3 size={17} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-white">Proces en fit guardrails</span>
+              <span className="mt-0.5 block truncate text-xs text-slate-500">
+                Intake, discovery, realisatie en no-fit signalering
+              </span>
+            </span>
+          </span>
+          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-bold text-slate-400">
+            {LAVENTECARE_PROCESS_STAGES.length} fases
+          </span>
+        </summary>
 
-        <div className="glass min-w-0 p-5">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={18} className="text-emerald-300" />
-            <h2 className="text-lg font-bold text-white">Fit guardrails</h2>
-          </div>
-          <div className="mt-4 space-y-3">
-            {LAVENTECARE_FIT_CRITERIA.slice(0, 5).map((item) => (
-              <div key={item} className="flex gap-3 glass min-w-0 p-3 border-emerald-500/15 bg-emerald-500/[0.06]">
-                <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-300" />
-                <p className="text-sm leading-5 text-slate-300">{item}</p>
+        <div className="grid grid-cols-1 gap-4 border-t border-white/10 p-4 xl:grid-cols-[1.4fr_0.9fr]">
+          <div className="min-w-0">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Proces</p>
+                <h2 className="mt-1 text-lg font-bold text-white">Van intake naar doorontwikkeling</h2>
               </div>
-            ))}
-          </div>
-          <div className="mt-5 glass min-w-0 p-4 border-rose-500/15 bg-rose-500/[0.06]">
-            <p className="text-sm font-semibold text-rose-100">No-fit signalen</p>
-            <ul className="mt-3 space-y-2">
-              {LAVENTECARE_NO_FIT_SIGNALS.slice(0, 3).map((item) => (
-                <li key={item} className="flex gap-2 text-sm leading-5 text-slate-400">
-                  <Flag size={14} className="mt-0.5 shrink-0 text-rose-300" />
-                  <span>{item}</span>
-                </li>
+              <Layers3 size={20} className="text-slate-400" />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {LAVENTECARE_PROCESS_STAGES.map((stage, index) => (
+                <div key={stage.key} className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm font-bold text-slate-200">
+                      {index + 1}
+                    </span>
+                    <h3 className="font-semibold text-white">{stage.title}</h3>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-400">{stage.summary}</p>
+                  <p className="mt-3 text-xs font-semibold text-slate-500">{stage.output}</p>
+                </div>
               ))}
-            </ul>
+            </div>
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={18} className="text-emerald-300" />
+              <h2 className="text-lg font-bold text-white">Fit guardrails</h2>
+            </div>
+            <div className="mt-4 space-y-3">
+              {LAVENTECARE_FIT_CRITERIA.slice(0, 5).map((item) => (
+                <div key={item} className="flex min-w-0 gap-3 rounded-lg border border-emerald-500/15 bg-emerald-500/[0.06] p-3">
+                  <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-300" />
+                  <p className="text-sm leading-5 text-slate-300">{item}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 min-w-0 rounded-lg border border-rose-500/15 bg-rose-500/[0.06] p-4">
+              <p className="text-sm font-semibold text-rose-100">No-fit signalen</p>
+              <ul className="mt-3 space-y-2">
+                {LAVENTECARE_NO_FIT_SIGNALS.slice(0, 3).map((item) => (
+                  <li key={item} className="flex gap-2 text-sm leading-5 text-slate-400">
+                    <Flag size={14} className="mt-0.5 shrink-0 text-rose-300" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
-      </section>
+      </details>
 
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <div className="glass min-w-0 p-5">

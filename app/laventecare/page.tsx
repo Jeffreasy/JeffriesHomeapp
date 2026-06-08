@@ -152,6 +152,7 @@ export default function LaventeCarePage() {
   const [requestingPaymentInvoiceId, setRequestingPaymentInvoiceId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<PortalView>("overview");
+  const [mailboxInvoiceId, setMailboxInvoiceId] = useState("");
   const [search, setSearch] = useState("");
 
   const selectedCompany = useMemo(
@@ -1045,6 +1046,12 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleOpenMailboxForInvoice = (id: string) => {
+    setMailboxInvoiceId(id);
+    setActiveView("mailbox");
+    success("Factuur klaargezet in Mailbox");
+  };
+
   const handleSendTemplatedMail = async (payload: Parameters<typeof sendTemplatedMailMut.mutateAsync>[0]) => {
     try {
       const result = await sendTemplatedMailMut.mutateAsync(payload);
@@ -1192,16 +1199,13 @@ export default function LaventeCarePage() {
           projects={activeProjects.length}
           invoices={invoices.length}
           documents={summary.documents}
-          onOpenCompany={openNewCompanyForm}
-          onOpenWorkstream={() => setShowWorkstreamForm(true)}
-          onOpenCommerce={() => setActiveView("commerce")}
           onOpenGaps={() => setActiveView("gaps")}
         />
 
         <PortalNavigation sections={portalSections} activeView={activeView} onChange={setActiveView} />
 
-        <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <div className="order-2 xl:order-1">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="hidden xl:order-2 xl:block">
             <PortalInsightRail
               capabilityRows={capabilityRows}
               sections={portalSections}
@@ -1214,7 +1218,7 @@ export default function LaventeCarePage() {
             />
           </div>
 
-          <section className="order-1 min-w-0 space-y-5 xl:order-2">
+          <section className="order-1 min-w-0 space-y-4">
             <PortalWorkspaceHeader section={activePortalSection} />
 
             {activeView === "overview" ? (
@@ -1299,17 +1303,21 @@ export default function LaventeCarePage() {
                 onUpdateQuoteStatus={handleUpdateQuoteStatus}
                 onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
                 onCreatePaymentRequest={handleCreateInvoicePaymentRequest}
+                onOpenMailboxForInvoice={handleOpenMailboxForInvoice}
               />
             ) : null}
 
             {activeView === "mailbox" ? (
               <LaventeCareMailboxView
+                key={mailboxInvoiceId || "mailbox"}
                 mailbox={mailbox}
                 mailboxLoading={mailboxLoading}
                 companies={companies}
                 contacts={contacts}
                 activeProjects={activeProjects}
                 activeWorkstreams={activeWorkstreams}
+                invoices={invoices}
+                prefillInvoiceId={mailboxInvoiceId}
                 templates={mailTemplates}
                 outbox={mailOutbox}
                 sending={sendTemplatedMailMut.isPending}

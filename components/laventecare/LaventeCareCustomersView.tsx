@@ -80,8 +80,8 @@ export function LaventeCareCustomersView({
           ].filter(Boolean);
 
           return (
-            <article key={id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="flex items-start justify-between gap-3">
+            <article key={id} className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <Building2 size={16} className="shrink-0 text-amber-300" />
@@ -92,7 +92,7 @@ export function LaventeCareCustomersView({
                     {company.sector ? ` - ${company.sector}` : ""}
                   </p>
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5">
+                <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
                   <button
                     type="button"
                     onClick={() => onEditCompany(company)}

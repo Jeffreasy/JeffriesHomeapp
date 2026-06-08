@@ -99,6 +99,7 @@ export function LaventeCareBillingView({
   onUpdateQuoteStatus,
   onUpdateInvoiceStatus,
   onCreatePaymentRequest,
+  onOpenMailboxForInvoice,
 }: {
   billing?: BillingItem;
   billingLoading: boolean;
@@ -122,6 +123,7 @@ export function LaventeCareBillingView({
   onUpdateQuoteStatus: (id: string, status: string) => Promise<void>;
   onUpdateInvoiceStatus: (id: string, status: string) => Promise<void>;
   onCreatePaymentRequest: (id: string) => Promise<void>;
+  onOpenMailboxForInvoice?: (id: string) => void;
 }) {
   const { success, error: toastError } = useToast();
   const [mode, setMode] = useState<BillingMode>("uren");
@@ -253,14 +255,14 @@ export function LaventeCareBillingView({
               ],
       });
       setInvoiceForm(emptyBillingInvoiceForm);
-      success("Factuurconcept aangemaakt");
+      success("Factuurconcept aangemaakt. Maak daarna het Bunq betaalverzoek en koppel de factuur in Mailbox.");
     } catch {
       return;
     }
   };
 
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <BillingMetric
           icon={Clock3}
@@ -288,21 +290,21 @@ export function LaventeCareBillingView({
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="glass min-w-0 p-4 sm:p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="glass min-w-0 overflow-hidden p-4 sm:p-5">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Commerciele workflow</p>
               <h3 className="mt-1 text-lg font-bold text-white">Offerte, uren en factuur</h3>
             </div>
-            <div className="grid grid-cols-3 gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
+            <div className="grid w-full min-w-0 grid-cols-3 gap-1 rounded-lg border border-white/10 bg-black/20 p-1 sm:w-auto">
               {(["uren", "offerte", "factuur"] as BillingMode[]).map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => setMode(item)}
                   className={cn(
-                    "min-h-9 rounded-md px-2 text-xs font-bold capitalize transition sm:px-3",
+                    "min-h-9 min-w-0 rounded-md px-2 text-xs font-bold capitalize transition sm:px-3",
                     mode === item ? "bg-amber-400 text-slate-950" : "text-slate-400 hover:bg-white/10 hover:text-white"
                   )}
                 >
@@ -538,7 +540,7 @@ export function LaventeCareBillingView({
           ) : null}
         </div>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <ProviderStatus billing={billing} />
           <ListPanel
             title="Recente offertes"
@@ -584,26 +586,34 @@ export function LaventeCareBillingView({
                 : invoice.payment_provider
                   ? ` - ${invoice.payment_provider}`
                   : "";
+              const actions: Array<{ label: string; busy: boolean; onClick: () => void }> = [];
+              if (invoice.status !== "betaald" && invoice.status !== "geannuleerd") {
+                if (!hasPaymentRequest) {
+                  actions.push({
+                    label: "Betaalverzoek",
+                    busy: requestingPaymentInvoiceId === invoice.id,
+                    onClick: () => onCreatePaymentRequest(invoice.id),
+                  });
+                } else if (invoice.status === "verstuurd") {
+                  actions.push({
+                    label: "Betaald",
+                    busy: updatingInvoiceId === invoice.id,
+                    onClick: () => onUpdateInvoiceStatus(invoice.id, "betaald"),
+                  });
+                }
+              }
+              if (onOpenMailboxForInvoice) {
+                actions.push({
+                  label: "Mail",
+                  busy: false,
+                  onClick: () => onOpenMailboxForInvoice(invoice.id),
+                });
+              }
               return {
                 id: invoice.id,
                 title: invoice.invoice_number,
                 meta: `${label(invoice.status)} - ${formatCents(invoice.total_cents)} - ${invoice.company_name ?? "geen klant"}${providerLabel}`,
-                action:
-                  invoice.status === "betaald" || invoice.status === "geannuleerd"
-                    ? undefined
-                    : !hasPaymentRequest
-                      ? {
-                          label: "Betaalverzoek",
-                          busy: requestingPaymentInvoiceId === invoice.id,
-                          onClick: () => onCreatePaymentRequest(invoice.id),
-                        }
-                      : invoice.status === "verstuurd"
-                        ? {
-                            label: "Betaald",
-                            busy: updatingInvoiceId === invoice.id,
-                            onClick: () => onUpdateInvoiceStatus(invoice.id, "betaald"),
-                          }
-                        : undefined,
+                actions,
               };
             })}
           />
@@ -658,7 +668,7 @@ function ProviderStatus({ billing }: { billing?: BillingItem }) {
           <h4 className="mt-1 text-sm font-bold text-white">bunq {ready ? "klaar voor live koppeling" : "voorbereid in facturen"}</h4>
           <p className="mt-2 text-sm leading-5 text-slate-400">
             {ready
-              ? "Facturen maken nu eerst een bevestigingsactie. Na akkoord wordt een bunq RequestInquiry gekoppeld en de factuur verstuurd."
+              ? "Facturen maken eerst een bevestigingsactie. Na akkoord wordt een bunq RequestInquiry gekoppeld en krijgt de factuur status verstuurd; mailen doe je daarna via Mailbox."
               : "Zet BUNQ_API_KEY, BUNQ_USER_ID en BUNQ_MONETARY_ACCOUNT_ID op Render voordat live betaalverzoeken aan gaan."}
           </p>
         </div>
@@ -763,7 +773,13 @@ function ListPanel({
 }: {
   title: string;
   empty: string;
-  items: Array<{ id: string; title: string; meta: string; action?: { label: string; busy: boolean; onClick: () => void } }>;
+  items: Array<{
+    id: string;
+    title: string;
+    meta: string;
+    action?: { label: string; busy: boolean; onClick: () => void };
+    actions?: Array<{ label: string; busy: boolean; onClick: () => void }>;
+  }>;
 }) {
   return (
     <div className="glass p-4">
@@ -777,27 +793,30 @@ function ListPanel({
                   <p className="truncate text-sm font-semibold text-white">{item.title}</p>
                   <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.meta}</p>
                 </div>
-                {item.action ? (
-                  <button
-                    type="button"
-                    onClick={item.action.onClick}
-                    disabled={item.action.busy}
-                    className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
-                  >
-                    {item.action.busy ? (
-                      <Loader2 size={13} className="animate-spin" />
-                    ) : item.action.label === "Betaald" || item.action.label === "Akkoord" ? (
-                      <CheckCircle2 size={13} />
-                    ) : item.action.label === "Factuur" ? (
-                      <ReceiptText size={13} />
-                    ) : item.action.label === "Betaalverzoek" ? (
-                      <Banknote size={13} />
-                    ) : (
-                      <Send size={13} />
-                    )}
-                    {item.action.label}
-                  </button>
-                ) : null}
+                <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
+                  {(item.actions ?? (item.action ? [item.action] : [])).map((action) => (
+                    <button
+                      key={action.label}
+                      type="button"
+                      onClick={action.onClick}
+                      disabled={action.busy}
+                      className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
+                    >
+                      {action.busy ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : action.label === "Betaald" || action.label === "Akkoord" ? (
+                        <CheckCircle2 size={13} />
+                      ) : action.label === "Factuur" ? (
+                        <ReceiptText size={13} />
+                      ) : action.label === "Betaalverzoek" ? (
+                        <Banknote size={13} />
+                      ) : (
+                        <Send size={13} />
+                      )}
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ))

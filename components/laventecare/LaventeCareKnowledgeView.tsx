@@ -41,22 +41,24 @@ export function LaventeCareKnowledgeView({
           </div>
         </div>
 
-        <div className="mt-4 space-y-4">
+        <div className="mt-4 space-y-3">
           {documentGroups.length === 0 ? (
             <EmptyState
               title={search ? "Geen documenten gevonden" : "Documentbasis nog leeg"}
               body={search ? "Pas je zoekterm aan of initialiseer de documentbasis opnieuw." : "Initialiseer de documentbasis bovenaan om LaventeCare-documentatie doorzoekbaar te maken."}
             />
           ) : documentGroups.map(([category, docs]) => (
-            <div key={category}>
-              <div className="mb-2 flex items-center gap-2">
-                <ClipboardList size={15} className="text-slate-400" />
-                <h3 className="text-sm font-bold capitalize text-slate-200">{category}</h3>
-                <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs text-slate-500">
+            <details key={category} open={search.trim().length > 0} className="rounded-lg border border-white/10 bg-white/[0.03]">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-3 marker:hidden">
+                <span className="flex min-w-0 items-center gap-2">
+                  <ClipboardList size={15} className="shrink-0 text-slate-400" />
+                  <span className="truncate text-sm font-bold capitalize text-slate-200">{category}</span>
+                </span>
+                <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs text-slate-500">
                   {docs.length}
                 </span>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
+              </summary>
+              <div className="grid gap-3 border-t border-white/10 p-3 md:grid-cols-2">
                 {docs.map((doc) => {
                   const documentKey = doc.document_key || doc.documentKey || "";
                   return (
@@ -100,7 +102,7 @@ export function LaventeCareKnowledgeView({
                   );
                 })}
               </div>
-            </div>
+            </details>
           ))}
         </div>
       </div>

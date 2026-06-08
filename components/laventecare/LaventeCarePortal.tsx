@@ -7,7 +7,6 @@ import {
   Banknote,
   BookOpenText,
   BriefcaseBusiness,
-  Building2,
   CheckCircle2,
   CircleDashed,
   ClipboardList,
@@ -86,9 +85,6 @@ export function LaventeCarePortalHero({
   projects,
   invoices,
   documents,
-  onOpenCompany,
-  onOpenWorkstream,
-  onOpenCommerce,
   onOpenGaps,
 }: {
   capabilityRows: CapabilityRow[];
@@ -99,9 +95,6 @@ export function LaventeCarePortalHero({
   projects: number;
   invoices: number;
   documents: number;
-  onOpenCompany: () => void;
-  onOpenWorkstream: () => void;
-  onOpenCommerce: () => void;
   onOpenGaps: () => void;
 }) {
   const ready = capabilityRows.filter((row) => row.status === "ready").length;
@@ -109,105 +102,71 @@ export function LaventeCarePortalHero({
   const missing = capabilityRows.filter((row) => row.status === "missing").length;
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <div className="glass min-w-0 p-4 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-bold text-sky-200">
+    <section className="glass min-w-0 p-3 sm:p-4">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs font-bold text-sky-200">
               <BriefcaseBusiness size={14} />
               Bedrijfsportaal
             </div>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              LaventeCare operatie, commercie en dossiers in een werkruimte
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-              CRM, opdrachten, delivery, documenten, facturen en AI-signalen staan nu als aparte werkgebieden klaar zodat de bedrijfsvoering schaalbaar blijft.
-            </p>
+            <button
+              type="button"
+              onClick={onOpenGaps}
+              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-[11px] font-bold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
+            >
+              <Gauge size={13} />
+              {ready}/{capabilityRows.length} klaar
+              {attention + missing > 0 ? ` - ${attention + missing} focus` : ""}
+            </button>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
-            <PortalActionButton icon={Building2} label="Klant" onClick={onOpenCompany} tone="amber" />
-            <PortalActionButton icon={Workflow} label="Opdracht" onClick={onOpenWorkstream} tone="violet" />
-            <PortalActionButton icon={ReceiptText} label="Factuur" onClick={onOpenCommerce} tone="emerald" />
-          </div>
-        </div>
-
-        <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-          <PortalStat label="Klanten" value={companies} detail={`${contacts} contacten`} icon={UsersRound} />
-          <PortalStat label="Leads" value={leads} detail="sales intake" icon={Sparkles} />
-          <PortalStat label="Opdrachten" value={workstreams} detail="werkbank" icon={Workflow} />
-          <PortalStat label="Projecten" value={projects} detail="delivery" icon={FolderKanban} />
-          <PortalStat label="Facturen" value={invoices} detail="bunq flow" icon={Banknote} />
-          <PortalStat label="Docs" value={documents} detail="templates" icon={BookOpenText} />
-          <PortalStat label="Vulling" value={`${ready}/${capabilityRows.length}`} detail={`${attention} inrichten${missing ? `, ${missing} ontbreekt` : ""}`} icon={Gauge} />
+          <h2 className="mt-2 text-xl font-bold tracking-tight text-white sm:text-2xl">
+            LaventeCare cockpit
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+            Klanten, opdrachten, projecten, mails, documenten en betalingen in een rustige bedrijfswerkruimte.
+          </p>
         </div>
       </div>
 
-      <div className="glass min-w-0 p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Business readiness</p>
-            <h3 className="mt-1 text-lg font-bold text-white">{ready}/{capabilityRows.length} functies gevuld</h3>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenGaps}
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 text-xs font-bold text-rose-200 transition hover:bg-rose-500/15"
-          >
-            <ListChecks size={14} />
-            Gaten
-          </button>
-        </div>
-        <div className="mt-4 space-y-2">
+      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <PortalStat label="Klanten" value={companies} detail={`${contacts} contacten`} icon={UsersRound} />
+        <PortalStat label="Leads" value={leads} detail="sales" icon={Sparkles} />
+        <PortalStat label="Opdrachten" value={workstreams} detail="werkbank" icon={Workflow} />
+        <PortalStat label="Projecten" value={projects} detail="delivery" icon={FolderKanban} />
+        <PortalStat label="Facturen" value={invoices} detail="bunq" icon={Banknote} />
+        <PortalStat label="Docs" value={documents} detail="templates" icon={BookOpenText} />
+        <PortalStat label="Vulling" value={`${ready}/${capabilityRows.length}`} detail={attention || missing ? `${attention + missing} focus` : "op orde"} icon={Gauge} />
+      </div>
+
+      {(attention > 0 || missing > 0) && (
+        <div className="mt-3 hidden gap-2 lg:grid lg:grid-cols-3">
           {capabilityRows
             .filter((row) => row.status !== "ready")
-            .concat(capabilityRows.filter((row) => row.status === "ready"))
-            .slice(0, 5)
+            .slice(0, 3)
             .map((row) => (
-            <div key={row.label} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-white">{row.label}</p>
-                <p className="mt-0.5 truncate text-xs text-slate-500">{row.nextStep}</p>
-              </div>
-              <CapabilityBadge status={row.status} />
-            </div>
+              <button
+                key={row.label}
+                type="button"
+                onClick={onOpenGaps}
+                className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2 text-left transition hover:bg-amber-500/10"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-bold text-amber-100">{row.label}</span>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">{row.nextStep}</span>
+                </span>
+                <CapabilityBadge status={row.status} />
+              </button>
             ))}
         </div>
-      </div>
+      )}
     </section>
-  );
-}
-
-function PortalActionButton({
-  icon: Icon,
-  label,
-  tone,
-  onClick,
-}: {
-  icon: LucideIcon;
-  label: string;
-  tone: "amber" | "emerald" | "violet";
-  onClick: () => void;
-}) {
-  const toneClass = {
-    amber: "border-amber-500/25 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20",
-    emerald: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20",
-    violet: "border-violet-500/25 bg-violet-500/10 text-violet-200 hover:bg-violet-500/20",
-  }[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn("inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-bold transition", toneClass)}
-    >
-      <Icon size={16} />
-      {label}
-    </button>
   );
 }
 
 function PortalStat({ label, value, detail, icon: Icon }: { label: string; value: number | string; detail: string; icon: LucideIcon }) {
   return (
-    <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+    <div className="min-w-[126px] flex-1 rounded-lg border border-white/10 bg-white/[0.03] p-3 sm:min-w-[142px]">
       <div className="flex items-center justify-between gap-2">
         <p className="truncate text-[11px] font-semibold uppercase tracking-normal text-slate-500">{label}</p>
         <Icon size={14} className="shrink-0 text-slate-500" />
@@ -228,8 +187,8 @@ export function PortalNavigation({
   onChange: (view: PortalView) => void;
 }) {
   return (
-    <nav className="sticky top-[88px] z-20 -mx-4 border-y border-white/10 bg-[var(--color-background)]/92 px-4 py-3 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+    <nav className="z-20 -mx-4 border-y border-white/10 bg-[var(--color-background)]/92 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:sticky lg:top-[76px] lg:-mx-8 lg:px-8">
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
         {sections.map((section) => {
           const Icon = section.icon;
           const active = section.id === activeView;
@@ -239,20 +198,20 @@ export function PortalNavigation({
               type="button"
               onClick={() => onChange(section.id)}
               className={cn(
-                "flex min-w-[148px] items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition",
+                "flex min-w-[108px] items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition sm:min-w-[138px]",
                 active
                   ? "border-sky-500/30 bg-sky-500/10 text-white"
                   : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-white"
               )}
             >
-              <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", active ? "border-sky-500/20 bg-sky-500/10 text-sky-200" : "border-white/10 bg-black/10")}>
+              <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border", active ? "border-sky-500/20 bg-sky-500/10 text-sky-200" : "border-white/10 bg-black/10")}>
                 <Icon size={16} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold">{section.label}</span>
-                <span className="mt-0.5 block truncate text-[11px] uppercase tracking-normal text-slate-500">{section.eyebrow}</span>
+                <span className="mt-0.5 hidden truncate text-[11px] uppercase tracking-normal text-slate-500 sm:block">{section.eyebrow}</span>
               </span>
-              <span className="rounded-full border border-white/10 bg-black/20 px-2 py-0.5 text-xs font-bold text-slate-300">{section.count}</span>
+              <span className="rounded-full border border-white/10 bg-black/20 px-1.5 py-0.5 text-[11px] font-bold text-slate-300 sm:px-2 sm:text-xs">{section.count}</span>
             </button>
           );
         })}
@@ -265,16 +224,16 @@ export function PortalWorkspaceHeader({ section }: { section?: PortalSection }) 
   if (!section) return null;
   const Icon = section.icon;
   return (
-    <div className="glass min-w-0 p-4 sm:p-5">
+    <div className="glass min-w-0 p-3 sm:p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200">
-            <Icon size={20} />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200">
+            <Icon size={18} />
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{section.eyebrow}</p>
             <h2 className="mt-1 truncate text-xl font-bold text-white">{section.label}</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">{section.description}</p>
+            <p className="mt-1 hidden max-w-3xl text-sm leading-6 text-slate-400 sm:block">{section.description}</p>
           </div>
         </div>
         <span className="inline-flex h-9 w-fit items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-slate-300">
@@ -415,13 +374,18 @@ export function CapabilityMatrix({
   const missing = capabilityRows.filter((row) => row.status === "missing").length;
   const maturity = Math.round(capabilityRows.reduce((sum, row) => sum + row.score, 0) / Math.max(1, capabilityRows.length));
   const focusRows = capabilityRows.filter((row) => row.status !== "ready").sort((a, b) => statusWeight(a.status) - statusWeight(b.status));
+  const visibleRows = expanded
+    ? capabilityRows
+    : focusRows.length > 0
+      ? focusRows.slice(0, 4)
+      : capabilityRows.slice(0, 4);
 
   return (
-    <section className="glass min-w-0 p-4 sm:p-5">
+    <section className="glass min-w-0 p-3 sm:p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Bedrijfsfunctionaliteit</p>
-          <h3 className="mt-1 text-lg font-bold text-white">Dekking en inrichting</h3>
+          <h3 className="mt-1 text-lg font-bold text-white">{expanded ? "Dekking en inrichting" : "Business readiness"}</h3>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
             Per bedrijfsfunctie zie je of de flow klaar is, gevuld moet worden of echt nog niet is ingericht.
           </p>
@@ -485,8 +449,8 @@ export function CapabilityMatrix({
         </div>
       </div>
 
-      <div className={cn("mt-4 grid gap-3", expanded ? "md:grid-cols-2 xl:grid-cols-3" : "md:grid-cols-2")}>
-        {capabilityRows.map((row) => (
+      <div className={cn("mt-4 grid gap-3", expanded ? "md:grid-cols-2 xl:grid-cols-3" : "md:grid-cols-2 xl:grid-cols-4")}>
+        {visibleRows.map((row) => (
           <button
             key={row.label}
             type="button"
@@ -524,6 +488,16 @@ export function CapabilityMatrix({
           </button>
         ))}
       </div>
+      {!expanded && capabilityRows.length > visibleRows.length ? (
+        <button
+          type="button"
+          onClick={() => onOpenView?.("gaps")}
+          className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-bold text-slate-200 transition hover:bg-white/[0.08]"
+        >
+          <ListChecks size={14} />
+          Volledige dekking bekijken
+        </button>
+      ) : null}
     </section>
   );
 }
