@@ -91,12 +91,14 @@ export function LaventeCareBillingView({
   updatingQuoteId,
   creatingInvoiceFromQuoteId,
   updatingInvoiceId,
+  requestingPaymentInvoiceId,
   onCreateQuote,
   onCreateTimeEntry,
   onCreateInvoice,
   onCreateInvoiceFromQuote,
   onUpdateQuoteStatus,
   onUpdateInvoiceStatus,
+  onCreatePaymentRequest,
 }: {
   billing?: BillingItem;
   billingLoading: boolean;
@@ -112,12 +114,14 @@ export function LaventeCareBillingView({
   updatingQuoteId: string | null;
   creatingInvoiceFromQuoteId: string | null;
   updatingInvoiceId: string | null;
+  requestingPaymentInvoiceId: string | null;
   onCreateQuote: (payload: QuotePayload) => Promise<void>;
   onCreateTimeEntry: (payload: TimeEntryPayload) => Promise<void>;
   onCreateInvoice: (payload: InvoicePayload) => Promise<void>;
   onCreateInvoiceFromQuote: (id: string) => Promise<void>;
   onUpdateQuoteStatus: (id: string, status: string) => Promise<void>;
   onUpdateInvoiceStatus: (id: string, status: string) => Promise<void>;
+  onCreatePaymentRequest: (id: string) => Promise<void>;
 }) {
   const { success, error: toastError } = useToast();
   const [mode, setMode] = useState<BillingMode>("uren");
@@ -573,25 +577,35 @@ export function LaventeCareBillingView({
           <ListPanel
             title="Recente facturen"
             empty="Nog geen facturen"
-            items={recentInvoices.map((invoice) => ({
-              id: invoice.id,
-              title: invoice.invoice_number,
-              meta: `${label(invoice.status)} - ${formatCents(invoice.total_cents)} - ${invoice.company_name ?? "geen klant"}`,
-              action:
-                invoice.status === "concept"
-                  ? {
-                      label: "Verstuurd",
-                      busy: updatingInvoiceId === invoice.id,
-                      onClick: () => onUpdateInvoiceStatus(invoice.id, "verstuurd"),
-                    }
-                  : invoice.status === "verstuurd"
-                    ? {
-                        label: "Betaald",
-                        busy: updatingInvoiceId === invoice.id,
-                        onClick: () => onUpdateInvoiceStatus(invoice.id, "betaald"),
-                      }
-                    : undefined,
-            }))}
+            items={recentInvoices.map((invoice) => {
+              const hasPaymentRequest = Boolean(invoice.provider_request_id || invoice.payment_url);
+              const providerLabel = hasPaymentRequest
+                ? ` - ${invoice.payment_provider || "bunq"} gekoppeld`
+                : invoice.payment_provider
+                  ? ` - ${invoice.payment_provider}`
+                  : "";
+              return {
+                id: invoice.id,
+                title: invoice.invoice_number,
+                meta: `${label(invoice.status)} - ${formatCents(invoice.total_cents)} - ${invoice.company_name ?? "geen klant"}${providerLabel}`,
+                action:
+                  invoice.status === "betaald" || invoice.status === "geannuleerd"
+                    ? undefined
+                    : !hasPaymentRequest
+                      ? {
+                          label: "Betaalverzoek",
+                          busy: requestingPaymentInvoiceId === invoice.id,
+                          onClick: () => onCreatePaymentRequest(invoice.id),
+                        }
+                      : invoice.status === "verstuurd"
+                        ? {
+                            label: "Betaald",
+                            busy: updatingInvoiceId === invoice.id,
+                            onClick: () => onUpdateInvoiceStatus(invoice.id, "betaald"),
+                          }
+                        : undefined,
+              };
+            })}
           />
         </div>
       </div>
@@ -644,7 +658,7 @@ function ProviderStatus({ billing }: { billing?: BillingItem }) {
           <h4 className="mt-1 text-sm font-bold text-white">bunq {ready ? "klaar voor live koppeling" : "voorbereid in facturen"}</h4>
           <p className="mt-2 text-sm leading-5 text-slate-400">
             {ready
-              ? "Facturen kunnen straks via bevestiging aan RequestInquiry/betaallinks worden gekoppeld."
+              ? "Facturen maken nu eerst een bevestigingsactie. Na akkoord wordt een bunq RequestInquiry gekoppeld en de factuur verstuurd."
               : "Zet BUNQ_API_KEY, BUNQ_USER_ID en BUNQ_MONETARY_ACCOUNT_ID op Render voordat live betaalverzoeken aan gaan."}
           </p>
         </div>
@@ -776,6 +790,8 @@ function ListPanel({
                       <CheckCircle2 size={13} />
                     ) : item.action.label === "Factuur" ? (
                       <ReceiptText size={13} />
+                    ) : item.action.label === "Betaalverzoek" ? (
+                      <Banknote size={13} />
                     ) : (
                       <Send size={13} />
                     )}

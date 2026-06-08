@@ -171,6 +171,11 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const createInvoicePaymentRequestMut = useMutation({
+    mutationFn: (id: string) => laventecareApi.createInvoicePaymentRequest(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
   const companies = useMemo(
     () =>
@@ -363,5 +368,6 @@ export function useLaventeCare() {
     createInvoiceMut,
     createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,
+    createInvoicePaymentRequestMut,
   };
 }

@@ -93,6 +93,7 @@ export default function LaventeCarePage() {
     createInvoiceMut,
     createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,
+    createInvoicePaymentRequestMut,
   } = useLaventeCare();
 
   const { success, error: toastError } = useToast();
@@ -123,6 +124,7 @@ export default function LaventeCarePage() {
   const [updatingQuoteId, setUpdatingQuoteId] = useState<string | null>(null);
   const [creatingInvoiceFromQuoteId, setCreatingInvoiceFromQuoteId] = useState<string | null>(null);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
+  const [requestingPaymentInvoiceId, setRequestingPaymentInvoiceId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
@@ -645,6 +647,24 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleCreateInvoicePaymentRequest = async (id: string) => {
+    setRequestingPaymentInvoiceId(id);
+    try {
+      const result = await createInvoicePaymentRequestMut.mutateAsync(id);
+      if (result.confirmationRequired) {
+        success(result.code ? `Betaalverzoek klaar. Bevestig met code ${result.code}` : "Betaalverzoek staat klaar voor bevestiging");
+      } else if (result.alreadyCreated) {
+        success("Deze factuur heeft al een gekoppeld betaalverzoek");
+      } else {
+        success(result.message || "Betaalverzoek verwerkt");
+      }
+    } catch {
+      toastError("Betaalverzoek klaarzetten is mislukt");
+    } finally {
+      setRequestingPaymentInvoiceId(null);
+    }
+  };
+
   if (cockpitLoading) {
     return (
       <div className="px-4 py-10 sm:px-6 text-slate-100">
@@ -790,12 +810,14 @@ export default function LaventeCarePage() {
               updatingQuoteId={updatingQuoteId}
               creatingInvoiceFromQuoteId={creatingInvoiceFromQuoteId}
               updatingInvoiceId={updatingInvoiceId}
+              requestingPaymentInvoiceId={requestingPaymentInvoiceId}
               onCreateQuote={handleCreateQuote}
               onCreateTimeEntry={handleCreateTimeEntry}
               onCreateInvoice={handleCreateInvoice}
               onCreateInvoiceFromQuote={handleCreateInvoiceFromQuote}
               onUpdateQuoteStatus={handleUpdateQuoteStatus}
               onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
+              onCreatePaymentRequest={handleCreateInvoicePaymentRequest}
             />
           </CollapsibleSection>
 

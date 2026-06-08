@@ -830,6 +830,18 @@ export interface LCInvoiceLine {
   sort_order: number;
 }
 
+export interface LCPaymentRequestAction {
+  confirmationRequired: boolean;
+  alreadyCreated?: boolean;
+  pendingActionId?: string;
+  code?: string;
+  toolName?: string;
+  summary?: string;
+  expiresAt?: string;
+  invoice?: LCInvoice;
+  message: string;
+}
+
 export interface LCBilling {
   summary: LCBillingSummary;
   quotes: LCQuote[];
@@ -956,6 +968,8 @@ export const laventecareApi = {
     sent_at?: string;
   }) =>
     apiFetch<{ status: string }>(`/laventecare/invoices/${id}/status`, { method: "PATCH", body: JSON.stringify(data) }),
+  createInvoicePaymentRequest: (id: string) =>
+    apiFetch<LCPaymentRequestAction>(`/laventecare/invoices/${id}/payment-request`, { method: "POST" }),
   listDocuments: () =>
     apiFetch<LCDocument[]>("/laventecare/documents"),
   searchDocuments: (query: string) =>
