@@ -1210,7 +1210,7 @@ export const laventecareApi = {
     apiFetch<LCProject[]>("/laventecare/projects"),
   createProject: (data: Partial<LCProject> & { company_name?: string; website?: string }) =>
     apiFetch<LCProject>("/laventecare/projects", { method: "POST", body: JSON.stringify(data) }),
-  updateProject: (id: string, data: { fase?: string; status?: string }) =>
+  updateProject: (id: string, data: Partial<LCProject>) =>
     apiFetch<{ status: string }>(`/laventecare/projects/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   listWorkstreams: (params?: { includeClosed?: boolean; limit?: number }) => {
     const search = new URLSearchParams();
@@ -1223,7 +1223,7 @@ export const laventecareApi = {
     apiFetch<LCWorkstream>("/laventecare/workstreams", { method: "POST", body: JSON.stringify(data) }),
   updateWorkstream: (id: string, data: Partial<LCWorkstream>) =>
     apiFetch<{ status: string }>(`/laventecare/workstreams/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  convertWorkstreamToProject: (id: string, data: { naam?: string; fase?: string; status?: string; samenvatting?: string }) =>
+  convertWorkstreamToProject: (id: string, data: { project_id?: string; naam?: string; fase?: string; status?: string; samenvatting?: string }) =>
     apiFetch<LCProject>(`/laventecare/workstreams/${id}/convert-project`, { method: "POST", body: JSON.stringify(data) }),
   listActions: () =>
     apiFetch<LCActionItem[]>("/laventecare/actions"),

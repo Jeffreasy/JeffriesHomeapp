@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, Clock3, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck, Plus } from "lucide-react";
+import { ArrowRight, CheckCircle2, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck, Plus } from "lucide-react";
 import { LAVENTECARE_FIT_CRITERIA, LAVENTECARE_NO_FIT_SIGNALS, LAVENTECARE_PROCESS_STAGES } from "@/lib/laventecare";
 import { cn } from "@/lib/utils";
 import { fitTone, formatDate, formatMoney, label, toneClasses } from "./LaventeCareUtils";
 import { EmptyState } from "./LaventeCareCards";
 import type { LeadItem, ProjectItem } from "./LaventeCareTypes";
+import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES } from "./LaventeCareTypes";
 
 export function LaventeCareFunnelView({
   activeLeads,
@@ -173,49 +174,64 @@ export function LaventeCareFunnelView({
             {activeProjects.length === 0 ? (
               <EmptyState title="Nog geen projecten" body="Zodra leads doorgaan naar delivery ontstaat hier de projectlaag met fase, status, waarde en deadlines." />
             ) : (
-              activeProjects.map((project) => (
-                <div key={project._id ?? project.naam} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="font-semibold text-white">{project.naam}</h3>
-                      <p className="mt-1 text-xs text-slate-500">{label(project.fase)} - {label(project.status)}</p>
+              activeProjects.map((project) => {
+                const projectId = project._id ?? project.id;
+                return (
+                  <div key={projectId ?? project.naam} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-white">{project.naam}</h3>
+                        <p className="mt-1 text-xs text-slate-500">{label(project.fase)} - {label(project.status)}</p>
+                      </div>
+                      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-200">
+                        {formatMoney(project.waardeIndicatie)}
+                      </span>
                     </div>
-                    <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-200">
-                      {formatMoney(project.waardeIndicatie)}
-                    </span>
-                  </div>
-                  {project.samenvatting && <p className="mt-3 text-sm leading-6 text-slate-400">{project.samenvatting}</p>}
-                  {project.deadline && <p className="mt-3 text-xs font-semibold text-slate-500">Deadline: {formatDate(project.deadline)}</p>}
-                  {project._id && (
-                    <div className="mt-4 grid gap-2 sm:grid-cols-4">
-                      {["discovery", "blueprint", "realisatie"].map((fase) => {
-                        const busy = processingProject === `${project._id}:fase:${fase}`;
-                        return (
-                          <button
-                            key={fase}
-                            type="button"
-                            onClick={() => handleProjectStatus(project, { fase })}
+                    {project.samenvatting && <p className="mt-3 text-sm leading-6 text-slate-400">{project.samenvatting}</p>}
+                    {project.deadline && <p className="mt-3 text-xs font-semibold text-slate-500">Deadline: {formatDate(project.deadline)}</p>}
+                    {projectId && (
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <label className="block">
+                          <span className="sr-only">Projectfase</span>
+                          <select
+                            value={project.fase}
+                            onChange={(event) => handleProjectStatus(project, { fase: event.target.value })}
                             disabled={Boolean(processingProject)}
-                            className="btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="min-h-9 w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 text-xs font-bold text-slate-200 outline-none transition focus:border-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {busy && <Loader2 size={13} className="animate-spin" />}
-                            {label(fase)}
-                          </button>
-                        );
-                      })}
-                      <button
-                        type="button"
-                        onClick={() => handleProjectStatus(project, { status: project.status === "wacht_op_klant" ? "actief" : "wacht_op_klant" })}
-                        disabled={Boolean(processingProject)}
-                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-2 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {processingProject?.startsWith(`${project._id}:status`) ? <Loader2 size={13} className="animate-spin" /> : <Clock3 size={13} />}
-                        {project.status === "wacht_op_klant" ? "Actief" : "Wacht"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))
+                            {LAVENTECARE_PROJECT_PHASES.map((phase) => (
+                              <option key={phase.value} value={phase.value}>
+                                Fase: {phase.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="sr-only">Projectstatus</span>
+                          <select
+                            value={project.status}
+                            onChange={(event) => handleProjectStatus(project, { status: event.target.value })}
+                            disabled={Boolean(processingProject)}
+                            className="min-h-9 w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 text-xs font-bold text-slate-200 outline-none transition focus:border-amber-400/50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {LAVENTECARE_PROJECT_STATUSES.map((status) => (
+                              <option key={status.value} value={status.value}>
+                                Status: {status.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {processingProject?.startsWith(`${projectId}:`) ? (
+                          <p className="sm:col-span-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
+                            <Loader2 size={13} className="animate-spin" />
+                            Project wordt bijgewerkt
+                          </p>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

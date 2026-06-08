@@ -2,7 +2,7 @@
 
 import { ArrowRight, CheckCircle2, Clock3, FolderKanban, Loader2, Plus, Tag, Workflow } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { WorkstreamItem } from "./LaventeCareTypes";
+import type { ProjectItem, WorkstreamItem } from "./LaventeCareTypes";
 import { LAVENTECARE_WORKSTREAM_TYPES } from "./LaventeCareTypes";
 import { EmptyState } from "./LaventeCareCards";
 import { formatDate, formatMoney, label, toneClasses } from "./LaventeCareUtils";
@@ -16,6 +16,7 @@ const statusFlow = [
 
 export function LaventeCareWorkstreamsView({
   workstreams,
+  projects,
   activeWorkstreamCount,
   processingWorkstream,
   onShowWorkstreamForm,
@@ -23,6 +24,7 @@ export function LaventeCareWorkstreamsView({
   handleWorkstreamToProject,
 }: {
   workstreams: WorkstreamItem[];
+  projects: ProjectItem[];
   activeWorkstreamCount: number;
   processingWorkstream: string | null;
   onShowWorkstreamForm: () => void;
@@ -30,6 +32,7 @@ export function LaventeCareWorkstreamsView({
   handleWorkstreamToProject: (workstream: WorkstreamItem) => Promise<void>;
 }) {
   const grouped = groupWorkstreams(workstreams);
+  const projectNameById = new Map(projects.map((project) => [project._id ?? project.id, project.naam]));
 
   return (
     <section className="space-y-4">
@@ -82,6 +85,7 @@ export function LaventeCareWorkstreamsView({
                 <WorkstreamCard
                   key={workstream._id ?? workstream.id}
                   workstream={workstream}
+                  projectName={workstream.project_id ? projectNameById.get(workstream.project_id) : undefined}
                   processingWorkstream={processingWorkstream}
                   onStatus={handleWorkstreamStatus}
                   onConvert={handleWorkstreamToProject}
@@ -97,11 +101,13 @@ export function LaventeCareWorkstreamsView({
 
 function WorkstreamCard({
   workstream,
+  projectName,
   processingWorkstream,
   onStatus,
   onConvert,
 }: {
   workstream: WorkstreamItem;
+  projectName?: string;
   processingWorkstream: string | null;
   onStatus: (workstream: WorkstreamItem, fields: { status?: string }) => Promise<void>;
   onConvert: (workstream: WorkstreamItem) => Promise<void>;
@@ -111,6 +117,7 @@ function WorkstreamCard({
   const highPriority = workstream.prioriteit === "hoog";
   const priorityTone = highPriority ? toneClasses.rose : toneClasses.violet;
   const busy = processingWorkstream?.startsWith(`${id}:`);
+  const linkedToProject = Boolean(workstream.project_id);
 
   return (
     <article className="glass min-w-0 p-4 bg-[var(--color-surface)]">
@@ -135,6 +142,12 @@ function WorkstreamCard({
         <p className="mt-3 flex gap-2 text-xs leading-5 text-slate-500">
           <ArrowRight size={13} className="mt-0.5 shrink-0 text-violet-300" />
           <span className="line-clamp-2">{workstream.deliverable}</span>
+        </p>
+      )}
+      {linkedToProject && (
+        <p className="mt-3 flex gap-2 rounded-lg border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2 text-xs font-semibold leading-5 text-emerald-100">
+          <FolderKanban size={13} className="mt-0.5 shrink-0 text-emerald-300" />
+          <span className="min-w-0 truncate">{projectName ? `Onder project: ${projectName}` : "Onder project gekoppeld"}</span>
         </p>
       )}
 
@@ -189,7 +202,7 @@ function WorkstreamCard({
             </button>
           );
         })}
-        {!isClosedWorkstream(workstream.status) ? (
+        {!isClosedWorkstream(workstream.status) && !linkedToProject ? (
           <button
             type="button"
             onClick={() => onConvert(workstream)}
@@ -197,7 +210,7 @@ function WorkstreamCard({
             className="col-span-2 inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy && processingWorkstream === `${id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
-            Naar project
+            Project maken
           </button>
         ) : null}
       </div>

@@ -102,7 +102,7 @@ export function useLaventeCare() {
   });
 
   const updateProjectMut = useMutation({
-    mutationFn: ({ id, ...data }: { id: string; fase?: string; status?: string }) =>
+    mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateProject>[1]) =>
       laventecareApi.updateProject(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
@@ -119,7 +119,7 @@ export function useLaventeCare() {
   });
 
   const convertWorkstreamMut = useMutation({
-    mutationFn: ({ id, ...data }: { id: string; naam?: string; fase?: string; status?: string; samenvatting?: string }) =>
+    mutationFn: ({ id, ...data }: { id: string; project_id?: string; naam?: string; fase?: string; status?: string; samenvatting?: string }) =>
       laventecareApi.convertWorkstreamToProject(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });

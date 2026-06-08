@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
@@ -10,6 +10,12 @@ import { useToast } from "@/components/ui/Toast";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
 import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
+import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
+import {
+  isGenericLaventeCareBusinessContext,
+  isSpecificLaventeCareBusinessContext,
+  resolveLaventeCareBusinessContextFromText,
+} from "@/lib/laventecare/business-context";
 import {
   EVENT_CATEGORY_SYMBOLS,
   EVENT_SYMBOL_OPTIONS,
@@ -83,6 +89,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   const [symbolTouched,   setSymbolTouched]   = useState(false);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
+  const laventeCareContextOptions = useLaventeCareBusinessContextOptions();
 
   const reset = useCallback(() => {
     setTitel(""); setStartDatum(defaultDate); setEindDatum(defaultDate);
@@ -92,6 +99,19 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   }, [defaultDate, defaultEndTime, defaultStartTime, initialTime]);
 
   const detectedContext = getPrimaryWorkspaceContext(`${titel} ${beschrijving} ${locatie}`, mergeTags(eventTags, extractHashTags(`${titel} ${beschrijving}`)));
+  const inferredBusinessContext = useMemo(
+    () => resolveLaventeCareBusinessContextFromText(`${titel} ${beschrijving} ${locatie}`, laventeCareContextOptions, businessContext),
+    [beschrijving, businessContext, laventeCareContextOptions, locatie, titel],
+  );
+  const automaticBusinessContext = useMemo(() => inferredBusinessContext ?? businessContextFromWorkspaceContext(detectedContext), [detectedContext, inferredBusinessContext]);
+  const effectiveBusinessContext = useMemo(() => {
+    if (businessContextTouched) return businessContext;
+    if (!businessContext) return automaticBusinessContext;
+    if (isGenericLaventeCareBusinessContext(businessContext) && isSpecificLaventeCareBusinessContext(automaticBusinessContext)) {
+      return automaticBusinessContext;
+    }
+    return businessContext;
+  }, [automaticBusinessContext, businessContext, businessContextTouched]);
 
   useEffect(() => {
     if (!open) return;
@@ -130,21 +150,33 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   }, [open, editEvent, reset]);
 
   useEffect(() => {
-    if (!detectedContext) return;
-    setEventTags((current) => {
-      const next = mergeTags(current, [detectedContext.tag]);
-      return next.join("|") === current.join("|") ? current : next;
-    });
-    if (!categoryTouched && categorie === "overig") {
-      setCategorie(detectedContext.eventCategory as CategoryId);
+    if (detectedContext) {
+      setEventTags((current) => {
+        const next = mergeTags(current, [detectedContext.tag]);
+        return next.join("|") === current.join("|") ? current : next;
+      });
+      if (!categoryTouched && categorie === "overig") {
+        setCategorie(detectedContext.eventCategory as CategoryId);
+      }
+      if (!symbolTouched && (symbol === categoryIcon("overig") || symbol === categoryIcon("werk") || symbol === "agenda")) {
+        setSymbol(detectedContext.eventSymbol);
+      }
+    } else if (automaticBusinessContext?.type?.startsWith("laventecare")) {
+      setEventTags((current) => {
+        const next = mergeTags(current, ["laventecare"]);
+        return next.join("|") === current.join("|") ? current : next;
+      });
+      if (!categoryTouched && categorie === "overig") {
+        setCategorie("werk");
+      }
+      if (!symbolTouched && (symbol === categoryIcon("overig") || symbol === categoryIcon("werk") || symbol === "agenda")) {
+        setSymbol("business");
+      }
     }
-    if (!symbolTouched && (symbol === categoryIcon("overig") || symbol === categoryIcon("werk") || symbol === "agenda")) {
-      setSymbol(detectedContext.eventSymbol);
+    if (!businessContextTouched && automaticBusinessContext && (!businessContext || (isGenericLaventeCareBusinessContext(businessContext) && isSpecificLaventeCareBusinessContext(automaticBusinessContext)))) {
+      setBusinessContext(automaticBusinessContext);
     }
-    if (!businessContextTouched && !businessContext) {
-      setBusinessContext(businessContextFromWorkspaceContext(detectedContext));
-    }
-  }, [businessContext, businessContextTouched, categorie, categoryTouched, detectedContext, symbol, symbolTouched]);
+  }, [automaticBusinessContext, businessContext, businessContextTouched, categorie, categoryTouched, detectedContext, symbol, symbolTouched]);
 
   const handleClose = () => { reset(); onClose(); };
 
@@ -178,7 +210,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
         tags: eventTags,
         category: categorie,
         symbol,
-        businessContext,
+        businessContext: effectiveBusinessContext,
       });
       const fullDesc = buildEventDescription({
         description: rawDesc,

@@ -3,7 +3,7 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { Loader2, Plus, Workflow } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
-import type { CompanyItem, WorkstreamForm } from "./LaventeCareTypes";
+import type { CompanyItem, ProjectItem, WorkstreamForm } from "./LaventeCareTypes";
 import { LAVENTECARE_WORKSTREAM_TYPES } from "./LaventeCareTypes";
 
 export function LaventeCareWorkstreamModal({
@@ -12,6 +12,7 @@ export function LaventeCareWorkstreamModal({
   workstreamForm,
   setWorkstreamForm,
   companies,
+  projects,
   savingWorkstream,
   onSubmit,
 }: {
@@ -20,9 +21,14 @@ export function LaventeCareWorkstreamModal({
   workstreamForm: WorkstreamForm;
   setWorkstreamForm: Dispatch<SetStateAction<WorkstreamForm>>;
   companies: CompanyItem[];
+  projects: ProjectItem[];
   savingWorkstream: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const filteredProjects = workstreamForm.companyId
+    ? projects.filter((project) => project.company_id === workstreamForm.companyId)
+    : projects;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -63,19 +69,47 @@ export function LaventeCareWorkstreamModal({
           <select
             value={workstreamForm.companyId}
             onChange={(event) => {
-              const selected = companies.find((company) => company.id === event.target.value);
+              const selected = companies.find((company) => (company._id ?? company.id) === event.target.value);
               setWorkstreamForm((form) => ({
                 ...form,
                 companyId: event.target.value,
                 klantNaam: selected ? selected.naam : form.klantNaam,
+                projectId: projects.some((project) => (project._id ?? project.id) === form.projectId && project.company_id === event.target.value)
+                  ? form.projectId
+                  : "",
               }));
             }}
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-violet-500"
           >
             <option value="">Nog niet gekoppeld</option>
             {companies.map((company) => (
-              <option key={company.id} value={company.id}>
+              <option key={company._id ?? company.id} value={company._id ?? company.id}>
                 {company.naam}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-semibold text-slate-400">Project</span>
+          <select
+            value={workstreamForm.projectId}
+            onChange={(event) => {
+              const selectedProject = projects.find((project) => (project._id ?? project.id) === event.target.value);
+              const selectedCompany = companies.find((company) => (company._id ?? company.id) === selectedProject?.company_id);
+              setWorkstreamForm((form) => ({
+                ...form,
+                projectId: event.target.value,
+                companyId: selectedProject?.company_id ?? form.companyId,
+                klantNaam: selectedCompany?.naam ?? form.klantNaam,
+              }));
+            }}
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-violet-500"
+          >
+            <option value="">Losse opdracht / later koppelen</option>
+            {filteredProjects.map((project) => (
+              <option key={project._id ?? project.id} value={project._id ?? project.id}>
+                {project.naam}
               </option>
             ))}
           </select>

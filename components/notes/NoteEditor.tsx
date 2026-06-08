@@ -36,6 +36,12 @@ import { AppIcon } from "@/components/ui/AppIcon";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
 import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
+import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
+import {
+  isGenericLaventeCareBusinessContext,
+  isSpecificLaventeCareBusinessContext,
+  resolveLaventeCareBusinessContextFromText,
+} from "@/lib/laventecare/business-context";
 import { NOTE_SYMBOL_OPTIONS, resolveAppIconName, type AppIconName } from "@/lib/symbols";
 import {
   businessContextFromEvent,
@@ -65,43 +71,188 @@ const PRIORITEITEN = [
   { value: "laag", label: "Laag", dot: "bg-blue-400" },
 ] as const;
 
-const NOTE_TEMPLATES = [
+const NOTE_TEMPLATE_CATEGORIES = ["Algemeen", "Werk", "LaventeCare", "Veiligheid"] as const;
+type NoteTemplateCategory = (typeof NOTE_TEMPLATE_CATEGORIES)[number];
+type NoteTemplate = {
+  id: string;
+  title: string;
+  label: string;
+  category: NoteTemplateCategory;
+  description: string;
+  icon: AppIconName;
+  content: string;
+  tags?: string[];
+  priority?: (typeof PRIORITEITEN)[number]["value"];
+  symbol?: AppIconName;
+  businessContext?: BusinessContextValue;
+};
+
+const LAVENTECARE_TEMPLATE_CONTEXT: BusinessContextValue = {
+  type: "laventecare",
+  title: "LaventeCare",
+};
+
+const NOTE_TEMPLATES: NoteTemplate[] = [
   {
     id: "evaluatie",
     title: "Evaluatie",
     label: "Evaluatie",
-    icon: "chart" as AppIconName,
+    category: "Algemeen",
+    description: "Terugblik met verbeterpunten en concrete vervolgacties.",
+    icon: "chart",
     content: "## Wat ging goed?\n\n## Wat kan beter?\n\n## Acties\n- [ ] ",
+  },
+  {
+    id: "dagstart",
+    title: "Dagstart",
+    label: "Dagstart",
+    category: "Algemeen",
+    description: "Korte dagfocus voor prioriteiten, energie en afsluiting.",
+    icon: "calendar",
+    tags: ["dagstart", "focus"],
+    symbol: "calendar",
+    content:
+      "## Vandaag belangrijk\n- [ ] \n\n" +
+      "## Planning\n\n" +
+      "## Energie en focus\n\n" +
+      "## Einde dag check\n- [ ] Afgerond of verplaatst\n- [ ] Morgen voorbereid\n",
   },
   {
     id: "dienst",
     title: "Dienstnotitie",
     label: "Dienst",
-    icon: "roster" as AppIconName,
+    category: "Werk",
+    description: "Overdracht, bijzonderheden en acties rondom een dienst.",
+    icon: "roster",
     content: "## Dienst\n\n## Bijzonderheden\n\n## Overdracht\n- [ ] ",
+  },
+  {
+    id: "gesprek",
+    title: "Gespreksnotitie",
+    label: "Gesprek",
+    category: "Werk",
+    description: "Bespreking vastleggen met besluiten en opvolging.",
+    icon: "note",
+    tags: ["gesprek", "actie"],
+    symbol: "note",
+    content:
+      "## Context\n- Met: \n- Aanleiding: \n- Datum/tijd: \n\n" +
+      "## Besproken\n\n" +
+      "## Besluiten\n\n" +
+      "## Acties\n- [ ] \n",
   },
   {
     id: "planning",
     title: "Planning",
     label: "Planning",
-    icon: "calendar" as AppIconName,
+    category: "Werk",
+    description: "Doel, stappen en deadline overzichtelijk maken.",
+    icon: "calendar",
     content: "## Doel\n\n## Stappen\n- [ ] \n\n## Deadline\n",
   },
   {
     id: "besluit",
     title: "Besluit",
     label: "Besluit",
-    icon: "shield" as AppIconName,
+    category: "Werk",
+    description: "Waarom iets besloten is en wat de impact wordt.",
+    icon: "shield",
     content: "## Besluit\n\n## Reden\n\n## Impact\n\n## Volgende stap\n- [ ] ",
+  },
+  {
+    id: "klantdossier",
+    title: "Klantdossier notitie",
+    label: "Klantdossier",
+    category: "LaventeCare",
+    description: "Klantcontext, contactpersoon, signalen en acties bundelen.",
+    icon: "business",
+    tags: ["laventecare", "klantcontext"],
+    symbol: "business",
+    businessContext: LAVENTECARE_TEMPLATE_CONTEXT,
+    content:
+      "## Klant/context\n- Klant: \n- Contactpersoon: \n- Relatie: prospect / klant / partner / leverancier / eigen_project\n- Website: \n- Koppeling: klantdossier / project / opdracht\n\n" +
+      "## Signaal\n\n" +
+      "## Belangrijk\n\n" +
+      "## Acties\n- [ ] \n",
+  },
+  {
+    id: "project",
+    title: "Projectnotitie",
+    label: "Project",
+    category: "LaventeCare",
+    description: "Scope, fase, risico's en volgende stap voor klantwerk.",
+    icon: "work",
+    tags: ["laventecare", "project", "opdracht"],
+    symbol: "work",
+    businessContext: LAVENTECARE_TEMPLATE_CONTEXT,
+    content:
+      "## Project/opdracht\n- Klant: \n- Fase: intake / pilot / build / oplevering / beheer\n- Doel: \n- Deadline: \n\n" +
+      "## Scope\n- In: \n- Uit: \n\n" +
+      "## Risico's of keuzes\n\n" +
+      "## Volgende stap\n- [ ] \n",
+  },
+  {
+    id: "pilot",
+    title: "Pilot en testfase",
+    label: "Pilot",
+    category: "LaventeCare",
+    description: "Testscope, criteria en veilige toegang voor pilots.",
+    icon: "radar",
+    tags: ["laventecare", "pilot", "testfase"],
+    priority: "hoog",
+    symbol: "radar",
+    businessContext: LAVENTECARE_TEMPLATE_CONTEXT,
+    content:
+      "## Pilot/testfase\n- Klant: \n- Omgeving: test / pilot / productie\n- Startdatum: \n- Feedbackmoment: \n\n" +
+      "## Testscope\n- [ ] \n\n" +
+      "## Acceptatiecriteria\n- [ ] Kernfunctionaliteit werkt\n- [ ] Gebruiksgemak is getest\n- [ ] Betrouwbaarheid is akkoord\n\n" +
+      "## Toegang\n- Accounts vastgelegd: ja / nee\n- Veilig kanaal: \n- Let op: geen wachtwoorden in klantmail opnemen.\n\n" +
+      "## Vervolg\n- [ ] \n",
+  },
+  {
+    id: "mail-briefing",
+    title: "Mailbriefing",
+    label: "Mailbriefing",
+    category: "LaventeCare",
+    description: "Interne briefing voor AI-mail met relevante context.",
+    icon: "mail",
+    tags: ["laventecare", "mail", "briefing"],
+    symbol: "mail",
+    businessContext: LAVENTECARE_TEMPLATE_CONTEXT,
+    content:
+      "## Mailcontext\n- Klant: \n- Contactpersoon: \n- Template: intake / update / pilot / oplevering / follow-up\n- Doel van de mail: \n\n" +
+      "## Interne bronnen\n- Notities: \n- Agenda: \n- Project/opdracht: \n\n" +
+      "## Kernboodschap voor klant\n\n" +
+      "## Niet meesturen naar klant\n- \n",
+  },
+  {
+    id: "incident",
+    title: "Support incident",
+    label: "Incident",
+    category: "LaventeCare",
+    description: "Probleem, impact, diagnose en afronding bij klantissues.",
+    icon: "alert",
+    tags: ["laventecare", "support", "incident"],
+    priority: "hoog",
+    symbol: "alert",
+    businessContext: LAVENTECARE_TEMPLATE_CONTEXT,
+    content:
+      "## Incident\n- Klant/context: \n- Ernst: laag / normaal / hoog\n- Start: \n- Impact: \n\n" +
+      "## Diagnose\n\n" +
+      "## Actie\n- [ ] \n\n" +
+      "## Afronding\n- Oorzaak: \n- Oplossing: \n- Klant geinformeerd: ja / nee\n",
   },
   {
     id: "accounts",
     title: "Accountgegevens",
     label: "Accounts",
-    icon: "shield" as AppIconName,
+    category: "Veiligheid",
+    description: "Pilotaccounts en toegangsbeheer zonder klantmail-lek.",
+    icon: "shield",
     tags: ["laventecare", "accounts", "toegang", "veilig"],
     priority: "hoog",
     symbol: "shield",
+    businessContext: LAVENTECARE_TEMPLATE_CONTEXT,
     content:
       "## Accountgegevens\n\n" +
       "## Context\n" +
@@ -110,12 +261,14 @@ const NOTE_TEMPLATES = [
       "- Doel van toegang: \n" +
       "- Omgeving: test / pilot / productie\n" +
       "- Status: actief / tijdelijk / verlopen\n\n" +
-      "## Toegang\n" +
-      "- Login URL: \n" +
-      "- Gebruikersnaam: \n" +
-      "- Rollen/rechten: \n" +
+      "## Accounts\n" +
+      "### Account 1\n" +
+      "- E-mail/gebruikersnaam: \n" +
+      "- Rol/rechten: \n" +
+      "- Wachtwoord/verwijzing: veilig kanaal / vault / tijdelijk\n" +
       "- 2FA/herstel: \n" +
-      "- Eigenaar/contact: \n\n" +
+      "- Eigenaar/contact: \n" +
+      "- Laatst getest: \n\n" +
       "## Veilig delen\n" +
       "- Gevoelige gegevens alleen delen via afgesproken veilig kanaal.\n" +
       "- Laatst gecontroleerd: \n" +
@@ -126,6 +279,11 @@ const NOTE_TEMPLATES = [
       "- [ ] Na pilot toegang intrekken of omzetten\n",
   },
 ] as const;
+
+const NOTE_TEMPLATE_GROUPS = NOTE_TEMPLATE_CATEGORIES.map((category) => ({
+  category,
+  templates: NOTE_TEMPLATES.filter((template) => template.category === category),
+}));
 
 type LinkSearchItem = {
   id?: string;
@@ -246,6 +404,7 @@ export function NoteEditor({
     () => buildEventOptionGroups(eventOptions, linkedEventId),
     [eventOptions, linkedEventId],
   );
+  const laventeCareContextOptions = useLaventeCareBusinessContextOptions();
   const eventById = useMemo(() => {
     const map = new Map<string, PersonalEvent>();
     for (const event of eventOptions) {
@@ -260,11 +419,34 @@ export function NoteEditor({
   const selectedEvent = linkedEventId ? eventById.get(linkedEventId) : undefined;
   const selectedEventContextTags = useMemo(() => contextTagsFromEvent(selectedEvent), [selectedEvent]);
   const selectedEventBusinessContext = useMemo(() => businessContextFromEvent(selectedEvent), [selectedEvent]);
+  const inferredBusinessContext = useMemo(
+    () => resolveLaventeCareBusinessContextFromText(
+      `${titel} ${inhoud} ${selectedEvent?.titel ?? ""} ${selectedEvent?.beschrijving ?? ""} ${selectedEvent?.locatie ?? ""}`,
+      laventeCareContextOptions,
+      businessContext,
+    ),
+    [businessContext, inhoud, laventeCareContextOptions, selectedEvent?.beschrijving, selectedEvent?.locatie, selectedEvent?.titel, titel],
+  );
   const detectedContexts = useMemo(() => detectWorkspaceContexts(
     `${titel} ${inhoud} ${selectedEvent?.titel ?? ""} ${selectedEvent?.beschrijving ?? ""}`,
     mergeTags(tags, selectedEventContextTags, extractHashTags(`${titel} ${inhoud}`)),
   ), [inhoud, selectedEvent?.beschrijving, selectedEvent?.titel, selectedEventContextTags, tags, titel]);
   const primaryContext = detectedContexts[0] ?? null;
+  const automaticBusinessContext = useMemo(() => {
+    const selectedSpecific = isSpecificLaventeCareBusinessContext(selectedEventBusinessContext) ? selectedEventBusinessContext : null;
+    return selectedSpecific
+      ?? inferredBusinessContext
+      ?? selectedEventBusinessContext
+      ?? businessContextFromWorkspaceContext(primaryContext);
+  }, [inferredBusinessContext, primaryContext, selectedEventBusinessContext]);
+  const effectiveBusinessContext = useMemo(() => {
+    if (businessContextTouched) return businessContext;
+    if (!businessContext) return automaticBusinessContext;
+    if (isGenericLaventeCareBusinessContext(businessContext) && isSpecificLaventeCareBusinessContext(automaticBusinessContext)) {
+      return automaticBusinessContext;
+    }
+    return businessContext;
+  }, [automaticBusinessContext, businessContext, businessContextTouched]);
   const showEventSelector = eventOptionGroups.length > 0 || Boolean(linkedEventId);
   const actionBusy = saving || pendingAction !== null || restoringId !== null;
 
@@ -386,10 +568,22 @@ export function NoteEditor({
   }, [inhoud, primaryContext, selectedEventContextTags, tags, titel]);
 
   useEffect(() => {
-    if (businessContextTouched || businessContext) return;
-    const nextContext = selectedEventBusinessContext ?? businessContextFromWorkspaceContext(primaryContext);
-    if (nextContext) setBusinessContext(nextContext);
-  }, [businessContext, businessContextTouched, primaryContext, selectedEventBusinessContext]);
+    if (businessContextTouched || !automaticBusinessContext) return;
+    if (!businessContext || (isGenericLaventeCareBusinessContext(businessContext) && isSpecificLaventeCareBusinessContext(automaticBusinessContext))) {
+      setBusinessContext(automaticBusinessContext);
+    }
+  }, [automaticBusinessContext, businessContext, businessContextTouched]);
+
+  useEffect(() => {
+    if (!effectiveBusinessContext?.type?.startsWith("laventecare")) return;
+    setTags((current) => {
+      const next = mergeTags(current, ["laventecare"]);
+      return tagsKey(next) === tagsKey(current) ? current : next;
+    });
+    if (!symbolTouched && ["note", "pageNote", "calendar", "work"].includes(symbol)) {
+      setSymbol("business");
+    }
+  }, [effectiveBusinessContext?.type, symbol, symbolTouched]);
 
   useEffect(() => {
     if (!primaryContext || symbolTouched) return;
@@ -508,7 +702,7 @@ export function NoteEditor({
         content: `${cleanContent} ${selectedEvent?.titel ?? ""} ${selectedEvent?.beschrijving ?? ""}`,
         tags: mergeTags(tags, selectedEventContextTags),
         symbol,
-        businessContext,
+        businessContext: effectiveBusinessContext,
       });
       await onSave({
         titel: cleanTitle || (isEditing ? "" : undefined),
@@ -530,7 +724,7 @@ export function NoteEditor({
     } finally {
       setSaving(false);
     }
-  }, [actionBusy, businessContext, canSave, currentSnapshot, deadline, eventById, inhoud, kleur, linkedEventId, note, onClose, onSave, prioriteit, selectedEvent?.beschrijving, selectedEvent?.titel, selectedEventContextTags, symbol, tags, titel]);
+  }, [actionBusy, canSave, currentSnapshot, deadline, effectiveBusinessContext, eventById, inhoud, kleur, linkedEventId, note, onClose, onSave, prioriteit, selectedEvent?.beschrijving, selectedEvent?.titel, selectedEventContextTags, symbol, tags, titel]);
 
   const handleCloseAttempt = useCallback(async () => {
     if (isDirty) {
@@ -728,16 +922,18 @@ export function NoteEditor({
     return { replacement: value };
   });
 
-  const applyTemplate = (template: typeof NOTE_TEMPLATES[number]) => {
+  const applyTemplate = (template: NoteTemplate) => {
     const prefix = inhoud.trim() ? "\n\n" : "";
     setInhoud(`${inhoud}${prefix}${template.content}`);
     if (!titel.trim()) setTitel(template.title);
-    if ("tags" in template) setTags((current) => normalizeTags([...current, ...template.tags]));
-    if ("priority" in template) setPrioriteit(template.priority);
-    if ("symbol" in template) {
+    const templateTags = template.tags ?? [];
+    if (templateTags.length) setTags((current) => normalizeTags([...current, ...templateTags]));
+    if (template.priority) setPrioriteit(template.priority);
+    if (template.symbol) {
       setSymbolTouched(true);
       setSymbol(template.symbol);
     }
+    if (template.businessContext && !businessContext) setBusinessContext(template.businessContext);
     setShowTemplates(false);
     requestAnimationFrame(() => {
       textRef.current?.focus();
@@ -766,7 +962,9 @@ export function NoteEditor({
     setLinkedEventId(nextEventId);
     const event = eventById.get(nextEventId);
     const eventContext = businessContextFromEvent(event);
-    if (eventContext && !businessContextTouched) setBusinessContext(eventContext);
+    if (eventContext && !businessContextTouched && (!businessContext || isSpecificLaventeCareBusinessContext(eventContext) || isGenericLaventeCareBusinessContext(businessContext))) {
+      setBusinessContext(eventContext);
+    }
     if (!deadline && nextEventId) {
       const eventDeadline = event ? eventToDeadline(event) : "";
       if (eventDeadline) setDeadline(eventDeadline);
@@ -904,20 +1102,67 @@ export function NoteEditor({
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden border-b border-[var(--color-border)]"
                     >
-                      <div className="grid gap-2 p-3 sm:grid-cols-2">
-                        {NOTE_TEMPLATES.map((template) => (
-                          <button
-                            key={template.id}
-                            type="button"
-                            onClick={() => applyTemplate(template)}
-                            className="flex min-h-[48px] min-w-0 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left transition-colors hover:border-amber-500/25 hover:bg-amber-500/10"
-                          >
-                            <AppIcon name={template.icon} tone="amber" size="sm" framed active />
-                            <span className="min-w-0 truncate text-sm font-semibold text-[var(--color-text)]">
-                              {template.label}
-                            </span>
-                          </button>
-                        ))}
+                      <div className="max-h-[min(56dvh,560px)] overflow-y-auto p-3">
+                        <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase text-amber-300">
+                              Templatebibliotheek
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+                              Kies een vaste structuur met tags, prioriteit en context.
+                            </p>
+                          </div>
+                          <span className="text-xs text-[var(--color-text-subtle)]">{NOTE_TEMPLATES.length} templates</span>
+                        </div>
+
+                        <div className="space-y-4">
+                          {NOTE_TEMPLATE_GROUPS.map((group) => (
+                            <section key={group.category} className="space-y-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-[11px] font-semibold uppercase text-[var(--color-text-subtle)]">
+                                  {group.category}
+                                </p>
+                                <span className="h-px flex-1 bg-[var(--color-border)]" />
+                              </div>
+                              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                {group.templates.map((template) => (
+                                  <button
+                                    key={template.id}
+                                    type="button"
+                                    onClick={() => applyTemplate(template)}
+                                    aria-label={`${template.label} template invoegen`}
+                                    className="flex min-h-[112px] min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-colors hover:border-amber-500/35 hover:bg-amber-500/10 focus:outline-none focus:ring-2 focus:ring-amber-500/35"
+                                  >
+                                    <span className="flex min-w-0 items-center gap-3">
+                                      <AppIcon name={template.icon} tone="amber" size="sm" framed active />
+                                      <span className="min-w-0 truncate text-sm font-semibold text-[var(--color-text)]">
+                                        {template.label}
+                                      </span>
+                                    </span>
+                                    <span className="line-clamp-2 min-h-[34px] text-xs leading-relaxed text-[var(--color-text-muted)]">
+                                      {template.description}
+                                    </span>
+                                    <span className="mt-auto flex min-w-0 flex-wrap gap-1.5">
+                                      {template.priority && (
+                                        <span className="rounded-full border border-red-500/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-200">
+                                          {template.priority}
+                                        </span>
+                                      )}
+                                      {template.tags?.slice(0, 2).map((tag) => (
+                                        <span
+                                          key={tag}
+                                          className="max-w-full truncate rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[10px] text-[var(--color-text-muted)]"
+                                        >
+                                          #{tag}
+                                        </span>
+                                      ))}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </section>
+                          ))}
+                        </div>
                       </div>
                     </motion.div>
                   )}

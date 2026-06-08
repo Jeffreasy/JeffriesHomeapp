@@ -5,6 +5,7 @@ import { AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
 import { ArrowUpRight, Plus, StickyNote } from "lucide-react";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
+import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
 import { formatDateRange, getTimeLabel, usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { useSchedule } from "@/hooks/useSchedule";
@@ -28,6 +29,7 @@ import { NotesList } from "@/components/notes/NotesList";
 import { NotesMetricsRow } from "@/components/notes/NotesMetrics";
 import { WeekJournal, getMonday } from "@/components/notes/WeekJournal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
 import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
 
 export default function NotitiesPage() {
@@ -53,6 +55,7 @@ export default function NotitiesPage() {
   const { diensten } = useSchedule();
   const { events: agendaEvents, upcoming: upcomingAgendaEvents } = usePersonalEvents({ diensten });
   const { openConfirm } = useConfirm();
+  const laventeCareContextOptions = useLaventeCareBusinessContextOptions();
 
   // ── Tab state ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<NotesTab>("collection");
@@ -242,7 +245,8 @@ export default function NotitiesPage() {
 
     setQuickSaving(true);
     try {
-      const enriched = enrichNoteDraft({ title: cleanText, content: cleanText, tags: extractedTags });
+      const matchedBusinessContext = resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
+      const enriched = enrichNoteDraft({ title: cleanText, content: cleanText, tags: extractedTags, businessContext: matchedBusinessContext });
       await create({
         titel: cleanText.length > 80 ? `${cleanText.slice(0, 77)}...` : cleanText,
         inhoud: cleanText,

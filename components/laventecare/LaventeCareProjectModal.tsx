@@ -4,6 +4,7 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { FolderKanban, Loader2, Plus } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import type { CompanyItem, ProjectForm } from "./LaventeCareTypes";
+import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES } from "./LaventeCareTypes";
 
 export function LaventeCareProjectModal({
   isOpen,
@@ -89,11 +90,25 @@ export function LaventeCareProjectModal({
             onChange={(event) => setProjectForm((form) => ({ ...form, fase: event.target.value }))}
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
           >
-            <option value="intake">Intake</option>
-            <option value="discovery">Discovery</option>
-            <option value="blueprint">Blueprint</option>
-            <option value="realisatie">Realisatie</option>
-            <option value="sla">SLA en beheer</option>
+            {LAVENTECARE_PROJECT_PHASES.map((phase) => (
+              <option key={phase.value} value={phase.value}>
+                {phase.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-xs font-semibold text-slate-400">Status</span>
+          <select
+            value={projectForm.status}
+            onChange={(event) => setProjectForm((form) => ({ ...form, status: event.target.value }))}
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
+          >
+            {LAVENTECARE_PROJECT_STATUSES.map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
           </select>
         </label>
         <label className="block">

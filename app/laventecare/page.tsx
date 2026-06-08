@@ -345,7 +345,6 @@ export default function LaventeCarePage() {
     summary.documents,
     timeEntries.length,
     totalWorkstreams,
-    workstreams.length,
   ]);
 
   const portalSections = useMemo<PortalSection[]>(
@@ -445,7 +444,6 @@ export default function LaventeCarePage() {
       actionItems.length,
       activeLeads.length,
       activeProjects.length,
-      activeWorkstreams.length,
       businessSignals.length,
       capabilityRows,
       companies.length,
@@ -675,6 +673,7 @@ export default function LaventeCarePage() {
       await createWorkstreamMut.mutateAsync({
         titel: workstreamForm.titel.trim(),
         company_id: optional(workstreamForm.companyId),
+        project_id: optional(workstreamForm.projectId),
         type: workstreamForm.type,
         status: workstreamForm.status,
         prioriteit: workstreamForm.prioriteit,
@@ -836,6 +835,7 @@ export default function LaventeCarePage() {
     try {
       await convertWorkstreamMut.mutateAsync({
         id,
+        project_id: workstream.project_id ?? undefined,
         naam: workstream.titel,
         fase: "intake",
         status: "actief",
@@ -854,6 +854,7 @@ export default function LaventeCarePage() {
     setWorkstreamForm({
       ...emptyWorkstreamForm,
       companyId: id,
+      projectId: "",
       klantNaam: company.naam,
       titel: `${company.naam}: opdracht`,
     });
@@ -1150,6 +1151,7 @@ export default function LaventeCarePage() {
           workstreamForm={workstreamForm}
           setWorkstreamForm={setWorkstreamForm}
           companies={companies}
+          projects={activeProjects}
           savingWorkstream={savingWorkstream}
           onSubmit={handleWorkstreamSubmit}
         />
@@ -1264,6 +1266,7 @@ export default function LaventeCarePage() {
             {activeView === "workstreams" ? (
               <LaventeCareWorkstreamsView
                 workstreams={workstreams}
+                projects={activeProjects}
                 activeWorkstreamCount={activeWorkstreams.length}
                 processingWorkstream={processingWorkstream}
                 onShowWorkstreamForm={() => setShowWorkstreamForm(true)}

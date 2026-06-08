@@ -185,9 +185,33 @@ export const emptyProjectForm: ProjectForm = {
   samenvatting: "",
 };
 
+export const LAVENTECARE_PROJECT_PHASES = [
+  { value: "intake", label: "Intake" },
+  { value: "discovery", label: "Discovery" },
+  { value: "voorstel", label: "Voorstel" },
+  { value: "blueprint", label: "Blueprint" },
+  { value: "pilot", label: "Pilot" },
+  { value: "uitvoering", label: "Uitvoering" },
+  { value: "realisatie", label: "Realisatie" },
+  { value: "oplevering", label: "Oplevering" },
+  { value: "live", label: "Live" },
+  { value: "sla", label: "SLA en beheer" },
+  { value: "evolution", label: "Doorontwikkeling" },
+] as const;
+
+export const LAVENTECARE_PROJECT_STATUSES = [
+  { value: "actief", label: "Actief" },
+  { value: "wacht_op_klant", label: "Wacht op klant" },
+  { value: "on_hold", label: "On hold" },
+  { value: "opgeleverd", label: "Opgeleverd" },
+  { value: "afgerond", label: "Afgerond" },
+  { value: "gearchiveerd", label: "Gearchiveerd" },
+] as const;
+
 export type WorkstreamForm = {
   titel: string;
   companyId: string;
+  projectId: string;
   type: string;
   status: string;
   prioriteit: "laag" | "normaal" | "hoog";
@@ -207,6 +231,7 @@ export type WorkstreamForm = {
 export const emptyWorkstreamForm: WorkstreamForm = {
   titel: "",
   companyId: "",
+  projectId: "",
   type: "advies",
   status: "nieuw",
   prioriteit: "normaal",

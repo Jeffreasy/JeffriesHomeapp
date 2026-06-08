@@ -6,11 +6,14 @@ import { StickyNote, Plus, ChevronRight, Pin, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
+import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
 import { resolveAppIconName } from "@/lib/symbols";
-import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
+import { businessContextLabel, enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
 
 export function QuickNote() {
   const { notes, create, isLoading } = useNotes();
+  const laventeCareContextOptions = useLaventeCareBusinessContextOptions();
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -20,7 +23,8 @@ export function QuickNote() {
     setSaving(true);
     try {
       const { cleanText, extractedTags } = parseHashTags(text.trim());
-      const enriched = enrichNoteDraft({ content: cleanText, tags: extractedTags });
+      const matchedBusinessContext = resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
+      const enriched = enrichNoteDraft({ content: cleanText, tags: extractedTags, businessContext: matchedBusinessContext });
       await create({
         inhoud: cleanText,
         tags: enriched.tags.length > 0 ? enriched.tags : undefined,
@@ -39,6 +43,7 @@ export function QuickNote() {
   const totalPinned = notes.filter((n) => n.isPinned).length;
   const quickParsed = parseHashTags(text);
   const quickContext = getPrimaryWorkspaceContext(text, quickParsed.extractedTags);
+  const quickBusinessContext = resolveLaventeCareBusinessContextFromText(text, laventeCareContextOptions);
 
   return (
     <section>
@@ -110,6 +115,14 @@ export function QuickNote() {
               <AppIcon name={quickContext.noteSymbol} tone="cyan" size="xs" />
               {quickContext.label}
               <span className="text-cyan-300/70">#{quickContext.tag}</span>
+            </span>
+          </div>
+        )}
+        {quickBusinessContext && (
+          <div className="px-3 pb-2">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-200">
+              <AppIcon name="business" tone="emerald" size="xs" />
+              {businessContextLabel(quickBusinessContext)}
             </span>
           </div>
         )}

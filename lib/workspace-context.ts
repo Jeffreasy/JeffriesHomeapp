@@ -144,14 +144,16 @@ export function enrichNoteDraft(input: {
 }) {
   const sourceText = `${input.title ?? ""} ${input.content ?? ""}`;
   const explicitTags = mergeTags(input.tags, extractHashTags(sourceText));
-  const context = getPrimaryWorkspaceContext(sourceText, explicitTags);
-  const businessContext = normalizeBusinessContext(input.businessContext) ?? businessContextFromWorkspaceContext(context);
-  const tags = context ? mergeTags(explicitTags, [context.tag]) : explicitTags;
+  const businessContext = normalizeBusinessContext(input.businessContext);
+  const businessTags = businessContextTags(businessContext);
+  const context = getPrimaryWorkspaceContext(sourceText, mergeTags(explicitTags, businessTags));
+  const normalizedBusinessContext = businessContext ?? businessContextFromWorkspaceContext(context);
+  const tags = context ? mergeTags(explicitTags, businessTags, [context.tag]) : mergeTags(explicitTags, businessTags);
   const symbol = context && shouldAutoApplyContextSymbol(input.symbol, ["note", "pageNote", "calendar", "work"])
     ? context.noteSymbol
     : input.symbol ?? "note";
 
-  return { context, tags, symbol, businessContext };
+  return { context, tags, symbol, businessContext: normalizedBusinessContext };
 }
 
 export function enrichEventDraft(input: {
@@ -165,15 +167,17 @@ export function enrichEventDraft(input: {
 }) {
   const sourceText = `${input.title ?? ""} ${input.description ?? ""} ${input.location ?? ""}`;
   const explicitTags = mergeTags(input.tags, extractHashTags(sourceText));
-  const context = getPrimaryWorkspaceContext(sourceText, explicitTags);
-  const businessContext = normalizeBusinessContext(input.businessContext) ?? businessContextFromWorkspaceContext(context);
-  const tags = context ? mergeTags(explicitTags, [context.tag]) : explicitTags;
+  const businessContext = normalizeBusinessContext(input.businessContext);
+  const businessTags = businessContextTags(businessContext);
+  const context = getPrimaryWorkspaceContext(sourceText, mergeTags(explicitTags, businessTags));
+  const normalizedBusinessContext = businessContext ?? businessContextFromWorkspaceContext(context);
+  const tags = context ? mergeTags(explicitTags, businessTags, [context.tag]) : mergeTags(explicitTags, businessTags);
   const category = context && (!input.category || input.category === "overig") ? context.eventCategory : input.category ?? "overig";
   const symbol = context && shouldAutoApplyContextSymbol(input.symbol, ["agenda", "calendar", "categoryOther", "categoryWork"])
     ? context.eventSymbol
     : input.symbol ?? "agenda";
 
-  return { context, tags, category, symbol, businessContext };
+  return { context, tags, category, symbol, businessContext: normalizedBusinessContext };
 }
 
 export function parseEventMetadata(description?: string | null): EventMetadata {
