@@ -94,6 +94,37 @@ const NOTE_TEMPLATES = [
     icon: "shield" as AppIconName,
     content: "## Besluit\n\n## Reden\n\n## Impact\n\n## Volgende stap\n- [ ] ",
   },
+  {
+    id: "accounts",
+    title: "Accountgegevens",
+    label: "Accounts",
+    icon: "shield" as AppIconName,
+    tags: ["laventecare", "accounts", "toegang", "veilig"],
+    priority: "hoog",
+    symbol: "shield",
+    content:
+      "## Accountgegevens\n\n" +
+      "## Context\n" +
+      "- Klant/context: \n" +
+      "- Project/pilot: \n" +
+      "- Doel van toegang: \n" +
+      "- Omgeving: test / pilot / productie\n" +
+      "- Status: actief / tijdelijk / verlopen\n\n" +
+      "## Toegang\n" +
+      "- Login URL: \n" +
+      "- Gebruikersnaam: \n" +
+      "- Rollen/rechten: \n" +
+      "- 2FA/herstel: \n" +
+      "- Eigenaar/contact: \n\n" +
+      "## Veilig delen\n" +
+      "- Gevoelige gegevens alleen delen via afgesproken veilig kanaal.\n" +
+      "- Laatst gecontroleerd: \n" +
+      "- Vervaldatum / intrekken na pilot: \n\n" +
+      "## Acties\n" +
+      "- [ ] Toegang testen\n" +
+      "- [ ] Klant bevestigen dat toegang werkt\n" +
+      "- [ ] Na pilot toegang intrekken of omzetten\n",
+  },
 ] as const;
 
 type LinkSearchItem = {
@@ -701,6 +732,12 @@ export function NoteEditor({
     const prefix = inhoud.trim() ? "\n\n" : "";
     setInhoud(`${inhoud}${prefix}${template.content}`);
     if (!titel.trim()) setTitel(template.title);
+    if ("tags" in template) setTags((current) => normalizeTags([...current, ...template.tags]));
+    if ("priority" in template) setPrioriteit(template.priority);
+    if ("symbol" in template) {
+      setSymbolTouched(true);
+      setSymbol(template.symbol);
+    }
     setShowTemplates(false);
     requestAnimationFrame(() => {
       textRef.current?.focus();
