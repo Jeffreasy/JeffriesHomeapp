@@ -58,7 +58,23 @@ export function LaventeCareMailboxView({
   const [workstreamId, setWorkstreamId] = useState("");
   const [toEmail, setToEmail] = useState("");
   const [toName, setToName] = useState("");
-  const [variables, setVariables] = useState("next_step=Ik hoor graag wat voor jou het beste moment is.\nquote.summary=\ninvoice.payment_url=\nproject.update=\nmeeting.summary=\nmeeting.actions=");
+  const [variables, setVariables] = useState(
+    [
+      "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
+      "cta.label=Afstemmen",
+      "cta.url=https://www.laventecare.nl/contact",
+      "quote.summary=scope, planning en uitvoering volgens afspraak",
+      "invoice.amount=zie factuur",
+      "invoice.due_date=14 dagen",
+      "invoice.payment_url=https://www.laventecare.nl/contact",
+      "project.status=in uitvoering",
+      "project.update=De voortgang loopt volgens afspraak.",
+      "project.risk=geen bijzonderheden",
+      "meeting.topic=afstemming",
+      "meeting.summary=De besproken punten zijn vastgelegd in het klantdossier.",
+      "meeting.actions=de vervolgstap wordt opgepakt",
+    ].join("\n")
+  );
 
   const activeTemplates = useMemo(
     () => templates.filter((template) => template.status === "active"),
@@ -70,6 +86,7 @@ export function LaventeCareMailboxView({
   const selectedContact = contacts.find((contact) => (contact._id ?? contact.id) === contactId);
   const resolvedEmail = toEmail.trim() || selectedContact?.email || "";
   const resolvedName = toName.trim() || selectedContact?.naam || "";
+  const variableHints = useMemo(() => extractPlaceholders(selectedTemplate), [selectedTemplate]);
 
   const handleSend = async (send: boolean) => {
     if (!selectedTemplate) return;
@@ -192,11 +209,37 @@ export function LaventeCareMailboxView({
             />
           </Field>
 
-          <div className="mt-4 rounded-lg border border-white/10 bg-black/20 p-3">
-            <p className="text-xs font-semibold uppercase text-slate-500">Preview bron</p>
-            <p className="mt-2 text-sm font-bold text-white">{selectedTemplate?.subject_template ?? "Geen template"}</p>
-            <p className="mt-2 line-clamp-4 text-xs leading-5 text-slate-400">{stripHtml(selectedTemplate?.body_html ?? "")}</p>
-            {selectedCompany ? <p className="mt-2 text-xs text-slate-500">Klantcontext: {selectedCompany.naam}</p> : null}
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">Template context</p>
+              <p className="mt-2 text-sm font-bold text-white">{selectedTemplate?.subject_template ?? "Geen template"}</p>
+              <p className="mt-2 line-clamp-4 text-xs leading-5 text-slate-400">{stripHtml(selectedTemplate?.body_html ?? "")}</p>
+              {selectedCompany ? <p className="mt-2 text-xs text-slate-500">Klantcontext: {selectedCompany.naam}</p> : null}
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {variableHints.slice(0, 18).map((hint) => (
+                  <span key={hint} className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold text-sky-100">
+                    {hint}
+                  </span>
+                ))}
+                {variableHints.length > 18 ? (
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-slate-400">
+                    +{variableHints.length - 18}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-100">
+              <div className="flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2">
+                <p className="text-xs font-bold uppercase text-slate-500">HTML preview</p>
+                <p className="truncate text-[11px] font-semibold text-slate-400">{selectedTemplate?.name ?? "Template"}</p>
+              </div>
+              <iframe
+                title="LaventeCare mail preview"
+                sandbox=""
+                srcDoc={selectedTemplate?.body_html ?? ""}
+                className="h-72 w-full bg-slate-100"
+              />
+            </div>
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -305,11 +348,19 @@ function parseVariables(value: string) {
     const [rawKey, ...rest] = line.split("=");
     const key = rawKey?.trim();
     if (!key) continue;
-    vars[key] = rest.join("=").trim();
+    const parsedValue = rest.join("=").trim();
+    if (!parsedValue) continue;
+    vars[key] = parsedValue;
   }
   return vars;
 }
 
 function stripHtml(value: string) {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function extractPlaceholders(template?: MailTemplateItem) {
+  if (!template) return [];
+  const matches = `${template.subject_template} ${template.body_html} ${template.body_text ?? ""}`.matchAll(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g);
+  return Array.from(new Set(Array.from(matches, (match) => match[1]))).sort();
 }
