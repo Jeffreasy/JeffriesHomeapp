@@ -792,6 +792,7 @@ export interface LCInvoice {
   company_id: string | null;
   project_id: string | null;
   workstream_id: string | null;
+  quote_id: string | null;
   invoice_number: string;
   status: string;
   issue_date: string;
@@ -925,6 +926,7 @@ export const laventecareApi = {
     company_id?: string;
     project_id?: string;
     workstream_id?: string;
+    quote_id?: string;
     status?: string;
     issue_date?: string;
     due_date?: string;
@@ -941,6 +943,8 @@ export const laventecareApi = {
     }>;
   }) =>
     apiFetch<LCInvoice>("/laventecare/invoices", { method: "POST", body: JSON.stringify(data) }),
+  createInvoiceFromQuote: (id: string) =>
+    apiFetch<LCInvoice>(`/laventecare/quotes/${id}/invoice`, { method: "POST" }),
   updateInvoiceStatus: (id: string, data: {
     status: string;
     paid_cents?: number;

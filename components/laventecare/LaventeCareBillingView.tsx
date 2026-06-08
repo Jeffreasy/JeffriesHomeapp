@@ -61,6 +61,7 @@ type InvoicePayload = {
   company_id?: string;
   project_id?: string;
   workstream_id?: string;
+  quote_id?: string;
   status?: string;
   due_date?: string;
   currency?: string;
@@ -88,10 +89,12 @@ export function LaventeCareBillingView({
   creatingTimeEntry,
   creatingInvoice,
   updatingQuoteId,
+  creatingInvoiceFromQuoteId,
   updatingInvoiceId,
   onCreateQuote,
   onCreateTimeEntry,
   onCreateInvoice,
+  onCreateInvoiceFromQuote,
   onUpdateQuoteStatus,
   onUpdateInvoiceStatus,
 }: {
@@ -107,10 +110,12 @@ export function LaventeCareBillingView({
   creatingTimeEntry: boolean;
   creatingInvoice: boolean;
   updatingQuoteId: string | null;
+  creatingInvoiceFromQuoteId: string | null;
   updatingInvoiceId: string | null;
   onCreateQuote: (payload: QuotePayload) => Promise<void>;
   onCreateTimeEntry: (payload: TimeEntryPayload) => Promise<void>;
   onCreateInvoice: (payload: InvoicePayload) => Promise<void>;
+  onCreateInvoiceFromQuote: (id: string) => Promise<void>;
   onUpdateQuoteStatus: (id: string, status: string) => Promise<void>;
   onUpdateInvoiceStatus: (id: string, status: string) => Promise<void>;
 }) {
@@ -127,6 +132,15 @@ export function LaventeCareBillingView({
 
   const recentQuotes = quotes.slice(0, 5);
   const recentInvoices = invoices.slice(0, 5);
+  const invoicesByQuoteId = useMemo(() => {
+    const byQuote = new Map<string, InvoiceItem>();
+    for (const invoice of invoices) {
+      if (invoice.quote_id && invoice.status !== "geannuleerd") {
+        byQuote.set(invoice.quote_id, invoice);
+      }
+    }
+    return byQuote;
+  }, [invoices]);
 
   const handleTimeSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -525,25 +539,36 @@ export function LaventeCareBillingView({
           <ListPanel
             title="Recente offertes"
             empty="Nog geen offertes"
-            items={recentQuotes.map((quote) => ({
-              id: quote.id,
-              title: quote.titel,
-              meta: `${quote.quote_number} - ${label(quote.status)} - ${formatCents(quote.total_cents)}`,
-              action:
-                quote.status === "concept"
-                  ? {
-                      label: "Verstuurd",
-                      busy: updatingQuoteId === quote.id,
-                      onClick: () => onUpdateQuoteStatus(quote.id, "verstuurd"),
-                    }
-                  : quote.status === "verstuurd"
+            items={recentQuotes.map((quote) => {
+              const linkedInvoice = invoicesByQuoteId.get(quote.id);
+              return {
+                id: quote.id,
+                title: quote.titel,
+                meta: `${quote.quote_number} - ${label(quote.status)} - ${formatCents(quote.total_cents)}${
+                  linkedInvoice ? ` - gefactureerd via ${linkedInvoice.invoice_number}` : ""
+                }`,
+                action:
+                  quote.status === "concept"
                     ? {
-                        label: "Akkoord",
+                        label: "Verstuurd",
                         busy: updatingQuoteId === quote.id,
-                        onClick: () => onUpdateQuoteStatus(quote.id, "geaccepteerd"),
+                        onClick: () => onUpdateQuoteStatus(quote.id, "verstuurd"),
                       }
-                    : undefined,
-            }))}
+                    : quote.status === "verstuurd"
+                      ? {
+                          label: "Akkoord",
+                          busy: updatingQuoteId === quote.id,
+                          onClick: () => onUpdateQuoteStatus(quote.id, "geaccepteerd"),
+                        }
+                      : quote.status === "geaccepteerd" && !linkedInvoice
+                        ? {
+                            label: "Factuur",
+                            busy: creatingInvoiceFromQuoteId === quote.id,
+                            onClick: () => onCreateInvoiceFromQuote(quote.id),
+                          }
+                        : undefined,
+              };
+            })}
           />
           <ListPanel
             title="Recente facturen"
@@ -745,7 +770,15 @@ function ListPanel({
                     disabled={item.action.busy}
                     className="inline-flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
                   >
-                    {item.action.busy ? <Loader2 size={13} className="animate-spin" /> : item.action.label === "Betaald" ? <CheckCircle2 size={13} /> : <Send size={13} />}
+                    {item.action.busy ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : item.action.label === "Betaald" || item.action.label === "Akkoord" ? (
+                      <CheckCircle2 size={13} />
+                    ) : item.action.label === "Factuur" ? (
+                      <ReceiptText size={13} />
+                    ) : (
+                      <Send size={13} />
+                    )}
                     {item.action.label}
                   </button>
                 ) : null}

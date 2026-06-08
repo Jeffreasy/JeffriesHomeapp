@@ -91,6 +91,7 @@ export default function LaventeCarePage() {
     updateQuoteStatusMut,
     createTimeEntryMut,
     createInvoiceMut,
+    createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,
   } = useLaventeCare();
 
@@ -120,6 +121,7 @@ export default function LaventeCarePage() {
   const [processingWorkstream, setProcessingWorkstream] = useState<string | null>(null);
   const [loggingDocumentKey, setLoggingDocumentKey] = useState<string | null>(null);
   const [updatingQuoteId, setUpdatingQuoteId] = useState<string | null>(null);
+  const [creatingInvoiceFromQuoteId, setCreatingInvoiceFromQuoteId] = useState<string | null>(null);
   const [updatingInvoiceId, setUpdatingInvoiceId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -607,6 +609,18 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleCreateInvoiceFromQuote = async (id: string) => {
+    setCreatingInvoiceFromQuoteId(id);
+    try {
+      await createInvoiceFromQuoteMut.mutateAsync(id);
+      success("Factuurconcept vanuit offerte aangemaakt");
+    } catch {
+      toastError("Offerte factureren is mislukt");
+    } finally {
+      setCreatingInvoiceFromQuoteId(null);
+    }
+  };
+
   const handleUpdateQuoteStatus = async (id: string, status: string) => {
     setUpdatingQuoteId(id);
     try {
@@ -774,10 +788,12 @@ export default function LaventeCarePage() {
               creatingTimeEntry={createTimeEntryMut.isPending}
               creatingInvoice={createInvoiceMut.isPending}
               updatingQuoteId={updatingQuoteId}
+              creatingInvoiceFromQuoteId={creatingInvoiceFromQuoteId}
               updatingInvoiceId={updatingInvoiceId}
               onCreateQuote={handleCreateQuote}
               onCreateTimeEntry={handleCreateTimeEntry}
               onCreateInvoice={handleCreateInvoice}
+              onCreateInvoiceFromQuote={handleCreateInvoiceFromQuote}
               onUpdateQuoteStatus={handleUpdateQuoteStatus}
               onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
             />
