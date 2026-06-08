@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   LifeBuoy,
   ListChecks,
+  MailCheck,
   ReceiptText,
   Search,
   ShieldCheck,
@@ -33,6 +34,7 @@ export type PortalView =
   | "signals"
   | "workstreams"
   | "commerce"
+  | "mailbox"
   | "delivery"
   | "operations"
   | "knowledge"
@@ -68,6 +70,7 @@ export const portalIcons = {
   signals: Sparkles,
   workstreams: Workflow,
   commerce: ReceiptText,
+  mailbox: MailCheck,
   delivery: FolderKanban,
   operations: LifeBuoy,
   knowledge: BookOpenText,

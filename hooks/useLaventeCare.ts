@@ -24,6 +24,9 @@ import type {
   TimeEntryItem,
   InvoiceItem,
   InvoiceLineItem,
+  MailboxItem,
+  MailTemplateItem,
+  MailOutboxItem,
 } from "@/components/laventecare/LaventeCareTypes";
 
 const closedWorkstreamStatuses = new Set(["afgerond", "done", "gesloten", "gearchiveerd", "omgezet_project"]);
@@ -40,6 +43,12 @@ export function useLaventeCare() {
   const { data: billing, isLoading: billingLoading } = useQuery({
     queryKey: ["laventecare", "billing"],
     queryFn: () => laventecareApi.billing({ limit: 80 }),
+    staleTime: 15_000,
+  });
+
+  const { data: mailbox, isLoading: mailboxLoading } = useQuery({
+    queryKey: ["laventecare", "mailbox"],
+    queryFn: () => laventecareApi.mailbox({ limit: 50 }),
     staleTime: 15_000,
   });
 
@@ -220,6 +229,22 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const createMailTemplateMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createMailTemplate>[0]) => laventecareApi.createMailTemplate(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateMailTemplateMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateMailTemplate>[1]) =>
+      laventecareApi.updateMailTemplate(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const sendTemplatedMailMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.sendTemplatedMail>[0]) => laventecareApi.sendTemplatedMail(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
   const companies = useMemo(
     () =>
@@ -250,6 +275,9 @@ export function useLaventeCare() {
     [cockpit]
   );
   const billingData = useMemo(() => billing as BillingItem | undefined, [billing]);
+  const mailboxData = useMemo(() => mailbox as MailboxItem | undefined, [mailbox]);
+  const mailTemplates = useMemo(() => (mailbox?.templates ?? []) as MailTemplateItem[], [mailbox]);
+  const mailOutbox = useMemo(() => (mailbox?.outbox ?? []) as MailOutboxItem[], [mailbox]);
   const quotes = useMemo(() => (billing?.quotes ?? []) as QuoteItem[], [billing]);
   const quoteLines = useMemo(() => (billing?.quoteLines ?? []) as QuoteLineItem[], [billing]);
   const timeEntries = useMemo(() => (billing?.timeEntries ?? []) as TimeEntryItem[], [billing]);
@@ -366,6 +394,9 @@ export function useLaventeCare() {
     actionItems: 0,
     dossierDocuments: 0,
     activityEvents: 0,
+    mailTemplates: 0,
+    mailOutbox: 0,
+    mailConfigured: false,
     documentsSeeded: false,
     knowledgeDocuments: 0,
     businessSignals: 0,
@@ -375,6 +406,7 @@ export function useLaventeCare() {
   return {
     cockpitLoading,
     billingLoading,
+    mailboxLoading,
     companies,
     contacts,
     documents,
@@ -391,6 +423,9 @@ export function useLaventeCare() {
     dossierDocuments,
     activityEvents,
     billing: billingData,
+    mailbox: mailboxData,
+    mailTemplates,
+    mailOutbox,
     quotes,
     quoteLines,
     timeEntries,
@@ -429,5 +464,8 @@ export function useLaventeCare() {
     createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,
     createInvoicePaymentRequestMut,
+    createMailTemplateMut,
+    updateMailTemplateMut,
+    sendTemplatedMailMut,
   };
 }

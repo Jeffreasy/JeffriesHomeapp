@@ -43,6 +43,7 @@ import { LaventeCareWorkstreamsView } from "@/components/laventecare/LaventeCare
 import { LaventeCareOperationsView } from "@/components/laventecare/LaventeCareOperationsView";
 import { LaventeCareKnowledgeView } from "@/components/laventecare/LaventeCareKnowledgeView";
 import { LaventeCareBillingView } from "@/components/laventecare/LaventeCareBillingView";
+import { LaventeCareMailboxView } from "@/components/laventecare/LaventeCareMailboxView";
 import {
   CapabilityMatrix,
   LaventeCarePortalHero,
@@ -60,6 +61,7 @@ export default function LaventeCarePage() {
   const {
     cockpitLoading,
     billingLoading,
+    mailboxLoading,
     companies,
     contacts,
     documents,
@@ -76,6 +78,9 @@ export default function LaventeCarePage() {
     dossierDocuments,
     activityEvents,
     billing,
+    mailbox,
+    mailTemplates,
+    mailOutbox,
     quotes,
     timeEntries,
     invoices,
@@ -111,6 +116,7 @@ export default function LaventeCarePage() {
     createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,
     createInvoicePaymentRequestMut,
+    sendTemplatedMailMut,
   } = useLaventeCare();
 
   const { success, error: toastError } = useToast();
@@ -250,6 +256,17 @@ export default function LaventeCarePage() {
         actionLabel: "Open commercie",
       },
       {
+        label: "Mailbox en templates",
+        detail: `${mailTemplates.length} templates, ${mailOutbox.length} outbox items`,
+        status: mailbox?.summary.configured && mailTemplates.length > 0 ? "ready" : mailTemplates.length > 0 ? "attention" : "missing",
+        owner: "Communicatie",
+        view: "mailbox",
+        score: mailbox?.summary.configured ? 100 : mailTemplates.length > 0 ? 70 : 20,
+        priority: mailbox?.summary.configured ? "laag" : "hoog",
+        nextStep: mailbox?.summary.nextStep ?? "Richt Microsoft Graph in en gebruik templates voor klantmails.",
+        actionLabel: "Open mailbox",
+      },
+      {
         label: "Bunq betalingen",
         detail: billing?.summary.bunqReady ? "API en rekening staan klaar" : "Render env mist nog providerdata",
         status: billing?.summary.bunqReady ? "ready" : "missing",
@@ -316,6 +333,10 @@ export default function LaventeCarePage() {
     contacts.length,
     dossierDocuments.length,
     invoices.length,
+    mailOutbox.length,
+    mailTemplates.length,
+    mailbox?.summary.configured,
+    mailbox?.summary.nextStep,
     openChanges.length,
     openIncidents.length,
     quotes.length,
@@ -374,6 +395,15 @@ export default function LaventeCarePage() {
         tone: "amber",
       },
       {
+        id: "mailbox",
+        label: "Mailbox",
+        eyebrow: "Templates en outbox",
+        description: "Zakelijke klantmails renderen, versturen en auditten.",
+        count: `${mailTemplates.length + mailOutbox.length}`,
+        icon: portalIcons.mailbox,
+        tone: mailbox?.summary.configured ? "emerald" : "amber",
+      },
+      {
         id: "delivery",
         label: "Delivery",
         eyebrow: "Projecten",
@@ -420,6 +450,9 @@ export default function LaventeCarePage() {
       companies.length,
       followUps.length,
       invoices.length,
+      mailOutbox.length,
+      mailTemplates.length,
+      mailbox?.summary.configured,
       openChanges.length,
       openIncidents.length,
       quotes.length,
@@ -1010,6 +1043,21 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleSendTemplatedMail = async (payload: Parameters<typeof sendTemplatedMailMut.mutateAsync>[0]) => {
+    try {
+      const result = await sendTemplatedMailMut.mutateAsync(payload);
+      if (result.status === "sent") {
+        success("LaventeCare mail verzonden en vastgelegd");
+      } else if (result.status === "failed") {
+        toastError(result.error_message || "Mail versturen is mislukt");
+      } else {
+        success("Mailconcept aangemaakt in de outbox");
+      }
+    } catch {
+      toastError(payload.send ? "Mail versturen is mislukt" : "Mailconcept aanmaken is mislukt");
+    }
+  };
+
   if (cockpitLoading) {
     return (
       <div className="px-4 py-10 sm:px-6 text-slate-100">
@@ -1236,6 +1284,21 @@ export default function LaventeCarePage() {
                 onUpdateQuoteStatus={handleUpdateQuoteStatus}
                 onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
                 onCreatePaymentRequest={handleCreateInvoicePaymentRequest}
+              />
+            ) : null}
+
+            {activeView === "mailbox" ? (
+              <LaventeCareMailboxView
+                mailbox={mailbox}
+                mailboxLoading={mailboxLoading}
+                companies={companies}
+                contacts={contacts}
+                activeProjects={activeProjects}
+                activeWorkstreams={activeWorkstreams}
+                templates={mailTemplates}
+                outbox={mailOutbox}
+                sending={sendTemplatedMailMut.isPending}
+                onSendTemplatedMail={handleSendTemplatedMail}
               />
             ) : null}
 

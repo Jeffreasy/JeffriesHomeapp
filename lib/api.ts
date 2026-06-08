@@ -692,6 +692,9 @@ export interface LCCockpit {
     actionItems: number;
     dossierDocuments: number;
     activityEvents: number;
+    mailTemplates: number;
+    mailOutbox: number;
+    mailConfigured: boolean;
     documentsSeeded: boolean;
     businessSignals: number;
     followUps: number;
@@ -708,6 +711,7 @@ export interface LCCockpit {
   documentCatalog: LCDocument[];
   dossierDocuments: LCDossierDocument[];
   activityEvents: LCActivityEvent[];
+  mailbox?: LCMailboxSummary;
   businessSignals: LCBusinessSignal[];
   followUps: LCFollowUpSignal[];
 }
@@ -851,6 +855,70 @@ export interface LCBilling {
   invoiceLines: LCInvoiceLine[];
 }
 
+export interface LCMailboxSummary {
+  templates: number;
+  activeTemplates: number;
+  outbox: number;
+  drafts: number;
+  sent: number;
+  failed: number;
+  provider: string;
+  senderEmail: string;
+  configured: boolean;
+  nextStep: string;
+}
+
+export interface LCMailTemplate {
+  id: string;
+  user_id: string;
+  template_key: string;
+  name: string;
+  category: string;
+  status: string;
+  subject_template: string;
+  body_html: string;
+  body_text: string | null;
+  default_cc: string[];
+  default_bcc: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LCMailOutboxItem {
+  id: string;
+  user_id: string;
+  template_id: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  project_id: string | null;
+  workstream_id: string | null;
+  quote_id: string | null;
+  invoice_id: string | null;
+  to_email: string;
+  to_name: string | null;
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  body_html: string;
+  body_text: string | null;
+  status: string;
+  provider: string;
+  provider_message_id: string | null;
+  error_message: string | null;
+  sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+  template_name?: string | null;
+  company_name?: string | null;
+  contact_name?: string | null;
+}
+
+export interface LCMailbox {
+  summary: LCMailboxSummary;
+  templates: LCMailTemplate[];
+  outbox: LCMailOutboxItem[];
+}
+
 export const laventecareApi = {
   cockpit: () =>
     apiFetch<LCCockpit>("/laventecare/cockpit"),
@@ -861,6 +929,42 @@ export const laventecareApi = {
     const query = search.toString();
     return apiFetch<LCBilling>(`/laventecare/billing${query ? `?${query}` : ""}`);
   },
+  mailbox: (params?: { limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCMailbox>(`/laventecare/mailbox${query ? `?${query}` : ""}`);
+  },
+  createMailTemplate: (data: {
+    template_key?: string;
+    name: string;
+    category?: string;
+    status?: string;
+    subject_template: string;
+    body_html: string;
+    body_text?: string;
+    default_cc?: string[];
+    default_bcc?: string[];
+  }) =>
+    apiFetch<LCMailTemplate>("/laventecare/mailbox/templates", { method: "POST", body: JSON.stringify(data) }),
+  updateMailTemplate: (id: string, data: Partial<LCMailTemplate>) =>
+    apiFetch<{ status: string }>(`/laventecare/mailbox/templates/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  sendTemplatedMail: (data: {
+    template_id: string;
+    company_id?: string;
+    contact_id?: string;
+    project_id?: string;
+    workstream_id?: string;
+    quote_id?: string;
+    invoice_id?: string;
+    to_email?: string;
+    to_name?: string;
+    cc?: string[];
+    bcc?: string[];
+    variables?: Record<string, string>;
+    send?: boolean;
+  }) =>
+    apiFetch<LCMailOutboxItem>("/laventecare/mailbox/send-template", { method: "POST", body: JSON.stringify(data) }),
   listCompanies: (params?: { q?: string; limit?: number }) => {
     const search = new URLSearchParams();
     if (params?.q) search.set("q", params.q);

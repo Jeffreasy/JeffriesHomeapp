@@ -14,6 +14,9 @@ import {
   type LCTimeEntry,
   type LCInvoice,
   type LCInvoiceLine,
+  type LCMailbox,
+  type LCMailTemplate,
+  type LCMailOutboxItem,
 } from "@/lib/api";
 
 export type Tone = "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
@@ -30,6 +33,9 @@ export type QuoteLineItem = LCQuoteLine;
 export type TimeEntryItem = LCTimeEntry;
 export type InvoiceItem = LCInvoice;
 export type InvoiceLineItem = LCInvoiceLine;
+export type MailboxItem = LCMailbox;
+export type MailTemplateItem = LCMailTemplate;
+export type MailOutboxItem = LCMailOutboxItem;
 
 export type CompanyItem = LCCompany & {
   _id?: string;
