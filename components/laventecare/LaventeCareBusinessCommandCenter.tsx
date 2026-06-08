@@ -49,7 +49,7 @@ function buildCompanyContextOption(company: CompanyItem): DossierContextOption {
   return {
     key: `company:${id}`,
     label: company.naam,
-    subtext: `Klant - ${label(company.relatie_type)} - ${label(company.status)}`,
+    subtext: `Klantdossier - ${label(company.relatie_type)} - ${label(company.status)}`,
     context: {
       kind: "company",
       id,
@@ -186,7 +186,7 @@ export function LaventeCareBusinessCommandCenter({
             <Building2 size={19} />
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Bedrijfsfundament</p>
+            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Klant- en bedrijfsfundament</p>
             <h2 className="mt-1 text-xl font-bold text-white">LaventeCare als systeempartner</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">{LAVENTECARE_PROFILE.positie}</p>
           </div>

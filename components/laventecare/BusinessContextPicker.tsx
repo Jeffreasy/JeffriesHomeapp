@@ -29,7 +29,7 @@ export function BusinessContextPicker({
   const normalized = normalizeBusinessContext(value);
   const options: BusinessContextOption[] = [
     { key: "none", label: "Geen zakelijke context", meta: "Persoonlijk of algemeen", value: null },
-    { key: "laventecare", label: "LaventeCare algemeen", meta: "Bedrijf, strategie of interne opvolging", value: { type: "laventecare", title: "LaventeCare" } },
+    { key: "laventecare", label: "LaventeCare algemeen", meta: "Strategie, operatie of interne opvolging", value: { type: "laventecare", title: "LaventeCare" } },
     ...companies
       .filter((company) => company._id || company.id)
       .slice(0, 12)
@@ -38,7 +38,7 @@ export function BusinessContextPicker({
         return {
           key: `company:${id}`,
           label: company.naam,
-          meta: `Klant - ${company.relatie_type} - ${company.status}`,
+          meta: `Klantdossier - ${company.relatie_type} - ${company.status}`,
           value: { type: "laventecare_company", id, title: company.naam },
         } satisfies BusinessContextOption;
       }),
@@ -113,7 +113,7 @@ export function BusinessContextPicker({
           <option value="laventecare">LaventeCare algemeen</option>
           {selectedKey === "custom" && <option value="custom">{selected.label}</option>}
           {companies.length > 0 && (
-            <optgroup label="Klanten">
+            <optgroup label="Klantdossiers">
               {companies
                 .filter((company) => company._id || company.id)
                 .slice(0, 12)

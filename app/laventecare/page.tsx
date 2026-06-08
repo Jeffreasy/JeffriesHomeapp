@@ -354,7 +354,7 @@ export default function LaventeCarePage() {
         id: "overview",
         label: "Overzicht",
         eyebrow: "Business cockpit",
-        description: "Bedrijfsfundament, operating model en snelle context.",
+        description: "Klantdossiers, operating model en snelle context.",
         count: `${companies.length + activeLeads.length + totalWorkstreams + activeProjects.length}`,
         icon: portalIcons.overview,
         tone: "sky",
@@ -363,7 +363,7 @@ export default function LaventeCarePage() {
         id: "customers",
         label: "Klanten",
         eyebrow: "CRM basis",
-        description: "Bedrijven, contactpersonen en klantdossiers.",
+        description: "Klantdossiers, contactpersonen en relatiecontext.",
         count: `${companies.length}`,
         icon: portalIcons.customers,
         tone: "amber",
@@ -434,7 +434,7 @@ export default function LaventeCarePage() {
       {
         id: "gaps",
         label: "Gatenlijst",
-        eyebrow: "Bedrijfsdekking",
+        eyebrow: "Klantdekking",
         description: "Welke bedrijfsfuncties staan live, half live of missen nog.",
         count: `${capabilityRows.filter((row) => row.status !== "ready").length}`,
         icon: portalIcons.gaps,
@@ -1386,6 +1386,14 @@ function normalizeCompanyStatus(value?: string | null): CompanyForm["status"] {
 }
 
 function normalizeCompanyRelation(value?: string | null): CompanyForm["relatieType"] {
-  if (value === "prospect" || value === "klant" || value === "partner" || value === "leverancier") return value;
+  if (
+    value === "prospect" ||
+    value === "klant" ||
+    value === "partner" ||
+    value === "leverancier" ||
+    value === "intern" ||
+    value === "eigen_project"
+  )
+    return value;
   return "prospect";
 }

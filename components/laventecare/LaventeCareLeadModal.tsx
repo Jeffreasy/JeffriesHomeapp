@@ -46,7 +46,7 @@ export function LaventeCareLeadModal({
           />
         </label>
         <label className="block lg:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Bestaande klant</span>
+          <span className="text-xs font-semibold text-slate-400">Klantdossier</span>
           <select
             value={leadForm.companyId}
             onChange={(event) => {
@@ -61,7 +61,7 @@ export function LaventeCareLeadModal({
             }}
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)]"
           >
-            <option value="">Nieuwe/geen klant</option>
+            <option value="">Nieuw of nog niet gekoppeld</option>
             {companies.map((company) => (
               <option key={company.id} value={company.id}>
                 {company.naam}
@@ -87,11 +87,11 @@ export function LaventeCareLeadModal({
           </select>
         </label>
         <label className="block lg:col-span-3">
-          <span className="text-xs font-semibold text-slate-400">Bedrijf</span>
+          <span className="text-xs font-semibold text-slate-400">Klant/organisatie</span>
           <input
             value={leadForm.companyName}
             onChange={(event) => setLeadForm((form) => ({ ...form, companyName: event.target.value }))}
-            placeholder="Bedrijfsnaam"
+            placeholder="Naam van klant, organisatie of opdrachtgever"
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
           />
         </label>

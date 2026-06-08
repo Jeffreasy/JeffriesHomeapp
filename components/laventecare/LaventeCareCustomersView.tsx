@@ -63,7 +63,7 @@ export function LaventeCareCustomersView({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <Metric label="Klanten" value={companies.length} sub="bedrijven en opdrachtgevers" />
+        <Metric label="Klanten" value={companies.length} sub="dossiers en opdrachtgevers" />
         <Metric label="Contacten" value={contacts.length} sub="personen in dossiers" />
         <Metric label="Actief" value={activeCompanyIds.size} sub="met open werk" />
       </div>

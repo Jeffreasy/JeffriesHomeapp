@@ -59,7 +59,7 @@ export function LaventeCareWorkstreamModal({
         </label>
 
         <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Bestaande klant</span>
+          <span className="text-xs font-semibold text-slate-400">Klantdossier</span>
           <select
             value={workstreamForm.companyId}
             onChange={(event) => {
@@ -72,7 +72,7 @@ export function LaventeCareWorkstreamModal({
             }}
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-violet-500"
           >
-            <option value="">Nieuwe/geen klant</option>
+            <option value="">Nog niet gekoppeld</option>
             {companies.map((company) => (
               <option key={company.id} value={company.id}>
                 {company.naam}
@@ -82,11 +82,11 @@ export function LaventeCareWorkstreamModal({
         </label>
 
         <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Klant/context</span>
+          <span className="text-xs font-semibold text-slate-400">Losse context</span>
           <input
             value={workstreamForm.klantNaam}
             onChange={(event) => setWorkstreamForm((form) => ({ ...form, klantNaam: event.target.value }))}
-            placeholder="Naam klant, organisatie of context"
+            placeholder="Alleen gebruiken als er nog geen klantdossier is"
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-violet-500"
           />
         </label>

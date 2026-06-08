@@ -228,7 +228,7 @@ export type CompanyForm = {
   website: string;
   sector: string;
   status: "actief" | "prospect" | "inactief";
-  relatieType: "prospect" | "klant" | "partner" | "leverancier";
+  relatieType: "prospect" | "klant" | "partner" | "leverancier" | "intern" | "eigen_project";
   notities: string;
   volgendeActie: string;
 };

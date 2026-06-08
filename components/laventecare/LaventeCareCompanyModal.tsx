@@ -33,11 +33,11 @@ export function LaventeCareCompanyModal({
     >
       <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Klantnaam</span>
+          <span className="text-xs font-semibold text-slate-400">Klantdossiernaam</span>
           <input
             value={companyForm.naam}
             onChange={(event) => setCompanyForm((form) => ({ ...form, naam: event.target.value }))}
-            placeholder="Bedrijf, organisatie of opdrachtgever"
+            placeholder="Klant, organisatie, opdrachtgever of eigen project"
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
           />
         </label>
@@ -63,7 +63,7 @@ export function LaventeCareCompanyModal({
         </label>
 
         <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Relatie</span>
+          <span className="text-xs font-semibold text-slate-400">Relatietype</span>
           <select
             value={companyForm.relatieType}
             onChange={(event) =>
@@ -75,6 +75,8 @@ export function LaventeCareCompanyModal({
             <option value="klant">Klant</option>
             <option value="partner">Partner</option>
             <option value="leverancier">Leverancier</option>
+            <option value="intern">Intern</option>
+            <option value="eigen_project">Eigen project</option>
           </select>
         </label>
 
