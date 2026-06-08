@@ -240,6 +240,10 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const suggestMailContentMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.suggestMailContent>[0]) => laventecareApi.suggestMailContent(data),
+  });
+
   const sendTemplatedMailMut = useMutation({
     mutationFn: (data: Parameters<typeof laventecareApi.sendTemplatedMail>[0]) => laventecareApi.sendTemplatedMail(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
@@ -466,6 +470,7 @@ export function useLaventeCare() {
     createInvoicePaymentRequestMut,
     createMailTemplateMut,
     updateMailTemplateMut,
+    suggestMailContentMut,
     sendTemplatedMailMut,
   };
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, type ReactNode, useMemo, useState } from "react";
-import { CheckCircle2, MailCheck, MailPlus, Send, TriangleAlert } from "lucide-react";
+import { CheckCircle2, MailCheck, MailPlus, Send, Sparkles, TriangleAlert } from "lucide-react";
+import type { LCMailAISuggestion } from "@/lib/api";
 import type {
   CompanyItem,
   ContactItem,
@@ -25,6 +26,13 @@ type SendPayload = {
   send?: boolean;
 };
 
+type SuggestPayload = Omit<SendPayload, "cc" | "bcc" | "send"> & {
+  quote_id?: string;
+  invoice_id?: string;
+  intent?: string;
+  tone?: string;
+};
+
 const inputClass =
   "w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-500/20";
 
@@ -38,6 +46,8 @@ export function LaventeCareMailboxView({
   templates,
   outbox,
   sending,
+  aiSuggesting,
+  onSuggestMailContent,
   onSendTemplatedMail,
 }: {
   mailbox?: MailboxItem;
@@ -49,6 +59,8 @@ export function LaventeCareMailboxView({
   templates: MailTemplateItem[];
   outbox: MailOutboxItem[];
   sending: boolean;
+  aiSuggesting: boolean;
+  onSuggestMailContent: (payload: SuggestPayload) => Promise<LCMailAISuggestion>;
   onSendTemplatedMail: (payload: SendPayload) => Promise<void>;
 }) {
   const [templateId, setTemplateId] = useState("");
@@ -58,6 +70,9 @@ export function LaventeCareMailboxView({
   const [workstreamId, setWorkstreamId] = useState("");
   const [toEmail, setToEmail] = useState("");
   const [toName, setToName] = useState("");
+  const [aiIntent, setAiIntent] = useState("Maak een klantmail op basis van de gekoppelde LaventeCare context.");
+  const [aiTone, setAiTone] = useState("professioneel, warm en concreet");
+  const [aiSuggestion, setAiSuggestion] = useState<LCMailAISuggestion | null>(null);
   const [variables, setVariables] = useState(
     [
       "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
@@ -87,6 +102,30 @@ export function LaventeCareMailboxView({
   const resolvedEmail = toEmail.trim() || selectedContact?.email || "";
   const resolvedName = toName.trim() || selectedContact?.naam || "";
   const variableHints = useMemo(() => extractPlaceholders(selectedTemplate), [selectedTemplate]);
+
+  const handleSuggest = async () => {
+    if (!selectedTemplate) return;
+    let suggestion: LCMailAISuggestion;
+    try {
+      suggestion = await onSuggestMailContent({
+        template_id: selectedTemplate.id,
+        company_id: companyId || undefined,
+        contact_id: contactId || undefined,
+        project_id: projectId || undefined,
+        workstream_id: workstreamId || undefined,
+        to_email: resolvedEmail || undefined,
+        to_name: resolvedName || undefined,
+        intent: aiIntent,
+        tone: aiTone,
+        variables: parseVariables(variables),
+      });
+    } catch {
+      return;
+    }
+    const merged = { ...parseVariables(variables), ...suggestion.variables };
+    setVariables(serializeVariables(merged, variableHints));
+    setAiSuggestion(suggestion);
+  };
 
   const handleSend = async (send: boolean) => {
     if (!selectedTemplate) return;
@@ -208,6 +247,74 @@ export function LaventeCareMailboxView({
               className={`${inputClass} min-h-36 resize-y leading-6`}
             />
           </Field>
+
+          <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/[0.06] p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-sky-200" />
+                  <p className="text-xs font-semibold uppercase text-sky-100">AI context vullen</p>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  Gebruikt gekoppelde klant, opdracht, project, notities, agenda, rooster, dossier en billing-context. Verstuurt niets automatisch.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={aiSuggesting || !selectedTemplate}
+                onClick={() => void handleSuggest()}
+                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-sky-300 px-3 text-sm font-bold text-sky-950 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Sparkles size={15} />
+                {aiSuggesting ? "AI leest context..." : "AI vullen"}
+              </button>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
+              <input
+                value={aiIntent}
+                onChange={(event) => setAiIntent(event.target.value)}
+                className={inputClass}
+                placeholder="Doel van deze mail"
+              />
+              <select value={aiTone} onChange={(event) => setAiTone(event.target.value)} className={inputClass}>
+                <option value="professioneel, warm en concreet">Professioneel warm</option>
+                <option value="kort, duidelijk en actiegericht">Kort en actiegericht</option>
+                <option value="zorgvuldig, adviserend en strategisch">Adviserend strategisch</option>
+                <option value="vriendelijk, informeel en helder">Vriendelijk informeel</option>
+              </select>
+            </div>
+            {aiSuggestion ? (
+              <div className="mt-3 rounded-lg border border-white/10 bg-black/25 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase text-slate-500">AI briefing</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-200">{aiSuggestion.briefing}</p>
+                    {aiSuggestion.subject_hint ? (
+                      <p className="mt-2 text-xs font-semibold text-sky-100">Onderwerp hint: {aiSuggestion.subject_hint}</p>
+                    ) : null}
+                  </div>
+                  <span className={`w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold ${confidenceClass(aiSuggestion.confidence)}`}>
+                    {label(aiSuggestion.confidence)}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {aiSuggestion.sources.slice(0, 6).map((source, index) => (
+                    <div key={`${source.type}-${source.title}-${index}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-xs font-bold text-white">{source.title}</p>
+                        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                          {sourceTypeLabel(source.type)}
+                        </span>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">
+                        {[source.date, source.summary].filter(Boolean).join(" - ")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
 
           <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <div className="rounded-lg border border-white/10 bg-black/20 p-3">
@@ -355,6 +462,28 @@ function parseVariables(value: string) {
   return vars;
 }
 
+function serializeVariables(values: Record<string, string>, hints: string[]) {
+  const seen = new Set<string>();
+  const orderedKeys = [
+    ...hints,
+    ...Object.keys(values).sort((a, b) => a.localeCompare(b, "nl")),
+  ].filter((key) => {
+    const normalized = key.trim();
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+
+  return orderedKeys
+    .map((key) => {
+      const value = values[key];
+      if (!value?.trim()) return "";
+      return `${key}=${value.trim()}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 function stripHtml(value: string) {
   return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -363,4 +492,31 @@ function extractPlaceholders(template?: MailTemplateItem) {
   if (!template) return [];
   const matches = `${template.subject_template} ${template.body_html} ${template.body_text ?? ""}`.matchAll(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g);
   return Array.from(new Set(Array.from(matches, (match) => match[1]))).sort();
+}
+
+function confidenceClass(value: string) {
+  switch (value) {
+    case "hoog":
+      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-100";
+    case "normaal":
+      return "border-sky-400/20 bg-sky-400/10 text-sky-100";
+    default:
+      return "border-amber-400/20 bg-amber-400/10 text-amber-100";
+  }
+}
+
+function sourceTypeLabel(value: string) {
+  const normalized = value.replace(/^billing_/, "");
+  const labels: Record<string, string> = {
+    action: "Actie",
+    agenda: "Agenda",
+    schedule: "Rooster",
+    note: "Notitie",
+    activity: "Moment",
+    quote: "Offerte",
+    invoice: "Factuur",
+    dossier: "Dossier",
+    laventecare: "Context",
+  };
+  return labels[normalized] ?? label(normalized);
 }

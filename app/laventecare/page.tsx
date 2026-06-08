@@ -116,6 +116,7 @@ export default function LaventeCarePage() {
     createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,
     createInvoicePaymentRequestMut,
+    suggestMailContentMut,
     sendTemplatedMailMut,
   } = useLaventeCare();
 
@@ -1058,6 +1059,17 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleSuggestMailContent = async (payload: Parameters<typeof suggestMailContentMut.mutateAsync>[0]) => {
+    try {
+      const suggestion = await suggestMailContentMut.mutateAsync(payload);
+      success("AI-context in de template gezet");
+      return suggestion;
+    } catch {
+      toastError("AI-context ophalen is mislukt");
+      throw new Error("AI-context ophalen is mislukt");
+    }
+  };
+
   if (cockpitLoading) {
     return (
       <div className="px-4 py-10 sm:px-6 text-slate-100">
@@ -1298,6 +1310,8 @@ export default function LaventeCarePage() {
                 templates={mailTemplates}
                 outbox={mailOutbox}
                 sending={sendTemplatedMailMut.isPending}
+                aiSuggesting={suggestMailContentMut.isPending}
+                onSuggestMailContent={handleSuggestMailContent}
                 onSendTemplatedMail={handleSendTemplatedMail}
               />
             ) : null}

@@ -919,6 +919,22 @@ export interface LCMailbox {
   outbox: LCMailOutboxItem[];
 }
 
+export interface LCMailAISource {
+  type: string;
+  title: string;
+  date?: string;
+  summary?: string;
+}
+
+export interface LCMailAISuggestion {
+  variables: Record<string, string>;
+  subject_hint?: string | null;
+  briefing: string;
+  sources: LCMailAISource[];
+  confidence: "hoog" | "normaal" | "laag" | string;
+  generated_at: string;
+}
+
 export const laventecareApi = {
   cockpit: () =>
     apiFetch<LCCockpit>("/laventecare/cockpit"),
@@ -949,6 +965,21 @@ export const laventecareApi = {
     apiFetch<LCMailTemplate>("/laventecare/mailbox/templates", { method: "POST", body: JSON.stringify(data) }),
   updateMailTemplate: (id: string, data: Partial<LCMailTemplate>) =>
     apiFetch<{ status: string }>(`/laventecare/mailbox/templates/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  suggestMailContent: (data: {
+    template_id: string;
+    company_id?: string;
+    contact_id?: string;
+    project_id?: string;
+    workstream_id?: string;
+    quote_id?: string;
+    invoice_id?: string;
+    to_email?: string;
+    to_name?: string;
+    intent?: string;
+    tone?: string;
+    variables?: Record<string, string>;
+  }) =>
+    apiFetch<LCMailAISuggestion>("/laventecare/mailbox/ai-suggest", { method: "POST", body: JSON.stringify(data) }),
   sendTemplatedMail: (data: {
     template_id: string;
     company_id?: string;
