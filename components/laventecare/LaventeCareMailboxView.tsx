@@ -106,6 +106,7 @@ export function LaventeCareMailboxView({
   const resolvedEmail = toEmail.trim() || selectedContact?.email || "";
   const resolvedName = toName.trim() || selectedContact?.naam || "";
   const parsedVariables = useMemo(() => parseVariables(variables), [variables]);
+  const outboundVariables = useMemo(() => prepareOutboundVariables(parsedVariables), [parsedVariables]);
   const variableHints = useMemo(() => extractPlaceholders(selectedTemplate), [selectedTemplate]);
   const previewHTML = useMemo(() => renderMailPreview(selectedTemplate?.body_html ?? "", parsedVariables), [selectedTemplate, parsedVariables]);
   const sendReadiness = useMemo(
@@ -134,7 +135,7 @@ export function LaventeCareMailboxView({
         to_name: resolvedName || undefined,
         intent: aiIntent,
         tone: aiTone,
-        variables: parsedVariables,
+        variables: outboundVariables,
       });
     } catch {
       return;
@@ -154,7 +155,7 @@ export function LaventeCareMailboxView({
       workstream_id: workstreamId || undefined,
       to_email: resolvedEmail || undefined,
       to_name: resolvedName || undefined,
-      variables: parsedVariables,
+      variables: outboundVariables,
       send,
     });
   };
@@ -523,6 +524,23 @@ function serializeVariables(values: Record<string, string>, hints: string[]) {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+function prepareOutboundVariables(values: Record<string, string>) {
+  const next = { ...values };
+  if (isDefaultPilotAccessSummary(next["pilot.access_summary"])) {
+    delete next["pilot.access_summary"];
+  }
+  return next;
+}
+
+function isDefaultPilotAccessSummary(value?: string) {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return (
+    normalized === "" ||
+    normalized === "pilottoegang stemmen we voor de start af via het afgesproken kanaal" ||
+    normalized === "pilotaccounts staan klaar; gevoelige inloggegevens deel ik via het afgesproken veilige kanaal"
+  );
 }
 
 type ReadinessStatus = "ok" | "warn" | "missing";
