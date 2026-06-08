@@ -77,11 +77,9 @@ export function LaventeCareMailboxView({
     [
       "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
       "cta.label=Afstemmen",
-      "cta.url=https://www.laventecare.nl/contact",
       "quote.summary=scope, planning en uitvoering volgens afspraak",
       "invoice.amount=zie factuur",
       "invoice.due_date=14 dagen",
-      "invoice.payment_url=https://www.laventecare.nl/contact",
       "project.status=in uitvoering",
       "project.update=De voortgang loopt volgens afspraak.",
       "project.risk=geen bijzonderheden",
@@ -101,6 +99,7 @@ export function LaventeCareMailboxView({
   const selectedContact = contacts.find((contact) => (contact._id ?? contact.id) === contactId);
   const resolvedEmail = toEmail.trim() || selectedContact?.email || "";
   const resolvedName = toName.trim() || selectedContact?.naam || "";
+  const parsedVariables = useMemo(() => parseVariables(variables), [variables]);
   const variableHints = useMemo(() => extractPlaceholders(selectedTemplate), [selectedTemplate]);
 
   const handleSuggest = async () => {
@@ -117,12 +116,12 @@ export function LaventeCareMailboxView({
         to_name: resolvedName || undefined,
         intent: aiIntent,
         tone: aiTone,
-        variables: parseVariables(variables),
+        variables: parsedVariables,
       });
     } catch {
       return;
     }
-    const merged = { ...parseVariables(variables), ...suggestion.variables };
+    const merged = { ...parsedVariables, ...suggestion.variables };
     setVariables(serializeVariables(merged, variableHints));
     setAiSuggestion(suggestion);
   };
@@ -137,7 +136,7 @@ export function LaventeCareMailboxView({
       workstream_id: workstreamId || undefined,
       to_email: resolvedEmail || undefined,
       to_name: resolvedName || undefined,
-      variables: parseVariables(variables),
+      variables: parsedVariables,
       send,
     });
   };
@@ -343,7 +342,7 @@ export function LaventeCareMailboxView({
               <iframe
                 title="LaventeCare mail preview"
                 sandbox=""
-                srcDoc={selectedTemplate?.body_html ?? ""}
+                srcDoc={renderMailPreview(selectedTemplate?.body_html ?? "", parsedVariables)}
                 className="h-72 w-full bg-slate-100"
               />
             </div>
@@ -482,6 +481,25 @@ function serializeVariables(values: Record<string, string>, hints: string[]) {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+function renderMailPreview(html: string, values: Record<string, string>) {
+  let result = html;
+  for (const [key, value] of Object.entries(values)) {
+    result = result.replaceAll(`{{${key}}}`, value);
+    result = result.replaceAll(`{{ ${key} }}`, value);
+  }
+  result = result.replace(/<tr>\s*<td\s+align="center"[^>]*>\s*<a\s+href="([^"]*)"[^>]*>[\s\S]*?<\/a>\s*<\/td>\s*<\/tr>/gi, (block, href) => {
+    return isSafePreviewUrl(href) ? block : "";
+  });
+  return result.replace(/\{\{\s*[a-zA-Z0-9_.-]+\s*\}\}/g, "");
+}
+
+function isSafePreviewUrl(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed || trimmed.includes("{{") || trimmed.includes("}}")) return false;
+  if (trimmed.replace(/\/+$/, "") === "https://www.laventecare.nl/contact" || trimmed.replace(/\/+$/, "") === "http://www.laventecare.nl/contact") return false;
+  return trimmed.startsWith("https://") || trimmed.startsWith("http://");
 }
 
 function stripHtml(value: string) {
