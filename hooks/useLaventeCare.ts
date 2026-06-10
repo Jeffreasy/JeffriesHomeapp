@@ -17,6 +17,7 @@ import type {
   ChangeRequestItem,
   SlaIncidentItem,
   DossierDocumentItem,
+  DossierAdviceItem,
   ActivityEventItem,
   BillingItem,
   QuoteItem,
@@ -56,6 +57,18 @@ export function useLaventeCare() {
     queryKey: ["laventecare", "workstreams", "all"],
     queryFn: () => laventecareApi.listWorkstreams({ includeClosed: true, limit: 100 }),
     staleTime: 15_000,
+  });
+
+  const { data: allDossierDocumentsData } = useQuery({
+    queryKey: ["laventecare", "dossier-documents", "all"],
+    queryFn: () => laventecareApi.listDossierDocuments({ limit: 250 }),
+    staleTime: 15_000,
+  });
+
+  const { data: dossierAdvice, isLoading: dossierAdviceLoading } = useQuery({
+    queryKey: ["laventecare", "dossier-advice", "global"],
+    queryFn: () => laventecareApi.dossierAdvice({ query: "laventecare", limit: 8 }),
+    staleTime: 30_000,
   });
 
   const createLeadMut = useMutation({
@@ -271,9 +284,10 @@ export function useLaventeCare() {
     [cockpit]
   );
   const dossierDocuments = useMemo(
-    () => (cockpit?.dossierDocuments ?? []) as DossierDocumentItem[],
-    [cockpit]
+    () => (allDossierDocumentsData ?? cockpit?.dossierDocuments ?? []) as DossierDocumentItem[],
+    [allDossierDocumentsData, cockpit]
   );
+  const aiDossierAdvice = useMemo(() => dossierAdvice as DossierAdviceItem | undefined, [dossierAdvice]);
   const activityEvents = useMemo(
     () => (cockpit?.activityEvents ?? []) as ActivityEventItem[],
     [cockpit]
@@ -411,6 +425,7 @@ export function useLaventeCare() {
     cockpitLoading,
     billingLoading,
     mailboxLoading,
+    dossierAdviceLoading,
     companies,
     contacts,
     documents,
@@ -425,6 +440,7 @@ export function useLaventeCare() {
     openChanges,
     recentDecisions,
     dossierDocuments,
+    aiDossierAdvice,
     activityEvents,
     billing: billingData,
     mailbox: mailboxData,

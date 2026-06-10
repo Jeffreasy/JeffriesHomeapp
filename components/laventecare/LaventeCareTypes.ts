@@ -17,6 +17,7 @@ import {
   type LCMailbox,
   type LCMailTemplate,
   type LCMailOutboxItem,
+  type LCDossierAdvice,
 } from "@/lib/api";
 
 export type Tone = "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
@@ -26,6 +27,7 @@ export type DocumentItem = LCDocument & {
 };
 
 export type DossierDocumentItem = LCDossierDocument;
+export type DossierAdviceItem = LCDossierAdvice;
 export type ActivityEventItem = LCActivityEvent;
 export type BillingItem = LCBilling;
 export type QuoteItem = LCQuote;

@@ -62,6 +62,7 @@ export default function LaventeCarePage() {
     cockpitLoading,
     billingLoading,
     mailboxLoading,
+    dossierAdviceLoading,
     companies,
     contacts,
     documents,
@@ -76,6 +77,7 @@ export default function LaventeCarePage() {
     openChanges,
     recentDecisions,
     dossierDocuments,
+    aiDossierAdvice,
     activityEvents,
     billing,
     mailbox,
@@ -372,7 +374,7 @@ export default function LaventeCarePage() {
         id: "signals",
         label: "Signalen",
         eyebrow: "AI triage",
-        description: "Agenda, mail en notities naar acties en leads.",
+        description: "Nieuwe matches, open acties en follow-ups.",
         count: `${businessSignals.length + actionItems.length + followUps.length}`,
         icon: portalIcons.signals,
         tone: "violet",
@@ -1363,7 +1365,11 @@ export default function LaventeCarePage() {
               <LaventeCareKnowledgeView
                 search={search}
                 setSearch={setSearch}
+                documents={documents}
                 documentGroups={documentGroups}
+                dossierDocuments={dossierDocuments}
+                dossierAdvice={aiDossierAdvice}
+                dossierAdviceLoading={dossierAdviceLoading}
               />
             ) : null}
 

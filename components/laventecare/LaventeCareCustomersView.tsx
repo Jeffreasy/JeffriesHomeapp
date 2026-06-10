@@ -72,7 +72,10 @@ export function LaventeCareCustomersView({
         {companies.map((company) => {
           const id = company._id ?? company.id;
           const companyContacts = contacts.filter((contact) => contact.company_id === id);
-          const companyDocs = dossierDocuments.filter((doc) => doc.company_id === id);
+          const leadIds = new Set(activeLeads.filter((lead) => lead.company_id === id).map((lead) => lead._id ?? lead.id));
+          const workstreamIds = new Set(activeWorkstreams.filter((workstream) => workstream.company_id === id).map((workstream) => workstream._id ?? workstream.id));
+          const projectIds = new Set(activeProjects.filter((project) => project.company_id === id).map((project) => project._id ?? project.id));
+          const companyDocs = dossierDocuments.filter((doc) => isDossierDocumentForCompany(doc, id, company.naam, leadIds, projectIds, workstreamIds));
           const openWork = [
             company.leads ? `${company.leads} lead${company.leads === 1 ? "" : "s"}` : "",
             company.workstreams ? `${company.workstreams} opdracht${company.workstreams === 1 ? "" : "en"}` : "",
@@ -218,6 +221,23 @@ export function LaventeCareCustomersView({
 
 function toExternalHref(url: string) {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+function isDossierDocumentForCompany(
+  doc: DossierDocumentItem,
+  companyId: string,
+  companyName: string,
+  leadIds: Set<string>,
+  projectIds: Set<string>,
+  workstreamIds: Set<string>
+) {
+  if (!companyId) return false;
+  if (doc.company_id === companyId) return true;
+  if (doc.context_id === companyId && ["company", "klant", "klantdossier", "laventecare_company"].includes(doc.context_type)) return true;
+  if (doc.lead_id && leadIds.has(doc.lead_id)) return true;
+  if (doc.project_id && projectIds.has(doc.project_id)) return true;
+  if (doc.workstream_id && workstreamIds.has(doc.workstream_id)) return true;
+  return Boolean(doc.context_title && doc.context_title.trim().toLowerCase() === companyName.trim().toLowerCase());
 }
 
 function Metric({ label, value, sub }: { label: string; value: number; sub: string }) {

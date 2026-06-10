@@ -44,7 +44,7 @@ type MailAttachment = MailAttachmentPayload & {
   extraction_status: "ok" | "partial" | "failed";
 };
 
-type SuggestPayload = Omit<SendPayload, "cc" | "bcc" | "send"> & {
+type SuggestPayload = Omit<SendPayload, "cc" | "bcc" | "send" | "attachments"> & {
   quote_id?: string;
   invoice_id?: string;
   intent?: string;

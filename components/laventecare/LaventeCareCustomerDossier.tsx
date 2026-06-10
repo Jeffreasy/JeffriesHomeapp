@@ -101,9 +101,10 @@ export function LaventeCareCustomerDossier({
   onStartWorkstream: (company: CompanyItem) => void;
   onCreateActivity: (payload: LCActivityEventCreate) => Promise<void>;
 }) {
-  const [activeTab, setActiveTab] = useState<DossierTab>("timeline");
+  const [activeTab, setActiveTab] = useState<DossierTab>("overview");
   const [form, setForm] = useState<ActivityFormState>(emptyActivityForm);
   const companyId = company?._id ?? company?.id ?? "";
+  const companyName = company?.naam ?? "";
 
   const companyContacts = useMemo(
     () => contacts.filter((contact) => contact.company_id === companyId),
@@ -121,6 +122,7 @@ export function LaventeCareCustomerDossier({
     () => projects.filter((project) => project.company_id === companyId),
     [projects, companyId]
   );
+  const leadIds = useMemo(() => new Set(companyLeads.map((lead) => lead._id ?? lead.id)), [companyLeads]);
   const projectIds = useMemo(() => new Set(companyProjects.map((project) => project._id ?? project.id)), [companyProjects]);
   const workstreamIds = useMemo(
     () => new Set(companyWorkstreams.map((workstream) => workstream._id ?? workstream.id)),
@@ -139,12 +141,9 @@ export function LaventeCareCustomerDossier({
   const companyDocuments = useMemo(
     () =>
       dossierDocuments.filter(
-        (doc) =>
-          doc.company_id === companyId ||
-          Boolean(doc.project_id && projectIds.has(doc.project_id)) ||
-          Boolean(doc.workstream_id && workstreamIds.has(doc.workstream_id))
+        (doc) => isDossierDocumentForCompany(doc, companyId, companyName, leadIds, projectIds, workstreamIds)
       ),
-    [dossierDocuments, companyId, projectIds, workstreamIds]
+    [dossierDocuments, companyId, companyName, leadIds, projectIds, workstreamIds]
   );
   const companyActivity = useMemo(
     () => activityEvents.filter((event) => event.company_id === companyId),
@@ -199,7 +198,7 @@ export function LaventeCareCustomerDossier({
       maxWidth="4xl"
     >
       <div className="space-y-5">
-        <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3 sm:p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -219,44 +218,62 @@ export function LaventeCareCustomerDossier({
                 {company.notities || "Nog geen klantcontext vastgelegd. Log een moment of voeg notities toe zodat Brain dit dossier beter begrijpt."}
               </p>
               {primaryContact ? (
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
-                  <span className="inline-flex items-center gap-1.5">
+                <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-2">
+                  <span className="inline-flex min-w-0 items-center gap-1.5">
                     <UserRound size={13} />
-                    {primaryContact.naam}
+                    <span className="truncate">{primaryContact.naam}</span>
                   </span>
                   {primaryContact.email ? (
-                    <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex min-w-0 items-center gap-1.5">
                       <Mail size={13} />
-                      {primaryContact.email}
+                      <span className="truncate">{primaryContact.email}</span>
                     </span>
                   ) : null}
                   {primaryContact.telefoon ? (
-                    <span className="inline-flex items-center gap-1.5">
+                    <span className="inline-flex min-w-0 items-center gap-1.5">
                       <Phone size={13} />
-                      {primaryContact.telefoon}
+                      <span className="truncate">{primaryContact.telefoon}</span>
                     </span>
                   ) : null}
                 </div>
               ) : null}
             </div>
 
-            <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
-              <button type="button" onClick={() => onEditCompany(company)} className="btn btn--ghost btn--sm justify-center">
+            <div className="grid shrink-0 grid-cols-3 gap-2 lg:flex">
+              <button
+                type="button"
+                onClick={() => onEditCompany(company)}
+                className="btn btn--ghost btn--sm justify-center"
+                aria-label={`${company.naam} bewerken`}
+                title="Klant bewerken"
+              >
                 <Save size={14} />
-                Bewerken
+                <span className="hidden sm:inline">Bewerken</span>
               </button>
-              <button type="button" onClick={() => onAddContact(company)} className="btn btn--ghost btn--sm justify-center">
+              <button
+                type="button"
+                onClick={() => onAddContact(company)}
+                className="btn btn--ghost btn--sm justify-center"
+                aria-label={`Contact toevoegen aan ${company.naam}`}
+                title="Contact toevoegen"
+              >
                 <Plus size={14} />
-                Contact
+                <span className="hidden sm:inline">Contact</span>
               </button>
-              <button type="button" onClick={() => onStartWorkstream(company)} className="btn btn--primary btn--sm justify-center">
+              <button
+                type="button"
+                onClick={() => onStartWorkstream(company)}
+                className="btn btn--primary btn--sm justify-center"
+                aria-label={`Nieuwe opdracht voor ${company.naam}`}
+                title="Nieuwe opdracht"
+              >
                 <Workflow size={14} />
-                Opdracht
+                <span className="hidden sm:inline">Opdracht</span>
               </button>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
             <DossierMetric label="Open werk" value={openWorkCount} detail="leads, opdrachten, projecten" />
             <DossierMetric label="Contacten" value={companyContacts.length} detail="gekoppelde personen" />
             <DossierMetric label="Documenten" value={companyDocuments.length} detail="vastgelegd dossier" />
@@ -264,9 +281,9 @@ export function LaventeCareCustomerDossier({
           </div>
         </section>
 
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          <TabButton active={activeTab === "timeline"} icon={History} label="Timeline" onClick={() => setActiveTab("timeline")} />
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:overflow-x-auto sm:pb-1" role="tablist" aria-label="Klantdossier onderdelen">
           <TabButton active={activeTab === "overview"} icon={Activity} label="Overzicht" onClick={() => setActiveTab("overview")} />
+          <TabButton active={activeTab === "timeline"} icon={History} label="Timeline" onClick={() => setActiveTab("timeline")} />
           <TabButton active={activeTab === "work"} icon={FolderKanban} label="Werk" onClick={() => setActiveTab("work")} />
           <TabButton active={activeTab === "documents"} icon={FileCheck2} label="Documenten" onClick={() => setActiveTab("documents")} />
         </div>
@@ -331,19 +348,7 @@ export function LaventeCareCustomerDossier({
           <div className="space-y-3">
             {companyDocuments.length > 0 ? (
               companyDocuments.map((doc) => (
-                <a
-                  key={doc.id}
-                  href={doc.pdf_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:bg-white/[0.06]"
-                >
-                  <p className="text-sm font-bold text-white">{doc.titel}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {doc.template_label ?? label(doc.context_type)} - {formatDate(doc.created_at)}
-                  </p>
-                  {doc.notes ? <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-400">{doc.notes}</p> : null}
-                </a>
+                <DocumentCard key={doc.id} doc={doc} />
               ))
             ) : (
               <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-500">
@@ -359,10 +364,10 @@ export function LaventeCareCustomerDossier({
 
 function DossierMetric({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-black/10 p-3">
+    <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 p-3">
       <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</p>
       <p className="mt-1 text-xl font-bold text-white">{value}</p>
-      <p className="mt-0.5 text-[11px] text-slate-500">{detail}</p>
+      <p className="mt-0.5 truncate text-[11px] text-slate-500">{detail}</p>
     </div>
   );
 }
@@ -382,8 +387,10 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
+      role="tab"
+      aria-selected={active}
       className={cn(
-        "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition",
+        "inline-flex h-10 min-w-0 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition sm:min-w-[132px]",
         active
           ? "border-amber-400/40 bg-amber-500/10 text-amber-100"
           : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-white"
@@ -398,14 +405,14 @@ function TabButton({
 function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
   if (timeline.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-500">
+      <div className="order-2 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-500 lg:order-1">
         Nog geen dossiermomenten. Log het eerste contactmoment om de klantgeschiedenis te starten.
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="order-2 space-y-3 lg:order-1">
       {timeline.map((item) => (
         <div key={item.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
           <div className="flex gap-3">
@@ -448,7 +455,7 @@ function ActivityForm({
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   return (
-    <form onSubmit={onSubmit} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+    <form onSubmit={onSubmit} className="order-1 rounded-xl border border-amber-500/15 bg-amber-500/[0.05] p-4 lg:order-2 lg:sticky lg:top-4">
       <div className="flex items-center gap-2">
         <NotebookPen size={16} className="text-amber-300" />
         <h3 className="text-sm font-bold text-white">Moment loggen</h3>
@@ -564,9 +571,9 @@ function InfoPanel({ title, rows }: { title: string; rows: [string, string][] })
       <h3 className="text-sm font-bold text-white">{title}</h3>
       <div className="mt-3 space-y-2">
         {rows.map(([rowLabel, value]) => (
-          <div key={rowLabel} className="flex items-start justify-between gap-3 text-sm">
+          <div key={rowLabel} className="grid gap-1 text-sm sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] sm:gap-3">
             <span className="text-slate-500">{rowLabel}</span>
-            <span className="max-w-[60%] text-right font-semibold text-slate-200">{value}</span>
+            <span className="min-w-0 break-words font-semibold text-slate-200 sm:text-right">{value}</span>
           </div>
         ))}
       </div>
@@ -593,6 +600,56 @@ function WorkColumn({ title, empty, items }: { title: string; empty: string; ite
       </div>
     </div>
   );
+}
+
+function DocumentCard({ doc }: { doc: DossierDocumentItem }) {
+  return (
+    <a
+      href={doc.pdf_url}
+      target="_blank"
+      rel="noreferrer"
+      className="group block rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-amber-500/25 hover:bg-white/[0.06]"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300">
+          <FileCheck2 size={17} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-bold text-white">{doc.titel}</span>
+          <span className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
+            <span>{doc.template_label ?? label(doc.context_type)}</span>
+            <span aria-hidden="true">-</span>
+            <span>{formatDate(doc.created_at)}</span>
+          </span>
+          {doc.notes ? <span className="mt-2 line-clamp-2 block text-sm leading-5 text-slate-400">{doc.notes}</span> : null}
+        </span>
+        <span className="hidden shrink-0 rounded-lg border border-white/10 bg-black/10 px-2.5 py-1 text-xs font-bold text-slate-300 transition group-hover:border-amber-500/25 group-hover:text-amber-200 sm:inline-flex">
+          Open PDF
+        </span>
+      </div>
+    </a>
+  );
+}
+
+function isDossierDocumentForCompany(
+  doc: DossierDocumentItem,
+  companyId: string,
+  companyName: string,
+  leadIds: Set<string>,
+  projectIds: Set<string>,
+  workstreamIds: Set<string>
+) {
+  if (!companyId) return false;
+  if (doc.company_id === companyId) return true;
+  if (doc.context_id === companyId && ["company", "klant", "klantdossier", "laventecare_company"].includes(doc.context_type)) return true;
+  if (doc.lead_id && leadIds.has(doc.lead_id)) return true;
+  if (doc.project_id && projectIds.has(doc.project_id)) return true;
+  if (doc.workstream_id && workstreamIds.has(doc.workstream_id)) return true;
+  return Boolean(doc.context_title && normalizeDossierText(doc.context_title) === normalizeDossierText(companyName));
+}
+
+function normalizeDossierText(value: string) {
+  return value.trim().toLowerCase();
 }
 
 function buildTimeline(input: {

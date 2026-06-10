@@ -571,6 +571,52 @@ export interface LCDossierDocument {
   created_at: string;
 }
 
+export interface LCDossierAdviceTarget {
+  kind: string;
+  id?: string | null;
+  title: string;
+  subtitle?: string;
+  company_id?: string | null;
+  company_name?: string;
+  phase?: string;
+  status?: string;
+  priority?: string;
+  query?: string;
+}
+
+export interface LCDocumentRecommendation {
+  document: LCDocument;
+  score: number;
+  priority: string;
+  usage: string;
+  reasons: string[];
+  alreadyInDossier: boolean;
+  dossierDocumentId?: string | null;
+  dossierCreatedAt?: string | null;
+}
+
+export interface LCDossierRequirement {
+  key: string;
+  label: string;
+  status: "ok" | "attention" | "missing" | string;
+  reason: string;
+  recommendedDocumentKeys: string[];
+}
+
+export interface LCDossierAdvice {
+  generatedAt: string;
+  target: LCDossierAdviceTarget;
+  status: string;
+  coverage: number;
+  requirements: LCDossierRequirement[];
+  recommendations: LCDocumentRecommendation[];
+  presentDocuments: LCDossierDocument[];
+  totalDossierDocuments?: number;
+  matchedDossierDocuments?: number;
+  nextActions: string[];
+  evidence: string[];
+}
+
 export interface LCActivityEvent {
   id: string;
   user_id: string;
@@ -1133,6 +1179,17 @@ export const laventecareApi = {
     if (params?.limit) search.set("limit", String(params.limit));
     const query = search.toString();
     return apiFetch<LCDossierDocument[]>(`/laventecare/dossier-documents${query ? `?${query}` : ""}`);
+  },
+  dossierAdvice: (params?: { leadId?: string; projectId?: string; workstreamId?: string; companyId?: string; query?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.leadId) search.set("leadId", params.leadId);
+    if (params?.projectId) search.set("projectId", params.projectId);
+    if (params?.workstreamId) search.set("workstreamId", params.workstreamId);
+    if (params?.companyId) search.set("companyId", params.companyId);
+    if (params?.query) search.set("query", params.query);
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCDossierAdvice>(`/laventecare/ai/dossier-advice${query ? `?${query}` : ""}`);
   },
   createDossierDocument: (data: LCDossierDocumentCreate) =>
     apiFetch<LCDossierDocument>("/laventecare/dossier-documents", {
