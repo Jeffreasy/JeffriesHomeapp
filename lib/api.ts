@@ -978,6 +978,15 @@ export const laventecareApi = {
     intent?: string;
     tone?: string;
     variables?: Record<string, string>;
+    attachments?: Array<{
+      name: string;
+      content_type: string;
+      size: number;
+      pages: number;
+      extracted_text: string;
+      summary: string;
+      extraction_status: "ok" | "partial" | "failed";
+    }>;
   }) =>
     apiFetch<LCMailAISuggestion>("/laventecare/mailbox/ai-suggest", { method: "POST", body: JSON.stringify(data) }),
   sendTemplatedMail: (data: {
@@ -994,6 +1003,12 @@ export const laventecareApi = {
     bcc?: string[];
     variables?: Record<string, string>;
     send?: boolean;
+    attachments?: Array<{
+      name: string;
+      content_type: string;
+      content_bytes: string;
+      size?: number;
+    }>;
   }) =>
     apiFetch<LCMailOutboxItem>("/laventecare/mailbox/send-template", { method: "POST", body: JSON.stringify(data) }),
   listCompanies: (params?: { q?: string; limit?: number }) => {

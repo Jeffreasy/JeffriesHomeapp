@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, type ReactNode, useMemo, useState } from "react";
-import { CheckCircle2, MailCheck, MailPlus, Send, Sparkles, TriangleAlert } from "lucide-react";
+import { FormEvent, type ChangeEvent, type ReactNode, useMemo, useState } from "react";
+import { CheckCircle2, FileText, MailCheck, MailPlus, Paperclip, Send, Sparkles, TriangleAlert, X } from "lucide-react";
 import type { LCMailAISuggestion } from "@/lib/api";
+import { extractLaventeCareMailAttachmentContext, type LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
 import type {
   CompanyItem,
   ContactItem,
@@ -26,6 +27,21 @@ type SendPayload = {
   to_name?: string;
   variables?: Record<string, string>;
   send?: boolean;
+  attachments?: MailAttachmentPayload[];
+};
+
+type MailAttachmentPayload = {
+  name: string;
+  content_type: string;
+  content_bytes: string;
+};
+
+type MailAttachment = MailAttachmentPayload & {
+  size: number;
+  pages: number;
+  extracted_text: string;
+  summary: string;
+  extraction_status: "ok" | "partial" | "failed";
 };
 
 type SuggestPayload = Omit<SendPayload, "cc" | "bcc" | "send"> & {
@@ -33,10 +49,13 @@ type SuggestPayload = Omit<SendPayload, "cc" | "bcc" | "send"> & {
   invoice_id?: string;
   intent?: string;
   tone?: string;
+  attachments?: LaventeCareMailAttachmentContext[];
 };
 
 const inputClass =
   "w-full min-w-0 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-500/20";
+const MAX_MAIL_ATTACHMENTS = 6;
+const MAX_MAIL_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 
 export function LaventeCareMailboxView({
   mailbox,
@@ -80,6 +99,9 @@ export function LaventeCareMailboxView({
   const [aiIntent, setAiIntent] = useState("Maak een klantmail op basis van de gekoppelde LaventeCare context.");
   const [aiTone, setAiTone] = useState("professioneel, warm en concreet");
   const [aiSuggestion, setAiSuggestion] = useState<LCMailAISuggestion | null>(null);
+  const [attachments, setAttachments] = useState<MailAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState("");
+  const [attachmentsReading, setAttachmentsReading] = useState(false);
   const [variables, setVariables] = useState(
     [
       "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
@@ -94,6 +116,9 @@ export function LaventeCareMailboxView({
       "pilot.criteria=kernfunctionaliteit, gebruiksgemak en betrouwbaarheid",
       "pilot.feedback_moment=na de eerste testperiode",
       "pilot.access_summary=pilottoegang stemmen we voor de start af via het afgesproken kanaal",
+      "documentation.summary=De klantdocumentatie voor de pilot staat klaar als praktische start- en naslagset.",
+      "documentation.attachments=quickstart, workflowhandleiding, pilotafspraken en vrijgave/datakwaliteit",
+      "documentation.next_step=Loop de documenten rustig door; daarna stemmen we de pilotstart en eventuele vragen samen af.",
       "meeting.topic=afstemming",
       "meeting.summary=De besproken punten zijn vastgelegd in het klantdossier.",
       "meeting.actions=de vervolgstap wordt opgepakt",
@@ -138,12 +163,14 @@ export function LaventeCareMailboxView({
         resolvedEmail,
         companyLinked: Boolean(effectiveCompanyId || selectedCompany),
         selectedInvoice,
+        attachmentCount: attachments.length,
+        unreadableAttachmentCount: attachments.filter((attachment) => attachment.extraction_status === "failed").length,
       }),
-    [selectedTemplate, previewVariables, previewHTML, resolvedEmail, effectiveCompanyId, selectedCompany, selectedInvoice]
+    [selectedTemplate, previewVariables, previewHTML, resolvedEmail, effectiveCompanyId, selectedCompany, selectedInvoice, attachments]
   );
 
   const handleSuggest = async () => {
-    if (!selectedTemplate) return;
+    if (!selectedTemplate || attachmentsReading) return;
     let suggestion: LCMailAISuggestion;
     try {
       suggestion = await onSuggestMailContent({
@@ -158,6 +185,7 @@ export function LaventeCareMailboxView({
         intent: aiIntent,
         tone: aiTone,
         variables: outboundVariables,
+        attachments: attachmentAIContext(attachments),
       });
     } catch {
       return;
@@ -180,7 +208,32 @@ export function LaventeCareMailboxView({
       to_name: resolvedName || undefined,
       variables: outboundVariables,
       send,
+      attachments: send && attachments.length ? attachments.map(({ name, content_type, content_bytes }) => ({ name, content_type, content_bytes })) : undefined,
     });
+  };
+
+  const handleAttachmentFiles = async (event: ChangeEvent<HTMLInputElement>) => {
+    setAttachmentError("");
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) return;
+    if (attachments.length + files.length > MAX_MAIL_ATTACHMENTS) {
+      setAttachmentError(`Maximaal ${MAX_MAIL_ATTACHMENTS} bijlagen per mail.`);
+      return;
+    }
+    setAttachmentsReading(true);
+    try {
+      const next = await Promise.all(files.map(readMailAttachment));
+      setAttachments((current) => [...current, ...next]);
+      const documentNames = [...attachments, ...next].map((item) => readableAttachmentName(item.name)).join(", ");
+      if (documentNames) {
+        setVariables((current) => upsertVariables(current, { "documentation.attachments": documentNames }));
+      }
+    } catch (error) {
+      setAttachmentError(error instanceof Error ? error.message : "Bijlage kon niet worden gelezen.");
+    } finally {
+      setAttachmentsReading(false);
+    }
   };
 
   return (
@@ -320,6 +373,54 @@ export function LaventeCareMailboxView({
 
           <InvoiceMailStatus invoice={selectedInvoice} template={selectedTemplate} />
 
+          <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4 text-slate-300" />
+                  <p className="text-xs font-semibold uppercase text-slate-500">Bijlagen</p>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  Voeg klant-PDF-bestanden toe bij direct versturen. De AI leest de tekstextractie mee voordat hij de mail invult.
+                </p>
+              </div>
+              <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-bold text-slate-200 transition hover:bg-white/[0.08]">
+                <Paperclip size={15} />
+                {attachmentsReading ? "PDF lezen..." : "PDF kiezen"}
+                <input type="file" accept="application/pdf,.pdf" multiple className="sr-only" onChange={handleAttachmentFiles} />
+              </label>
+            </div>
+            {attachmentError ? <p className="mt-2 text-xs font-semibold text-rose-300">{attachmentError}</p> : null}
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {attachments.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500 sm:col-span-2">
+                  Voor HenkeWonen: quickstart, workflowhandleiding, pilotafspraken en vrijgave/datakwaliteit selecteren.
+                </div>
+              ) : (
+                attachments.map((attachment, index) => (
+                  <div key={`${attachment.name}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                    <FileText className="h-4 w-4 shrink-0 text-sky-200" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-bold text-white">{attachment.name}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {formatFileSize(attachment.size)} - {attachment.pages || "?"} pag. - {attachmentStatusLabel(attachment.extraction_status)}
+                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">{attachment.summary}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAttachments((current) => current.filter((_, currentIndex) => currentIndex !== index))}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
+                      aria-label={`${attachment.name} verwijderen`}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           <Field label="Variabelen" className="mt-3">
             <textarea
               value={variables}
@@ -342,12 +443,12 @@ export function LaventeCareMailboxView({
               </div>
               <button
                 type="button"
-                disabled={aiSuggesting || !selectedTemplate}
+                disabled={aiSuggesting || attachmentsReading || !selectedTemplate}
                 onClick={() => void handleSuggest()}
                 className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-sky-300 px-3 text-sm font-bold text-sky-950 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Sparkles size={15} />
-                {aiSuggesting ? "AI leest context..." : "AI vullen"}
+                {attachmentsReading ? "PDF's lezen..." : aiSuggesting ? "AI leest context..." : "AI vullen"}
               </button>
             </div>
             <div className="mt-3 grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
@@ -686,6 +787,8 @@ function buildSendReadiness({
   resolvedEmail,
   companyLinked,
   selectedInvoice,
+  attachmentCount,
+  unreadableAttachmentCount,
 }: {
   template?: MailTemplateItem;
   variables: Record<string, string>;
@@ -693,6 +796,8 @@ function buildSendReadiness({
   resolvedEmail: string;
   companyLinked: boolean;
   selectedInvoice?: InvoiceItem;
+  attachmentCount: number;
+  unreadableAttachmentCount: number;
 }) {
   const placeholders = extractPlaceholders(template);
   const unresolved = placeholders.filter((placeholder) => !variables[placeholder]?.trim() && !placeholder.endsWith(".url"));
@@ -701,6 +806,7 @@ function buildSendReadiness({
   const safeCTAs = renderedCTAUrls.filter(isSafePreviewUrl);
   const hasLogo = previewHTML.includes("ik.imagekit.io/a0oim4e3e") || previewHTML.includes("LaventeCare");
   const hasAccessPlaceholder = placeholders.some((placeholder) => placeholder.startsWith("pilot.access"));
+  const documentationTemplate = placeholders.some((placeholder) => placeholder.startsWith("documentation."));
   const sensitiveAccessDetected = hasSensitiveAccessValue(Object.values(variables).join("\n"));
 
   const items: Array<{ label: string; detail: string; status: ReadinessStatus }> = [
@@ -755,6 +861,18 @@ function buildSendReadiness({
       status: sensitiveAccessDetected ? "warn" : "ok",
     });
   }
+  if (documentationTemplate || attachmentCount > 0) {
+    items.push({
+      label: "Bijlagen",
+      detail:
+        attachmentCount > 0
+          ? unreadableAttachmentCount > 0
+            ? `${unreadableAttachmentCount} van ${attachmentCount} PDF-bijlage(n) niet volledig leesbaar; controleer handmatig.`
+            : `${attachmentCount} PDF-bijlage(n) gelezen; AI-context wordt meegenomen bij AI vullen.`
+          : "Documentatietemplate geselecteerd; voeg de klant-PDF-bestanden toe voordat je verstuurt.",
+      status: attachmentCount > 0 ? (unreadableAttachmentCount > 0 ? "warn" : "ok") : "warn",
+    });
+  }
 
   const status: ReadinessStatus = items.some((item) => item.status === "missing")
     ? "missing"
@@ -762,6 +880,79 @@ function buildSendReadiness({
       ? "warn"
       : "ok";
   return { status, items };
+}
+
+async function readMailAttachment(file: File): Promise<MailAttachment> {
+  if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+    throw new Error(`${file.name} is geen PDF.`);
+  }
+  if (file.size > MAX_MAIL_ATTACHMENT_BYTES) {
+    throw new Error(`${file.name} is groter dan 3MB.`);
+  }
+  const dataURL = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error(`${file.name} kon niet worden gelezen.`));
+    reader.readAsDataURL(file);
+  });
+  const contentBytes = dataURL.split(",")[1]?.trim();
+  if (!contentBytes) {
+    throw new Error(`${file.name} bevat geen leesbare inhoud.`);
+  }
+  const context = await extractLaventeCareMailAttachmentContext(file);
+  return {
+    name: file.name,
+    content_type: file.type || "application/pdf",
+    content_bytes: contentBytes,
+    size: file.size,
+    pages: context.pages,
+    extracted_text: context.extracted_text,
+    summary: context.summary,
+    extraction_status: context.extraction_status,
+  };
+}
+
+function attachmentAIContext(attachments: MailAttachment[]): LaventeCareMailAttachmentContext[] {
+  return attachments.map(({ name, content_type, size, pages, extracted_text, summary, extraction_status }) => ({
+    name,
+    content_type,
+    size,
+    pages,
+    extracted_text,
+    summary,
+    extraction_status,
+  }));
+}
+
+function upsertVariables(current: string, nextValues: Record<string, string>) {
+  const currentValues = parseVariables(current);
+  return serializeVariables({ ...currentValues, ...nextValues }, Object.keys(nextValues));
+}
+
+function readableAttachmentName(name: string) {
+  return name
+    .replace(/\.pdf$/i, "")
+    .replace(/henke-wonen-portal-/i, "")
+    .replace(/-Print$/i, "")
+    .replace(/-/g, " ")
+    .trim();
+}
+
+function attachmentStatusLabel(value: MailAttachment["extraction_status"]) {
+  switch (value) {
+    case "ok":
+      return "AI gelezen";
+    case "partial":
+      return "AI uittreksel";
+    default:
+      return "niet leesbaar";
+  }
+}
+
+function formatFileSize(value: number) {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function readinessBadgeClass(value: ReadinessStatus) {
