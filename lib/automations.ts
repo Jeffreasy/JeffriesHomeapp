@@ -88,28 +88,38 @@ export function createAutomation(
 // ─── Dienst-Wekker Templates ─────────────────────────────────────────────────
 
 export interface DienstWekkerTemplate {
+  id: string;
   name: string;
+  label: string;
   time: string;
   action: AutomationAction;
   description: string;
 }
 
+export type DienstWekkerTimes = Record<string, string>;
+
 export const DIENST_WEKKER_PACKS: Record<ShiftType, DienstWekkerTemplate[]> = {
   Vroeg: [
     {
-      name: "🌅 Vroeg — Opstaan (05:00)",
+      id: "opstaan",
+      name: "Vroeg - Opstaan",
+      label: "Opstaan",
       time: "05:00",
       description: "Zachte ochtendverlichting bij het opstaan",
       action: { type: "scene", sceneId: "ochtend" },
     },
     {
-      name: "☀️ Vroeg — Klaar (05:30)",
+      id: "klaar",
+      name: "Vroeg - Klaar",
+      label: "Klaar maken",
       time: "05:30",
       description: "Heldere verlichting om klaar te maken",
       action: { type: "scene", sceneId: "helder" },
     },
     {
-      name: "🚪 Vroeg — Vertrek (06:15)",
+      id: "vertrek",
+      name: "Vroeg - Vertrek",
+      label: "Vertrek",
       time: "06:15",
       description: "Alle lampen uit bij vertrek",
       action: { type: "off" },
@@ -117,13 +127,17 @@ export const DIENST_WEKKER_PACKS: Record<ShiftType, DienstWekkerTemplate[]> = {
   ],
   Laat: [
     {
-      name: "🌙 Laat — Klaar (12:30)",
+      id: "klaar",
+      name: "Laat - Klaar",
+      label: "Klaar maken",
       time: "12:30",
       description: "Zet lichten aan voor vertrek laat dienst",
       action: { type: "scene", sceneId: "helder" },
     },
     {
-      name: "🚪 Laat — Vertrek (13:45)",
+      id: "vertrek",
+      name: "Laat - Vertrek",
+      label: "Vertrek",
       time: "13:45",
       description: "Alle lampen uit bij vertrek laat dienst",
       action: { type: "off" },
@@ -131,7 +145,9 @@ export const DIENST_WEKKER_PACKS: Record<ShiftType, DienstWekkerTemplate[]> = {
   ],
   Dienst: [
     {
-      name: "💼 Dienst — Vertrek (12:00)",
+      id: "vertrek",
+      name: "Dienst - Vertrek",
+      label: "Vertrek",
       time: "12:00",
       description: "Alle lampen uit bij vertrek dagdienst",
       action: { type: "off" },
@@ -141,19 +157,42 @@ export const DIENST_WEKKER_PACKS: Record<ShiftType, DienstWekkerTemplate[]> = {
 };
 
 /** Create a full set of automation objects for a shift type */
-export function createDienstWekkerPack(shiftType: ShiftType): Automation[] {
+export function createDienstWekkerPack(shiftType: ShiftType, times: Partial<DienstWekkerTimes> = {}): Automation[] {
   const templates = DIENST_WEKKER_PACKS[shiftType] ?? [];
   return templates.map((t) =>
     createAutomation({
-      name: t.name,
+      name: `${t.name} (${times[t.id] ?? t.time})`,
       enabled: true,
       group: `dienst-wekker-${shiftType.toLowerCase()}`,
       trigger: {
-        time: t.time,
+        time: times[t.id] ?? t.time,
         triggerType: "schedule",
         shiftType,
       },
       action: t.action,
     })
   );
+}
+
+export function getDienstWekkerDefaultTimes(shiftType: ShiftType): DienstWekkerTimes {
+  return Object.fromEntries((DIENST_WEKKER_PACKS[shiftType] ?? []).map((template) => [template.id, template.time]));
+}
+
+export function actionLabel(action: AutomationAction): string {
+  switch (action.type) {
+    case "scene":
+      return `Scene: ${SCENE_DEFINITIONS[action.sceneId!]?.label ?? action.sceneId}`;
+    case "on":
+      return "Alle lampen aan";
+    case "off":
+      return "Alle lampen uit";
+    case "brightness":
+      return `Helderheid ${action.brightness}%`;
+    case "color_temp":
+      return `Kleurtemperatuur ${Math.round(1_000_000 / (action.colorTempMireds ?? 370))}K`;
+    case "color":
+      return `Kleur ${action.colorHex?.toUpperCase()}`;
+    default:
+      return "Onbekende actie";
+  }
 }

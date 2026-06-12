@@ -10,14 +10,16 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { AutomationCard } from "@/components/automations/AutomationCard";
 import { AutomationForm } from "@/components/automations/AutomationForm";
 import { DienstWekkerSection } from "@/components/automations/DienstWekkerSection";
-import { type Automation, type ShiftType } from "@/lib/automations";
+import { type Automation, type DienstWekkerTimes, type ShiftType } from "@/lib/automations";
 import { cn } from "@/lib/utils";
 
+type ManagedShiftType = Exclude<ShiftType, "any">;
+
 export default function AutomationsPage() {
-  const { automations, add, update, addDienstWekkerPack, toggle, remove, lastCheck } =
+  const { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, lastCheck } =
     useAutomations();
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
-  const [installing, setInstalling] = useState<ShiftType | null>(null);
+  const [busyWekkerType, setBusyWekkerType] = useState<ManagedShiftType | null>(null);
   const { openConfirm } = useConfirm();
   const { success } = useToast();
 
@@ -44,28 +46,36 @@ export default function AutomationsPage() {
     success("Automatisering verwijderd");
   };
 
-  const handleAddWekkerPack = async (shiftType: ShiftType) => {
-    setInstalling(shiftType);
+  const handleSaveWekkerPack = async (shiftType: ManagedShiftType, times: DienstWekkerTimes) => {
+    setBusyWekkerType(shiftType);
     try {
-      const count = await addDienstWekkerPack(shiftType);
-      success(`${count} ${shiftType}-dienst automations aangemaakt`);
+      const count = await addDienstWekkerPack(shiftType, times);
+      success(`${shiftType}-wekker opgeslagen met ${count} stappen`);
     } finally {
-      setInstalling(null);
+      setBusyWekkerType(null);
+    }
+  };
+
+  const handleRemoveWekkerPack = async (shiftType: ManagedShiftType) => {
+    const confirmed = await openConfirm({
+      title: `${shiftType}-wekker verwijderen`,
+      message: `Alle automatische wekkerstappen voor ${shiftType}-diensten verwijderen?`,
+      confirmLabel: "Verwijderen",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
+    setBusyWekkerType(shiftType);
+    try {
+      await removeDienstWekkerPack(shiftType);
+      success(`${shiftType}-wekker verwijderd`);
+    } finally {
+      setBusyWekkerType(null);
     }
   };
 
   const enabled = automations.filter((a) => a.enabled);
   const disabled = automations.filter((a) => !a.enabled);
-
-  const hasVroegPack = automations.some((a) => a.group === "dienst-wekker-vroeg");
-  const hasLaatPack = automations.some((a) => a.group === "dienst-wekker-laat");
-  const hasDienstPack = automations.some((a) => a.group === "dienst-wekker-dienst");
-
-  const wekkerPacks = [
-    { type: "Vroeg" as ShiftType, label: "Vroeg dienst", sub: "05:00 · 05:30 · 06:15", accent: "#f97316", hasIt: hasVroegPack },
-    { type: "Laat"  as ShiftType, label: "Laat dienst",  sub: "12:30 · 13:45",          accent: "#ef4444", hasIt: hasLaatPack  },
-    { type: "Dienst" as ShiftType, label: "Dagdienst",   sub: "12:00",                   accent: "#3b82f6", hasIt: hasDienstPack },
-  ];
 
   return (
     <div className="text-slate-100">
@@ -110,7 +120,12 @@ export default function AutomationsPage() {
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
         <ErrorBoundary>
-          <DienstWekkerSection packs={wekkerPacks} onInstall={handleAddWekkerPack} installingType={installing} />
+          <DienstWekkerSection
+            automations={automations}
+            busyType={busyWekkerType}
+            onSave={handleSaveWekkerPack}
+            onRemove={handleRemoveWekkerPack}
+          />
         </ErrorBoundary>
 
           {/* Engine status */}

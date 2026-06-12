@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { automationsApi, type AutomationRow } from "@/lib/api";
 import {
   type Automation,
+  type DienstWekkerTimes,
   type ShiftType,
   createDienstWekkerPack,
 } from "@/lib/automations";
@@ -95,11 +96,11 @@ export function useAutomations() {
   );
 
   const addDienstWekkerPack = useCallback(
-    async (shiftType: ShiftType) => {
+    async (shiftType: ShiftType, times?: Partial<DienstWekkerTimes>) => {
       if (!userId) return 0;
       const groupTag = `dienst-wekker-${shiftType.toLowerCase()}`;
       await automationsApi.deleteByGroup(userId, groupTag);
-      const pack = createDienstWekkerPack(shiftType);
+      const pack = createDienstWekkerPack(shiftType, times);
       await Promise.all(
         pack.map((a) =>
           automationsApi.create(userId, {
@@ -112,11 +113,21 @@ export function useAutomations() {
           })
         )
       );
-      fetchAutomations();
+      await fetchAutomations();
       return pack.length;
     },
     [userId, fetchAutomations]
   );
 
-  return { automations, add, update, addDienstWekkerPack, toggle, remove, lastCheck: null };
+  const removeDienstWekkerPack = useCallback(
+    async (shiftType: ShiftType) => {
+      if (!userId) return;
+      const groupTag = `dienst-wekker-${shiftType.toLowerCase()}`;
+      await automationsApi.deleteByGroup(userId, groupTag);
+      await fetchAutomations();
+    },
+    [userId, fetchAutomations]
+  );
+
+  return { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, lastCheck: null };
 }

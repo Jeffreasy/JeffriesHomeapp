@@ -1,14 +1,20 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { useToast } from "@/components/ui/Toast";
+import { useDevices, useLampCommand } from "@/hooks/useDevices";
 import {
   formatNextAppointmentMeta,
   formatTimelineMeta,
   type FocusTimelineItem,
   useFocusData,
 } from "@/hooks/useFocusData";
-import type { FocusAttention, FocusBusinessStatus, FocusSyncSummary } from "@/lib/api";
+import type { Device, DeviceCommand, FocusAttention, FocusBusinessStatus, FocusSyncSummary } from "@/lib/api";
+import { CUSTOM_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
+import { cn } from "@/lib/utils";
 
 const PANEL = "rounded-lg border border-white/10 bg-white/[0.035] shadow-[0_18px_60px_rgba(0,0,0,0.26)]";
 
@@ -228,12 +234,125 @@ function SystemPanel({
         <Metric label="Online" value={`${devices.online}/${devices.total}`} tone="green" />
         <Metric label="Bridge" value={devices.bridgeOnline ? "Live" : "Offline"} tone={devices.bridgeOnline ? "green" : "rose"} />
       </div>
+      <FocusLightControls />
       <div className="mt-3 space-y-2">
         <InfoRow label="Netto" value={finance.value} meta={finance.hidden ? "Privacy actief" : finance.meta} />
         <InfoRow label="Afspraak" value={nextAppointment} />
         <InfoRow label="Sync" value={syncValue} />
       </div>
     </section>
+  );
+}
+
+const FOCUS_LIGHT_SCENE_IDS = ["focus", "avond", "nacht", "ochtend"] as const;
+
+function applyCommandToDevice(device: Device, cmd: DeviceCommand): Device {
+  const next = {
+    ...(device.current_state ?? { on: false, brightness: 100, color_temp: 4000, r: 0, g: 0, b: 0 }),
+  };
+
+  if (cmd.on !== undefined) next.on = cmd.on;
+  if (cmd.brightness !== undefined) next.brightness = cmd.brightness;
+  if (cmd.color_temp_mireds !== undefined) {
+    next.color_temp = Math.round(1_000_000 / cmd.color_temp_mireds);
+    next.r = 0;
+    next.g = 0;
+    next.b = 0;
+  }
+  if (cmd.r !== undefined) next.r = cmd.r;
+  if (cmd.g !== undefined) next.g = cmd.g;
+  if (cmd.b !== undefined) next.b = cmd.b;
+  if (cmd.on === false) next.on = false;
+
+  return { ...device, current_state: next };
+}
+
+function FocusLightControls() {
+  const { data: devices = [], isLoading } = useDevices();
+  const { mutate: sendCommand, isPending } = useLampCommand();
+  const queryClient = useQueryClient();
+  const { success, error } = useToast();
+
+  const onlineDevices = useMemo(() => devices.filter((device) => device.status === "online"), [devices]);
+  const onDevices = useMemo(() => onlineDevices.filter((device) => device.current_state?.on), [onlineDevices]);
+  const activeScene = detectActiveScene(devices);
+  const quickScenes = useMemo(
+    () => [
+      ...FOCUS_LIGHT_SCENE_IDS.map((id) => CUSTOM_SCENES.find((scene) => scene.id === id)).filter((scene): scene is ScenePreset => Boolean(scene)),
+      OFF_SCENE,
+    ],
+    [],
+  );
+
+  const canSend = onlineDevices.length > 0 && !isLoading;
+  const allOff = onDevices.length === 0;
+  const toggleLabel = allOff ? "Alles aan" : "Alles uit";
+
+  const applyCommand = (label: string, cmd: DeviceCommand) => {
+    if (!canSend) {
+      error("Geen online lampen beschikbaar");
+      return;
+    }
+
+    queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
+      old?.map((device) => (device.status === "online" ? applyCommandToDevice(device, cmd) : device)),
+    );
+
+    onlineDevices.forEach((device) => sendCommand({ id: device.id, cmd }));
+    success(`${label} toegepast op ${onlineDevices.length} lampen`);
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-white/8 bg-black/15 p-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <AppIcon name="lights" size="sm" tone="amber" framed />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">Lichten</p>
+            <p className="truncate text-xs text-slate-500">
+              {isLoading ? "Laden" : `${onlineDevices.length} online · ${onDevices.length} aan`}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => applyCommand(toggleLabel, allOff ? { on: true, brightness: 70 } : { on: false })}
+          disabled={!canSend || isPending}
+          className={cn(
+            "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+            allOff
+              ? "border-amber-400/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15"
+              : "border-slate-400/20 bg-slate-500/10 text-slate-200 hover:bg-slate-500/15",
+          )}
+        >
+          <AppIcon name="power" size="xs" />
+          {toggleLabel}
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {quickScenes.map((scene) => {
+          const active = activeScene === scene.id;
+          return (
+            <button
+              key={scene.id}
+              type="button"
+              onClick={() => applyCommand(scene.label, scene.command)}
+              disabled={!canSend || isPending}
+              aria-pressed={active}
+              className={cn(
+                "flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                active ? "bg-white/[0.08]" : "bg-white/[0.025] hover:bg-white/[0.06]",
+              )}
+              style={{ borderColor: active ? scene.color : `${scene.color}33` }}
+            >
+              <span className="min-w-0 truncate text-xs font-bold text-white">{scene.label}</span>
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: scene.color }} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
