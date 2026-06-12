@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { FocusModeAutoRedirect } from "@/components/layout/FocusModeControl";
 
 const AUTH_ROUTES = ["/sign-in", "/sign-up"];
 const CHROMELESS_ROUTES = ["/focus"];
@@ -23,6 +24,8 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen w-full overflow-x-hidden bg-[var(--color-background)]">
+      <FocusModeAutoRedirect />
+
       {/* Desktop sidebar — hidden on mobile */}
       <Sidebar />
 

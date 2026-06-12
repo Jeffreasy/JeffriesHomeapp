@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { FocusModeShortcut } from "@/components/layout/FocusModeControl";
 import {
   MOBILE_MORE_ITEMS,
   MOBILE_PRIMARY_ITEMS,
@@ -78,6 +79,8 @@ export function BottomNav() {
                   <AppIcon name="close" tone="slate" size="sm" />
                 </button>
               </div>
+
+              <FocusModeShortcut variant="mobile" />
 
               <div className="grid grid-cols-2 gap-2">
                 {MOBILE_MORE_ITEMS.map((item) => (
