@@ -110,7 +110,7 @@ function StatusPill({ icon, label, active }: { icon: "radar" | "wifi" | "wifiOff
 
 function NowPanel({ item, todayIso }: { item: FocusTimelineItem | null; todayIso?: string }) {
   return (
-    <section className={`${PANEL} flex min-h-[280px] flex-col p-4 sm:p-5`}>
+    <section className={`${PANEL} flex h-full min-h-[260px] flex-col p-4 sm:p-5 xl:min-h-0`}>
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase text-slate-500">Nu centraal</p>
@@ -144,11 +144,11 @@ function NowPanel({ item, todayIso }: { item: FocusTimelineItem | null; todayIso
 }
 
 function TimelinePanel({ items, todayIso }: { items: FocusTimelineItem[]; todayIso?: string }) {
-  const visible = items.slice(0, 7);
+  const visible = items.slice(0, 9);
   return (
-    <section className={`${PANEL} p-4 sm:p-5`}>
+    <section className={`${PANEL} flex h-full min-h-[240px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
       <PanelHeader icon="calendarDays" label="Vandaag en straks" value={`${visible.length} items`} />
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {visible.length > 0 ? (
           visible.map((item) => (
             <Link
@@ -176,9 +176,9 @@ function TimelinePanel({ items, todayIso }: { items: FocusTimelineItem[]; todayI
 
 function AttentionPanel({ items }: { items: FocusAttention[] }) {
   return (
-    <section className={`${PANEL} p-4 sm:p-5`}>
+    <section className={`${PANEL} flex h-full min-h-[240px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
       <PanelHeader icon="warning" label="Aandacht nodig" value={items.length === 0 ? "Rustig" : `${items.length}`} />
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {items.length > 0 ? (
           items.map((item) => {
             const content = (
@@ -208,14 +208,30 @@ function AttentionPanel({ items }: { items: FocusAttention[] }) {
   );
 }
 
-function HomePanel({ devices }: { devices: { total: number; online: number; on: number; bridgeOnline: boolean } }) {
+function SystemPanel({
+  devices,
+  finance,
+  sync,
+  nextAppointment,
+}: {
+  devices: { total: number; online: number; on: number; bridgeOnline: boolean };
+  finance: { value: string; hidden: boolean; meta: string };
+  sync?: FocusSyncSummary;
+  nextAppointment: string;
+}) {
+  const syncValue = [sync?.schedule.status ?? "laden", sync?.gmail.status ?? "laden"].join(" / ");
   return (
-    <section className={`${PANEL} p-4`}>
-      <PanelHeader icon="lights" label="Woning" value={`${devices.online}/${devices.total} online`} />
+    <section className={`${PANEL} h-full min-h-[250px] p-4 xl:min-h-0`}>
+      <PanelHeader icon="shield" label="Systeemlijn" value={devices.bridgeOnline ? "Live" : "Aandacht"} />
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <Metric label="Aan" value={`${devices.on}`} tone="amber" />
-        <Metric label="Online" value={`${devices.online}`} tone="green" />
+        <Metric label="Lampen aan" value={`${devices.on}`} tone="amber" />
+        <Metric label="Online" value={`${devices.online}/${devices.total}`} tone="green" />
         <Metric label="Bridge" value={devices.bridgeOnline ? "Live" : "Offline"} tone={devices.bridgeOnline ? "green" : "rose"} />
+      </div>
+      <div className="mt-3 space-y-2">
+        <InfoRow label="Netto" value={finance.value} meta={finance.hidden ? "Privacy actief" : finance.meta} />
+        <InfoRow label="Afspraak" value={nextAppointment} />
+        <InfoRow label="Sync" value={syncValue} />
       </div>
     </section>
   );
@@ -231,10 +247,10 @@ function HabitNotePanel({
   notes: Array<{ id: string; title: string; meta: string; priority: string; href: string }>;
 }) {
   return (
-    <section className={`${PANEL} p-4 sm:p-5`}>
+    <section className={`${PANEL} flex h-full min-h-[280px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
       <PanelHeader icon="habit" label="Persoonlijk systeem" value={`${habitProgress.completed}/${habitProgress.due} habits`} />
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <div className="space-y-2">
+      <div className="mt-4 grid min-h-0 flex-1 gap-4 sm:grid-cols-2">
+        <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
           <p className="text-xs font-semibold uppercase text-slate-500">Habits vandaag</p>
           {habits.length > 0 ? (
             habits.map((habit) => (
@@ -250,7 +266,7 @@ function HabitNotePanel({
             <EmptyLine title="Geen habits gepland" detail="Vandaag heeft geen actieve habit-items." />
           )}
         </div>
-        <div className="space-y-2">
+        <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
           <p className="text-xs font-semibold uppercase text-slate-500">Notitie focus</p>
           {notes.length > 0 ? (
             notes.map((note) => (
@@ -270,35 +286,13 @@ function HabitNotePanel({
 
 function BusinessPanel({ business }: { business?: FocusBusinessStatus }) {
   return (
-    <section className={`${PANEL} p-4`}>
+    <section className={`${PANEL} h-full min-h-[230px] p-4 xl:min-h-0 xl:p-3.5`}>
       <PanelHeader icon="business" label="LaventeCare" value={business ? `${business.activeProjects} projecten` : "Laden"} />
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid grid-cols-2 gap-2 xl:mt-3 xl:grid-cols-4 xl:gap-1.5">
         <Metric label="Opdrachten" value={`${business?.activeWorkstreams ?? 0}`} tone="blue" />
         <Metric label="Acties" value={`${business?.openActions ?? 0}`} tone={(business?.overdueActions ?? 0) > 0 ? "rose" : "green"} />
         <Metric label="Offertes" value={`${business?.openQuotes ?? 0}`} tone="amber" />
         <Metric label="Open" value={formatEuroCents(business?.outstandingCents)} tone={(business?.openInvoices ?? 0) > 0 ? "amber" : "green"} />
-      </div>
-    </section>
-  );
-}
-
-function FinanceSyncPanel({
-  finance,
-  sync,
-  nextAppointment,
-}: {
-  finance: { value: string; hidden: boolean; meta: string };
-  sync?: FocusSyncSummary;
-  nextAppointment: string;
-}) {
-  return (
-    <section className={`${PANEL} p-4`}>
-      <PanelHeader icon="shield" label="Statuslijn" value={finance.hidden ? "Privacy" : "Live"} />
-      <div className="mt-4 space-y-2">
-        <InfoRow label="Netto prognose" value={finance.value} meta={finance.meta} />
-        <InfoRow label="Volgende afspraak" value={nextAppointment} />
-        <InfoRow label="Rooster sync" value={sync?.schedule.status ?? "laden"} />
-        <InfoRow label="Gmail sync" value={sync?.gmail.status ?? "laden"} />
       </div>
     </section>
   );
@@ -328,9 +322,9 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "a
           ? "text-sky-200"
           : "text-amber-200";
   return (
-    <div className="min-h-20 rounded-lg border border-white/8 bg-white/[0.025] p-3">
+    <div className="min-h-14 rounded-lg border border-white/8 bg-white/[0.025] p-2.5">
       <p className="text-xs text-slate-500">{label}</p>
-      <p className={`mt-2 truncate text-xl font-bold ${color}`}>{value}</p>
+      <p className={`mt-2 truncate text-lg font-bold ${color}`}>{value}</p>
     </div>
   );
 }
@@ -338,11 +332,11 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "a
 function InfoRow({ label, value, meta }: { label: string; value: string; meta?: string }) {
   return (
     <div className="rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <p className="shrink-0 text-xs text-slate-500">{label}</p>
-        <p className="min-w-0 truncate text-right text-sm font-semibold text-white">{value}</p>
+        <p className="min-w-0 truncate text-sm font-semibold text-white sm:text-right">{value}</p>
       </div>
-      {meta && <p className="mt-1 truncate text-right text-xs text-slate-600">{meta}</p>}
+      {meta && <p className="mt-1 truncate text-xs text-slate-600 sm:text-right">{meta}</p>}
     </div>
   );
 }
@@ -376,7 +370,7 @@ export default function FocusPage() {
   const todayIso = focus.dateInfo?.todayIso;
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-[#07090f] text-slate-100 lg:h-dvh lg:overflow-hidden">
+    <div className="min-h-dvh overflow-y-auto bg-[#07090f] text-slate-100 xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden">
       <Header
         time={focus.clock?.time ?? focus.summary?.time}
         today={focus.dateInfo?.todayLabel}
@@ -385,19 +379,29 @@ export default function FocusPage() {
         bridgeOnline={focus.devices.bridgeOnline}
       />
 
-      <main className="grid gap-3 p-3 sm:p-4 lg:h-[calc(100dvh-82px)] lg:grid-cols-[minmax(300px,0.95fr)_minmax(420px,1.35fr)_minmax(280px,0.8fr)]">
-        <div className="grid gap-3 lg:min-h-0 lg:grid-rows-[minmax(280px,1fr)_auto_auto]">
+      <main className="grid gap-3 p-3 sm:p-4 lg:grid-cols-2 xl:min-h-0 xl:flex-1 xl:overflow-hidden xl:grid-cols-[minmax(280px,0.9fr)_minmax(400px,1.28fr)_minmax(280px,0.92fr)] xl:grid-rows-[minmax(210px,0.9fr)_minmax(160px,0.72fr)_minmax(200px,0.58fr)]">
+        <div className="order-1 xl:col-start-1 xl:row-start-1 xl:min-h-0">
           <NowPanel item={focus.nextItem} todayIso={todayIso} />
-          <HomePanel devices={focus.devices} />
-          <FinanceSyncPanel
+        </div>
+
+        <div className="order-2 xl:col-start-3 xl:row-span-2 xl:row-start-1 xl:min-h-0">
+          <AttentionPanel items={focus.attention} />
+        </div>
+
+        <div className="order-3 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:min-h-0">
+          <TimelinePanel items={focus.timeline} todayIso={todayIso} />
+        </div>
+
+        <div className="order-4 xl:col-start-1 xl:row-span-2 xl:row-start-2 xl:min-h-0">
+          <SystemPanel
+            devices={focus.devices}
             finance={focus.finance}
             sync={focus.sync}
             nextAppointment={formatNextAppointmentMeta(focus.personal.nextAppointment, todayIso)}
           />
         </div>
 
-        <div className="grid gap-3 lg:min-h-0 lg:grid-rows-[minmax(280px,1fr)_minmax(260px,0.9fr)]">
-          <TimelinePanel items={focus.timeline} todayIso={todayIso} />
+        <div className="order-5 xl:col-start-2 xl:row-start-3 xl:min-h-0">
           <HabitNotePanel
             habits={focus.habitItems}
             habitProgress={{ due: focus.habits.due, completed: focus.habits.completed }}
@@ -405,8 +409,7 @@ export default function FocusPage() {
           />
         </div>
 
-        <div className="grid gap-3 lg:min-h-0 lg:grid-rows-[minmax(310px,1fr)_auto]">
-          <AttentionPanel items={focus.attention} />
+        <div className="order-6 xl:col-start-3 xl:row-start-3 xl:min-h-0">
           <BusinessPanel business={focus.business} />
         </div>
       </main>
