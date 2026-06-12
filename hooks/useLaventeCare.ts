@@ -6,6 +6,7 @@ import { laventecareApi } from "@/lib/api";
 import type {
   CompanyItem,
   ContactItem,
+  AccessCredentialItem,
   DocumentItem,
   LeadItem,
   ProjectItem,
@@ -95,6 +96,18 @@ export function useLaventeCare() {
   const updateContactMut = useMutation({
     mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateContact>[1]) =>
       laventecareApi.updateContact(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const createAccessCredentialMut = useMutation({
+    mutationFn: (data: Parameters<typeof laventecareApi.createAccessCredential>[0]) =>
+      laventecareApi.createAccessCredential(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const updateAccessCredentialMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateAccessCredential>[1]) =>
+      laventecareApi.updateAccessCredential(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
@@ -242,6 +255,16 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const generateInvoiceDocumentMut = useMutation({
+    mutationFn: (id: string) => laventecareApi.invoiceDocument(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const refreshInvoicePaymentMut = useMutation({
+    mutationFn: (id: string) => laventecareApi.refreshInvoicePayment(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const createMailTemplateMut = useMutation({
     mutationFn: (data: Parameters<typeof laventecareApi.createMailTemplate>[0]) => laventecareApi.createMailTemplate(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
@@ -281,6 +304,14 @@ export function useLaventeCare() {
         companyId: c.company_id ?? undefined,
         isPrimary: c.is_primary,
       })) as ContactItem[],
+    [cockpit]
+  );
+  const accessCredentials = useMemo(
+    () =>
+      (cockpit?.accessCredentials ?? []).map((item) => ({
+        ...item,
+        _id: item.id,
+      })) as AccessCredentialItem[],
     [cockpit]
   );
   const dossierDocuments = useMemo(
@@ -399,6 +430,7 @@ export function useLaventeCare() {
   const summary = cockpit?.summary ?? {
     companies: 0,
     contacts: 0,
+    accessCredentials: 0,
     leads: 0,
     activeLeads: 0,
     workstreams: 0,
@@ -428,6 +460,7 @@ export function useLaventeCare() {
     dossierAdviceLoading,
     companies,
     contacts,
+    accessCredentials,
     documents,
     activeLeads,
     workstreams,
@@ -457,6 +490,8 @@ export function useLaventeCare() {
     updateCompanyMut,
     createContactMut,
     updateContactMut,
+    createAccessCredentialMut,
+    updateAccessCredentialMut,
     createLeadMut,
     updateLeadMut,
     convertLeadMut,
@@ -484,6 +519,8 @@ export function useLaventeCare() {
     createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,
     createInvoicePaymentRequestMut,
+    generateInvoiceDocumentMut,
+    refreshInvoicePaymentMut,
     createMailTemplateMut,
     updateMailTemplateMut,
     suggestMailContentMut,

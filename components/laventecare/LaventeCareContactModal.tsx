@@ -81,12 +81,38 @@ export function LaventeCareContactModal({
           />
         </label>
 
-        <label className="block sm:col-span-2">
+        <label className="block">
           <span className="text-xs font-semibold text-slate-400">Rol</span>
           <input
             value={contactForm.rol}
             onChange={(event) => setContactForm((form) => ({ ...form, rol: event.target.value }))}
             placeholder="Eigenaar, projectleider, financieel contact..."
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-semibold text-slate-400">Beslisrol</span>
+          <select
+            value={contactForm.decisionRole}
+            onChange={(event) => setContactForm((form) => ({ ...form, decisionRole: event.target.value }))}
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-sky-500"
+          >
+            <option value="">Niet vastgelegd</option>
+            <option value="beslisser">Beslisser</option>
+            <option value="beinvloeder">Beinvloeder</option>
+            <option value="gebruiker">Gebruiker</option>
+            <option value="financieel">Financieel</option>
+            <option value="technisch">Technisch</option>
+          </select>
+        </label>
+
+        <label className="block sm:col-span-2">
+          <span className="text-xs font-semibold text-slate-400">Voorkeurskanaal</span>
+          <input
+            value={contactForm.preferredChannel}
+            onChange={(event) => setContactForm((form) => ({ ...form, preferredChannel: event.target.value }))}
+            placeholder="Email, telefoon, WhatsApp, Teams..."
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
           />
         </label>

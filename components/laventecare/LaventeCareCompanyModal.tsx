@@ -29,7 +29,7 @@ export function LaventeCareCompanyModal({
       title={editingCompany ? "Klant bewerken" : "Nieuwe klant"}
       icon={<Building2 size={18} className="text-amber-300" />}
       theme="amber"
-      maxWidth="2xl"
+      maxWidth="4xl"
     >
       <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
@@ -104,6 +104,152 @@ export function LaventeCareCompanyModal({
             className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
           />
         </label>
+
+        <div className="sm:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-normal text-amber-300">Facturatie en contract</p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">KVK</span>
+              <input
+                value={companyForm.kvkNumber}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, kvkNumber: event.target.value }))}
+                placeholder="88162710"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">BTW</span>
+              <input
+                value={companyForm.vatNumber}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, vatNumber: event.target.value }))}
+                placeholder="NL..."
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Betaaltermijn</span>
+              <input
+                type="number"
+                min={1}
+                value={companyForm.paymentTermsDays}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, paymentTermsDays: event.target.value ? Number(event.target.value) : "" }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Factuurmail</span>
+              <input
+                value={companyForm.billingEmail}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, billingEmail: event.target.value }))}
+                placeholder="administratie@..."
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Contractstatus</span>
+              <select
+                value={companyForm.contractStatus}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, contractStatus: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-500"
+              >
+                <option value="geen_contract">Geen contract</option>
+                <option value="voorstel">Voorstel</option>
+                <option value="akkoord">Akkoord</option>
+                <option value="actief">Actief</option>
+                <option value="afgelopen">Afgelopen</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Service level</span>
+              <select
+                value={companyForm.serviceLevel}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, serviceLevel: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-500"
+              >
+                <option value="basis">Basis</option>
+                <option value="pilot">Pilot</option>
+                <option value="project">Project</option>
+                <option value="beheer">Beheer</option>
+                <option value="sla">SLA</option>
+              </select>
+            </label>
+            <label className="block sm:col-span-2 lg:col-span-3">
+              <span className="text-xs font-semibold text-slate-400">Factuuradres / referentie</span>
+              <input
+                value={companyForm.billingAddress}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, billingAddress: event.target.value }))}
+                placeholder="Factuuradres"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+              />
+              <input
+                value={companyForm.billingReference}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, billingReference: event.target.value }))}
+                placeholder="Referentie, PO of projectcode"
+                className="mt-2 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="sm:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-normal text-amber-300">Portaal en compliance</p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Voorkeurskanaal</span>
+              <input
+                value={companyForm.preferredChannel}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, preferredChannel: event.target.value }))}
+                placeholder="Email, WhatsApp, Teams..."
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Klantportaal</span>
+              <input
+                value={companyForm.portalUrl}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, portalUrl: event.target.value }))}
+                placeholder="https://..."
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Standaard login</span>
+              <input
+                value={companyForm.defaultLoginUrl}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, defaultLoginUrl: event.target.value }))}
+                placeholder="https://.../login"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Onboarding</span>
+              <select
+                value={companyForm.onboardingStatus}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, onboardingStatus: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-500"
+              >
+                <option value="niet_gestart">Niet gestart</option>
+                <option value="intake">Intake</option>
+                <option value="pilot">Pilot</option>
+                <option value="actief">Actief</option>
+                <option value="afgerond">Afgerond</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Verwerking/privacy</span>
+              <select
+                value={companyForm.dataProcessingStatus}
+                onChange={(event) => setCompanyForm((form) => ({ ...form, dataProcessingStatus: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-500"
+              >
+                <option value="niet_nodig">Niet nodig</option>
+                <option value="te_controleren">Te controleren</option>
+                <option value="verwerkersovereenkomst_nodig">Verwerkersovereenkomst nodig</option>
+                <option value="vastgelegd">Vastgelegd</option>
+              </select>
+            </label>
+          </div>
+        </div>
 
         <label className="block sm:col-span-2">
           <span className="text-xs font-semibold text-slate-400">Notities</span>

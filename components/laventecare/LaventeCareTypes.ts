@@ -1,6 +1,7 @@
 import {
   type LCCompany,
   type LCContact,
+  type LCAccessCredential,
   type LCLead,
   type LCProject,
   type LCWorkstream,
@@ -49,6 +50,10 @@ export type ContactItem = LCContact & {
   _id?: string;
   companyId?: string;
   isPrimary?: boolean;
+};
+
+export type AccessCredentialItem = LCAccessCredential & {
+  _id?: string;
 };
 
 export type LeadItem = LCLead & {
@@ -258,6 +263,19 @@ export type CompanyForm = {
   relatieType: "prospect" | "klant" | "partner" | "leverancier" | "intern" | "eigen_project";
   notities: string;
   volgendeActie: string;
+  kvkNumber: string;
+  vatNumber: string;
+  billingEmail: string;
+  billingAddress: string;
+  billingReference: string;
+  paymentTermsDays: number | "";
+  contractStatus: string;
+  serviceLevel: string;
+  preferredChannel: string;
+  portalUrl: string;
+  defaultLoginUrl: string;
+  onboardingStatus: string;
+  dataProcessingStatus: string;
 };
 
 export const emptyCompanyForm: CompanyForm = {
@@ -268,6 +286,19 @@ export const emptyCompanyForm: CompanyForm = {
   relatieType: "prospect",
   notities: "",
   volgendeActie: "",
+  kvkNumber: "",
+  vatNumber: "",
+  billingEmail: "",
+  billingAddress: "",
+  billingReference: "",
+  paymentTermsDays: 14,
+  contractStatus: "geen_contract",
+  serviceLevel: "basis",
+  preferredChannel: "",
+  portalUrl: "",
+  defaultLoginUrl: "",
+  onboardingStatus: "niet_gestart",
+  dataProcessingStatus: "niet_nodig",
 };
 
 export type ContactForm = {
@@ -278,6 +309,8 @@ export type ContactForm = {
   rol: string;
   isPrimary: boolean;
   notities: string;
+  preferredChannel: string;
+  decisionRole: string;
 };
 
 export const emptyContactForm: ContactForm = {
@@ -288,6 +321,50 @@ export const emptyContactForm: ContactForm = {
   rol: "",
   isPrimary: false,
   notities: "",
+  preferredChannel: "",
+  decisionRole: "",
+};
+
+export type AccessCredentialForm = {
+  companyId: string;
+  contactId: string;
+  projectId: string;
+  workstreamId: string;
+  title: string;
+  loginUrl: string;
+  username: string;
+  role: string;
+  environment: string;
+  status: string;
+  ownerContact: string;
+  secretLabel: string;
+  secretValue: string;
+  secretHint: string;
+  sharingPolicy: string;
+  lastCheckedAt: string;
+  expiresAt: string;
+  notes: string;
+};
+
+export const emptyAccessCredentialForm: AccessCredentialForm = {
+  companyId: "",
+  contactId: "",
+  projectId: "",
+  workstreamId: "",
+  title: "",
+  loginUrl: "",
+  username: "",
+  role: "",
+  environment: "pilot",
+  status: "actief",
+  ownerContact: "",
+  secretLabel: "wachtwoord",
+  secretValue: "",
+  secretHint: "",
+  sharingPolicy: "veilig_kanaal",
+  lastCheckedAt: "",
+  expiresAt: "",
+  notes: "",
 };
 
 export type ActivityForm = {

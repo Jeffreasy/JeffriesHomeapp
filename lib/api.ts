@@ -431,6 +431,19 @@ export interface LCCompany {
   notities: string | null;
   laatste_contact: string | null;
   volgende_actie: string | null;
+  kvk_number: string | null;
+  vat_number: string | null;
+  billing_email: string | null;
+  billing_address: string | null;
+  billing_reference: string | null;
+  payment_terms_days: number;
+  contract_status: string;
+  service_level: string;
+  preferred_channel: string | null;
+  portal_url: string | null;
+  default_login_url: string | null;
+  onboarding_status: string;
+  data_processing_status: string;
   created_at: string;
   updated_at: string;
   contacts: number;
@@ -451,8 +464,40 @@ export interface LCContact {
   rol: string | null;
   is_primary: boolean;
   notities: string | null;
+  preferred_channel: string | null;
+  decision_role: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface LCAccessCredential {
+  id: string;
+  user_id: string;
+  company_id: string;
+  contact_id: string | null;
+  project_id: string | null;
+  workstream_id: string | null;
+  title: string;
+  login_url: string | null;
+  username: string | null;
+  role: string | null;
+  environment: string;
+  status: string;
+  owner_contact: string | null;
+  secret_label: string;
+  secret_configured: boolean;
+  secret_hint: string | null;
+  sharing_policy: string;
+  last_checked_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  company_name?: string | null;
+  contact_name?: string | null;
+  project_name?: string | null;
+  workstream_title?: string | null;
 }
 
 export interface LCLead {
@@ -725,6 +770,7 @@ export interface LCCockpit {
   summary: {
     companies: number;
     contacts: number;
+    accessCredentials: number;
     leads: number;
     activeLeads: number;
     workstreams: number;
@@ -747,6 +793,7 @@ export interface LCCockpit {
   };
   companies: LCCompany[];
   contacts: LCContact[];
+  accessCredentials: LCAccessCredential[];
   activeLeads: LCLead[];
   activeWorkstreams: LCWorkstream[];
   activeProjects: LCProject[];
@@ -857,6 +904,14 @@ export interface LCInvoice {
   provider_request_id: string | null;
   merchant_reference: string | null;
   payment_url: string | null;
+  document_url: string | null;
+  document_generated_at: string | null;
+  ubl_generated_at: string | null;
+  payment_checked_at: string | null;
+  payment_status: string | null;
+  payment_last_error: string | null;
+  reminder_count: number;
+  last_reminder_at: string | null;
   sent_at: string | null;
   paid_at: string | null;
   notes: string | null;
@@ -890,6 +945,25 @@ export interface LCPaymentRequestAction {
   expiresAt?: string;
   invoice?: LCInvoice;
   message: string;
+}
+
+export interface LCInvoiceDocument {
+  invoice: LCInvoice;
+  lines: LCInvoiceLine[];
+  company?: LCCompany | null;
+  html: string;
+  text: string;
+  ubl_xml: string;
+  download_name: string;
+  generated_at: string;
+}
+
+export interface LCInvoicePaymentRefresh {
+  invoice: LCInvoice;
+  provider_status: string;
+  changed: boolean;
+  message: string;
+  checked_at: string;
 }
 
 export interface LCBilling {
@@ -1073,6 +1147,19 @@ export const laventecareApi = {
     notities?: string;
     laatste_contact?: string;
     volgende_actie?: string;
+    kvk_number?: string;
+    vat_number?: string;
+    billing_email?: string;
+    billing_address?: string;
+    billing_reference?: string;
+    payment_terms_days?: number;
+    contract_status?: string;
+    service_level?: string;
+    preferred_channel?: string;
+    portal_url?: string;
+    default_login_url?: string;
+    onboarding_status?: string;
+    data_processing_status?: string;
   }) =>
     apiFetch<LCCompany>("/laventecare/companies", { method: "POST", body: JSON.stringify(data) }),
   updateCompany: (id: string, data: Partial<LCCompany>) =>
@@ -1092,10 +1179,42 @@ export const laventecareApi = {
     rol?: string;
     is_primary?: boolean;
     notities?: string;
+    preferred_channel?: string;
+    decision_role?: string;
   }) =>
     apiFetch<LCContact>("/laventecare/contacts", { method: "POST", body: JSON.stringify(data) }),
   updateContact: (id: string, data: Partial<LCContact>) =>
     apiFetch<{ status: string }>(`/laventecare/contacts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  listAccessCredentials: (params?: { companyId?: string; limit?: number }) => {
+    const search = new URLSearchParams();
+    if (params?.companyId) search.set("companyId", params.companyId);
+    if (params?.limit) search.set("limit", String(params.limit));
+    const query = search.toString();
+    return apiFetch<LCAccessCredential[]>(`/laventecare/access-credentials${query ? `?${query}` : ""}`);
+  },
+  createAccessCredential: (data: {
+    company_id: string;
+    contact_id?: string;
+    project_id?: string;
+    workstream_id?: string;
+    title: string;
+    login_url?: string;
+    username?: string;
+    role?: string;
+    environment?: string;
+    status?: string;
+    owner_contact?: string;
+    secret_label?: string;
+    secret_value?: string;
+    secret_hint?: string;
+    sharing_policy?: string;
+    last_checked_at?: string;
+    expires_at?: string;
+    notes?: string;
+  }) =>
+    apiFetch<LCAccessCredential>("/laventecare/access-credentials", { method: "POST", body: JSON.stringify(data) }),
+  updateAccessCredential: (id: string, data: Partial<LCAccessCredential> & { secret_value?: string }) =>
+    apiFetch<{ status: string }>(`/laventecare/access-credentials/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   createQuote: (data: {
     company_id?: string;
     project_id?: string;
@@ -1166,6 +1285,10 @@ export const laventecareApi = {
     apiFetch<{ status: string }>(`/laventecare/invoices/${id}/status`, { method: "PATCH", body: JSON.stringify(data) }),
   createInvoicePaymentRequest: (id: string) =>
     apiFetch<LCPaymentRequestAction>(`/laventecare/invoices/${id}/payment-request`, { method: "POST" }),
+  invoiceDocument: (id: string) =>
+    apiFetch<LCInvoiceDocument>(`/laventecare/invoices/${id}/document`),
+  refreshInvoicePayment: (id: string) =>
+    apiFetch<LCInvoicePaymentRefresh>(`/laventecare/invoices/${id}/payment-refresh`, { method: "POST" }),
   listDocuments: () =>
     apiFetch<LCDocument[]>("/laventecare/documents"),
   searchDocuments: (query: string) =>
@@ -1347,6 +1470,90 @@ export const laventecareApi = {
 };
 
 // ─── Settings & Sync ──────────────────────────────────────────────────────────
+
+export interface FocusSummary {
+  userId: string;
+  generatedAt: string;
+  timezone: string;
+  date: string;
+  time: string;
+  period: string;
+  health: FocusHealth;
+  sync: FocusSyncSummary;
+  counts: FocusCounts;
+  business: FocusBusinessStatus;
+  attention: FocusAttention[];
+  errors?: string[];
+}
+
+export interface FocusHealth {
+  devicesTotal: number;
+  devicesOnline: number;
+  devicesOn: number;
+  devicesOffline: number;
+  bridgeOnline: boolean;
+  bridgeStatus: string;
+  bridgeLastSeenAt?: string | null;
+  commandsPending: number;
+  commandsProcessing: number;
+  commandsFailed: number;
+}
+
+export interface FocusSyncSummary {
+  schedule: FocusSyncTarget;
+  personal: FocusSyncTarget;
+  gmail: FocusSyncTarget;
+}
+
+export interface FocusSyncTarget {
+  status: string;
+  enabled: boolean;
+  configured: boolean;
+  lastSuccessAt?: string | null;
+  total?: number;
+  pending?: number;
+}
+
+export interface FocusCounts {
+  scheduleTotal: number;
+  scheduleUpcoming: number;
+  personalUpcoming: number;
+  personalPending: number;
+  notesActive: number;
+  notesPinned: number;
+  notesOverdue: number;
+  notesDueToday: number;
+  notesTriage: number;
+  habitsActive: number;
+  habitsTodayDue: number;
+  habitsCompleted: number;
+  unreadEmails: number;
+}
+
+export interface FocusBusinessStatus {
+  activeLeads: number;
+  activeWorkstreams: number;
+  activeProjects: number;
+  openActions: number;
+  overdueActions: number;
+  openQuotes: number;
+  openInvoices: number;
+  outstandingCents: number;
+}
+
+export interface FocusAttention {
+  id: string;
+  domain: string;
+  severity: "high" | "medium" | "low" | string;
+  title: string;
+  detail: string;
+  href?: string;
+}
+
+export const focusApi = {
+  summary: (userId?: string) =>
+    apiFetch<FocusSummary>(userId ? `/focus/summary?userId=${encodeURIComponent(userId)}` : "/focus/summary"),
+};
 
 export interface PendingAIAction {
   id: string;

@@ -9,6 +9,7 @@ import {
   FileCheck2,
   FolderKanban,
   History,
+  KeyRound,
   Loader2,
   Mail,
   NotebookPen,
@@ -22,7 +23,10 @@ import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import type { LCActivityEventCreate } from "@/lib/api";
 import {
+  emptyAccessCredentialForm,
   LAVENTECARE_ACTIVITY_TYPES,
+  type AccessCredentialForm,
+  type AccessCredentialItem,
   type ActivityEventItem,
   type ActionItem,
   type CompanyItem,
@@ -34,7 +38,7 @@ import {
 } from "./LaventeCareTypes";
 import { formatDate, formatMoney, label } from "./LaventeCareUtils";
 
-type DossierTab = "overview" | "timeline" | "work" | "documents";
+type DossierTab = "overview" | "timeline" | "work" | "documents" | "access";
 
 type TimelineItem = {
   id: string;
@@ -72,6 +76,7 @@ export function LaventeCareCustomerDossier({
   isOpen,
   company,
   contacts,
+  accessCredentials,
   leads,
   workstreams,
   projects,
@@ -79,15 +84,18 @@ export function LaventeCareCustomerDossier({
   dossierDocuments,
   activityEvents,
   savingActivity,
+  savingAccessCredential,
   onClose,
   onEditCompany,
   onAddContact,
   onStartWorkstream,
   onCreateActivity,
+  onCreateAccessCredential,
 }: {
   isOpen: boolean;
   company: CompanyItem | null;
   contacts: ContactItem[];
+  accessCredentials: AccessCredentialItem[];
   leads: LeadItem[];
   workstreams: WorkstreamItem[];
   projects: ProjectItem[];
@@ -95,11 +103,32 @@ export function LaventeCareCustomerDossier({
   dossierDocuments: DossierDocumentItem[];
   activityEvents: ActivityEventItem[];
   savingActivity: boolean;
+  savingAccessCredential: boolean;
   onClose: () => void;
   onEditCompany: (company: CompanyItem) => void;
   onAddContact: (company: CompanyItem) => void;
   onStartWorkstream: (company: CompanyItem) => void;
   onCreateActivity: (payload: LCActivityEventCreate) => Promise<void>;
+  onCreateAccessCredential: (payload: {
+    company_id: string;
+    contact_id?: string;
+    project_id?: string;
+    workstream_id?: string;
+    title: string;
+    login_url?: string;
+    username?: string;
+    role?: string;
+    environment?: string;
+    status?: string;
+    owner_contact?: string;
+    secret_label?: string;
+    secret_value?: string;
+    secret_hint?: string;
+    sharing_policy?: string;
+    last_checked_at?: string;
+    expires_at?: string;
+    notes?: string;
+  }) => Promise<void>;
 }) {
   const [activeTab, setActiveTab] = useState<DossierTab>("overview");
   const [form, setForm] = useState<ActivityFormState>(emptyActivityForm);
@@ -149,6 +178,10 @@ export function LaventeCareCustomerDossier({
     () => activityEvents.filter((event) => event.company_id === companyId),
     [activityEvents, companyId]
   );
+  const companyAccess = useMemo(
+    () => accessCredentials.filter((item) => item.company_id === companyId),
+    [accessCredentials, companyId]
+  );
 
   const timeline = useMemo(
     () =>
@@ -161,8 +194,9 @@ export function LaventeCareCustomerDossier({
         actions: companyActions,
         documents: companyDocuments,
         activities: companyActivity,
+        accessCredentials: companyAccess,
       }),
-    [company, companyActions, companyActivity, companyContacts, companyDocuments, companyLeads, companyProjects, companyWorkstreams]
+    [company, companyAccess, companyActions, companyActivity, companyContacts, companyDocuments, companyLeads, companyProjects, companyWorkstreams]
   );
 
   if (!company) return null;
@@ -277,7 +311,7 @@ export function LaventeCareCustomerDossier({
             <DossierMetric label="Open werk" value={openWorkCount} detail="leads, opdrachten, projecten" />
             <DossierMetric label="Contacten" value={companyContacts.length} detail="gekoppelde personen" />
             <DossierMetric label="Documenten" value={companyDocuments.length} detail="vastgelegd dossier" />
-            <DossierMetric label="Timeline" value={timeline.length} detail="momenten en events" />
+            <DossierMetric label="Toegang" value={companyAccess.length} detail="accounts en portalen" />
           </div>
         </section>
 
@@ -286,6 +320,7 @@ export function LaventeCareCustomerDossier({
           <TabButton active={activeTab === "timeline"} icon={History} label="Timeline" onClick={() => setActiveTab("timeline")} />
           <TabButton active={activeTab === "work"} icon={FolderKanban} label="Werk" onClick={() => setActiveTab("work")} />
           <TabButton active={activeTab === "documents"} icon={FileCheck2} label="Documenten" onClick={() => setActiveTab("documents")} />
+          <TabButton active={activeTab === "access"} icon={KeyRound} label="Toegang" onClick={() => setActiveTab("access")} />
         </div>
 
         {activeTab === "timeline" ? (
@@ -309,12 +344,24 @@ export function LaventeCareCustomerDossier({
               ["Relatietype", label(company.relatie_type)],
               ["Status", label(company.status)],
               ["Website", company.website ?? "Niet gevuld"],
+              ["Klantportaal", company.portal_url ?? "Niet gevuld"],
+              ["Standaard login", company.default_login_url ?? "Niet gevuld"],
               ["Laatste contact", formatDate(company.laatste_contact ?? undefined)],
               ["Volgende actie", company.volgende_actie ?? "Niet gevuld"],
+            ]} />
+            <InfoPanel title="Zakelijk" rows={[
+              ["KVK", company.kvk_number ?? "Niet gevuld"],
+              ["BTW", company.vat_number ?? "Niet gevuld"],
+              ["Factuurmail", company.billing_email ?? "Niet gevuld"],
+              ["Betaaltermijn", `${company.payment_terms_days ?? 14} dagen`],
+              ["Contract", label(company.contract_status ?? "geen_contract")],
+              ["Service", label(company.service_level ?? "basis")],
             ]} />
             <InfoPanel title="Primaire contactpersoon" rows={[
               ["Naam", primaryContact?.naam ?? "Niet gevuld"],
               ["Rol", primaryContact?.rol ?? "Niet gevuld"],
+              ["Beslisrol", primaryContact?.decision_role ? label(primaryContact.decision_role) : "Niet gevuld"],
+              ["Kanaal", primaryContact?.preferred_channel ?? company.preferred_channel ?? "Niet gevuld"],
               ["Email", primaryContact?.email ?? "Niet gevuld"],
               ["Telefoon", primaryContact?.telefoon ?? "Niet gevuld"],
             ]} />
@@ -356,6 +403,19 @@ export function LaventeCareCustomerDossier({
               </div>
             )}
           </div>
+        ) : null}
+
+        {activeTab === "access" ? (
+          <AccessCredentialPanel
+            companyId={companyId}
+            contacts={companyContacts}
+            projects={companyProjects}
+            workstreams={companyWorkstreams}
+            credentials={companyAccess}
+            defaultLoginUrl={company.default_login_url ?? company.portal_url ?? ""}
+            saving={savingAccessCredential}
+            onCreate={onCreateAccessCredential}
+          />
         ) : null}
       </div>
     </Modal>
@@ -565,6 +625,304 @@ function ActivityForm({
   );
 }
 
+function AccessCredentialPanel({
+  companyId,
+  contacts,
+  projects,
+  workstreams,
+  credentials,
+  defaultLoginUrl,
+  saving,
+  onCreate,
+}: {
+  companyId: string;
+  contacts: ContactItem[];
+  projects: ProjectItem[];
+  workstreams: WorkstreamItem[];
+  credentials: AccessCredentialItem[];
+  defaultLoginUrl: string;
+  saving: boolean;
+  onCreate: (payload: {
+    company_id: string;
+    contact_id?: string;
+    project_id?: string;
+    workstream_id?: string;
+    title: string;
+    login_url?: string;
+    username?: string;
+    role?: string;
+    environment?: string;
+    status?: string;
+    owner_contact?: string;
+    secret_label?: string;
+    secret_value?: string;
+    secret_hint?: string;
+    sharing_policy?: string;
+    last_checked_at?: string;
+    expires_at?: string;
+    notes?: string;
+  }) => Promise<void>;
+}) {
+  const [form, setForm] = useState<AccessCredentialForm>({
+    ...emptyAccessCredentialForm,
+    companyId,
+    loginUrl: defaultLoginUrl,
+  });
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.title.trim()) return;
+    await onCreate({
+      company_id: companyId,
+      contact_id: optionalPayload(form.contactId),
+      project_id: optionalPayload(form.projectId),
+      workstream_id: optionalPayload(form.workstreamId),
+      title: form.title.trim(),
+      login_url: optionalPayload(form.loginUrl),
+      username: optionalPayload(form.username),
+      role: optionalPayload(form.role),
+      environment: form.environment,
+      status: form.status,
+      owner_contact: optionalPayload(form.ownerContact),
+      secret_label: optionalPayload(form.secretLabel),
+      secret_value: optionalPayload(form.secretValue),
+      secret_hint: optionalPayload(form.secretHint),
+      sharing_policy: form.sharingPolicy,
+      last_checked_at: optionalPayload(form.lastCheckedAt),
+      expires_at: optionalPayload(form.expiresAt),
+      notes: optionalPayload(form.notes),
+    });
+    setForm({ ...emptyAccessCredentialForm, companyId, loginUrl: defaultLoginUrl });
+  };
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="space-y-3">
+        {credentials.length > 0 ? (
+          credentials.map((item) => (
+            <div key={item._id ?? item.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <KeyRound size={16} className="text-amber-300" />
+                    <h3 className="truncate text-sm font-bold text-white">{item.title}</h3>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {label(item.environment)} - {label(item.status)}
+                    {item.role ? ` - ${item.role}` : ""}
+                  </p>
+                </div>
+                <span className={cn(
+                  "inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[11px] font-bold",
+                  item.secret_configured
+                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+                    : "border-amber-500/25 bg-amber-500/10 text-amber-200"
+                )}>
+                  {item.secret_configured ? "Secret aanwezig" : "Via veilig kanaal"}
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                <AccessRow label="Gebruiker" value={item.username ?? "Niet gevuld"} />
+                <AccessRow label="Eigenaar" value={item.owner_contact ?? item.contact_name ?? "Niet gevuld"} />
+                <AccessRow label="Vervalt" value={formatDate(item.expires_at ?? undefined)} />
+                <AccessRow label="Laatst getest" value={formatDate(item.last_checked_at ?? undefined)} />
+              </div>
+
+              {item.login_url ? (
+                <a
+                  href={toExternalHref(item.login_url)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-3 block truncate rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-bold text-sky-200 transition hover:bg-sky-500/20"
+                >
+                  {item.login_url}
+                </a>
+              ) : null}
+              {item.notes ? <p className="mt-3 text-xs leading-5 text-slate-500">{item.notes}</p> : null}
+            </div>
+          ))
+        ) : (
+          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm leading-6 text-slate-500">
+            Nog geen toegang vastgelegd. Leg pilotaccounts, portalen en tijdelijke rollen hier vast zodat mails, dossiers en AI-context niet afhankelijk zijn van losse notities.
+          </div>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="rounded-xl border border-amber-500/15 bg-amber-500/[0.05] p-4 lg:sticky lg:top-4">
+        <div className="flex items-center gap-2">
+          <KeyRound size={16} className="text-amber-300" />
+          <h3 className="text-sm font-bold text-white">Toegang toevoegen</h3>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400">Titel</span>
+            <input
+              value={form.title}
+              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              placeholder="Pilot admin, WordPress beheer, klantportaal..."
+              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400">Login URL</span>
+            <input
+              value={form.loginUrl}
+              onChange={(event) => setForm((current) => ({ ...current, loginUrl: event.target.value }))}
+              placeholder="https://.../login"
+              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+            />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Gebruiker</span>
+              <input
+                value={form.username}
+                onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+                placeholder="email of gebruikersnaam"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Rol</span>
+              <input
+                value={form.role}
+                onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}
+                placeholder="Admin, editor, klant..."
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Omgeving</span>
+              <select
+                value={form.environment}
+                onChange={(event) => setForm((current) => ({ ...current, environment: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+              >
+                <option value="test">Test</option>
+                <option value="pilot">Pilot</option>
+                <option value="productie">Productie</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Status</span>
+              <select
+                value={form.status}
+                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+              >
+                <option value="actief">Actief</option>
+                <option value="tijdelijk">Tijdelijk</option>
+                <option value="te_controleren">Te controleren</option>
+                <option value="verlopen">Verlopen</option>
+                <option value="ingetrokken">Ingetrokken</option>
+              </select>
+            </label>
+          </div>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400">Secret</span>
+            <input
+              type="password"
+              value={form.secretValue}
+              onChange={(event) => setForm((current) => ({ ...current, secretValue: event.target.value }))}
+              placeholder="Alleen invullen als backend secret key staat"
+              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400">Secret hint</span>
+            <input
+              value={form.secretHint}
+              onChange={(event) => setForm((current) => ({ ...current, secretHint: event.target.value }))}
+              placeholder="Bijv. gedeeld via veilige mail"
+              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400">Contactpersoon</span>
+            <select
+              value={form.contactId}
+              onChange={(event) => setForm((current) => ({ ...current, contactId: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+            >
+              <option value="">Niet gekoppeld</option>
+              {contacts.map((contact) => (
+                <option key={contact._id ?? contact.id} value={contact._id ?? contact.id}>{contact.naam}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-400">Project/opdracht</span>
+            <select
+              value={form.projectId || `workstream:${form.workstreamId}`}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value.startsWith("workstream:")) {
+                  setForm((current) => ({ ...current, projectId: "", workstreamId: value.replace("workstream:", "") }));
+                } else {
+                  setForm((current) => ({ ...current, projectId: value, workstreamId: "" }));
+                }
+              }}
+              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+            >
+              <option value="">Niet gekoppeld</option>
+              {projects.map((project) => (
+                <option key={project._id ?? project.id} value={project._id ?? project.id}>Project: {project.naam}</option>
+              ))}
+              {workstreams.map((workstream) => (
+                <option key={workstream._id ?? workstream.id} value={`workstream:${workstream._id ?? workstream.id}`}>
+                  Opdracht: {workstream.titel}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Gecontroleerd</span>
+              <input
+                type="date"
+                value={form.lastCheckedAt}
+                onChange={(event) => setForm((current) => ({ ...current, lastCheckedAt: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Vervalt</span>
+              <input
+                type="date"
+                value={form.expiresAt}
+                onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+              />
+            </label>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={saving || !form.title.trim()}
+          className="btn mt-4 w-full border-transparent bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+          Toegang vastleggen
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function AccessRow({ label: rowLabel, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 px-3 py-2">
+      <p className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">{rowLabel}</p>
+      <p className="mt-1 truncate text-xs font-semibold text-slate-200">{value}</p>
+    </div>
+  );
+}
+
 function InfoPanel({ title, rows }: { title: string; rows: [string, string][] }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
@@ -579,6 +937,15 @@ function InfoPanel({ title, rows }: { title: string; rows: [string, string][] })
       </div>
     </div>
   );
+}
+
+function optionalPayload(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function toExternalHref(url: string) {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
 function WorkColumn({ title, empty, items }: { title: string; empty: string; items: { id: string; title: string; meta: string; body?: string | null }[] }) {
@@ -661,6 +1028,7 @@ function buildTimeline(input: {
   actions: ActionItem[];
   documents: DossierDocumentItem[];
   activities: ActivityEventItem[];
+  accessCredentials: AccessCredentialItem[];
 }) {
   const items: TimelineItem[] = [];
   if (!input.company) return items;
@@ -686,6 +1054,18 @@ function buildTimeline(input: {
       date: doc.created_at,
       meta: doc.template_label ?? label(doc.context_type),
       tone: "amber",
+    });
+  }
+
+  for (const access of input.accessCredentials) {
+    items.push({
+      id: `access:${access._id ?? access.id}`,
+      kind: "toegang",
+      title: access.title,
+      body: access.login_url,
+      date: access.updated_at ?? access.created_at,
+      meta: `${label(access.environment)} - ${label(access.status)}`,
+      tone: access.status === "actief" ? "emerald" : "amber",
     });
   }
 
@@ -790,6 +1170,7 @@ function timelineIcon(kind: string) {
   if (kind === "email") return <Mail size={16} />;
   if (kind === "actie") return <CheckCircle2 size={16} />;
   if (kind === "lead") return <Activity size={16} />;
+  if (kind === "toegang") return <KeyRound size={16} />;
   if (kind === "klant") return <Building2 size={16} />;
   return <CalendarClock size={16} />;
 }

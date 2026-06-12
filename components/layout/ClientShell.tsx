@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 
 const AUTH_ROUTES = ["/sign-in", "/sign-up"];
+const CHROMELESS_ROUTES = ["/focus"];
 
 /**
  * ClientShell — layout wrapper.
@@ -16,8 +17,9 @@ const AUTH_ROUTES = ["/sign-in", "/sign-up"];
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = AUTH_ROUTES.some((r) => pathname.startsWith(r));
+  const isChromelessPage = CHROMELESS_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
 
-  if (isAuthPage) return <>{children}</>;
+  if (isAuthPage || isChromelessPage) return <>{children}</>;
 
   return (
     <div className="flex min-h-screen w-full overflow-x-hidden bg-[var(--color-background)]">
