@@ -66,7 +66,12 @@ export function useLaventeCare() {
     staleTime: 15_000,
   });
 
-  const { data: dossierAdvice, isLoading: dossierAdviceLoading } = useQuery({
+  const {
+    data: dossierAdvice,
+    isLoading: dossierAdviceLoading,
+    isError: dossierAdviceError,
+    refetch: refetchDossierAdvice,
+  } = useQuery({
     queryKey: ["laventecare", "dossier-advice", "global"],
     queryFn: () => laventecareApi.dossierAdvice({ query: "laventecare", limit: 8 }),
     staleTime: 30_000,
@@ -458,6 +463,8 @@ export function useLaventeCare() {
     billingLoading,
     mailboxLoading,
     dossierAdviceLoading,
+    dossierAdviceError,
+    refetchDossierAdvice,
     companies,
     contacts,
     accessCredentials,

@@ -66,6 +66,8 @@ export default function LaventeCarePage() {
     billingLoading,
     mailboxLoading,
     dossierAdviceLoading,
+    dossierAdviceError,
+    refetchDossierAdvice,
     companies,
     contacts,
     accessCredentials,
@@ -1712,6 +1714,8 @@ export default function LaventeCarePage() {
                 dossierDocuments={dossierDocuments}
                 dossierAdvice={aiDossierAdvice}
                 dossierAdviceLoading={dossierAdviceLoading}
+                dossierAdviceError={dossierAdviceError}
+                onRetryDossierAdvice={() => { void refetchDossierAdvice(); }}
               />
             ) : null}
 

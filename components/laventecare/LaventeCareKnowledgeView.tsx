@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowUpRight, BookOpenText, BrainCircuit, CheckCircle2, ClipboardList, Download, FileText, Layers3, Printer, Search, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, BookOpenText, BrainCircuit, CheckCircle2, ClipboardList, Download, FileText, Layers3, Printer, RotateCcw, Search, ShieldCheck } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import {
   getLaventeCarePdfUrl,
@@ -23,6 +23,8 @@ export function LaventeCareKnowledgeView({
   dossierDocuments,
   dossierAdvice,
   dossierAdviceLoading,
+  dossierAdviceError,
+  onRetryDossierAdvice,
 }: {
   search: string;
   setSearch: Dispatch<SetStateAction<string>>;
@@ -31,6 +33,8 @@ export function LaventeCareKnowledgeView({
   dossierDocuments: DossierDocumentItem[];
   dossierAdvice?: DossierAdviceItem;
   dossierAdviceLoading?: boolean;
+  dossierAdviceError?: boolean;
+  onRetryDossierAdvice?: () => void;
 }) {
   const dossierKeys = new Set(dossierDocuments.map((document) => document.document_key));
   const indexedKeys = new Set(documents.map((document) => documentKeyOf(document)).filter(Boolean));
@@ -66,7 +70,7 @@ export function LaventeCareKnowledgeView({
           <KnowledgeMetric label="Zoekresultaat" value={filteredCount} detail={search.trim() ? "gefilterd" : "zichtbaar"} />
         </div>
 
-        <DossierAdvicePanel advice={dossierAdvice} loading={dossierAdviceLoading} />
+        <DossierAdvicePanel advice={dossierAdvice} loading={dossierAdviceLoading} error={dossierAdviceError} onRetry={onRetryDossierAdvice} />
 
         <div className="mt-4 space-y-3">
           {documentGroups.length === 0 ? (
@@ -243,7 +247,17 @@ function visibilityLabel(value: string) {
   return label(value);
 }
 
-function DossierAdvicePanel({ advice, loading }: { advice?: DossierAdviceItem; loading?: boolean }) {
+function DossierAdvicePanel({
+  advice,
+  loading,
+  error,
+  onRetry,
+}: {
+  advice?: DossierAdviceItem;
+  loading?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
+}) {
   if (loading && !advice) {
     return (
       <div className="mt-4 border-y border-white/10 py-4">
@@ -255,6 +269,27 @@ function DossierAdvicePanel({ advice, loading }: { advice?: DossierAdviceItem; l
           <div className="h-full w-1/3 animate-pulse rounded-full bg-sky-400/40" />
         </div>
         <p className="mt-2 text-sm text-slate-500">Dossierdekking en kennisadvies laden...</p>
+      </div>
+    );
+  }
+
+  if (error && !advice) {
+    return (
+      <div className="mt-4 border-y border-white/10 py-4">
+        <div className="flex items-center gap-2">
+          <BrainCircuit size={17} className="text-rose-300" />
+          <h3 className="text-sm font-bold text-white">AI-dossieradvies</h3>
+        </div>
+        <p className="mt-2 text-sm text-rose-300">Het AI-dossieradvies kon niet worden geladen.</p>
+        {onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-white/[0.08]"
+          >
+            <RotateCcw size={13} /> Opnieuw proberen
+          </button>
+        ) : null}
       </div>
     );
   }
