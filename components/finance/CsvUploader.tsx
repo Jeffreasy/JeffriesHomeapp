@@ -16,7 +16,12 @@ interface ImportProgress {
   bijgewerkt:    number;
 }
 
-export function CsvUploader() {
+interface CsvUploaderProps {
+  /** Called after a successful import so the parent can refresh its data. */
+  onImported?: () => void;
+}
+
+export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
   const [state, setState]           = useState<UploadState>("idle");
   const [errorMsg, setErrorMsg]     = useState<string | null>(null);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
@@ -82,6 +87,7 @@ export function CsvUploader() {
       }
 
       resetPagination();
+      onImported?.();
       setState("done");
     } catch (err) {
       setErrorMsg(`Import fout: ${err instanceof Error ? err.message : "Onbekende fout"}`);

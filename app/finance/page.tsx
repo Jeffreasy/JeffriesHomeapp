@@ -58,6 +58,7 @@ export default function FinancePage() {
     isDone,
     loadMore,
     updateCategorie,
+    refresh,
   } = useTransactions({ ibanFilter, zoekterm, jaarFilter: jaarFilter || undefined, ...filters });
 
   const handleCategorie = useCallback(
@@ -321,7 +322,7 @@ export default function FinancePage() {
                 <Upload size={18} className="text-amber-300" />
               </div>
               <div className="finance-import min-w-0">
-                <CsvUploader />
+                <CsvUploader onImported={refresh} />
               </div>
             </div>
           </div>

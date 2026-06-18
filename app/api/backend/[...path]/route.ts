@@ -25,7 +25,9 @@ function backendBaseUrl() {
 }
 
 function backendApiKey() {
-  return process.env.BACKEND_API_KEY ?? process.env.APP_SECRET_KEY ?? process.env.NEXT_PUBLIC_API_KEY ?? "";
+  // Server-only names only. Never read NEXT_PUBLIC_* here — those are inlined
+  // into the client bundle and would publish the backend secret to every browser.
+  return process.env.BACKEND_API_KEY ?? process.env.APP_SECRET_KEY ?? "";
 }
 
 function copyRequestHeaders(request: NextRequest) {
@@ -52,23 +54,22 @@ function copyResponseHeaders(headers: Headers) {
   return nextHeaders;
 }
 
-function shouldInjectUserId(path: string) {
-  return path === "notes" || path.startsWith("notes/");
-}
-
 async function proxyBackend(request: NextRequest, context: RouteContext) {
   const params = await context.params;
   const path = (params.path ?? []).map(encodeURIComponent).join("/");
+
+  // Require an authenticated Clerk session for every backend call (defense in
+  // depth on top of the Clerk middleware), and derive the user identity
+  // server-side. The client may never choose its own userId.
+  const { userId } = await auth();
+  if (!userId) {
+    return Response.json({ detail: "Niet ingelogd." }, { status: 401 });
+  }
+
   const target = new URL(`${backendBaseUrl()}/${path}`);
   target.search = request.nextUrl.search;
-
-  if (shouldInjectUserId(path)) {
-    const { userId } = await auth();
-    if (!userId) {
-      return Response.json({ detail: "Niet ingelogd." }, { status: 401 });
-    }
-    target.searchParams.set("userId", userId);
-  }
+  // Override/strip any client-supplied userId with the session userId.
+  target.searchParams.set("userId", userId);
 
   const method = request.method.toUpperCase();
   const init: RequestInit = {

@@ -30,6 +30,16 @@ export type { TransactionFullStats };
 
 const PAGE_SIZE = 50;
 
+// monthEnd returns the real last calendar day of a "YYYY-MM" month, e.g.
+// "2026-02" -> "2026-02-28". Using a hardcoded "-31" produces invalid dates
+// (2026-02-31) that Postgres rejects, which silently emptied the month filter.
+function monthEnd(maand: string): string {
+  const [y, m] = maand.split("-").map(Number);
+  if (!y || !m) return `${maand}-28`;
+  const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last day of this month
+  return `${maand}-${String(lastDay).padStart(2, "0")}`;
+}
+
 function mapTransaction(tx: ModelTransaction): TransactionRow {
   return {
     ...tx,
@@ -57,6 +67,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<TransactionFullStats | null>(null);
   const [offset, setOffset] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Build a stable filter key for resetting pagination
   const filterKey = useMemo(
@@ -108,7 +119,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
         // Convert maandFilter to date range
         if (filter.maandFilter) {
           if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.maandFilter}-01`;
-          if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.maandFilter}-31`;
+          if (!apiFilter.datumTot) apiFilter.datumTot = monthEnd(filter.maandFilter);
         }
 
         // If jaarFilter is set, compute datumVan/datumTot
@@ -144,7 +155,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     fetchData();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, filterKey]);
+  }, [userId, filterKey, refreshTick]);
 
   const loadMore = useCallback(async () => {
     if (!userId || isDone) return;
@@ -158,7 +169,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     };
     if (filter.maandFilter) {
       if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.maandFilter}-01`;
-      if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.maandFilter}-31`;
+      if (!apiFilter.datumTot) apiFilter.datumTot = monthEnd(filter.maandFilter);
     }
     if (filter.jaarFilter) {
       if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.jaarFilter}-01-01`;
@@ -196,6 +207,12 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     setOffset(0);
   }, []);
 
+  // refresh re-runs the fetch effect (e.g. after a CSV import in another
+  // component) so the list/stats reflect newly inserted rows without a reload.
+  const refresh = useCallback(() => {
+    setRefreshTick((t) => t + 1);
+  }, []);
+
   return {
     transactions,
     isDone,
@@ -207,5 +224,6 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     updateCategorie,
     loadMore,
     resetPagination,
+    refresh,
   };
 }

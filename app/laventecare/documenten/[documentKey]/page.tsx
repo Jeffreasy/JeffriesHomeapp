@@ -68,7 +68,8 @@ function backendBaseUrl() {
 }
 
 function backendApiKey() {
-  return process.env.BACKEND_API_KEY ?? process.env.APP_SECRET_KEY ?? process.env.NEXT_PUBLIC_API_KEY ?? "";
+  // Server-only names only — never NEXT_PUBLIC_* (would leak into the client bundle).
+  return process.env.BACKEND_API_KEY ?? process.env.APP_SECRET_KEY ?? "";
 }
 
 function firstParam(value: string | string[] | undefined) {

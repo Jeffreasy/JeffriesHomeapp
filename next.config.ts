@@ -8,9 +8,6 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   outputFileTracingIncludes: {
     "/api/laventecare/pdf/[documentKey]": [
       "./node_modules/@fontsource/outfit/files/outfit-latin-400-normal.woff",
