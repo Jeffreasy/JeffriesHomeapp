@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,19 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     setState(null);
   }, []);
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(!!state, dialogRef);
+
+  // Close on Escape (treated as cancel).
+  useEffect(() => {
+    if (!state) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [state, handleClose]);
+
   const isDanger = state?.variant === "danger";
 
   return (
@@ -67,6 +81,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             />
             {/* Dialog */}
             <motion.div
+              ref={dialogRef}
+              tabIndex={-1}
               initial={{ opacity: 0, scale: 0.95, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 8 }}
@@ -75,7 +91,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               aria-modal="true"
               aria-labelledby="confirm-title"
               aria-describedby="confirm-message"
-              className="fixed z-[101] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm glass rounded-2xl p-6 shadow-2xl border border-[var(--color-border)]"
+              className="fixed z-[101] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm glass rounded-2xl p-6 shadow-2xl border border-[var(--color-border)] focus:outline-none"
             >
               <button
                 onClick={() => handleClose(false)}
@@ -124,7 +140,6 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                     color: isDanger ? "#ef4444" : "#f59e0b",
                     border: `1px solid ${isDanger ? "rgba(239,68,68,0.30)" : "rgba(245,158,11,0.30)"}`,
                   }}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus
                   autoFocus
                 >
                   {state.confirmLabel ?? "Bevestigen"}

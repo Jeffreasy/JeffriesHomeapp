@@ -65,6 +65,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
   const [totalCount, setTotalCount] = useState(0);
   const [isDone, setIsDone] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [isError, setIsError] = useState(false);
   const [stats, setStats] = useState<TransactionFullStats | null>(null);
   const [offset, setOffset] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -107,6 +108,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
 
     const fetchData = async () => {
       setIsLoading(true);
+      setIsError(false);
       try {
         const apiFilter: GetTransactionsParams = {
           ...filter,
@@ -143,6 +145,9 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
         setOffset(pageItems.length);
       } catch {
         if (!cancelled) {
+          // Surface the failure instead of resetting to an empty result, so the
+          // UI can distinguish "load failed" from "no transactions".
+          setIsError(true);
           setTransactions([]);
           setTotalCount(0);
           setIsDone(true);
@@ -217,6 +222,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     transactions,
     isDone,
     isLoading,
+    isError,
     isSearching: (filter.zoekterm ?? "") !== deferredZoek,
     stats,
     totalCount: totalCount || stats?.aantalTxs || stats?.aantalAlleTxs || 0,

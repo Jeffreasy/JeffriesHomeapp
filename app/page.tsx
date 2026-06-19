@@ -306,7 +306,7 @@ export default function DashboardPage() {
                 <RouteTile href="/lampen" icon="lights" label="Lampen" sub="Kamers en scenes" tone="amber" />
                 <RouteTile href="/rooster" icon="roster" label="Rooster" sub="Diensten en import" tone="indigo" />
                 <RouteTile href="/agenda" icon="agenda" label="Agenda" sub="Afspraken en sync" tone="blue" />
-                <RouteTile href="/finance" icon="finance" label="Financien" sub="Salaris en uitgaven" tone="green" />
+                <RouteTile href="/finance" icon="finance" label="Finance" sub="Salaris en uitgaven" tone="green" />
                 <RouteTile href="/notities" icon="pageNote" label="Notities" sub="Capture en lijsten" tone="blue" />
               </div>
             </div>

@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useSwipe } from "@/hooks/useSwipe";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface BottomSheetProps {
   open: boolean;
@@ -29,18 +30,9 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
     threshold: 80,
   });
 
-  // Focus trap: move focus into sheet when opened
-  useEffect(() => {
-    if (open) {
-      const timer = setTimeout(() => {
-        const focusable = sheetRef.current?.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        focusable?.focus();
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
+  // Focus trap: move focus into the sheet, cycle Tab within it, and restore
+  // focus to the trigger on close (shared with Modal/ConfirmDialog).
+  useFocusTrap(open, sheetRef);
 
   // Close on Escape key
   useEffect(() => {
@@ -82,6 +74,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
           {/* Sheet */}
           <motion.div
             ref={sheetRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label={title ? undefined : "Lampbediening"}
@@ -90,7 +83,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[81] flex max-h-[min(88dvh,720px)] flex-col rounded-t-[20px] border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-24px_70px_rgba(0,0,0,0.45)]"
+            className="fixed bottom-0 left-0 right-0 z-[81] flex max-h-[min(88dvh,720px)] flex-col rounded-t-[20px] border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-24px_70px_rgba(0,0,0,0.45)] focus:outline-none"
             style={{
               paddingBottom: "env(safe-area-inset-bottom, 16px)",
             }}

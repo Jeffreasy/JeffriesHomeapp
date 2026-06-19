@@ -6,7 +6,9 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { FocusModeAutoRedirect } from "@/components/layout/FocusModeControl";
 
 const AUTH_ROUTES = ["/sign-in", "/sign-up"];
-const CHROMELESS_ROUTES = ["/focus"];
+// /laventecare/documenten/[documentKey] is an immersive document/PDF viewer with
+// its own back-link — render it shell-free so the bottom nav doesn't overlap it.
+const CHROMELESS_ROUTES = ["/focus", "/laventecare/documenten"];
 
 /**
  * ClientShell — layout wrapper.

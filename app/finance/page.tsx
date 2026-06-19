@@ -37,6 +37,7 @@ import { FinanceMetricsGrid } from "@/components/finance/FinanceMetricsGrid";
 import { FinanceCharts } from "@/components/finance/FinanceCharts";
 import { FinanceInsights } from "@/components/finance/FinanceInsights";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
 
 type ChartView = "saldo" | "inuit";
 
@@ -54,6 +55,7 @@ export default function FinancePage() {
     stats,
     totalCount,
     isLoading,
+    isError,
     isSearching,
     isDone,
     loadMore,
@@ -452,14 +454,21 @@ export default function FinancePage() {
           </div>
 
           <div className="mt-5">
-            <TransactionList
-              transactions={transactions}
-              onCategorie={handleCategorie}
-              isDone={isDone}
-              onLoadMore={loadMore}
-              isLoading={isLoading || isSearching}
-              formatAmount={privacyOn ? formatPrivateSignedEuro : signedEuro}
-            />
+            {isError ? (
+              <ErrorState
+                onRetry={refresh}
+                text="De transacties konden niet worden geladen. Je bestaande gegevens zijn niet kwijt."
+              />
+            ) : (
+              <TransactionList
+                transactions={transactions}
+                onCategorie={handleCategorie}
+                isDone={isDone}
+                onLoadMore={loadMore}
+                isLoading={isLoading || isSearching}
+                formatAmount={privacyOn ? formatPrivateSignedEuro : signedEuro}
+              />
+            )}
           </div>
         </section>
       </main>

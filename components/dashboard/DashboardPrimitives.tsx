@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ChevronRight, ArrowRight, type LucideIcon } from "lucide-react";
+import { ChevronRight, ArrowRight, AlertTriangle, RefreshCw, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { type Tone, toneClasses } from "./DashboardUtils";
@@ -180,6 +180,41 @@ export function EmptyState({ icon, title, text }: { icon: IconSource; title: str
       <RenderIcon icon={icon} size={22} className="text-slate-600" />
       <p className="mt-3 text-sm font-semibold text-slate-300">{title}</p>
       <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{text}</p>
+    </div>
+  );
+}
+
+/**
+ * ErrorState — shown when a data load FAILS, so it is visually distinct from an
+ * empty result (a failed fetch must never look like "no data"). Offers a retry.
+ */
+export function ErrorState({
+  title = "Kon niet laden",
+  text = "Er ging iets mis bij het ophalen van deze gegevens. Probeer het opnieuw.",
+  onRetry,
+}: {
+  title?: string;
+  text?: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-red-500/30 bg-red-500/5 px-4 py-6 text-center"
+    >
+      <AlertTriangle size={22} className="text-red-400" aria-hidden="true" />
+      <p className="mt-3 text-sm font-semibold text-slate-200">{title}</p>
+      <p className="mt-1 max-w-sm text-xs leading-5 text-slate-400">{text}</p>
+      {onRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:bg-[var(--color-surface-hover)]"
+        >
+          <RefreshCw size={13} aria-hidden="true" />
+          Opnieuw proberen
+        </button>
+      )}
     </div>
   );
 }

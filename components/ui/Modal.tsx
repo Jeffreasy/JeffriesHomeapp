@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 interface ModalProps {
   isOpen: boolean;
@@ -29,7 +30,7 @@ const maxWidthClasses = {
 const themeClasses = {
   primary: "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]",
   sky: "border-sky-500/20 bg-sky-500/10",
-  emerald: "border-emerald-500/20 bg-[#022c22]/90",
+  emerald: "border-emerald-500/20 bg-emerald-500/10",
   rose: "border-rose-500/20 bg-rose-500/10",
   violet: "border-violet-500/20 bg-violet-500/10",
   slate: "border-slate-500/20 bg-slate-500/10",
@@ -46,6 +47,9 @@ export function Modal({
   className,
   theme = "primary",
 }: ModalProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(isOpen, contentRef);
+
   // Prevent scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -83,12 +87,14 @@ export function Modal({
           
           {/* Modal content */}
           <motion.div
+            ref={contentRef}
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", bounce: 0, duration: 0.3 }}
             className={cn(
-              "relative flex max-h-[calc(100dvh-4rem)] w-full flex-col overflow-hidden rounded-2xl shadow-2xl glass sm:max-h-[calc(100dvh-3rem)]",
+              "relative flex max-h-[calc(100dvh-4rem)] w-full flex-col overflow-hidden rounded-2xl shadow-2xl glass focus:outline-none sm:max-h-[calc(100dvh-3rem)]",
               maxWidthClasses[maxWidth],
               themeClasses[theme],
               className

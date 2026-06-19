@@ -62,27 +62,34 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast, success, error }}>
       {children}
-      {/* Toast container */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+      {/* Toast container — lifted above the mobile bottom nav and clear of the iOS safe area */}
+      <div className="fixed right-3 bottom-[calc(96px+env(safe-area-inset-bottom,0px))] z-[70] flex flex-col gap-2 pointer-events-none md:right-6 md:bottom-6">
         <AnimatePresence>
           {toasts.map((t) => {
             const Icon = icons[t.type];
             return (
               <motion.div
                 key={t.id}
+                // Errors are announced assertively, success/info politely, so
+                // screen-reader users hear mutation outcomes (the app's main
+                // feedback channel).
+                role={t.type === "error" ? "alert" : "status"}
+                aria-live={t.type === "error" ? "assertive" : "polite"}
                 initial={{ opacity: 0, x: 80, scale: 0.9 }}
                 animate={{ opacity: 1, x: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 80, scale: 0.9 }}
                 transition={{ duration: 0.2 }}
                 className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-xl max-w-sm glass bg-[var(--color-surface)] ${colors[t.type]}`}
               >
-                <Icon size={16} className="flex-shrink-0" />
+                <Icon size={16} className="flex-shrink-0" aria-hidden="true" />
                 <p className="text-sm font-medium text-slate-200 flex-1">{t.message}</p>
                 <button
+                  type="button"
                   onClick={() => removeToast(t.id)}
-                  className="text-slate-500 hover:text-slate-300 ml-1"
+                  aria-label="Melding sluiten"
+                  className="-m-1.5 ml-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md text-slate-400 hover:text-slate-200"
                 >
-                  <X size={14} />
+                  <X size={14} aria-hidden="true" />
                 </button>
               </motion.div>
             );

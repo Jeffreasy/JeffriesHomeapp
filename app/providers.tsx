@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { PwaRegistry } from "@/components/pwa/PwaRegistry";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const PERSIST_DENY_PREFIXES = ["/notes", "/personal-events", "/schedule", "/sync", "sync-status"];
 
@@ -62,7 +63,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <ToastProvider>
             <ConfirmProvider>
               <PwaRegistry />
-              {children}
+              <ErrorBoundary>{children}</ErrorBoundary>
             </ConfirmProvider>
           </ToastProvider>
         </PersistQueryClientProvider>
@@ -71,7 +72,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <ToastProvider>
             <ConfirmProvider>
               <PwaRegistry />
-              {children}
+              <ErrorBoundary>{children}</ErrorBoundary>
             </ConfirmProvider>
           </ToastProvider>
         </QueryClientProvider>

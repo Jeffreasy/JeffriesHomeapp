@@ -19,9 +19,11 @@
   --color-primary-border: rgba(245, 158, 11, 0.30);
 
   /* ── Text ──────────────────────────────────── */
+  /* muted/subtle lightened to clear WCAG AA (~7.7:1 / ~6.7:1 on the dark bg);
+     previous slate-500/600 values failed contrast for body-level secondary text. */
   --color-text: #f1f5f9;
-  --color-text-muted: #64748b;
-  --color-text-subtle: #475569;
+  --color-text-muted: #94a3b8;
+  --color-text-subtle: #8b98a9;
 
   /* ── Status ──────────────────────────────────── */
   --color-online: #22c55e;

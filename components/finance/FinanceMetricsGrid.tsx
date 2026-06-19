@@ -47,7 +47,7 @@ export function FinanceMetricsGrid({
         value={formatPrivateEuro(stats.huidigSaldo)}
         meta={stats.laatsteSaldoPeildatum
           ? `Laatste import t/m ${formatShortDate(stats.laatsteSaldoPeildatum)}`
-          : saldoTrend === null ? "Laatste geimporteerde bankbalans" : `${formatPrivateSignedEuro(saldoTrend)} sinds eerste maand`}
+          : saldoTrend === null ? "Laatste geïmporteerde bankbalans" : `${formatPrivateSignedEuro(saldoTrend)} sinds eerste maand`}
         icon={Landmark}
         tone={stats.huidigSaldo >= 0 ? "amber" : "rose"}
       />

@@ -1408,16 +1408,23 @@ export default function LaventeCarePage() {
   };
 
   if (cockpitLoading) {
+    // Skeleton mirrors the real layout (full-width hero + max-w-[1600px] main +
+    // a tall workspace) so the page doesn't jump when cockpit data resolves.
     return (
-      <div className="px-4 py-10 sm:px-6 text-slate-100">
-        <div className="mx-auto max-w-7xl">
-          <div className="h-40 animate-pulse glass" />
-          <div className="mt-4 grid gap-4 md:grid-cols-4">
+      <div className="text-slate-100" aria-busy="true">
+        <div className="h-44 w-full animate-pulse border-b border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] sm:h-48" />
+        <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
+          <div className="h-11 w-full max-w-md animate-pulse rounded-xl glass" />
+          <div className="grid gap-4 md:grid-cols-4">
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="h-28 animate-pulse glass" />
+              <div key={item} className="h-28 animate-pulse rounded-2xl glass" />
             ))}
           </div>
-        </div>
+          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="min-h-[50vh] animate-pulse rounded-2xl glass" />
+            <div className="hidden min-h-[50vh] animate-pulse rounded-2xl glass lg:block" />
+          </div>
+        </main>
       </div>
     );
   }
