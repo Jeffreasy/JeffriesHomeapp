@@ -12,7 +12,7 @@ import { formatLevel } from "@/lib/habit-constants";
  * Mobile-first: compact, touch-friendly, 56px min-height items.
  */
 export function DailyChecklist() {
-  const { todayHabits, todaySummary, level, toggle, isLoading } = useHabits();
+  const { todayHabits, todaySummary, level, toggle, isLoading, pendingHabitId } = useHabits();
   const { hidden: privacyOn } = usePrivacy("habits");
 
   if (isLoading) {
@@ -98,6 +98,7 @@ export function DailyChecklist() {
               key={habit._id}
               habit={habit}
               masked={privacyOn}
+              pending={pendingHabitId === habit._id}
               onToggle={() => toggle(habit._id)}
             />
           ))}
@@ -107,7 +108,7 @@ export function DailyChecklist() {
   );
 }
 
-function HabitCheckItem({ habit, onToggle, masked }: { habit: HabitWithLog; onToggle: () => void; masked: boolean }) {
+function HabitCheckItem({ habit, onToggle, masked, pending }: { habit: HabitWithLog; onToggle: () => void; masked: boolean; pending: boolean }) {
   const isCompleted = habit.log?.voltooid === true;
   const isNegative = habit.type === "negatief";
   const hasIncident = habit.log?.isIncident === true;
@@ -121,7 +122,9 @@ function HabitCheckItem({ habit, onToggle, masked }: { habit: HabitWithLog; onTo
     <motion.button
       layout
       onClick={isNegative ? undefined : onToggle}
-      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all min-h-[56px] active:scale-[0.97]"
+      disabled={isNegative || pending}
+      aria-busy={pending}
+      className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all min-h-[56px] active:scale-[0.97] disabled:cursor-default"
       style={{
         background: isSuccess
           ? "rgba(34, 197, 94, 0.06)"
@@ -134,8 +137,9 @@ function HabitCheckItem({ habit, onToggle, masked }: { habit: HabitWithLog; onTo
             ? "1px solid rgba(239, 68, 68, 0.12)"
             : "1px solid transparent",
         cursor: isNegative ? "default" : "pointer",
+        opacity: pending ? 0.6 : 1,
       }}
-      whileTap={isNegative ? {} : { scale: 0.97 }}
+      whileTap={isNegative || pending ? {} : { scale: 0.97 }}
     >
       {/* Check circle / Shield icon */}
       <div

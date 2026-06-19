@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQueryClient } from "@tanstack/react-query";
 import { getLevel } from "@/lib/habit-constants";
+import { useToast } from "@/components/ui/Toast";
 
 import {
   useGetHabits,
@@ -359,9 +360,31 @@ export function useHabits(datum?: string) {
     return { due, completed, rate: due > 0 ? completed / due : 0 };
   }, [todayHabits]);
 
+  const { error: toastError } = useToast();
+  const [pendingHabitId, setPendingHabitId] = useState<string | null>(null);
+
   const invalidateAll = () => {
     for (const queryKey of HABIT_QUERY_KEYS) {
       queryClient.invalidateQueries({ queryKey });
+    }
+  };
+
+  // Single in-flight guard + error toast for per-habit actions. Prevents the
+  // double/triple-tap duplicate-toggle bug (tap does nothing for 300-800ms) and
+  // surfaces failures instead of silently leaving the tick unchanged.
+  const runHabitAction = async (
+    habitId: string,
+    action: () => Promise<void>,
+    errorMessage: string,
+  ) => {
+    if (pendingHabitId) return;
+    setPendingHabitId(habitId);
+    try {
+      await action();
+    } catch {
+      toastError(errorMessage);
+    } finally {
+      setPendingHabitId(null);
     }
   };
 
@@ -374,6 +397,7 @@ export function useHabits(datum?: string) {
     level,
     todaySummary,
     isLoading: loadingHabits || loadingStats || loadingBadges || loadingForDate,
+    pendingHabitId,
 
     create: async (data: HabitCreateData) => {
       await postHabits(toHabitPayload(data), { userId });
@@ -383,44 +407,71 @@ export function useHabits(datum?: string) {
       await patchHabitsId(id, toHabitPayload(data) as Record<string, unknown>);
       invalidateAll();
     },
-    toggle: async (habitId: string, waarde?: number, notitie?: string) => {
-      await postHabitsIdToggle(
+    toggle: (habitId: string, waarde?: number, notitie?: string) =>
+      runHabitAction(
         habitId,
-        toApiPayload({ datum: queryParams.datum, waarde, notitie }),
-        { userId },
-      );
-      invalidateAll();
-    },
-    increment: async (habitId: string, stap: number) => {
-      const habit = todayHabits.find(
-        (h: HabitWithLogRecord) => h.id === habitId,
-      );
-      const currentVal = habit?.log?.waarde ?? 0;
-      await postHabitsIdToggle(
+        async () => {
+          await postHabitsIdToggle(
+            habitId,
+            toApiPayload({ datum: queryParams.datum, waarde, notitie }),
+            { userId },
+          );
+          invalidateAll();
+        },
+        "Habit bijwerken is mislukt",
+      ),
+    increment: (habitId: string, stap: number) =>
+      runHabitAction(
         habitId,
-        toApiPayload({ datum: queryParams.datum, waarde: currentVal + stap }),
-        { userId },
-      );
-      invalidateAll();
-    },
-    incident: async (habitId: string, trigger?: string, notitie?: string) => {
-      await postHabitsIdIncident(habitId, toApiPayload({ trigger, notitie }), {
-        userId,
-      });
-      invalidateAll();
-    },
+        async () => {
+          const habit = todayHabits.find(
+            (h: HabitWithLogRecord) => h.id === habitId,
+          );
+          const currentVal = habit?.log?.waarde ?? 0;
+          await postHabitsIdToggle(
+            habitId,
+            toApiPayload({ datum: queryParams.datum, waarde: currentVal + stap }),
+            { userId },
+          );
+          invalidateAll();
+        },
+        "Habit bijwerken is mislukt",
+      ),
+    incident: (habitId: string, trigger?: string, notitie?: string) =>
+      runHabitAction(
+        habitId,
+        async () => {
+          await postHabitsIdIncident(
+            habitId,
+            toApiPayload({ trigger, notitie }),
+            { userId },
+          );
+          invalidateAll();
+        },
+        "Incident registreren is mislukt",
+      ),
     reorder: async (items: Array<{ id: string; volgorde: number }>) => {
       await postHabitsReorder({ items });
       invalidateAll();
     },
-    pause: async (id: string) => {
-      await postHabitsIdPause(id);
-      invalidateAll();
-    },
-    archive: async (id: string) => {
-      await postHabitsIdArchive(id);
-      invalidateAll();
-    },
+    pause: (id: string) =>
+      runHabitAction(
+        id,
+        async () => {
+          await postHabitsIdPause(id);
+          invalidateAll();
+        },
+        "Pauzeren is mislukt",
+      ),
+    archive: (id: string) =>
+      runHabitAction(
+        id,
+        async () => {
+          await postHabitsIdArchive(id);
+          invalidateAll();
+        },
+        "Archiveren is mislukt",
+      ),
     remove: async (id: string) => {
       await deleteHabitsId(id);
       invalidateAll();
