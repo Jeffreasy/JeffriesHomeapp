@@ -1012,6 +1012,11 @@ function isDossierDocumentForCompany(
   if (doc.lead_id && leadIds.has(doc.lead_id)) return true;
   if (doc.project_id && projectIds.has(doc.project_id)) return true;
   if (doc.workstream_id && workstreamIds.has(doc.workstream_id)) return true;
+  // Name-match fallback only for documents with NO id-based context at all. A
+  // document already tied to another entity by id must not also be pulled into
+  // this dossier by a coincidental or same-name title (cross-customer misfile).
+  const hasIdContext = Boolean(doc.company_id || doc.context_id || doc.lead_id || doc.project_id || doc.workstream_id);
+  if (hasIdContext) return false;
   return Boolean(doc.context_title && normalizeDossierText(doc.context_title) === normalizeDossierText(companyName));
 }
 

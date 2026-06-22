@@ -60,11 +60,11 @@ export function formatMoney(value?: number) {
   }).format(value);
 }
 
-export function formatCents(value?: number) {
+export function formatCents(value?: number, currency = "EUR") {
   if (typeof value !== "number" || Number.isNaN(value)) return "€0";
   return new Intl.NumberFormat("nl-NL", {
     style: "currency",
-    currency: "EUR",
+    currency: currency || "EUR",
   }).format(value / 100);
 }
 
