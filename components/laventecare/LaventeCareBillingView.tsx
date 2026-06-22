@@ -1213,5 +1213,8 @@ function asNumber(value: number | "") {
 }
 
 function euroToCents(value: number) {
-  return Math.round(value * 100);
+  if (!Number.isFinite(value)) return 0;
+  // toPrecision(15) strips binary-float noise (e.g. 1.005 * 100 = 100.4999…)
+  // before rounding, so half-cent inputs round to the correct whole cents.
+  return Math.round(Number((value * 100).toPrecision(15)));
 }
