@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
   CalendarRange,
   ChevronLeft,
   ChevronRight,
@@ -15,6 +16,7 @@ import {
   formatDateRange,
   getDisplayEndDate,
   getTimeLabel,
+  isMultiDay,
   type PersonalEvent,
 } from "@/hooks/usePersonalEvents";
 import type { NoteRecord } from "@/hooks/useNotes";
@@ -90,7 +92,6 @@ export function AgendaCalendar({
   const title = mode === "month" ? formatMonthTitle(cursorDate) : formatWeekTitle(days);
   const activeEventCount = days.reduce((sum, day) => sum + day.events.length, 0);
   const activeNoteCount = days.reduce((sum, day) => sum + day.notes.length, 0);
-  const selectedSummary = formatDaySummary(selectedDay);
   const selectedLinkedNotes = new Set<string>();
   for (const event of selectedDay.events) {
     for (const note of notesByEventId.get(event.eventId) ?? []) {
@@ -98,6 +99,13 @@ export function AgendaCalendar({
     }
   }
   const dayNotes = selectedDay.notes.filter((note) => !getLinkedEventId(note) && !selectedLinkedNotes.has(note.id));
+
+  // Phones (< sm) get an agenda list instead of the cramped month grid.
+  const [mobileView, setMobileView] = useState<"agenda" | "maand">("agenda");
+  const agendaSections = useMemo(
+    () => buildAgendaList(cursorDate, selectedDate, todayIso, events, notesByDate),
+    [cursorDate, selectedDate, todayIso, events, notesByDate],
+  );
 
   const goPrevious = () => {
     onCursorDateChange(mode === "month" ? addMonthsIso(cursorDate, -1) : addDaysIso(cursorDate, -7));
@@ -140,7 +148,7 @@ export function AgendaCalendar({
                 </p>
               </div>
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            <div className="mt-2 hidden flex-wrap gap-x-3 gap-y-1 sm:flex">
               {CALENDAR_LEGEND.map((item) => (
                 <span key={item.label} className="inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
                   <span className={cn("h-1.5 w-1.5 rounded-full", item.dot)} />
@@ -151,7 +159,33 @@ export function AgendaCalendar({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-9 rounded-lg border border-[var(--color-border)] bg-black/15 p-0.5">
+            {/* Mobile: Agenda (list) vs Maand (dots overview) */}
+            <div className="flex h-9 rounded-lg border border-[var(--color-border)] bg-black/15 p-0.5 sm:hidden">
+              <button
+                type="button"
+                onClick={() => setMobileView("agenda")}
+                aria-pressed={mobileView === "agenda"}
+                className={cn(
+                  "inline-flex min-w-[4rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
+                  mobileView === "agenda" ? "bg-white/[0.08] text-white" : "text-slate-500",
+                )}
+              >
+                Agenda
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileView("maand")}
+                aria-pressed={mobileView === "maand"}
+                className={cn(
+                  "inline-flex min-w-[4rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
+                  mobileView === "maand" ? "bg-white/[0.08] text-white" : "text-slate-500",
+                )}
+              >
+                Maand
+              </button>
+            </div>
+            {/* Desktop: Maand vs Week */}
+            <div className="hidden h-9 rounded-lg border border-[var(--color-border)] bg-black/15 p-0.5 sm:flex">
               <button
                 type="button"
                 onClick={() => setMode("month")}
@@ -209,38 +243,123 @@ export function AgendaCalendar({
               aria-label={`Afspraak maken op ${formatCompactDate(selectedDate)}`}
             >
               <Plus size={14} />
-              Afspraak
+              <span className="hidden sm:inline">Afspraak</span>
             </button>
           </div>
         </div>
-        <div className="mt-3 rounded-lg border border-white/[0.04] bg-black/10 px-3 py-2 sm:hidden">
-          <p className="truncate text-xs font-semibold text-white">{formatFullDate(selectedDay.date)}</p>
-          <p className="mt-0.5 truncate text-[11px] text-slate-500">{selectedSummary}</p>
-          {selectedDay.events.length > 0 && (
-            <div className="mt-2 space-y-1">
-              {selectedDay.events.slice(0, 3).map((event) => (
-                <MobileSelectedEventRow
-                  key={`${event.kalender}:${event.eventId}:mobile-summary`}
-                  event={event}
-                  hasConflict={conflictMap.has(event.eventId)}
-                  onClick={() => onEditEvent(event)}
-                />
-              ))}
-              {selectedDay.events.length > 3 && (
-                <button
-                  type="button"
-                  onClick={() => selectDate(selectedDay.date)}
-                  className="w-full rounded-md px-2 py-1 text-left text-[10px] font-semibold text-slate-500 transition-colors hover:bg-white/[0.04] hover:text-slate-300"
-                >
-                  +{selectedDay.events.length - 3} meer op deze dag
-                </button>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px]">
+      {/* ── Mobile (< sm): agenda list or month-dots overview ─────────────── */}
+      <div className="sm:hidden">
+        {mobileView === "agenda" ? (
+          agendaSections.length > 0 ? (
+            <div className="divide-y divide-[var(--color-border)]">
+              {agendaSections.map((section) => {
+                const standaloneNotes = section.notes.filter((note) => !getLinkedEventId(note));
+                return (
+                  <div key={section.date}>
+                    <div
+                      className={cn(
+                        "flex items-center justify-between px-3 py-2",
+                        section.isToday ? "border-l-2 border-emerald-400/50 bg-emerald-500/[0.04]" : "bg-white/[0.015]",
+                      )}
+                    >
+                      <span className={cn("text-xs font-semibold", section.isToday ? "text-emerald-200" : "text-white")}>
+                        {formatListHeader(section.date)}{section.isToday ? " · vandaag" : ""}
+                      </span>
+                      <span className="text-[11px] text-slate-500">{formatDaySummary(section)}</span>
+                    </div>
+                    <div className="flex flex-col gap-2 px-3 pb-3 pt-2">
+                      {section.events.map((event) => (
+                        <AgendaListRow
+                          key={`${event.kalender}:${event.eventId}:${section.date}`}
+                          event={event}
+                          conflict={conflictMap.get(event.eventId)}
+                          noteCount={notesByEventId.get(event.eventId)?.length ?? 0}
+                          onClick={() => onEditEvent(event)}
+                        />
+                      ))}
+                      {standaloneNotes.map((note) => (
+                        <button
+                          key={note.id}
+                          type="button"
+                          onClick={() => onEditNote(note)}
+                          className="flex items-center gap-2 rounded-lg border border-amber-500/15 bg-amber-500/[0.05] px-3 py-2 text-left text-xs text-amber-100/90 transition-colors hover:bg-amber-500/10"
+                        >
+                          <StickyNote size={13} className="shrink-0 text-amber-300" />
+                          <span className="min-w-0 flex-1 truncate">{getDisplayTitle(note)}</span>
+                        </button>
+                      ))}
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onCreateEvent(section.date)}
+                          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--color-border)] py-1.5 text-[11px] font-semibold text-slate-500 transition-colors hover:bg-white/[0.03] hover:text-slate-300"
+                        >
+                          <Plus size={12} /> Afspraak
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onCreateNoteForDate(section.date)}
+                          className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-dashed border-amber-500/20 py-1.5 text-[11px] font-semibold text-amber-300/80 transition-colors hover:bg-amber-500/[0.06]"
+                        >
+                          <StickyNote size={12} /> Notitie
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
+              <CalendarRange size={26} className="text-slate-600" />
+              <p className="text-sm font-semibold text-slate-300">Geen items deze maand</p>
+              <button
+                type="button"
+                onClick={() => onCreateEvent(selectedDate)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/12 px-3 py-1.5 text-xs font-semibold text-emerald-300"
+              >
+                <Plus size={14} /> Afspraak maken
+              </button>
+            </div>
+          )
+        ) : (
+          <div>
+            <div className="grid grid-cols-7 border-b border-[var(--color-border)] bg-black/10">
+              {WEEKDAYS.map((day) => (
+                <div key={day} className="px-1 py-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                  {day}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7">
+              {days.map((day) => (
+                <MobileMonthDotsCell
+                  key={day.date}
+                  day={day}
+                  conflictMap={conflictMap}
+                  onSelect={() => {
+                    selectDate(day.date);
+                    setMobileView("agenda");
+                  }}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-[var(--color-border)] px-3 py-2">
+              {CALENDAR_LEGEND.map((item) => (
+                <span key={item.label} className="inline-flex items-center gap-1.5 text-[10px] font-medium text-slate-500">
+                  <span className={cn("h-1.5 w-1.5 rounded-full", item.dot)} />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Desktop (sm+): month grid + selected-day panel ───────────────── */}
+      <div className="hidden grid-cols-1 sm:grid xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 border-b border-[var(--color-border)] xl:border-b-0 xl:border-r">
           <div className="grid grid-cols-7 border-b border-[var(--color-border)] bg-black/10">
             {WEEKDAYS.map((day) => (
@@ -250,7 +369,7 @@ export function AgendaCalendar({
             ))}
           </div>
 
-          <div className={cn("grid grid-cols-7", mode === "month" ? "auto-rows-[minmax(112px,1fr)] sm:auto-rows-[minmax(104px,1fr)]" : "auto-rows-[minmax(126px,1fr)] sm:auto-rows-[minmax(132px,1fr)]")}>
+          <div className={cn("grid grid-cols-7", mode === "month" ? "auto-rows-[minmax(120px,1fr)] lg:auto-rows-[minmax(132px,1fr)]" : "auto-rows-[minmax(130px,1fr)]")}>
             {days.map((day) => (
               <CalendarDayCell
                 key={day.date}
@@ -297,9 +416,7 @@ function CalendarDayCell({
   onEditEvent: (event: PersonalEvent) => void;
 }) {
   const maxVisible = mode === "month" ? 3 : 5;
-  const mobileMaxVisible = mode === "month" ? 2 : 4;
   const hiddenCount = Math.max(0, day.events.length - maxVisible);
-  const mobileHiddenCount = Math.max(0, day.events.length - mobileMaxVisible);
 
   return (
     <div
@@ -351,30 +468,7 @@ function CalendarDayCell({
         )}
       </div>
 
-      <div className="space-y-1 sm:hidden">
-        {day.events.slice(0, mobileMaxVisible).map((event) => (
-          <CalendarEventBar
-            key={`${event.kalender}:${event.eventId}:${day.date}:mobile`}
-            event={event}
-            mode={mode}
-            compact
-            hasConflict={conflictMap.has(event.eventId)}
-            noteCount={notesByEventId.get(event.eventId)?.length ?? 0}
-            onClick={() => onEditEvent(event)}
-          />
-        ))}
-        {mobileHiddenCount > 0 && (
-          <button
-            type="button"
-            onClick={onSelect}
-            className="flex min-h-6 w-full items-center rounded-md px-1 text-left text-[10px] font-semibold text-slate-500 transition-colors hover:bg-white/[0.04] hover:text-slate-300"
-          >
-            +{mobileHiddenCount}
-          </button>
-        )}
-      </div>
-
-      <div className="hidden space-y-1 sm:block">
+      <div className="space-y-1">
         {day.events.slice(0, maxVisible).map((event) => (
           <CalendarEventBar
             key={`${event.kalender}:${event.eventId}:${day.date}`}
@@ -451,7 +545,7 @@ function CalendarEventBar({
       onClick={onClick}
       aria-label={label}
       className={cn(
-        "flex w-full min-w-0 items-center rounded-md border text-left text-[10px] font-semibold transition-colors",
+        "flex w-full min-w-0 items-center rounded-md border text-left text-[11px] font-semibold transition-colors",
         compact ? "min-h-7 gap-1 px-1" : "min-h-[26px] gap-1.5 px-1.5",
         tone.cell,
       )}
@@ -463,40 +557,6 @@ function CalendarEventBar({
         {displayTitle}
       </span>
       {noteCount > 0 && <StickyNote size={9} className="shrink-0 opacity-70" />}
-    </button>
-  );
-}
-
-function MobileSelectedEventRow({
-  event,
-  hasConflict,
-  onClick,
-}: {
-  event: PersonalEvent;
-  hasConflict: boolean;
-  onClick: () => void;
-}) {
-  const tone = getEventTone(event, hasConflict);
-  const isRoster = event.kalender === "Rooster";
-  const displayTitle = isRoster && event.shiftType ? `${event.shiftType}: ${event.titel}` : event.titel;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex min-h-8 w-full min-w-0 items-center gap-2 rounded-md border px-2 text-left transition-colors",
-        tone.cell,
-      )}
-      aria-label={`${isRoster ? "Dienst" : "Afspraak"} openen: ${event.titel}`}
-    >
-      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)} />
-      <span className="shrink-0 text-[10px] font-semibold tabular-nums text-slate-300">
-        {getTimeLabel(event)}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-[11px] font-semibold text-white">
-        {displayTitle}
-      </span>
     </button>
   );
 }
@@ -695,6 +755,162 @@ function SelectedDayEvent({
       </div>
     </div>
   );
+}
+
+// ─── Mobile agenda list (phones) ─────────────────────────────────────────────
+
+function AgendaListRow({
+  event,
+  conflict,
+  noteCount,
+  onClick,
+}: {
+  event: PersonalEvent;
+  conflict?: ConflictInfo;
+  noteCount: number;
+  onClick: () => void;
+}) {
+  const tone = getEventTone(event, Boolean(conflict));
+  const isRoster = event.kalender === "Rooster";
+  const typeLabel = isRoster ? event.shiftType || "Dienst" : "Afspraak";
+  const accent = conflict
+    ? "border-l-rose-400"
+    : isRoster
+      ? "border-l-indigo-400"
+      : event.status?.startsWith("Pending")
+        ? "border-l-sky-400"
+        : "border-l-emerald-400";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex min-h-14 w-full items-stretch gap-3 rounded-lg border border-l-[3px] px-3 py-2.5 text-left transition-colors",
+        tone.panel,
+        accent,
+      )}
+    >
+      <span className="w-12 shrink-0 text-right tabular-nums">
+        {event.heledag ? (
+          <span className="inline-block rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[11px] font-medium text-slate-300">
+            Hele dag
+          </span>
+        ) : (
+          <>
+            <span className="block text-sm font-semibold text-white">{event.startTijd ?? "--:--"}</span>
+            {event.eindTijd && (
+              <span className="block text-[11px] text-[color:var(--color-text-muted)]">{event.eindTijd}</span>
+            )}
+          </>
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 block text-sm font-semibold leading-snug text-white">{event.titel}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-[color:var(--color-text-muted)]">
+          <span>{typeLabel}</span>
+          {event.locatie && (
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <MapPin size={11} className="shrink-0" />
+              <span className="truncate">{event.locatie}</span>
+            </span>
+          )}
+          {isMultiDay(event) && <span>· t/m {formatDateRange(event)}</span>}
+        </span>
+        {conflict && (
+          <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-300">
+            <AlertTriangle size={12} className="shrink-0" />
+            {conflict.message}
+          </span>
+        )}
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5 self-center">
+        {noteCount > 0 && (
+          <span className="inline-flex items-center gap-0.5 text-[11px] text-amber-300">
+            <StickyNote size={12} />
+            {noteCount}
+          </span>
+        )}
+        <ChevronRight size={15} className="text-slate-600" />
+      </span>
+    </button>
+  );
+}
+
+function MobileMonthDotsCell({
+  day,
+  conflictMap,
+  onSelect,
+}: {
+  day: CalendarDay;
+  conflictMap: Map<string, ConflictInfo>;
+  onSelect: () => void;
+}) {
+  const tones = new Set<string>();
+  for (const event of day.events) {
+    tones.add(getEventTone(event, conflictMap.has(event.eventId)).dot);
+  }
+  const dots = Array.from(tones).slice(0, 3);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-label={`${formatCompactDate(day.date)} — ${day.events.length} items`}
+      aria-current={day.isToday ? "date" : undefined}
+      className={cn(
+        "flex min-h-12 flex-col items-center gap-1 border-b border-r border-[var(--color-border)] py-1.5 transition-colors last:border-r-0",
+        day.isSelected ? "bg-sky-500/[0.06]" : "hover:bg-white/[0.03]",
+        !day.inMonth && "opacity-40",
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-6 w-6 items-center justify-center rounded-md text-xs font-semibold tabular-nums",
+          day.isToday
+            ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/20"
+            : day.isSelected
+              ? "text-sky-200"
+              : "text-slate-300",
+        )}
+      >
+        {Number(day.date.slice(8, 10))}
+      </span>
+      <span className="flex h-1.5 items-center gap-0.5">
+        {dots.map((dot) => (
+          <span key={dot} className={cn("h-1.5 w-1.5 rounded-full", dot)} />
+        ))}
+        {day.notes.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-amber-300/70" />}
+      </span>
+    </button>
+  );
+}
+
+function buildAgendaList(
+  cursorDate: string,
+  selectedDate: string,
+  todayIso: string,
+  events: PersonalEvent[],
+  notesByDate: Map<string, NoteRecord[]>,
+): CalendarDay[] {
+  const monthStart = `${cursorDate.slice(0, 7)}-01`;
+  const monthEnd = getMonthEndIso(monthStart);
+  const dayCount = diffDays(monthStart, monthEnd) + 1;
+  const sections: CalendarDay[] = [];
+  for (let index = 0; index < dayCount; index++) {
+    const date = addDaysIso(monthStart, index);
+    const day = buildSingleDay(date, selectedDate, todayIso, events, notesByDate, true);
+    if (day.events.length > 0 || day.notes.length > 0) sections.push(day);
+  }
+  return sections;
+}
+
+function formatListHeader(dateIso: string) {
+  return new Date(`${dateIso}T12:00:00`).toLocaleDateString("nl-NL", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 }
 
 function buildCalendarDays(
