@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { devicesApi, type Device, type DeviceCommand } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 
 // ─── Devices (Go API — proxies to Convex + WiZ UDP) ──────────────────────────
 
@@ -22,11 +23,18 @@ export function useDevices() {
 
 export function useLampCommand() {
   const queryClient = useQueryClient();
+  const { error: toastError } = useToast();
 
   const mutation = useMutation({
     mutationFn: ({ id, cmd }: { id: string; cmd: DeviceCommand }) =>
       devicesApi.command(id, cmd),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+    },
+    onError: () => {
+      // A physical-device control surface must never silently swallow a failed
+      // command — tell the user and reconverge on the real server state.
+      toastError("Lamp-commando mislukt — controleer of de lamp bereikbaar is");
       queryClient.invalidateQueries({ queryKey: ["devices"] });
     },
   });

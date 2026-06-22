@@ -62,8 +62,10 @@ export default function DashboardPage() {
   const [modalOpen, setModalOpen] = useState(false);
 
   const onlineDevices = useMemo(() => devices.filter((d) => d.status === "online"), [devices]);
-  const onDevices = useMemo(() => devices.filter((d) => d.current_state?.on), [devices]);
-  const allOn = onDevices.length === devices.length && devices.length > 0;
+  const onDevices = useMemo(() => onlineDevices.filter((d) => d.current_state?.on), [onlineDevices]);
+  // allOn reflects ONLINE devices only — the toggle-all action also acts only on
+  // online devices, so counting offline ones made the label contradict the action.
+  const allOn = onlineDevices.length > 0 && onDevices.length === onlineDevices.length;
   
   const todayIso = dateInfo?.todayIso;
   const personalUpcomingEvents = useMemo(

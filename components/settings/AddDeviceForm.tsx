@@ -21,6 +21,13 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ip || !name) return;
+    // Instant client-side IPv4 check (the backend additionally requires a private
+    // LAN address) so a typo gets feedback without a round-trip.
+    const octets = ip.trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!octets || octets.slice(1).some((o) => Number(o) > 255)) {
+      error("Voer een geldig IPv4-adres in (bijv. 192.168.1.50)");
+      return;
+    }
     try {
       await createDevice({ ip_address: ip, name, room_id: roomId || undefined });
       success(`'${name}' geregistreerd!`);
