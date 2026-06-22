@@ -5,7 +5,9 @@ import { eurExact } from "@/lib/finance-constants";
 export function exportCsv(transactions: TransactionRow[]) {
   const header = "Datum,Tegenpartij,Omschrijving,Bedrag,Code,Categorie";
   const DQ = String.fromCharCode(34);
-  const escQ = (s: string) => s.replaceAll(DQ, DQ + DQ);
+  // Escape embedded double-quotes and collapse any CR/LF inside a field to a
+  // single space, so the value stays on one CSV line for naive consumers.
+  const escQ = (s: string) => s.replaceAll(DQ, DQ + DQ).replace(/[\r\n]+/g, " ");
   const rows = transactions.map((tx) =>
     [
       tx.datum,

@@ -14,7 +14,7 @@ import { SalarisView } from "@/components/salary/SalarisView";
 import { AfsprakenView } from "@/components/schedule/AfsprakenView";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { calcTotalHours, getHistory, getUpcoming, shiftBreakdown, teamBreakdown } from "@/lib/schedule";
+import { calcTotalHours, getEndKey, getHistory, getUpcoming, shiftBreakdown, teamBreakdown } from "@/lib/schedule";
 import { generateUnifiedTimeline } from "@/lib/unified";
 import { cn } from "@/lib/utils";
 
@@ -22,27 +22,60 @@ import { getAmsterdamTodayIso, formatHours, formatMetaDate, formatShortDate, plu
 import { EmptyRoster, SectionHeader } from "@/components/schedule/RoosterCards";
 import { OverviewPanel, OverviewTab } from "@/components/schedule/RoosterOverview";
 
+const tabId = (id: Tab) => `rooster-tab-${id}`;
+const tabPanelId = (id: Tab) => `rooster-panel-${id}`;
+
 function TabBar({ active, onChange }: { active: Tab; onChange: (tab: Tab) => void }) {
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const currentIndex = TABS.findIndex((t) => t.id === active);
+    if (currentIndex < 0) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % TABS.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + TABS.length) % TABS.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = TABS.length - 1;
+    }
+
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = TABS[nextIndex];
+    onChange(nextTab.id);
+    document.getElementById(tabId(nextTab.id))?.focus();
+  };
+
   return (
-    <nav aria-label="Rooster onderdelen" className="flex gap-1 overflow-x-auto scrollbar-none">
-      {TABS.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          type="button"
-          onClick={() => onChange(id)}
-          aria-current={active === id ? "page" : undefined}
-          className={cn(
-            "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40",
-            active === id
-              ? "border-amber-500/30 bg-amber-500/12 text-amber-200"
-              : "border-transparent text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
-          )}
-        >
-          <Icon size={14} />
-          {label}
-        </button>
-      ))}
-    </nav>
+    <div role="tablist" aria-label="Rooster onderdelen" className="flex gap-1 overflow-x-auto scrollbar-none">
+      {TABS.map(({ id, label, icon: Icon }) => {
+        const selected = active === id;
+        return (
+          <button
+            key={id}
+            id={tabId(id)}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            aria-controls={tabPanelId(id)}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(id)}
+            onKeyDown={handleKeyDown}
+            className={cn(
+              "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40",
+              selected
+                ? "border-amber-500/30 bg-amber-500/12 text-amber-200"
+                : "border-transparent text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
+            )}
+          >
+            <Icon size={14} />
+            {label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -139,7 +172,9 @@ export default function RoosterPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [weekOverrides, setWeekOverrides] = useState<Record<string, boolean>>({});
   const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [calSyncing, setCalSyncing] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [compactTimeline, setCompactTimeline] = useState(false);
 
   useEffect(() => {
@@ -187,9 +222,29 @@ export default function RoosterPage() {
   const thisMonthEvents = currentMonth
     ? upcomingEvents.filter((event) => event.startDatum.slice(0, 7) === currentMonth)
     : [];
-  const nextShiftEvents = nextDienst
-    ? (eventsByDate[nextDienst.startDatum] ?? []).filter((event) => conflictMap.has(event.eventId))
-    : [];
+  const nextShiftEvents = useMemo(() => {
+    if (!nextDienst) return [];
+    // A night shift (e.g. 22:00–07:00) rolls past midnight, so getEndKey()
+    // returns a later calendar day than startDatum. Collect conflicting events
+    // across every day the shift spans — otherwise an early-morning appointment
+    // on the following day (which conflictMap *does* flag as a hard conflict) is
+    // silently dropped from this card.
+    const endDay = getEndKey(nextDienst).slice(0, 10);
+    const result: PersonalEvent[] = [];
+    const seen = new Set<string>();
+    let day = nextDienst.startDatum;
+    let guard = 0;
+    while (day <= endDay && guard++ < 32) {
+      for (const event of eventsByDate[day] ?? []) {
+        if (seen.has(event.eventId)) continue;
+        if (!conflictMap.has(event.eventId)) continue;
+        seen.add(event.eventId);
+        result.push(event);
+      }
+      day = addDaysIso(day, 1);
+    }
+    return result;
+  }, [nextDienst, eventsByDate, conflictMap]);
   const hasScheduleData = meta || nextDienst || diensten.length > 0;
 
   const openNewEvent = () => {
@@ -226,6 +281,8 @@ export default function RoosterPage() {
   };
 
   const handleClearSchedule = async () => {
+    if (clearing) return;
+    setClearing(true);
     try {
       await clear();
       setConfirmClear(false);
@@ -233,6 +290,8 @@ export default function RoosterPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "onbekende fout";
       toastError(`Wissen mislukt: ${message}`);
+    } finally {
+      setClearing(false);
     }
   };
 
@@ -240,10 +299,15 @@ export default function RoosterPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const res = await importCsv(file);
-    if (res.ok) success(`${res.count} diensten geimporteerd`);
-    else toastError(`Import mislukt: ${res.error}`);
-    event.target.value = "";
+    setImporting(true);
+    try {
+      const res = await importCsv(file);
+      if (res.ok) success(`${res.count} diensten geimporteerd`);
+      else toastError(`Import mislukt: ${res.error}`);
+    } finally {
+      setImporting(false);
+      event.target.value = "";
+    }
   };
 
   const isWeekOpen = (weeknr: string, index: number) => weekOverrides[weeknr] ?? index < (compactTimeline ? 1 : 3);
@@ -283,18 +347,21 @@ export default function RoosterPage() {
               {meta && (
                 confirmClear ? (
                   <div className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 sm:col-span-1">
-                    <span className="text-xs font-semibold text-rose-300">Wissen?</span>
+                    <span className="text-xs font-semibold text-rose-300">{clearing ? "Wissen..." : "Wissen?"}</span>
                     <button
                       type="button"
                       onClick={handleClearSchedule}
-                      className="rounded-lg px-2 py-1 text-xs font-bold text-rose-200 hover:bg-rose-500/15"
+                      disabled={clearing}
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-rose-200 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                     >
+                      {clearing && <RefreshCw size={12} className="animate-spin" />}
                       Ja
                     </button>
                     <button
                       type="button"
                       onClick={() => setConfirmClear(false)}
-                      className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-400 hover:bg-white/5"
+                      disabled={clearing}
+                      className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-400 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Nee
                     </button>
@@ -318,12 +385,13 @@ export default function RoosterPage() {
               <button
                 type="button"
                 aria-label="CSV rooster importeren"
+                aria-busy={importing}
                 onClick={() => fileRef.current?.click()}
-                disabled={isLoading}
+                disabled={isLoading || importing}
                 className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Upload size={16} />
-                <span className="hidden sm:inline">CSV</span>
+                <Upload size={16} className={importing ? "animate-pulse" : ""} />
+                <span className="hidden sm:inline">{importing ? "Importeren" : "CSV"}</span>
               </button>
 
               <button
@@ -345,7 +413,7 @@ export default function RoosterPage() {
                 <Plus size={16} />
                 <span className="hidden sm:inline">Afspraak</span>
               </button>
-              <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} className="hidden" />
+              <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} disabled={importing} className="hidden" />
             </div>
           </div>
 
@@ -412,29 +480,37 @@ export default function RoosterPage() {
             </section>
 
             {tab === "overzicht" && (
-              <OverviewTab
-                unifiedWeeks={unifiedWeeks}
-                isWeekOpen={isWeekOpen}
-                toggleWeek={toggleWeek}
-                setAllWeeks={setAllWeeks}
-                todayIso={todayIso}
-                eventsByDate={eventsByDate}
-                conflictMap={conflictMap}
-                onEditEvent={handleEditEvent}
-                upcomingEvents={upcomingEvents}
-                withConflicts={withConflicts}
-                pendingEvents={pendingEvents}
-                history={history}
-                showHistory={showHistory}
-                setShowHistory={setShowHistory}
-                metaRows={meta?.totalRows ?? diensten.length}
-                metaSyncedAt={meta?.importedAt}
-                thisMonthEvents={thisMonthEvents.length}
-              />
+              <div role="tabpanel" id={tabPanelId("overzicht")} aria-labelledby={tabId("overzicht")} tabIndex={0}>
+                <OverviewTab
+                  unifiedWeeks={unifiedWeeks}
+                  isWeekOpen={isWeekOpen}
+                  toggleWeek={toggleWeek}
+                  setAllWeeks={setAllWeeks}
+                  todayIso={todayIso}
+                  eventsByDate={eventsByDate}
+                  conflictMap={conflictMap}
+                  onEditEvent={handleEditEvent}
+                  upcomingEvents={upcomingEvents}
+                  withConflicts={withConflicts}
+                  pendingEvents={pendingEvents}
+                  history={history}
+                  showHistory={showHistory}
+                  setShowHistory={setShowHistory}
+                  metaRows={meta?.totalRows ?? diensten.length}
+                  metaSyncedAt={meta?.importedAt}
+                  thisMonthEvents={thisMonthEvents.length}
+                />
+              </div>
             )}
 
             {tab === "statistieken" && (
-              <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5">
+              <div
+                role="tabpanel"
+                id={tabPanelId("statistieken")}
+                aria-labelledby={tabId("statistieken")}
+                tabIndex={0}
+                className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
+              >
                 <ErrorBoundary>
                   <StatsView diensten={diensten} />
                 </ErrorBoundary>
@@ -442,7 +518,13 @@ export default function RoosterPage() {
             )}
 
             {tab === "salaris" && (
-              <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5">
+              <div
+                role="tabpanel"
+                id={tabPanelId("salaris")}
+                aria-labelledby={tabId("salaris")}
+                tabIndex={0}
+                className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
+              >
                 <ErrorBoundary>
                   <SalarisView diensten={diensten} />
                 </ErrorBoundary>
@@ -450,7 +532,13 @@ export default function RoosterPage() {
             )}
 
             {tab === "afspraken_beheer" && (
-              <div className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5">
+              <div
+                role="tabpanel"
+                id={tabPanelId("afspraken_beheer")}
+                aria-labelledby={tabId("afspraken_beheer")}
+                tabIndex={0}
+                className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
+              >
                 <ErrorBoundary>
                   <AfsprakenView
                     diensten={upcoming}
@@ -479,4 +567,12 @@ export default function RoosterPage() {
 
 function shortSyncError(error: string) {
   return error.length > 140 ? `${error.slice(0, 137)}...` : error;
+}
+
+/** Advance an ISO date (YYYY-MM-DD) by `days`, noon-anchored to match eventsByDate keys. */
+function addDaysIso(baseIso: string, days: number): string {
+  const date = new Date(`${baseIso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return baseIso;
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }

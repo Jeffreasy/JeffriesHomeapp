@@ -39,6 +39,7 @@ export function HabitsVandaagTab({
   dayHealth,
   stats,
   habits,
+  pendingHabitId,
 }: {
   todayHabits: HabitWithLog[];
   isLoading: boolean;
@@ -55,6 +56,7 @@ export function HabitsVandaagTab({
   dayHealth: DayHealth;
   stats?: HabitStatsRecord;
   habits: HabitRecord[];
+  pendingHabitId: string | null;
 }) {
   const activeCount = habits.filter((h) => h.isActief && !h.isPauze).length;
   const emptyTitle = isToday
@@ -64,7 +66,9 @@ export function HabitsVandaagTab({
     : "Geen habits op deze dag";
   const emptyText = activeCount > 0
     ? `${activeCount} actieve habit${activeCount === 1 ? "" : "s"}, maar niet op deze datum.`
-    : "Maak je eerste habit aan om vandaag te kunnen afvinken.";
+    : isToday
+      ? "Maak je eerste habit aan om vandaag te kunnen afvinken."
+      : "Je hebt nog geen habits op deze dag.";
 
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -90,6 +94,7 @@ export function HabitsVandaagTab({
                 key={habit._id}
                 habit={habit}
                 masked={privacyOn}
+                pending={pendingHabitId === habit._id}
                 onToggle={() => toggle(habit._id!)}
                 onIncrement={(stap) => increment(habit._id!, stap)}
                 onIncident={(trigger, notitie) =>

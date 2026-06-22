@@ -302,7 +302,8 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
               max={455}
               value={colorTempMireds}
               onChange={(e) => setColorTempMireds(+e.target.value)}
-              style={{ background: "linear-gradient(to right, #ff9329, #fff4e6, #cce4ff)" }}
+              // Mireds: laag = koel (6500K), hoog = warm (2200K) → links koel/blauw, rechts warm/oranje
+              style={{ background: "linear-gradient(to right, #cce4ff, #fff4e6, #ff9329)" }}
             />
           </>
         )}

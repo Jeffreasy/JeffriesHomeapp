@@ -30,7 +30,7 @@ function getMonday(d: Date): Date {
 }
 
 function isoDate(d: Date): string {
-  return d.toLocaleDateString("sv-SE"); // YYYY-MM-DD
+  return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" }); // YYYY-MM-DD
 }
 
 function getWeekNumber(d: Date): number {

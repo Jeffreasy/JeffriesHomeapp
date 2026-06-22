@@ -21,17 +21,23 @@ export default function AutomationsPage() {
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [busyWekkerType, setBusyWekkerType] = useState<ManagedShiftType | null>(null);
   const { openConfirm } = useConfirm();
-  const { success } = useToast();
+  const { success, error } = useToast();
 
-  const handleSave = (data: Parameters<typeof add>[0]) => {
-    if (editingId === "new") {
-      add(data);
-      success(`Automatisering '${data.name}' aangemaakt`);
-    } else if (editingId) {
-      update(editingId, data);
-      success(`Automatisering '${data.name}' bijgewerkt`);
-    }
+  const handleSave = async (data: Parameters<typeof add>[0]) => {
+    const isNew = editingId === "new";
+    const target = editingId;
     setEditingId(null);
+    try {
+      if (isNew) {
+        await add(data);
+        success(`Automatisering '${data.name}' aangemaakt`);
+      } else if (target) {
+        await update(target, data);
+        success(`Automatisering '${data.name}' bijgewerkt`);
+      }
+    } catch {
+      error(`Opslaan van '${data.name}' mislukt`);
+    }
   };
 
   const handleDelete = async (a: Automation) => {
@@ -42,8 +48,20 @@ export default function AutomationsPage() {
       variant: "danger",
     });
     if (!confirmed) return;
-    remove(a.id);
-    success("Automatisering verwijderd");
+    try {
+      await remove(a.id);
+      success("Automatisering verwijderd");
+    } catch {
+      error(`Verwijderen van '${a.name}' mislukt`);
+    }
+  };
+
+  const handleToggle = async (a: Automation) => {
+    try {
+      await toggle(a.id);
+    } catch {
+      error(`Schakelen van '${a.name}' mislukt`);
+    }
   };
 
   const handleSaveWekkerPack = async (shiftType: ManagedShiftType, times: DienstWekkerTimes) => {
@@ -161,7 +179,7 @@ export default function AutomationsPage() {
                     <AutomationCard
                       key={a.id}
                       automation={a}
-                      onToggle={() => toggle(a.id)}
+                      onToggle={() => handleToggle(a)}
                       onEdit={() => setEditingId(a.id)}
                       onDelete={() => handleDelete(a)}
                     />
@@ -182,7 +200,7 @@ export default function AutomationsPage() {
                     <AutomationCard
                       key={a.id}
                       automation={a}
-                      onToggle={() => toggle(a.id)}
+                      onToggle={() => handleToggle(a)}
                       onEdit={() => setEditingId(a.id)}
                       onDelete={() => handleDelete(a)}
                     />

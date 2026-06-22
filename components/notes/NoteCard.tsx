@@ -100,8 +100,6 @@ export function NoteCard({
           ? "cursor-progress opacity-80"
           : `cursor-pointer hover:border-[var(--color-border-hover)] ${isCompleted ? "opacity-80" : ""}`
       }`}
-      role="button"
-      tabIndex={0}
       style={{
         background: note.kleur
           ? `linear-gradient(135deg, ${note.kleur}${KLEUR_OPACITY} 0%, rgba(15,15,20,0.85) 100%)`
@@ -109,11 +107,6 @@ export function NoteCard({
       }}
       onClick={() => {
         if (!pendingAction) onEdit(note);
-      }}
-      onKeyDown={(event) => {
-        if (pendingAction || (event.key !== "Enter" && event.key !== " ")) return;
-        event.preventDefault();
-        onEdit(note);
       }}
     >
       {/* Priority indicator — left strip */}
@@ -140,8 +133,16 @@ export function NoteCard({
               title={`Prioriteit: ${prio.label}`}
             />
           )}
-          <h3 className={`line-clamp-1 text-sm font-semibold text-slate-200 ${isCompleted ? "text-slate-400 line-through decoration-emerald-400/50" : ""}`}>
-            {masked ? "••••••" : displayTitle}
+          <h3 className="min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); if (!pendingAction) onEdit(note); }}
+              disabled={Boolean(pendingAction)}
+              className={`block w-full truncate text-left text-sm font-semibold text-slate-200 outline-none focus-visible:underline disabled:cursor-not-allowed ${isCompleted ? "text-slate-400 line-through decoration-emerald-400/50" : ""}`}
+              aria-label={masked ? "Notitie openen" : `Notitie openen: ${displayTitle}`}
+            >
+              {masked ? "••••••" : displayTitle}
+            </button>
           </h3>
         </div>
 
@@ -229,8 +230,8 @@ export function NoteCard({
             <span className="text-[10px] text-slate-600">{age}</span>
           </div>
 
-          {/* Action buttons — always visible on mobile, hover on desktop */}
-          <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+          {/* Action buttons — always visible on touch, hover-reveal only on hover-capable pointers (e.g. desktop) */}
+          <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:[@media(hover:hover)]:opacity-0 sm:group-hover:opacity-100">
             {onToggleComplete && (
               <button
                 type="button"
@@ -256,7 +257,7 @@ export function NoteCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); void runAction("archive", () => onArchive(note.id)); }}
               disabled={Boolean(pendingAction)}
-              className={`${actionButtonClass} hidden hover:bg-[var(--color-surface-hover)] sm:flex`}
+              className={`${actionButtonClass} hover:bg-[var(--color-surface-hover)]`}
               aria-label={note.isArchived ? "Terugzetten" : "Archiveren"}
             >
               <Archive size={14} className="text-slate-500" />
@@ -265,7 +266,7 @@ export function NoteCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); void runAction("delete", () => onDelete(note.id)); }}
               disabled={Boolean(pendingAction)}
-              className={`${actionButtonClass} hidden hover:bg-red-500/20 sm:flex`}
+              className={`${actionButtonClass} hover:bg-red-500/20`}
               aria-label="Verwijderen"
             >
               <Trash2 size={14} className="text-slate-500 hover:text-red-400" />
@@ -278,13 +279,15 @@ export function NoteCard({
           <div className={`-mt-1 flex flex-wrap items-center gap-1.5 pb-2 ${compact ? "px-3" : "px-4"}`}>
             <Link2 size={10} className="text-amber-400/60 shrink-0" />
             {backlinks.slice(0, 3).map((bl) => (
-              <span
+              <button
                 key={bl.id}
+                type="button"
                 onClick={(e) => { e.stopPropagation(); onNavigateToNote?.(bl.titel || "Naamloos"); }}
+                aria-label={`Ga naar notitie: ${bl.titel || "Naamloos"}`}
                 className="text-[10px] text-amber-400/70 bg-amber-400/8 px-1.5 py-0.5 rounded-md cursor-pointer hover:bg-amber-400/15 transition-colors"
               >
                 {bl.titel}
-              </span>
+              </button>
             ))}
             {backlinks.length > 3 && (
               <span className="text-[10px] text-slate-600">+{backlinks.length - 3}</span>
@@ -349,7 +352,14 @@ function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) 
             role="checkbox"
             aria-checked="false"
             aria-label={unchecked[1]}
+            tabIndex={onToggle ? 0 : undefined}
             onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(originalIdx); } : undefined}
+            onKeyDown={onToggle ? (e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.stopPropagation();
+              onToggle(originalIdx);
+            } : undefined}
             className={`mt-0.5 w-3 h-3 rounded-[3px] border border-[var(--color-border)] shrink-0 ${onToggle ? "cursor-pointer hover:border-amber-400/50" : ""}`}
           />
           <span>{renderLineWithLinks(unchecked[1], onNavigateToNote)}</span>
@@ -364,7 +374,14 @@ function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) 
             role="checkbox"
             aria-checked="true"
             aria-label={checked[1]}
+            tabIndex={onToggle ? 0 : undefined}
             onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(originalIdx); } : undefined}
+            onKeyDown={onToggle ? (e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.stopPropagation();
+              onToggle(originalIdx);
+            } : undefined}
             className={`mt-0.5 w-3 h-3 rounded-[3px] bg-emerald-500/40 border border-emerald-500/50 shrink-0 flex items-center justify-center ${onToggle ? "cursor-pointer hover:bg-emerald-500/60" : ""}`}
           >
             <Check size={7} className="text-emerald-300" />
@@ -385,15 +402,28 @@ function renderLineWithLinks(text: string, onNavigateToNote?: (title: string) =>
   return parts.map((part, i) => {
     const linkMatch = /^\[\[([^\]]+)\]\]$/.exec(part);
     if (linkMatch) {
+      if (!onNavigateToNote) {
+        return (
+          <span
+            key={i}
+            className="inline-flex items-center gap-0.5 text-amber-400/80 bg-amber-400/10 px-1 py-0.5 rounded text-[10px]"
+          >
+            <Link2 size={8} />
+            {linkMatch[1]}
+          </span>
+        );
+      }
       return (
-        <span
+        <button
           key={i}
-          onClick={onNavigateToNote ? (e) => { e.stopPropagation(); onNavigateToNote(linkMatch[1]); } : undefined}
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onNavigateToNote(linkMatch[1]); }}
+          aria-label={`Ga naar notitie: ${linkMatch[1]}`}
           className="inline-flex items-center gap-0.5 text-amber-400/80 bg-amber-400/10 px-1 py-0.5 rounded text-[10px] cursor-pointer hover:bg-amber-400/20 transition-colors"
         >
           <Link2 size={8} />
           {linkMatch[1]}
-        </span>
+        </button>
       );
     }
     return <span key={i}>{part}</span>;

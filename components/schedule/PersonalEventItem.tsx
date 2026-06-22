@@ -52,7 +52,7 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
   const handleDelete = async () => {
     if (!confirmDelete) {
       setConfirmDelete(true);
-      setTimeout(() => setConfirmDelete(false), 3000);
+      setTimeout(() => setConfirmDelete(false), 6000);
       return;
     }
 
@@ -224,12 +224,12 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
                 exit={{ opacity: 0, scale: 0.8 }}
                 className="flex items-center gap-0.5 bg-red-950/50 border border-red-500/20 rounded-md px-1.5 py-0.5"
               >
-                <span className="text-[10px] text-red-400 font-medium mr-0.5">Zeker?</span>
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} className="p-0.5 hover:bg-red-500/20 rounded text-red-500 cursor-pointer">
-                  <Check size={12} />
+                <span className="text-[10px] text-red-400 font-medium mr-0.5">Verwijderen?</span>
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} aria-label="Verwijderen bevestigen" className="flex h-9 w-9 items-center justify-center rounded hover:bg-red-500/20 text-red-500 cursor-pointer">
+                  <Check size={14} />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }} className="p-0.5 hover:bg-slate-700/50 rounded text-slate-400 cursor-pointer">
-                  <X size={12} />
+                <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }} aria-label="Verwijderen annuleren" className="flex h-9 w-9 items-center justify-center rounded hover:bg-slate-700/50 text-slate-400 cursor-pointer">
+                  <X size={14} />
                 </button>
               </motion.div>
             ) : (

@@ -405,6 +405,7 @@ a,
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
+.cat-dropdown--left { right: auto; left: 0; }
 .cat-option {
   display: block; width: 100%; text-align: left;
   padding: 6px 10px; border: none; background: transparent;
@@ -413,6 +414,7 @@ a,
   font-family: var(--font-sans);
 }
 .cat-option:hover { background: rgba(255,255,255,0.06); color: var(--color-text); }
+.cat-option:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; background: rgba(255,255,255,0.06); color: var(--color-text); }
 .cat-option--active { color: var(--color-primary); background: var(--color-primary-subtle); }
 .cat-option--clear { color: var(--color-text-subtle); margin-top: 4px; border-top: 1px solid var(--color-border); border-radius: 0 0 6px 6px; }
 

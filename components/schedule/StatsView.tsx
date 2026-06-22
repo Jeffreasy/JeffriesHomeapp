@@ -11,6 +11,7 @@ import {
   type YearStats,
   type DienstRow,
 } from "@/lib/schedule";
+import { hoursValue, getAmsterdamTodayIso } from "./RoosterUtils";
 
 const SHIFT_COLORS: Record<string, string> = {
   Vroeg:  "#f97316", // Orange
@@ -70,7 +71,7 @@ function MonthStreamItem({
                 <p className={`text-xl font-black tabular-nums tracking-tighter ${
                   active ? "text-white" : "text-slate-300 group-hover:text-white"
                 }`}>
-                  {stats.totalHours}<span className="text-xs text-slate-500 ml-0.5">h</span>
+                  {hoursValue(stats.totalHours)}<span className="text-xs text-slate-500 ml-0.5">h</span>
                 </p>
                 <div className="min-w-12 max-w-[100px] flex-1 opacity-60">
                   <ShiftSegment shifts={stats.shifts} total={stats.count} />
@@ -110,9 +111,9 @@ function MonthDetailStream({ stats }: { stats: MonthStats }) {
       <div className="mb-6 border-b border-white/10 pb-4 sm:mb-8">
         <h3 className="mb-2 text-2xl font-black uppercase tracking-tight text-white sm:text-3xl">{stats.label}</h3>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-          <span>Totaal: {stats.totalHours}u</span>
+          <span>Totaal: {hoursValue(stats.totalHours)}u</span>
           <span>Diensten: {stats.count}</span>
-          <span>Gem: {stats.avgDuur}u</span>
+          <span>Gem: {hoursValue(stats.avgDuur)}u</span>
         </div>
       </div>
 
@@ -127,7 +128,7 @@ function MonthDetailStream({ stats }: { stats: MonthStats }) {
                 <p className="text-[10px] font-black uppercase tracking-widest text-white">
                   Week {weeknr}
                 </p>
-                <p className="text-[10px] font-bold text-slate-400">{wkHours}u</p>
+                <p className="text-[10px] font-bold text-slate-400">{hoursValue(wkHours)}u</p>
               </div>
               
               <div className="space-y-1">
@@ -162,7 +163,7 @@ function DienstregelItem({ dienst }: { dienst: DienstRow }) {
         <p className="text-xs font-mono text-slate-300">
           {dienst.startTijd}<span className="text-slate-600 px-1">-</span>{dienst.eindTijd}
         </p>
-        <p className="w-8 text-right text-[10px] font-bold text-slate-500">{dienst.duur}u</p>
+        <p className="w-8 text-right text-[10px] font-bold text-slate-500">{hoursValue(dienst.duur)}u</p>
       </div>
     </div>
   );
@@ -177,7 +178,7 @@ function YearSummaryHero({ year }: { year: YearStats }) {
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Jaarvolume · {year.year}</p>
         </div>
         <p className="text-5xl font-black leading-none tracking-tight text-white tabular-nums sm:text-7xl md:text-8xl">
-          {year.totalHours}<span className="ml-2 text-2xl font-bold text-slate-600 sm:text-3xl">u</span>
+          {hoursValue(year.totalHours)}<span className="ml-2 text-2xl font-bold text-slate-600 sm:text-3xl">u</span>
         </p>
       </div>
       
@@ -189,7 +190,7 @@ function YearSummaryHero({ year }: { year: YearStats }) {
         <div>
           <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">Gemiddeld</p>
           <p className="text-3xl font-black text-slate-300 tabular-nums">
-            {year.count ? Math.round((year.totalHours / year.count) * 10) / 10 : 0}
+            {year.count ? hoursValue(year.totalHours / year.count) : 0}
           </p>
         </div>
       </div>
@@ -199,7 +200,7 @@ function YearSummaryHero({ year }: { year: YearStats }) {
 
 export function StatsView({ diensten }: { diensten: DienstRow[] }) {
   const years    = useMemo(() => groupByYear(diensten), [diensten]);
-  const currentM = new Date().toISOString().slice(0, 7);
+  const currentM = getAmsterdamTodayIso().slice(0, 7);
 
   const [activeYear,  setActiveYear]  = useState<string>(() => years.at(-1)?.year ?? "");
   const [activeMonth, setActiveMonth] = useState<string | null>(null);

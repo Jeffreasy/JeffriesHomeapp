@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
@@ -87,12 +87,38 @@ export default function FinancePage() {
     }));
   };
 
+  const scrollToTransactions = useCallback(() => {
+    if (typeof document === "undefined") return;
+    document
+      .getElementById("finance-transactions")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   const toggleCategoryFilter = (cat: string) => {
     setFilters((current) => ({
       ...current,
       categorieFilter: current.categorieFilter === cat ? undefined : cat,
     }));
   };
+
+  // Used by the insights merchant/category controls, which live far above the
+  // transaction list they filter. Without bringing the list (and search box)
+  // into view, the click appears to do nothing on smaller viewports.
+  const jumpSearchToTransactions = useCallback(
+    (term: string) => {
+      setZoekterm(term);
+      scrollToTransactions();
+    },
+    [scrollToTransactions]
+  );
+
+  const jumpCategoryToTransactions = useCallback(
+    (cat: string) => {
+      toggleCategoryFilter(cat);
+      scrollToTransactions();
+    },
+    [scrollToTransactions]
+  );
 
   const formatPrivateEuro = useCallback((value: number) => mask(eur(value)), [mask]);
   const formatPrivateEuroExact = useCallback((value: number) => mask(eurExact(value)), [mask]);
@@ -102,6 +128,23 @@ export default function FinancePage() {
     const years = stats?.jaren?.length ? stats.jaren : ["2026", "2025"];
     return Array.from(new Set([...years, ""]));
   }, [stats]);
+
+  // The default jaarFilter ("2026") is a guess made before any data has loaded.
+  // If the user has no data for that year, the page would open on an empty
+  // metrics/charts view until they manually pick a year. Once the real list of
+  // years arrives, snap to the most recent year that actually has data — but
+  // only once, and never override a year the user has already chosen.
+  const yearDefaulted = useRef(false);
+  useEffect(() => {
+    if (yearDefaulted.current) return;
+    const years = stats?.jaren;
+    if (!years?.length) return;
+    yearDefaulted.current = true;
+    if (jaarFilter !== "" && !years.includes(jaarFilter)) {
+      // stats.jaren is sorted ascending, so the last entry is the latest year.
+      setJaarFilter(years[years.length - 1]);
+    }
+  }, [stats, jaarFilter]);
 
   const recentMonths = useMemo(() => {
     if (!stats?.maanden?.length) return [];
@@ -220,7 +263,7 @@ export default function FinancePage() {
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-slate-400">
                     <ShieldCheck size={14} />
-                    Go API live
+                    Veilig opgeslagen
                   </div>
                 </div>
 
@@ -319,7 +362,7 @@ export default function FinancePage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-white">Import</p>
-                  <p className="mt-1 text-xs text-slate-500">Rabobank CSV naar PostgreSQL</p>
+                  <p className="mt-1 text-xs text-slate-500">Rabobank CSV-export importeren</p>
                 </div>
                 <Upload size={18} className="text-amber-300" />
               </div>
@@ -406,8 +449,9 @@ export default function FinancePage() {
               topCategory={topCategory}
               topMerchant={topMerchant}
               filters={filters}
-              setZoekterm={setZoekterm}
-              toggleCategoryFilter={toggleCategoryFilter}
+              zoekterm={zoekterm}
+              setZoekterm={jumpSearchToTransactions}
+              toggleCategoryFilter={jumpCategoryToTransactions}
               formatPrivateEuro={formatPrivateEuro}
               formatPrivateEuroExact={formatPrivateEuroExact}
               formatPrivateSignedEuro={formatPrivateSignedEuro}
@@ -415,7 +459,7 @@ export default function FinancePage() {
           </CollapsibleSection>
         )}
 
-        <section className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+        <section id="finance-transactions" className="scroll-mt-24 rounded-lg border border-white/10 bg-white/[0.035] p-4">
           <SectionTitle
             icon={Search}
             title="Transacties"

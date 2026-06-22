@@ -5,6 +5,7 @@ import { MapPin } from "lucide-react";
 import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { CalendarDays } from "lucide-react";
+import { hoursValue } from "./RoosterUtils";
 
 interface DienstItemProps {
   dienst:     DienstRow;
@@ -80,7 +81,7 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
                 {dienst.startTijd}<span className="mx-1 text-slate-600">-</span>{dienst.eindTijd}
               </span>
               <span className="rounded-md border border-white/8 bg-white/[0.03] px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-slate-500">
-                {dienst.duur}u
+                {hoursValue(dienst.duur)}u
               </span>
             </div>
 
@@ -137,7 +138,7 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
       <div className="flex-1 min-w-0">
         <p className="text-sm text-slate-300 font-mono tracking-tighter">
           {dienst.startTijd}<span className="text-slate-600 mx-1">–</span>{dienst.eindTijd}
-          <span className="text-[10px] text-slate-500 font-bold tracking-widest ml-2 uppercase">· {dienst.duur}H</span>
+          <span className="text-[10px] text-slate-500 font-bold tracking-widest ml-2 uppercase">· {hoursValue(dienst.duur)}H</span>
         </p>
         {dienst.locatie && (
           <p className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-1 uppercase font-bold tracking-widest">

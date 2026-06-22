@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { useHabits, type HabitCreateData } from "@/hooks/useHabits";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 import { HabitForm } from "@/components/habits/HabitForm";
 import { HabitHeatmap } from "@/components/habits/HabitHeatmap";
@@ -30,9 +37,9 @@ export default function HabitsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("vandaag");
   const [showForm, setShowForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("habits");
   const { success, error: toastError } = useToast();
+  const { openConfirm } = useConfirm();
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setSelectedDate(todayStr()), 0);
@@ -54,6 +61,7 @@ export default function HabitsPage() {
     archive,
     remove,
     isLoading,
+    pendingHabitId,
   } = useHabits(selectedDate || undefined);
 
   const currentToday = useMemo(
@@ -113,17 +121,53 @@ export default function HabitsPage() {
     }
   };
 
-  const handleDelete = () => {
-    if (!confirmDelete) return;
-    remove(confirmDelete);
-    setConfirmDelete(null);
-  };
+  const requestDelete = useCallback(
+    async (id: string) => {
+      const confirmed = await openConfirm({
+        title: "Habit verwijderen?",
+        message: "Logs, streaks en badges worden verwijderd.",
+        confirmLabel: "Verwijderen",
+        variant: "danger",
+      });
+      if (!confirmed) return;
+      try {
+        await remove(id);
+        success("Habit verwijderd");
+      } catch {
+        toastError("Habit verwijderen is mislukt");
+      }
+    },
+    [openConfirm, remove, success, toastError],
+  );
 
   const moveDate = (days: number) => {
     setSelectedDate((date) => shiftDate(date || todayStr(), days));
   };
 
   const resetDate = () => setSelectedDate(todayStr());
+
+  const handleTabKeyDown = (
+    e: ReactKeyboardEvent<HTMLButtonElement>,
+    id: TabId,
+  ) => {
+    const index = TABS.findIndex((t) => t.id === id);
+    if (index === -1) return;
+    let nextIndex: number | null = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      nextIndex = (index + 1) % TABS.length;
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      nextIndex = (index - 1 + TABS.length) % TABS.length;
+    } else if (e.key === "Home") {
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      nextIndex = TABS.length - 1;
+    }
+    if (nextIndex === null) return;
+    e.preventDefault();
+    const nextTab = TABS[nextIndex];
+    setActiveTab(nextTab.id);
+    document.getElementById(`habits-tab-${nextTab.id}`)?.focus();
+  };
 
   return (
     <div className="text-slate-100">
@@ -151,44 +195,56 @@ export default function HabitsPage() {
           habits={habits}
         />
 
-        <nav
+        <div
+          role="tablist"
           aria-label="Habit onderdelen"
           className="mt-5 grid grid-cols-3 gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1"
         >
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveTab(id)}
-              aria-pressed={activeTab === id}
-              aria-current={activeTab === id ? "page" : undefined}
-              aria-label={`Tab ${label}`}
-              className={cn(
-                "relative flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40 sm:gap-2 sm:text-sm",
-                activeTab === id
-                  ? "text-amber-200"
-                  : "text-slate-500 hover:text-slate-300",
-              )}
-            >
-              {activeTab === id && (
-                <motion.span
-                  layoutId="habits-tab"
-                  className="absolute inset-0 rounded-md border border-amber-500/20 bg-amber-500/10"
-                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-2">
-                <Icon size={16} />
-                {label}
-              </span>
-            </button>
-          ))}
-        </nav>
+          {TABS.map(({ id, label, icon: Icon }) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                id={`habits-tab-${id}`}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`habits-tabpanel-${id}`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setActiveTab(id)}
+                onKeyDown={(e) => handleTabKeyDown(e, id)}
+                className={cn(
+                  "relative flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40 sm:gap-2 sm:text-sm",
+                  isActive
+                    ? "text-amber-200"
+                    : "text-slate-500 hover:text-slate-300",
+                )}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="habits-tab"
+                    className="absolute inset-0 rounded-md border border-amber-500/20 bg-amber-500/10"
+                    transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-2">
+                  <Icon size={16} aria-hidden="true" />
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
         <AnimatePresence mode="wait">
           {activeTab === "vandaag" && (
             <motion.section
               key="vandaag"
+              id="habits-tabpanel-vandaag"
+              role="tabpanel"
+              aria-labelledby="habits-tab-vandaag"
+              tabIndex={0}
+              className="focus:outline-none"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -204,11 +260,12 @@ export default function HabitsPage() {
                 incident={incident}
                 pause={pause}
                 archive={archive}
-                setConfirmDelete={setConfirmDelete}
+                setConfirmDelete={requestDelete}
                 setEditingHabit={setEditingHabit}
                 dayHealth={dayHealth}
                 stats={stats}
                 habits={habits}
+                pendingHabitId={pendingHabitId}
               />
             </motion.section>
           )}
@@ -216,6 +273,11 @@ export default function HabitsPage() {
           {activeTab === "overzicht" && (
             <motion.section
               key="overzicht"
+              id="habits-tabpanel-overzicht"
+              role="tabpanel"
+              aria-labelledby="habits-tab-overzicht"
+              tabIndex={0}
+              className="focus:outline-none"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -230,11 +292,12 @@ export default function HabitsPage() {
                 incident={incident}
                 pause={pause}
                 archive={archive}
-                setConfirmDelete={setConfirmDelete}
+                setConfirmDelete={requestDelete}
                 setEditingHabit={setEditingHabit}
                 dayHealth={dayHealth}
                 habits={habits}
                 todayHabits={todayHabits}
+                pendingHabitId={pendingHabitId}
               />
             </motion.section>
           )}
@@ -242,10 +305,14 @@ export default function HabitsPage() {
           {activeTab === "stats" && (
             <motion.section
               key="stats"
+              id="habits-tabpanel-stats"
+              role="tabpanel"
+              aria-labelledby="habits-tab-stats"
+              tabIndex={0}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,420px)_1fr]"
+              className="mt-5 grid gap-4 focus:outline-none xl:grid-cols-[minmax(0,420px)_1fr]"
             >
               <div className="space-y-4">
                 <HabitStats masked={privacyOn} />
@@ -271,58 +338,6 @@ export default function HabitsPage() {
       >
         <Plus size={24} />
       </motion.button>
-
-      <AnimatePresence>
-        {confirmDelete && (
-          <>
-            <motion.div
-              key="delete-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setConfirmDelete(null)}
-              className="fixed inset-0 z-[90] bg-black/65 backdrop-blur-sm"
-            />
-            <motion.div
-              key="delete-dialog"
-              initial={{ opacity: 0, scale: 0.94 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.94 }}
-              className="fixed inset-x-4 top-1/2 z-[91] mx-auto max-w-sm -translate-y-1/2 rounded-lg border border-rose-500/20 bg-[#11141c] p-5 shadow-2xl"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-rose-500/25 bg-rose-500/10">
-                  <AlertTriangle size={20} className="text-rose-300" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">
-                    Habit verwijderen?
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Logs, streaks en badges worden verwijderd.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(null)}
-                  className="h-11 rounded-lg border border-white/10 bg-white/[0.04] text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.07]"
-                >
-                  Annuleren
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="h-11 rounded-lg border border-rose-500/25 bg-rose-500/15 text-sm font-bold text-rose-200 transition-colors hover:bg-rose-500/20"
-                >
-                  Verwijderen
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       <HabitForm
         open={showForm}

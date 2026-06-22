@@ -47,10 +47,18 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
 
     setSaving(true);
     try {
+      // Anchor the quick-add deadline at 09:00 local and store it as a full ISO
+      // string so it matches the format the note editor produces
+      // (normalizeDeadlineForSave -> toISOString). A bare "YYYY-MM-DD" would sort
+      // lexically ahead of any "...T..:..:..Z" deadline on the same day and would
+      // be parsed as UTC-midnight by getDeadlineState, skewing the soon/overdue
+      // buckets for users outside UTC.
+      const deadlineAt = new Date(date);
+      deadlineAt.setHours(9, 0, 0, 0);
       await onCreate({
         inhoud: text,
         titel: text.length > 80 ? text.slice(0, 77) + "..." : text,
-        deadline: date.toLocaleDateString("sv-SE"),
+        deadline: deadlineAt.toISOString(),
       });
       setQuickText("");
     } finally {

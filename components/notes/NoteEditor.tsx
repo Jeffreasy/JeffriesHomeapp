@@ -856,6 +856,10 @@ export function NoteEditor({
   }, [applySnapshot, note?.id, onRestoreRevision, openConfirm, reloadRevisions]);
 
   useEffect(() => {
+    // Remember whatever triggered the editor so focus can return there on close
+    // (mirrors the shared useFocusTrap behaviour for keyboard users).
+    const previousFocus = document.activeElement as HTMLElement | null;
+
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Tab") {
         const modal = modalRef.current;
@@ -901,7 +905,11 @@ export function NoteEditor({
       }
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      // Return focus to the originating card/button when the editor closes.
+      previousFocus?.focus?.();
+    };
   }, [handleCloseAttempt, handleSave]);
 
   const insertChecklist = () => prefixSelectedLines("- [ ] ");
@@ -1515,6 +1523,11 @@ export function NoteEditor({
           {saveError && (
             <p role="alert" className="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
               {saveError}
+            </p>
+          )}
+          {note && onToggleComplete && isDirty && (
+            <p className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 sm:hidden">
+              Sla je wijzigingen eerst op om deze notitie af te ronden.
             </p>
           )}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

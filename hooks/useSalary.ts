@@ -80,8 +80,9 @@ export function useSalary() {
     return raw.map(fromRow);
   }, [raw]);
 
-  const nu = new Date();
-  const huidigKey = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, "0")}`;
+  const huidigKey = new Date()
+    .toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" })
+    .slice(0, 7);
   const huidig = records.find((r) => r.periode === huidigKey) ?? null;
 
   const perJaar: Record<number, SalarisRecord[]> = {};

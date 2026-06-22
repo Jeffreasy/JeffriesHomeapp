@@ -36,6 +36,7 @@ export function HabitsOverzichtTab({
   dayHealth,
   habits,
   todayHabits,
+  pendingHabitId,
 }: {
   groupedHabits: GroupedHabits;
   isLoading: boolean;
@@ -51,6 +52,7 @@ export function HabitsOverzichtTab({
   dayHealth: DayHealth;
   habits: HabitRecord[];
   todayHabits: HabitWithLog[];
+  pendingHabitId: string | null;
 }) {
   const todayById = new Map(todayHabits.map((habit) => [habit._id, habit]));
 
@@ -80,6 +82,7 @@ export function HabitsOverzichtTab({
                     key={habit._id}
                     habit={{ ...habit, log: todayVersion?.log ?? null }}
                     masked={privacyOn}
+                    pending={pendingHabitId === habit._id}
                     onToggle={() => toggle(habit._id!)}
                     onIncrement={(stap) => increment(habit._id!, stap)}
                     onIncident={(trigger, notitie) =>
@@ -147,6 +150,7 @@ export function HabitsOverzichtTab({
                 key={habit._id}
                 habit={{ ...habit, log: null }}
                 masked={privacyOn}
+                pending={pendingHabitId === habit._id}
                 onToggle={() => undefined}
                 onIncrement={() => undefined}
                 onIncident={() => undefined}

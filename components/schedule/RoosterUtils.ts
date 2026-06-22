@@ -67,8 +67,13 @@ export function formatMetaDate(iso?: string) {
   return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
+/** Format a number of hours in nl-NL notation (comma decimal), e.g. 7.5 → "7,5". */
+export function hoursValue(hours: number) {
+  return String(Math.round(hours * 10) / 10).replace(".", ",");
+}
+
 export function formatHours(hours: number) {
-  return `${Math.round(hours * 10) / 10}u`;
+  return `${hoursValue(hours)}u`;
 }
 
 export function pluralize(count: number, singular: string, plural = `${singular}s`) {

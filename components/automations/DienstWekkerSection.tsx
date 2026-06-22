@@ -255,7 +255,8 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
                 type="button"
                 onClick={() => onSave(activeType, activeDraft)}
                 disabled={busy || (!dirty && installedCount > 0)}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-500/15 px-3 text-xs font-semibold text-amber-100 transition-colors hover:bg-amber-500/20 disabled:opacity-45"
+                title={!dirty && installedCount > 0 ? "Geen wijzigingen om op te slaan. Pas een tijd aan om opnieuw op te slaan." : undefined}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-500/15 px-3 text-xs font-semibold text-amber-100 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {busy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
                 {installedCount > 0 ? "Opslaan" : "Inschakelen"}

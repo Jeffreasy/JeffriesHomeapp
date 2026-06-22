@@ -8,6 +8,7 @@ import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents
 import { type DienstRow } from "@/lib/schedule";
 import { useToast } from "@/components/ui/Toast";
 import { PersonalEventItem } from "./PersonalEventItem";
+import { getAmsterdamTodayIso } from "./RoosterUtils";
 import { syncApi } from "@/lib/api";
 
 interface AfsprakenViewProps {
@@ -45,7 +46,7 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
   };
 
   const [showHistory, setShowHistory] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getAmsterdamTodayIso();
 
   if (isLoading) {
     return (
@@ -125,7 +126,7 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
           </div>
           <div className="flex items-center justify-between pt-2">
             <p className="text-[10px] text-slate-500">
-              Klik om direct naar Google Calendar te sturen
+              Verwerk nu om direct naar Google Calendar te sturen
             </p>
             <button onClick={handleVerwerk} disabled={processing}
               className="flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"

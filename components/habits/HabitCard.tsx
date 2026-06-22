@@ -54,6 +54,7 @@ interface HabitCardProps {
   onRemove: () => void;
   onEdit: () => void;
   masked?: boolean;
+  pending?: boolean;
 }
 
 export function HabitCard({
@@ -66,6 +67,7 @@ export function HabitCard({
   onRemove,
   onEdit,
   masked = false,
+  pending = false,
 }: HabitCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -73,16 +75,35 @@ export function HabitCard({
   const [selectedTrigger, setSelectedTrigger] = useState<string | undefined>();
   const [triggerNotitie, setTriggerNotitie] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!showMenu) return;
-    const handler = (e: MouseEvent) => {
+    const closeOnOutside = (e: Event) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setShowMenu(false);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    const closeOnKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowMenu(false);
+        menuTriggerRef.current?.focus();
+      }
+    };
+    const closeOnScroll = () => setShowMenu(false);
+    // pointerdown covers mouse + touch + pen; touchstart as fallback for older
+    // iOS Safari where synthetic mouse events are unreliable on non-interactive
+    // tap targets.
+    document.addEventListener("pointerdown", closeOnOutside);
+    document.addEventListener("touchstart", closeOnOutside);
+    document.addEventListener("keydown", closeOnKey);
+    window.addEventListener("scroll", closeOnScroll, { passive: true });
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutside);
+      document.removeEventListener("touchstart", closeOnOutside);
+      document.removeEventListener("keydown", closeOnKey);
+      window.removeEventListener("scroll", closeOnScroll);
+    };
   }, [showMenu]);
 
   const isCompleted = habit.log?.voltooid === true;
@@ -115,8 +136,10 @@ export function HabitCard({
     <motion.div
       ref={menuRef}
       layout
+      aria-busy={pending}
       className="relative rounded-2xl overflow-hidden transition-all"
       style={{
+        opacity: pending ? 0.6 : 1,
         background: isSuccess
           ? `linear-gradient(135deg, ${color}08, ${color}04)`
           : hasIncident
@@ -168,13 +191,15 @@ export function HabitCard({
           <button
             type="button"
             onClick={onToggle}
+            disabled={pending}
+            aria-busy={pending}
             aria-label={
               isCompleted
                 ? `${displayName} heropenen`
                 : `${displayName} voltooien`
             }
             title={isCompleted ? "Heropenen" : "Voltooien"}
-            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer"
+            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer disabled:cursor-default"
             style={{
               background: isCompleted ? color : "rgba(255,255,255,0.03)",
               border: isCompleted ? "none" : `2px solid ${color}30`,
@@ -236,9 +261,11 @@ export function HabitCard({
                 +{habit.log.xpVerdiend} XP
               </span>
             ) : null}
-            <span className="text-[10px] text-slate-600">
-              {MOEILIJKHEID_LABELS[habit.moeilijkheid as string]}
-            </span>
+            {!masked && (
+              <span className="text-[10px] text-[var(--color-text-muted)]">
+                {MOEILIJKHEID_LABELS[habit.moeilijkheid as string]}
+              </span>
+            )}
             {habit.doelTijd && !masked && (
               <span className="inline-flex items-center gap-1 text-[10px] text-sky-400/60">
                 <AppIcon name="time" tone="blue" size="xs" />
@@ -253,8 +280,10 @@ export function HabitCard({
           <button
             type="button"
             onClick={() => setShowTriggerModal(true)}
+            disabled={pending}
+            aria-busy={pending}
             aria-label={`Incident loggen voor ${displayName}`}
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-500/12 bg-red-500/8 transition-transform active:scale-90"
+            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-500/12 bg-red-500/8 transition-transform active:scale-90 disabled:cursor-default disabled:opacity-40"
             title="Incident loggen"
           >
             <AlertTriangle size={16} className="text-red-400/70" />
@@ -263,8 +292,10 @@ export function HabitCard({
 
         {/* More menu */}
         <button
+          ref={menuTriggerRef}
           type="button"
           onClick={() => setShowMenu(!showMenu)}
+          aria-haspopup="menu"
           aria-expanded={showMenu}
           aria-label={`Acties voor ${displayName}`}
           title="Acties"
@@ -292,7 +323,8 @@ export function HabitCard({
             <button
               type="button"
               onClick={() => onIncrement(-stap)}
-              disabled={currentWaarde <= 0}
+              disabled={currentWaarde <= 0 || pending}
+              aria-busy={pending}
               aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verminderen`}
               className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-20"
               style={{
@@ -311,7 +343,7 @@ export function HabitCard({
               >
                 {masked ? "••" : currentWaarde}
               </span>
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-[var(--color-text-muted)]">
                 {" "}
                 / {masked ? "••" : `${habit.doelWaarde} ${habit.eenheid ?? ""}`}
               </span>
@@ -321,7 +353,8 @@ export function HabitCard({
             <button
               type="button"
               onClick={() => onIncrement(stap)}
-              disabled={isCompleted}
+              disabled={isCompleted || pending}
+              aria-busy={pending}
               aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verhogen`}
               className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-30"
               style={{
@@ -396,10 +429,10 @@ export function HabitCard({
                           Lv.{levelInfo.level} {levelInfo.titel}
                         </span>
                       </div>
-                      <span className="text-[10px] text-slate-500">
+                      <span className="text-[10px] text-[var(--color-text-muted)]">
                         {formatXP(habit.totaalXP)}
                         {levelInfo.nextXP > 0 && (
-                          <span className="text-slate-600">
+                          <span className="text-[var(--color-text-subtle)]">
                             {" "}
                             · nog {levelInfo.nextXP}
                           </span>
@@ -435,7 +468,7 @@ export function HabitCard({
 
               {/* Aangemaakt datum */}
               <div className="flex items-center gap-1.5 mt-2">
-                <span className="text-[10px] text-slate-600">
+                <span className="text-[10px] text-[var(--color-text-muted)]">
                   Aangemaakt{" "}
                   {new Date(habit.aangemaakt).toLocaleDateString("nl-NL", {
                     day: "numeric",
@@ -549,7 +582,11 @@ export function HabitCard({
           animate={{ height: "auto", opacity: 1 }}
           className="border-t border-[var(--color-border)] overflow-hidden"
         >
-          <div className="p-2.5 flex gap-2">
+          <div
+            role="menu"
+            aria-label={`Acties voor ${displayName}`}
+            className="p-2.5 flex gap-2"
+          >
             <MenuBtn
               icon={<Edit3 size={15} />}
               label="Bewerken"
@@ -604,6 +641,7 @@ function MenuBtn({
   return (
     <button
       type="button"
+      role="menuitem"
       onClick={onClick}
       aria-label={label}
       className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl transition-all active:scale-95 min-h-[52px] cursor-pointer"
@@ -638,7 +676,7 @@ function DetailStat({
         {icon}
       </div>
       <div className="text-[11px] font-bold text-slate-200">{value}</div>
-      <div className="text-[9px] text-slate-500 mt-0.5">{label}</div>
+      <div className="text-[9px] text-[var(--color-text-muted)] mt-0.5">{label}</div>
     </div>
   );
 }

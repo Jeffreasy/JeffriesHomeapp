@@ -74,7 +74,9 @@ export function AutomationCard({ automation, onToggle, onEdit, onDelete }: Autom
         <p className="text-xs text-slate-400 mt-0.5">
           {automation.trigger.triggerType === "schedule" ? (
             <span className="text-orange-400/80">
-              Alleen op {automation.trigger.shiftType} dienst
+              {automation.trigger.shiftType && automation.trigger.shiftType !== "any"
+                ? `Alleen op ${automation.trigger.shiftType} dienst`
+                : "Op elke dienst"}
             </span>
           ) : (
             <span className="text-amber-400/80">{daysLabel(automation.trigger.days)}</span>

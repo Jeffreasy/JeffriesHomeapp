@@ -7,6 +7,7 @@ import { type ConflictInfo } from "@/lib/conflictDetection";
 import { cn } from "@/lib/utils";
 import { AppIcon, type SymbolTone } from "@/components/ui/AppIcon";
 import type { AppIconName } from "@/lib/symbols";
+import { hoursValue } from "./RoosterUtils";
 
 /** Format ISO date string (YYYY-MM-DD) → DD-MM-YYYY veilig. */
 function formatDate(iso: string, style: "compact" | "full" = "full"): string {
@@ -118,7 +119,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
               {dienst.dag} · {formatDate(dienst.startDatum, "compact")}
             </p>
             <p className="text-xs text-slate-400">
-              {dienst.startTijd}–{dienst.eindTijd} · {dienst.shiftType} · {dienst.duur}u
+              {dienst.startTijd}–{dienst.eindTijd} · {dienst.shiftType} · {hoursValue(dienst.duur)}u
             </p>
             {!isBezig && (
               <p className={cn(
@@ -235,7 +236,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
           )}
           <div className="flex items-center gap-2 text-slate-300">
             <AppIcon name="timer" tone="slate" size="xs" />
-            <span>{dienst.duur} uur · Team {dienst.team || "?"}</span>
+            <span>{hoursValue(dienst.duur)} uur · Team {dienst.team || "?"}</span>
           </div>
         </div>
 

@@ -57,6 +57,8 @@ import {
 type AgendaView = "today" | "upcoming" | "pending" | "history";
 type CalendarMode = "month" | "week";
 
+const HISTORY_RENDER_LIMIT = 60;
+
 type TimelineGroup = {
   date: string;
   label: string;
@@ -281,7 +283,7 @@ export default function AgendaPage() {
       case "pending":
         return pending;
       case "history":
-        return historyTimelineEvents.slice(0, 60);
+        return historyTimelineEvents.slice(0, HISTORY_RENDER_LIMIT);
       default:
         return upcomingTimelineEvents;
     }
@@ -309,8 +311,7 @@ export default function AgendaPage() {
 
   const emptyCopy = viewEmptyCopy(activeView);
   const activeViewMeta = viewTabs.find((tab) => tab.id === activeView) ?? viewTabs[0];
-  const todaySplit = splitEventCounts(todayTimelineEvents);
-  const monthSplit = splitEventCounts(monthEvents);
+  const historyHiddenCount = Math.max(0, historyTimelineEvents.length - HISTORY_RENDER_LIMIT);
 
   // ─── Actions ────────────────────────────────────────────────────────────
 
@@ -462,7 +463,7 @@ export default function AgendaPage() {
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Vandaag</p>
             <p className="mt-1 text-lg font-semibold text-white tabular-nums">{todayTimelineEvents.length}</p>
             <p className="mt-0.5 truncate text-[10px] text-slate-600">
-              {todaySplit.appointments} afspraken · {todaySplit.shifts} diensten
+              {formatSplitCounts(todayTimelineEvents)}
             </p>
           </button>
           <button
@@ -472,29 +473,30 @@ export default function AgendaPage() {
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">30 dagen</p>
             <p className="mt-1 text-lg font-semibold text-white tabular-nums">{monthEvents.length}</p>
             <p className="mt-0.5 truncate text-[10px] text-slate-600">
-              {monthSplit.appointments} afspraken · {monthSplit.shifts} diensten
+              {formatSplitCounts(monthEvents)}
             </p>
           </button>
-          <button
-            onClick={() => { if (withConflicts.length > 0) setActiveView("upcoming"); }}
-            disabled={withConflicts.length === 0}
-            aria-label={
-              withConflicts.length > 0
-                ? `Conflicten: ${withConflicts.length} ${withConflicts.length === 1 ? "conflict" : "conflicten"} — bekijk`
-                : "Conflicten: geen conflicten"
-            }
-            className={`rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors ${
-              withConflicts.length > 0 ? "hover:bg-white/[0.045] cursor-pointer" : "cursor-default"
-            }`}
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Conflicten</p>
-            <p className={`mt-1 text-lg font-semibold tabular-nums ${withConflicts.length > 0 ? "text-amber-300" : "text-emerald-300"}`}>
-              {withConflicts.length}
-            </p>
-            <p className="mt-0.5 truncate text-[10px] text-slate-600">
-              {withConflicts.length > 0 ? "te controleren" : "geen conflicten"}
-            </p>
-          </button>
+          {withConflicts.length > 0 ? (
+            <button
+              onClick={() => setActiveView("upcoming")}
+              aria-label={`Conflicten: ${withConflicts.length} ${withConflicts.length === 1 ? "conflict" : "conflicten"} — bekijk`}
+              className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors hover:bg-white/[0.045] cursor-pointer"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Conflicten</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-amber-300">{withConflicts.length}</p>
+              <p className="mt-0.5 truncate text-[10px] text-slate-600">te controleren</p>
+            </button>
+          ) : (
+            <div
+              role="status"
+              aria-label="Conflicten: geen conflicten"
+              className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left"
+            >
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Conflicten</p>
+              <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-300">0</p>
+              <p className="mt-0.5 truncate text-[10px] text-slate-600">geen conflicten</p>
+            </div>
+          )}
           <button
             onClick={() => setActiveView("pending")}
             className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors hover:bg-white/[0.045] cursor-pointer"
@@ -593,6 +595,15 @@ export default function AgendaPage() {
                   text={emptyCopy.text}
                 />
               </Panel>
+            )}
+
+            {activeView === "history" && historyHiddenCount > 0 && (
+              <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-4 py-3 text-xs text-slate-500">
+                <Archive size={13} className="shrink-0 text-slate-600" aria-hidden="true" />
+                <span>
+                  {HISTORY_RENDER_LIMIT} van {historyTimelineEvents.length} getoond · {historyHiddenCount} oudere{historyHiddenCount === 1 ? "" : "n"} verborgen
+                </span>
+              </div>
             )}
 
             {activeView !== "pending" && pending.length > 0 && (
@@ -802,5 +813,11 @@ export default function AgendaPage() {
 }
 
 function shortSyncError(error: string) {
-  return error.length > 140 ? `${error.slice(0, 137)}...` : error;
+  const trimmed = error.trim();
+  if (trimmed.length <= 140) return trimmed;
+  // Truncate on a word boundary so the message never cuts mid-word.
+  const head = trimmed.slice(0, 137);
+  const lastSpace = head.lastIndexOf(" ");
+  const clipped = lastSpace > 80 ? head.slice(0, lastSpace) : head;
+  return `${clipped.trimEnd()}…`;
 }

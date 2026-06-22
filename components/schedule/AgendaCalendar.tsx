@@ -160,14 +160,18 @@ export function AgendaCalendar({
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Mobile: Agenda (list) vs Maand (dots overview) */}
-            <div className="flex h-9 rounded-lg border border-[var(--color-border)] bg-black/15 p-0.5 sm:hidden">
+            <div
+              role="group"
+              aria-label="Weergave"
+              className="flex h-9 rounded-lg border border-[var(--color-border)] bg-black/15 p-0.5 sm:hidden"
+            >
               <button
                 type="button"
                 onClick={() => setMobileView("agenda")}
                 aria-pressed={mobileView === "agenda"}
                 className={cn(
                   "inline-flex min-w-[4rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
-                  mobileView === "agenda" ? "bg-white/[0.08] text-white" : "text-slate-500",
+                  mobileView === "agenda" ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
                 )}
               >
                 Agenda
@@ -178,14 +182,18 @@ export function AgendaCalendar({
                 aria-pressed={mobileView === "maand"}
                 className={cn(
                   "inline-flex min-w-[4rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
-                  mobileView === "maand" ? "bg-white/[0.08] text-white" : "text-slate-500",
+                  mobileView === "maand" ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
                 )}
               >
                 Maand
               </button>
             </div>
             {/* Desktop: Maand vs Week */}
-            <div className="hidden h-9 rounded-lg border border-[var(--color-border)] bg-black/15 p-0.5 sm:flex">
+            <div
+              role="group"
+              aria-label="Weergave"
+              className="hidden h-9 rounded-lg border border-[var(--color-border)] bg-black/15 p-0.5 sm:flex"
+            >
               <button
                 type="button"
                 onClick={() => setMode("month")}

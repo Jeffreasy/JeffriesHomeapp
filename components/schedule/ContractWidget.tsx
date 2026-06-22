@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
-import { analyzeContract } from "@/lib/schedule";
+import { analyzeContract, getCurrentWeekBalance } from "@/lib/schedule";
 import { Target, TrendingDown, TrendingUp, CheckCircle2 } from "lucide-react";
+import { hoursValue } from "./RoosterUtils";
 
 export function ContractWidget() {
   const { diensten } = useSchedule();
@@ -14,8 +15,7 @@ export function ContractWidget() {
   }, [diensten]);
 
   const currentOrNextWeek = useMemo(() => {
-    if (stats.weeklyBalances.length === 0) return null;
-    return stats.weeklyBalances[stats.weeklyBalances.length - 1];
+    return getCurrentWeekBalance(stats);
   }, [stats]);
 
   if (!currentOrNextWeek) return null;
@@ -61,8 +61,8 @@ export function ContractWidget() {
               transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
               className="text-5xl font-black leading-none tracking-tight text-white tabular-nums md:text-6xl"
             >
-              {currentOrNextWeek.actualHours}
-              <span className="text-2xl text-slate-600 font-bold ml-1">/{currentOrNextWeek.expectedHours}</span>
+              {hoursValue(currentOrNextWeek.actualHours)}
+              <span className="text-2xl text-slate-600 font-bold ml-1">/{hoursValue(currentOrNextWeek.expectedHours)}</span>
             </motion.h2>
 
             <motion.div 
@@ -75,7 +75,7 @@ export function ContractWidget() {
               {isOver && <TrendingUp size={16} strokeWidth={3} />}
               {isUnder && <TrendingDown size={16} strokeWidth={3} />}
               {isPerfect && <CheckCircle2 size={16} strokeWidth={3} />}
-              {currentOrNextWeek.delta > 0 ? "+" : ""}{currentOrNextWeek.delta}
+              {currentOrNextWeek.delta > 0 ? "+" : ""}{hoursValue(currentOrNextWeek.delta)}
             </motion.div>
           </div>
         </div>
@@ -120,7 +120,7 @@ export function ContractWidget() {
               className="text-xl font-black tabular-nums"
               style={{ color: stats.totalDelta > 0 ? "#f97316" : stats.totalDelta < 0 ? "#ef4444" : "#10b981" }}
             >
-              {stats.totalDelta > 0 ? "+" : ""}{stats.totalDelta}
+              {stats.totalDelta > 0 ? "+" : ""}{hoursValue(stats.totalDelta)}
               <span className="ml-1 text-xs opacity-60 tracking-widest">u</span>
             </span>
           </div>

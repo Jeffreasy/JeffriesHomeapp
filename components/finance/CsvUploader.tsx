@@ -13,7 +13,6 @@ interface ImportProgress {
   total:    number;
   toegevoegd:   number;
   overgeslagen: number;
-  bijgewerkt:    number;
 }
 
 interface CsvUploaderProps {
@@ -29,7 +28,7 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
   const [isDragOver, setIsDragOver] = useState(false);
   const abortRef                    = useRef(false);
 
-  const { importBatch, resetPagination } = useTransactions();
+  const { importBatch } = useTransactions();
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.name.toLowerCase().endsWith(".csv")) {
@@ -67,7 +66,6 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
     const total = Math.ceil(parseResult.transactions.length / CHUNK);
     let toegevoegd = 0;
     let overgeslagen = 0;
-    let bijgewerkt = 0;
 
     try {
       for (let i = 0, chunk = 0; i < parseResult.transactions.length; i += CHUNK, chunk++) {
@@ -81,12 +79,13 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
         const isObj = typeof res === 'object' && res !== null;
         toegevoegd   += (isObj && 'inserted' in res ? res.inserted : 0) ?? 0;
         overgeslagen += (isObj && 'skipped' in res ? res.skipped : 0) ?? 0;
-        bijgewerkt   += 0;
 
-        setProgress({ chunk: chunk + 1, total, toegevoegd, overgeslagen, bijgewerkt });
+        setProgress({ chunk: chunk + 1, total, toegevoegd, overgeslagen });
       }
 
-      resetPagination();
+      // The page owns the live transactions list; ask it to refresh so the
+      // newly imported rows appear. Resetting pagination on this component's
+      // own useTransactions instance would be a no-op (separate state).
       onImported?.();
       setState("done");
     } catch (err) {
@@ -178,7 +177,7 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
             </div>
             {progress && (
               <p className="progress-sub">
-                +{progress.toegevoegd} nieuw · {progress.bijgewerkt} bijgewerkt · {progress.overgeslagen} al bekend
+                +{progress.toegevoegd} nieuw · {progress.overgeslagen} al bekend
               </p>
             )}
             <button className="btn btn--ghost btn--sm" onClick={reset}>Stoppen</button>
@@ -194,10 +193,6 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
               <div className="preview-stat preview-stat--success">
                 <span className="preview-stat__value">+{progress.toegevoegd.toLocaleString("nl")}</span>
                 <span className="preview-stat__label">nieuw</span>
-              </div>
-              <div className="preview-stat">
-                <span className="preview-stat__value">{progress.bijgewerkt.toLocaleString("nl")}</span>
-                <span className="preview-stat__label">bijgewerkt</span>
               </div>
               <div className="preview-stat">
                 <span className="preview-stat__value">{progress.overgeslagen.toLocaleString("nl")}</span>

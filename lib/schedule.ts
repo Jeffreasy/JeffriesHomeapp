@@ -359,7 +359,9 @@ export function teamBreakdown(diensten: DienstRow[]): Record<string, number> {
 
 /** Past / completed diensten (status Gedraaid), most recent first */
 export function getHistory(diensten: DienstRow[], limit = 20): DienstRow[] {
+  const nowKey = getNowKey();
   return diensten
+    .map(d => withRuntimeStatus(d, nowKey))
     .filter(d => d.status === "Gedraaid")
     .sort((a, b) => b.startDatum.localeCompare(a.startDatum))
     .slice(0, limit);
@@ -477,6 +479,39 @@ export interface ContractStats {
   contractUrenPerWeek: number;
   weeklyBalances: WeeklyBalance[];
   totalDelta: number;
+}
+
+/** Current ISO week key in the same "YYYY-WW" format groupByWeekNr produces */
+export function getCurrentWeekNr(date = new Date()): string {
+  const d = new Date(getAmsterdamParts(date).date);
+  const jan4   = new Date(d.getFullYear(), 0, 4);
+  const monday = new Date(jan4);
+  monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const weekNum = Math.floor((d.getTime() - monday.getTime()) / (7 * 86_400_000)) + 1;
+  return `${d.getFullYear()}-${String(weekNum).padStart(2, "0")}`;
+}
+
+/**
+ * Pick the balance to surface as "this week": the current ISO week if it has
+ * shifts, otherwise the most recent week that is not in the future. Never
+ * returns a future week, so the headline never presents a far-ahead planned
+ * week as the current contract-hour balance.
+ */
+export function getCurrentWeekBalance(
+  stats: ContractStats,
+  date = new Date(),
+): WeeklyBalance | null {
+  if (stats.weeklyBalances.length === 0) return null;
+  const currentKey = getCurrentWeekNr(date);
+  const exact = stats.weeklyBalances.find(w => w.weeknr === currentKey);
+  if (exact) return exact;
+  // weeklyBalances is sorted ascending; take the last week at or before now.
+  const pastOrCurrent = stats.weeklyBalances.filter(
+    w => w.weeknr.localeCompare(currentKey, undefined, { numeric: true }) <= 0,
+  );
+  if (pastOrCurrent.length > 0) return pastOrCurrent[pastOrCurrent.length - 1];
+  // Only future weeks exist (e.g. brand-new schedule) — fall back to the first.
+  return stats.weeklyBalances[0];
 }
 
 export function analyzeContract(diensten: DienstRow[], contractUren = 16): ContractStats {

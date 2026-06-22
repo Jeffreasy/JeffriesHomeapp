@@ -100,7 +100,7 @@ export function HabitHeatmap() {
           <Activity size={14} className="text-orange-400" /> Activiteit (365
           dagen)
         </h3>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-[var(--color-text-muted)]">
           Heatmap kon niet worden geladen.
         </p>
       </div>
@@ -114,7 +114,7 @@ export function HabitHeatmap() {
           <Activity size={14} className="text-orange-400" /> Activiteit (365
           dagen)
         </h3>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-[var(--color-text-muted)]">
           Nog geen habit-activiteit om te tonen.
         </p>
       </div>
@@ -139,7 +139,7 @@ export function HabitHeatmap() {
             {monthLabels.map(({ label, col }, i) => (
               <div
                 key={i}
-                className="text-[9px] text-slate-500 absolute"
+                className="text-[9px] text-[var(--color-text-muted)] absolute"
                 style={{ left: `${col * 15 + 28}px` }}
               >
                 {label}
@@ -153,7 +153,7 @@ export function HabitHeatmap() {
             <div className="flex flex-col gap-[3px] mr-1.5 pt-0.5">
               {DAYS.map((d, i) => (
                 <div key={i} className="h-[12px] flex items-center">
-                  <span className="text-[8px] text-slate-600 w-5 text-right">
+                  <span className="text-[8px] text-[var(--color-text-muted)] w-5 text-right">
                     {d}
                   </span>
                 </div>
@@ -184,7 +184,7 @@ export function HabitHeatmap() {
 
           {/* Legend */}
           <div className="flex items-center gap-1.5 mt-2 pl-7">
-            <span className="text-[8px] text-slate-600">Minder</span>
+            <span className="text-[8px] text-[var(--color-text-muted)]">Minder</span>
             {HEATMAP_COLORS.map((color, i) => (
               <div
                 key={i}
@@ -192,7 +192,7 @@ export function HabitHeatmap() {
                 style={{ background: color }}
               />
             ))}
-            <span className="text-[8px] text-slate-600">Meer</span>
+            <span className="text-[8px] text-[var(--color-text-muted)]">Meer</span>
           </div>
         </div>
       </div>

@@ -18,6 +18,7 @@ export function FinanceInsights({
   topCategory,
   topMerchant,
   filters,
+  zoekterm,
   setZoekterm,
   toggleCategoryFilter,
   formatPrivateEuro,
@@ -29,6 +30,7 @@ export function FinanceInsights({
   topCategory: any;
   topMerchant: any;
   filters: TransactionFilter;
+  zoekterm: string;
   setZoekterm: (term: string) => void;
   toggleCategoryFilter: (cat: string) => void;
   formatPrivateEuro: (value: number) => string;
@@ -65,12 +67,19 @@ export function FinanceInsights({
           <div className="mt-4">
             {stats.topMerchants?.length ? (
               <div className="space-y-1">
-                {stats.topMerchants.map((merchant: any, index: any) => (
+                {stats.topMerchants.map((merchant: any, index: any) => {
+                  const isActive = zoekterm === merchant.naam;
+                  return (
                   <button
                     key={merchant.naam}
                     type="button"
                     onClick={() => setZoekterm(merchant.naam)}
-                    className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+                    aria-pressed={isActive}
+                    className={`grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${
+                      isActive
+                        ? "bg-amber-500/10 ring-1 ring-amber-500/30"
+                        : "hover:bg-[rgba(255,255,255,0.04)]"
+                    }`}
                   >
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-xs font-bold text-amber-200">
                       {index + 1}
@@ -81,7 +90,8 @@ export function FinanceInsights({
                     </span>
                     <span className="text-sm font-bold text-slate-100">{formatPrivateEuroExact(merchant.bedrag)}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="glass p-4 text-sm text-slate-500">
