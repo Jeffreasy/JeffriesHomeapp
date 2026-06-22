@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
@@ -178,7 +179,19 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
     }
   }, [automaticBusinessContext, businessContext, businessContextTouched, categorie, categoryTouched, detectedContext, symbol, symbolTouched]);
 
-  const handleClose = () => { reset(); onClose(); };
+  const handleClose = useCallback(() => { reset(); onClose(); }, [reset, onClose]);
+
+  // Accessibility: trap focus in the dialog, restore focus on close, close on Escape.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(open, dialogRef);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, handleClose]);
 
   const handleCategoryChange = (nextCategory: CategoryId) => {
     setCategoryTouched(true);
@@ -280,11 +293,18 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
             data-app-modal="agenda-event"
             className="fixed inset-x-0 bottom-0 z-[101] mx-auto max-w-lg sm:inset-x-4 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2"
           >
-            <div className="glass flex max-h-[calc(100dvh-0.5rem)] flex-col overflow-hidden rounded-t-2xl border border-[var(--color-border)] shadow-2xl sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl">
+            <div
+              ref={dialogRef}
+              tabIndex={-1}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="agenda-event-title"
+              className="glass flex max-h-[calc(100dvh-0.5rem)] flex-col overflow-hidden rounded-t-2xl border border-[var(--color-border)] shadow-2xl focus:outline-none sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
+            >
 
               {/* Header */}
               <div className="flex shrink-0 items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
-                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <h2 id="agenda-event-title" className="text-sm font-semibold text-white flex items-center gap-2">
                   <AppIcon name="agenda" tone="indigo" size="sm" />
                   {editEvent ? "Afspraak wijzigen" : "Nieuwe afspraak"}
                 </h2>
@@ -312,7 +332,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     onChange={e => setTitel(e.target.value)}
                     placeholder="bijv. Verjaardag Mama"
                     required
-                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
                   {detectedContext && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -331,6 +351,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     Hele dag
                   </label>
                   <button type="button" onClick={() => setHeledag(v => !v)}
+                    role="switch" aria-checked={heledag} aria-label="Hele dag"
                     className="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
                     style={{ background: heledag ? "#6366f1" : "rgba(255,255,255,0.1)" }}>
                     <span className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all"
@@ -346,7 +367,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     </label>
                     <input type="date" value={startDatum}
                       onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                   <div>
@@ -355,7 +376,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     </label>
                     <input type="date" value={eindDatum} min={startDatum}
                       onChange={e => setEindDatum(e.target.value)}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                 </div>
@@ -369,7 +390,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                         <AppIcon name="time" tone="slate" size="xs" /> Van
                       </label>
                       <input type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
-                        className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                     <div>
@@ -377,7 +398,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                         <AppIcon name="time" tone="slate" size="xs" /> Tot
                       </label>
                       <input type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
-                        className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                   </motion.div>
@@ -390,7 +411,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   </label>
                   <input type="text" value={locatie} onChange={e => setLocatie(e.target.value)}
                     placeholder="bijv. Amsterdam"
-                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
                 </div>
 
@@ -455,7 +476,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   </label>
                   <textarea value={beschrijving} onChange={e => setBeschrijving(e.target.value)}
                     rows={2} placeholder="Aantekeningen..."
-                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none"
+                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none"
                   />
                 </div>
 

@@ -84,7 +84,7 @@ export function InlineStats({
 export function StatusPill({ status }: { status?: string }) {
   const isRunning = status === "running";
   const isSuccess = status === "success";
-  const label = isRunning ? "Sync" : isSuccess ? "OK" : status ? "Check" : "Geen status";
+  const label = isRunning ? "Synct…" : isSuccess ? "Gesynct" : status ? "Controleer" : "Geen sync";
   return (
     <span
       className={cn(

@@ -259,7 +259,9 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
 
   const history = useMemo(
     () => visibleEvents
-      .filter((e) => e.status === "Voorbij" || isEventPast(e, now))
+      // Exclude pending items so a past-dated PendingCreate/Update doesn't show
+      // up (and count) in BOTH the Wachtrij and Historie views.
+      .filter((e) => !isPending(e) && (e.status === "Voorbij" || isEventPast(e, now)))
       .sort((a, b) => endSortKey(b).localeCompare(endSortKey(a))),
     [now, visibleEvents]
   );
@@ -290,10 +292,16 @@ export function usePersonalEvents(options?: { diensten?: DienstRow[] }) {
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, PersonalEvent[]> = {};
+    const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
     for (const e of upcoming) {
+      // Guard against malformed/empty dates: addDaysIso on an invalid date
+      // throws a RangeError (white-screens the page) or never advances.
+      if (!ISO_DATE.test(e.startDatum)) continue;
       let day = e.startDatum;
-      const end = getDisplayEndDate(e);
-      while (day <= end) {
+      const rawEnd = getDisplayEndDate(e);
+      const end = ISO_DATE.test(rawEnd) && rawEnd >= e.startDatum ? rawEnd : e.startDatum;
+      let guard = 0;
+      while (day <= end && guard++ < 400) {
         (map[day] ??= []).push(e);
         day = addDaysIso(day, 1);
       }

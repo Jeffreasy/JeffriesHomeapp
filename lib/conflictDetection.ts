@@ -1,4 +1,4 @@
-import { type DienstRow } from "./schedule";
+import { getStartKey, getEndKey, type DienstRow } from "./schedule";
 import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -33,22 +33,37 @@ export function timeRangesOverlap(
 
 // ─── Per-event conflict detectie ──────────────────────────────────────────────
 
+/** "YYYY-MM-DD HH:MM" datetime key for the start of an event. */
+function eventStartKey(event: PersonalEvent): string {
+  return `${event.startDatum} ${event.heledag ? "00:00" : event.startTijd || "00:00"}`;
+}
+
+/** "YYYY-MM-DD HH:MM" datetime key for the (display) end of an event. */
+function eventEndKey(event: PersonalEvent): string {
+  return `${getDisplayEndDate(event)} ${event.heledag ? "23:59" : event.eindTijd || "23:59"}`;
+}
+
 function detectConflict(
   event: PersonalEvent,
   dienst: DienstRow,
 ): ConflictLevel | null {
-  if (event.startDatum > dienst.startDatum || getDisplayEndDate(event) < dienst.startDatum) return null;
+  // Compare full datetime ranges, not just the dienst's start day. getStartKey/
+  // getEndKey roll night shifts past midnight, so an overnight or multi-day
+  // dienst is matched against an appointment on its later day too — these were
+  // previously silently missed.
+  const dStart = getStartKey(dienst);
+  const dEnd = getEndKey(dienst);
+  const evStart = eventStartKey(event);
+  const evEnd = eventEndKey(event);
 
-  // Hele-dag event → altijd zacht conflict
+  // No overlap of the two datetime ranges → not a conflict.
+  if (evStart >= dEnd || dStart >= evEnd) return null;
+
+  // Hele-dag / event zonder tijden → zacht conflict (geen exacte tijdsoverlap).
   if (event.heledag || !event.startTijd || !event.eindTijd) return "soft";
 
-  // Beide hebben tijden → echte overlap check
-  const overlaps = timeRangesOverlap(
-    event.startTijd, event.eindTijd,
-    dienst.startTijd, dienst.eindTijd,
-  );
-
-  return overlaps ? "hard" : "info";
+  // Beide hebben tijden en de datetime-ranges overlappen → hard conflict.
+  return "hard";
 }
 
 // ─── Bulk analyse ─────────────────────────────────────────────────────────────

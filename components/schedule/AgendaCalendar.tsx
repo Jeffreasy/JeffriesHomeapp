@@ -332,10 +332,20 @@ function CalendarDayCell({
         {(day.notes.length > 0 || day.events.some((event) => conflictMap.has(event.eventId))) && (
           <div className="flex items-center gap-1">
             {day.notes.length > 0 && (
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-300/70" title={`${day.notes.length} notities`} />
+              <span
+                role="img"
+                aria-label={`${day.notes.length} ${day.notes.length === 1 ? "notitie" : "notities"}`}
+                className="h-1.5 w-1.5 rounded-full bg-amber-300/70"
+                title={`${day.notes.length} notities`}
+              />
             )}
             {day.events.some((event) => conflictMap.has(event.eventId)) && (
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-400/80" title="Conflict" />
+              <span
+                role="img"
+                aria-label="Conflict op deze dag"
+                className="h-1.5 w-1.5 rounded-full bg-rose-400/80"
+                title="Conflict"
+              />
             )}
           </div>
         )}

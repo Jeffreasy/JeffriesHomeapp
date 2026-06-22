@@ -13,6 +13,9 @@ const inter = Inter({
 
 export const viewport = {
   themeColor: "#0a0a0f",
+  // Let content extend into the notch/home-indicator zone so env(safe-area-inset-*)
+  // resolves to real values in the standalone PWA (otherwise it's 0).
+  viewportFit: "cover" as const,
 };
 
 export const metadata: Metadata = {

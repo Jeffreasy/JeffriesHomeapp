@@ -402,10 +402,12 @@ export default function AgendaPage() {
               <button
                 onClick={handleSync}
                 disabled={syncing}
+                aria-label="Synchroniseer met Google Calendar"
+                aria-busy={syncing}
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] text-slate-400 hover:text-sky-300 hover:border-sky-500/20 transition-colors disabled:opacity-40 cursor-pointer"
                 title="Sync met Google Calendar"
               >
-                {syncing ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+                {syncing ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={15} aria-hidden="true" />}
               </button>
 
               <StatusPill status={syncStatus?.status} />
@@ -421,12 +423,14 @@ export default function AgendaPage() {
             </div>
           </div>
 
-          <div className="mt-3 flex gap-1 overflow-x-auto pb-0.5">
+          <div role="tablist" aria-label="Agenda-weergave" className="mt-3 flex gap-1 overflow-x-auto pb-0.5">
             {viewTabs.map(({ id, label, count, icon: Icon }) => {
               const active = activeView === id;
               return (
                 <button
                   key={id}
+                  role="tab"
+                  aria-selected={active}
                   onClick={() => setActiveView(id)}
                   className={`flex h-9 min-w-max items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors cursor-pointer ${
                     active
@@ -434,7 +438,7 @@ export default function AgendaPage() {
                       : "border-transparent bg-white/[0.03] text-slate-500 hover:text-slate-300 hover:bg-white/[0.05]"
                   }`}
                 >
-                  <Icon size={13} />
+                  <Icon size={13} aria-hidden="true" />
                   <span>{label}</span>
                   <span className={`rounded-md px-1.5 py-0.5 text-[10px] tabular-nums ${
                     active ? "bg-sky-400/12 text-sky-100" : "bg-white/[0.04] text-slate-500"
@@ -472,12 +476,23 @@ export default function AgendaPage() {
             </p>
           </button>
           <button
-            onClick={() => setActiveView(withConflicts.length > 0 ? "upcoming" : activeView)}
-            className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors hover:bg-white/[0.045] cursor-pointer"
+            onClick={() => { if (withConflicts.length > 0) setActiveView("upcoming"); }}
+            disabled={withConflicts.length === 0}
+            aria-label={
+              withConflicts.length > 0
+                ? `Conflicten: ${withConflicts.length} ${withConflicts.length === 1 ? "conflict" : "conflicten"} — bekijk`
+                : "Conflicten: geen conflicten"
+            }
+            className={`rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors ${
+              withConflicts.length > 0 ? "hover:bg-white/[0.045] cursor-pointer" : "cursor-default"
+            }`}
           >
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Conflicten</p>
             <p className={`mt-1 text-lg font-semibold tabular-nums ${withConflicts.length > 0 ? "text-amber-300" : "text-emerald-300"}`}>
               {withConflicts.length}
+            </p>
+            <p className="mt-0.5 truncate text-[10px] text-slate-600">
+              {withConflicts.length > 0 ? "te controleren" : "geen conflicten"}
             </p>
           </button>
           <button

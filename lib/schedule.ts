@@ -215,11 +215,11 @@ function normalizeTime(time: string | undefined, fallback: string): string {
   return `${match[1].padStart(2, "0")}:${match[2]}`;
 }
 
-function getStartKey(dienst: DienstRow): string {
+export function getStartKey(dienst: DienstRow): string {
   return `${dienst.startDatum} ${normalizeTime(dienst.startTijd, "00:00")}`;
 }
 
-function getEndKey(dienst: DienstRow): string {
+export function getEndKey(dienst: DienstRow): string {
   let endDate = dienst.eindDatum || dienst.startDatum;
   const startKey = getStartKey(dienst);
   let endKey = `${endDate} ${normalizeTime(dienst.eindTijd, "23:59")}`;
