@@ -230,10 +230,16 @@ function groupWorkstreams(workstreams: WorkstreamItem[]) {
     { status: "afgerond", label: "Afgerond", items: [] as WorkstreamItem[] },
     { status: "gesloten", label: "Gesloten", items: [] as WorkstreamItem[] },
     { status: "gearchiveerd", label: "Archief", items: [] as WorkstreamItem[] },
+    { status: "overig", label: "Overig", items: [] as WorkstreamItem[] },
   ];
+  const byStatus = new Map(groups.map((group) => [group.status, group]));
+  const overig = byStatus.get("overig")!;
 
   for (const item of workstreams) {
-    const target = groups.find((group) => group.status === item.status) ?? groups[0];
+    // 'done' is the backend synonym for afgerond; any unrecognised status goes to
+    // 'Overig' instead of being silently mislabeled as 'Nieuw'.
+    const key = item.status === "done" ? "afgerond" : item.status;
+    const target = byStatus.get(key) ?? overig;
     target.items.push(item);
   }
 
