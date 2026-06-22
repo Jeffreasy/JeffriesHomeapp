@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { ArrowLeft, Download, ExternalLink, FileText, FolderOpen, Printer } from "lucide-react";
 import {
@@ -72,6 +73,22 @@ function backendApiKey() {
   return process.env.BACKEND_API_KEY ?? process.env.APP_SECRET_KEY ?? "";
 }
 
+const OWNER_USER_ID =
+  process.env.HOMEAPP_OWNER_USER_ID ?? "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
+
+// This route renders with a file-extension documentKey (e.g. "foo.pdf"), which
+// the Clerk middleware matcher skips — so it can be reached without a session.
+// Real customer dossier documents must therefore be gated by an explicit
+// owner-identity check here, independent of middleware.
+async function isOwner() {
+  try {
+    const { userId } = await auth();
+    return userId === OWNER_USER_ID;
+  } catch {
+    return false;
+  }
+}
+
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -127,7 +144,9 @@ async function getViewerData({ params, searchParams }: PageProps): Promise<Viewe
   const context = parseLaventeCarePdfDossierContext(toUrlSearchParams(rawSearchParams));
 
   if (!document) {
-    const dossier = await getDossierDocument(documentKey);
+    // Only the authenticated owner may resolve real dossier documents; everyone
+    // else gets the generic "not found" view without any backend fetch.
+    const dossier = (await isOwner()) ? await getDossierDocument(documentKey) : null;
     return dossier ? { kind: "dossier", dossier, theme, context } : { kind: "missing", documentKey, theme, context };
   }
 

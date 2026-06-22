@@ -20,6 +20,15 @@ const HOP_BY_HOP_HEADERS = new Set([
 
 const DEFAULT_BACKEND_API_URL = "https://jeffriesbackend.onrender.com/api/v1";
 
+// Single-tenant: the entire backend serves ONE owner's data (PII, care dossiers,
+// invoices, bunq payment requests). Enforce the owner identity IN CODE as a
+// second, independent layer — do not rely solely on the out-of-band Clerk
+// sign-up restriction. Any signed-in non-owner is rejected. Overridable via
+// HOMEAPP_OWNER_USER_ID; defaults to the known owner so it is fail-closed even
+// if the env var is never set.
+const OWNER_USER_ID =
+  process.env.HOMEAPP_OWNER_USER_ID ?? "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
+
 function backendBaseUrl() {
   return (process.env.BACKEND_API_URL ?? DEFAULT_BACKEND_API_URL).replace(/\/+$/, "");
 }
@@ -64,6 +73,11 @@ async function proxyBackend(request: NextRequest, context: RouteContext) {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ detail: "Niet ingelogd." }, { status: 401 });
+  }
+  // Defense in depth: only the single owner may reach the backend, regardless of
+  // who managed to obtain a valid Clerk session.
+  if (userId !== OWNER_USER_ID) {
+    return Response.json({ detail: "Geen toegang." }, { status: 403 });
   }
 
   const target = new URL(`${backendBaseUrl()}/${path}`);
