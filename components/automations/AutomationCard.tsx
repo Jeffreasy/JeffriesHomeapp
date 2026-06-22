@@ -98,7 +98,7 @@ export function AutomationCard({ automation, onToggle, onEdit, onDelete }: Autom
           onClick={onToggle}
           aria-label={automation.enabled ? "Automatisering pauzeren" : "Automatisering starten"}
           className={cn(
-            "w-8 h-8 rounded-lg border flex items-center justify-center transition-all",
+            "h-10 w-10 sm:h-8 sm:w-8 rounded-lg border flex items-center justify-center transition-all",
             automation.enabled
               ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
               : "bg-[var(--color-surface)] border-[var(--color-border)] text-slate-500 hover:bg-[var(--color-surface-hover)]"
@@ -109,14 +109,14 @@ export function AutomationCard({ automation, onToggle, onEdit, onDelete }: Autom
         <button
           onClick={onEdit}
           aria-label={`${automation.name} bewerken`}
-          className="w-8 h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 flex items-center justify-center hover:text-amber-400 hover:border-amber-500/30 hover:bg-[var(--color-surface-hover)] transition-all"
+          className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 flex items-center justify-center hover:text-amber-400 hover:border-amber-500/30 hover:bg-[var(--color-surface-hover)] transition-all"
         >
           <Pencil size={12} />
         </button>
         <button
           onClick={onDelete}
           aria-label={`${automation.name} verwijderen`}
-          className="w-8 h-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 flex items-center justify-center hover:text-red-400 hover:border-red-500/30 hover:bg-[var(--color-surface-hover)] transition-all"
+          className="h-10 w-10 sm:h-8 sm:w-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 flex items-center justify-center hover:text-red-400 hover:border-red-500/30 hover:bg-[var(--color-surface-hover)] transition-all"
         >
           <Trash2 size={12} />
         </button>

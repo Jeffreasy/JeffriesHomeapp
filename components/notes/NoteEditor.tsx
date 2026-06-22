@@ -560,12 +560,16 @@ export function NoteEditor({
   }, [autoResize, inhoud]);
 
   useEffect(() => {
+    // Only merge tags from EXPLICIT context (a linked event / business context),
+    // not from free-text #hashtags typed in the title/body — doing the latter on
+    // every keystroke silently added tags the user never chose and kept the note
+    // permanently "Onopgeslagen".
     const contextTags = primaryContext ? [primaryContext.tag] : [];
-    const nextTags = mergeTags(tags, selectedEventContextTags, extractHashTags(`${titel} ${inhoud}`), contextTags);
+    const nextTags = mergeTags(tags, selectedEventContextTags, contextTags);
     if (tagsKey(nextTags) !== tagsKey(tags)) {
       setTags(nextTags);
     }
-  }, [inhoud, primaryContext, selectedEventContextTags, tags, titel]);
+  }, [primaryContext, selectedEventContextTags, tags]);
 
   useEffect(() => {
     if (businessContextTouched || !automaticBusinessContext) return;

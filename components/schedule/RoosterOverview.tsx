@@ -159,7 +159,7 @@ export function OverviewTab({
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
-        <div className="hidden space-y-4 md:block">
+        <div className="space-y-4">
           <ContractWidget />
           <MonthBalanceChart />
         </div>

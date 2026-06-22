@@ -55,6 +55,7 @@ interface HabitCardProps {
   onEdit: () => void;
   masked?: boolean;
   pending?: boolean;
+  paused?: boolean;
 }
 
 export function HabitCard({
@@ -68,6 +69,7 @@ export function HabitCard({
   onEdit,
   masked = false,
   pending = false,
+  paused = false,
 }: HabitCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -191,7 +193,7 @@ export function HabitCard({
           <button
             type="button"
             onClick={onToggle}
-            disabled={pending}
+            disabled={pending || paused}
             aria-busy={pending}
             aria-label={
               isCompleted
@@ -280,7 +282,7 @@ export function HabitCard({
           <button
             type="button"
             onClick={() => setShowTriggerModal(true)}
-            disabled={pending}
+            disabled={pending || paused}
             aria-busy={pending}
             aria-label={`Incident loggen voor ${displayName}`}
             className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-500/12 bg-red-500/8 transition-transform active:scale-90 disabled:cursor-default disabled:opacity-40"
@@ -323,7 +325,7 @@ export function HabitCard({
             <button
               type="button"
               onClick={() => onIncrement(-stap)}
-              disabled={currentWaarde <= 0 || pending}
+              disabled={currentWaarde <= 0 || pending || paused}
               aria-busy={pending}
               aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verminderen`}
               className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-20"
@@ -353,7 +355,7 @@ export function HabitCard({
             <button
               type="button"
               onClick={() => onIncrement(stap)}
-              disabled={isCompleted || pending}
+              disabled={isCompleted || pending || paused}
               aria-busy={pending}
               aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verhogen`}
               className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-30"

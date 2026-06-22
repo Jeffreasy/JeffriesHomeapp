@@ -35,6 +35,8 @@ export function useAutomations() {
   const {
     data: docs = [],
     refetch,
+    isError,
+    isFetching,
   } = useQuery({
     queryKey: ["automations", userId],
     queryFn: () => automationsApi.list(userId),
@@ -129,5 +131,9 @@ export function useAutomations() {
     [userId, fetchAutomations]
   );
 
-  return { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, lastCheck: null };
+  // isLoading: still fetching the first time (initialData keeps isPending false,
+  // so derive it from isFetching while the list is still empty).
+  const isLoading = isFetching && automations.length === 0 && !isError;
+
+  return { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, isLoading, isError, refetch: fetchAutomations, lastCheck: null };
 }

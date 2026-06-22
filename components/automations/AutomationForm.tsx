@@ -61,12 +61,14 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
     if (actionType === "color")      action.colorHex = colorHex;
     if (actionType === "color_temp") action.colorTempMireds = colorTempMireds;
 
+    // Never exclude the trigger shift itself (that would make the rule never fire).
+    const cleanExcluded = excludedShifts.filter((s) => s !== shiftType);
     const trigger = {
       time,
       triggerType,
       days: triggerType === "time" ? days : undefined,
       shiftType: triggerType === "schedule" ? shiftType : undefined,
-      excludedShifts: excludedShifts.length > 0 ? excludedShifts : undefined,
+      excludedShifts: cleanExcluded.length > 0 ? cleanExcluded : undefined,
     };
 
     onSave({ 
@@ -328,22 +330,27 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
           Sla deze automatisering automatisch over als je één van deze diensten hebt op die dag.
         </p>
         <div className="grid grid-cols-3 gap-2">
-          {(["Vroeg", "Laat", "Dienst"] as ShiftType[]).map((shift) => (
-            <button
-              key={shift}
-              type="button"
-              aria-pressed={excludedShifts.includes(shift)}
-              onClick={() => toggleExcludedShift(shift)}
-              className={cn(
-                "py-1.5 rounded-lg text-xs font-medium border transition-all",
-                excludedShifts.includes(shift)
-                  ? "bg-purple-500/15 text-purple-400 border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.1)]"
-                  : "bg-[var(--color-surface)] text-slate-400 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
-              )}
-            >
-              {shift}
-            </button>
-          ))}
+          {(["Vroeg", "Laat", "Dienst"] as ShiftType[]).map((shift) => {
+            const isTrigger = shift === shiftType;
+            return (
+              <button
+                key={shift}
+                type="button"
+                aria-pressed={excludedShifts.includes(shift)}
+                disabled={isTrigger}
+                title={isTrigger ? "Dit is je triggershift — uitsluiten zou de automatisering nooit laten vuren" : undefined}
+                onClick={() => toggleExcludedShift(shift)}
+                className={cn(
+                  "py-1.5 rounded-lg text-xs font-medium border transition-all disabled:cursor-not-allowed disabled:opacity-40",
+                  excludedShifts.includes(shift)
+                    ? "bg-purple-500/15 text-purple-400 border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.1)]"
+                    : "bg-[var(--color-surface)] text-slate-400 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+                )}
+              >
+                {shift}
+              </button>
+            );
+          })}
         </div>
       </fieldset>
 

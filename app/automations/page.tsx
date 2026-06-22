@@ -7,6 +7,7 @@ import { useAutomations } from "@/hooks/useAutomations";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
 import { AutomationCard } from "@/components/automations/AutomationCard";
 import { AutomationForm } from "@/components/automations/AutomationForm";
 import { DienstWekkerSection } from "@/components/automations/DienstWekkerSection";
@@ -16,7 +17,7 @@ import { cn } from "@/lib/utils";
 type ManagedShiftType = Exclude<ShiftType, "any">;
 
 export default function AutomationsPage() {
-  const { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, lastCheck } =
+  const { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, isLoading, isError, refetch, lastCheck } =
     useAutomations();
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [busyWekkerType, setBusyWekkerType] = useState<ManagedShiftType | null>(null);
@@ -210,7 +211,20 @@ export default function AutomationsPage() {
             </section>
           )}
 
-          {automations.length === 0 && !editingId && (
+          {isError ? (
+            <div className="py-6">
+              <ErrorState
+                onRetry={refetch}
+                text="De automatiseringen konden niet worden geladen. Probeer het opnieuw."
+              />
+            </div>
+          ) : isLoading ? (
+            <div className="space-y-2 py-4">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-16 animate-pulse rounded-xl bg-white/[0.03]" />
+              ))}
+            </div>
+          ) : automations.length === 0 && !editingId ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
                 <Activity size={24} className="text-slate-600" />
@@ -227,7 +241,7 @@ export default function AutomationsPage() {
                 Eerste automatisering
               </button>
             </div>
-          )}
+          ) : null}
       </main>
     </div>
   );

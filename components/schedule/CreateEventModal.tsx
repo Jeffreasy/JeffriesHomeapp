@@ -94,10 +94,12 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
 
   const reset = useCallback(() => {
     setTitel(""); setStartDatum(defaultDate); setEindDatum(defaultDate);
-    setHeledag(!initialTime); setStartTijd(defaultStartTime); setEindTijd(defaultEndTime);
+    // A new appointment defaults to a timed event (less surprising than all-day
+    // for the header / calendar "+ Afspraak" actions); the user can toggle it.
+    setHeledag(false); setStartTijd(defaultStartTime); setEindTijd(defaultEndTime);
     setLocatie(""); setBeschrijving(""); setCategorie("overig"); setSymbol(categoryIcon("overig"));
     setEventTags([]); setBusinessContext(null); setBusinessContextTouched(false); setCategoryTouched(false); setSymbolTouched(false); setError("");
-  }, [defaultDate, defaultEndTime, defaultStartTime, initialTime]);
+  }, [defaultDate, defaultEndTime, defaultStartTime]);
 
   const detectedContext = getPrimaryWorkspaceContext(`${titel} ${beschrijving} ${locatie}`, mergeTags(eventTags, extractHashTags(`${titel} ${beschrijving}`)));
   const inferredBusinessContext = useMemo(

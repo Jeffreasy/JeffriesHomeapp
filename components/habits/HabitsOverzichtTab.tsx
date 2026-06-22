@@ -150,6 +150,7 @@ export function HabitsOverzichtTab({
                 key={habit._id}
                 habit={{ ...habit, log: null }}
                 masked={privacyOn}
+                paused
                 pending={pendingHabitId === habit._id}
                 onToggle={() => undefined}
                 onIncrement={() => undefined}
