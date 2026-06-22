@@ -171,7 +171,7 @@ export function OverviewTab({
               title="Diensten en afspraken"
               sub={`${unifiedWeeks.length} weken`}
             />
-            <div className="hidden items-center gap-2 sm:flex">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setAllWeeks(true)}

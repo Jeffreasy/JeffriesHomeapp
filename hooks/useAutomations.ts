@@ -103,7 +103,9 @@ export function useAutomations() {
       const groupTag = `dienst-wekker-${shiftType.toLowerCase()}`;
       await automationsApi.deleteByGroup(userId, groupTag);
       const pack = createDienstWekkerPack(shiftType, times);
-      await Promise.all(
+      // allSettled (not all): attempt every create even if one fails, so we don't
+      // abort mid-pack and leave a half-built wekker after the delete-by-group.
+      const results = await Promise.allSettled(
         pack.map((a) =>
           automationsApi.create(userId, {
             name:           a.name,
@@ -116,6 +118,10 @@ export function useAutomations() {
         )
       );
       await fetchAutomations();
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) {
+        throw new Error(`${failed} van ${pack.length} wekker-onderdelen konden niet worden opgeslagen`);
+      }
       return pack.length;
     },
     [userId, fetchAutomations]

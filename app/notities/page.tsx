@@ -29,6 +29,7 @@ import { NotesList } from "@/components/notes/NotesList";
 import { NotesMetricsRow } from "@/components/notes/NotesMetrics";
 import { WeekJournal, getMonday } from "@/components/notes/WeekJournal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/Toast";
 import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
 import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
 
@@ -52,6 +53,7 @@ export default function NotitiesPage() {
     restoreRevision,
   } = useNotes();
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("notes");
+  const { error: toastError } = useToast();
   const { diensten } = useSchedule();
   const { events: agendaEvents, upcoming: upcomingAgendaEvents } = usePersonalEvents({ diensten });
   const { openConfirm } = useConfirm();
@@ -257,6 +259,8 @@ export default function NotitiesPage() {
         businessContextTitle: enriched.businessContext?.title ?? undefined,
       });
       setQuickText("");
+    } catch {
+      toastError("Notitie opslaan is mislukt — probeer opnieuw");
     } finally {
       setQuickSaving(false);
     }

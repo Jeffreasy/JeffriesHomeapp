@@ -284,7 +284,11 @@ export function AgendaCalendar({
                           event={event}
                           conflict={conflictMap.get(event.eventId)}
                           noteCount={notesByEventId.get(event.eventId)?.length ?? 0}
-                          onClick={() => onEditEvent(event)}
+                          onClick={() => {
+                            // Diensten worden via het rooster beheerd, niet via de
+                            // afspraak-editor — alleen afspraken openen de modal.
+                            if (event.kalender !== "Rooster") onEditEvent(event);
+                          }}
                         />
                       ))}
                       {standaloneNotes.map((note) => (
@@ -839,7 +843,8 @@ function AgendaListRow({
             {noteCount}
           </span>
         )}
-        <ChevronRight size={15} className="text-slate-600" />
+        {/* Diensten komen uit je rooster en zijn hier niet bewerkbaar — geen edit-chevron. */}
+        {!isRoster && <ChevronRight size={15} className="text-slate-600" />}
       </span>
     </button>
   );
@@ -884,11 +889,14 @@ function MobileMonthDotsCell({
       >
         {Number(day.date.slice(8, 10))}
       </span>
-      <span className="flex h-1.5 items-center gap-0.5">
+      <span className="flex h-3 items-center gap-0.5">
         {dots.map((dot) => (
           <span key={dot} className={cn("h-1.5 w-1.5 rounded-full", dot)} />
         ))}
         {day.notes.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-amber-300/70" />}
+        {day.events.length > 3 && (
+          <span className="ml-0.5 text-[9px] font-semibold tabular-nums text-slate-500">{day.events.length}</span>
+        )}
       </span>
     </button>
   );

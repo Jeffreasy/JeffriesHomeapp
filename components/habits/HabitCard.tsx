@@ -337,8 +337,14 @@ export function HabitCard({
               <Minus size={16} className="text-slate-400" />
             </button>
 
-            {/* Current value display */}
-            <div className="flex-1 text-center">
+            {/* Current value — tap to jump straight to the goal (or reset). */}
+            <button
+              type="button"
+              onClick={() => onIncrement((isCompleted ? 0 : habit.doelWaarde ?? currentWaarde) - currentWaarde)}
+              disabled={pending || paused}
+              aria-label={isCompleted ? `${displayName} terugzetten naar 0` : `${displayName} direct op ${habit.doelWaarde} ${habit.eenheid ?? ""} zetten`}
+              className="flex-1 rounded-lg py-1 text-center transition-colors hover:bg-white/[0.04] disabled:cursor-default disabled:hover:bg-transparent"
+            >
               <span
                 className="text-sm font-bold"
                 style={{ color: isCompleted ? color : "rgba(255,255,255,0.8)" }}
@@ -349,7 +355,7 @@ export function HabitCard({
                 {" "}
                 / {masked ? "••" : `${habit.doelWaarde} ${habit.eenheid ?? ""}`}
               </span>
-            </div>
+            </button>
 
             {/* Plus button */}
             <button
@@ -542,8 +548,12 @@ export function HabitCard({
                       ? "Beschrijf de trigger..."
                       : "Optionele notitie..."
                   }
+                  aria-required={selectedTrigger === "anders"}
                   className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500/30 min-h-[44px] mb-3"
                 />
+              )}
+              {selectedTrigger === "anders" && !triggerNotitie.trim() && (
+                <p className="-mt-2 mb-3 text-[11px] text-red-400/80">Een korte beschrijving is verplicht bij &ldquo;anders&rdquo;.</p>
               )}
 
               <div className="flex gap-2">

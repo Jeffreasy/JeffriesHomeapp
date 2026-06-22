@@ -158,7 +158,7 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
                   value={filters.minBedrag ?? ""}
                   onChange={(e) => onChange({ minBedrag: e.target.value ? Number(e.target.value) : undefined })}
                   min={0}
-                  step={10}
+                  step="0.01"
                 />
               </div>
               <span className="filter-range__sep">–</span>
@@ -170,11 +170,15 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
                   placeholder="∞"
                   value={filters.maxBedrag ?? ""}
                   onChange={(e) => onChange({ maxBedrag: e.target.value ? Number(e.target.value) : undefined })}
-                  min={0}
-                  step={10}
+                  min={filters.minBedrag ?? 0}
+                  step="0.01"
+                  aria-invalid={filters.minBedrag != null && filters.maxBedrag != null && filters.minBedrag > filters.maxBedrag}
                 />
               </div>
             </div>
+            {filters.minBedrag != null && filters.maxBedrag != null && filters.minBedrag > filters.maxBedrag && (
+              <p className="mt-1.5 text-[11px] text-amber-300">Min is groter dan max — geen resultaten.</p>
+            )}
           </FilterGroup>
 
           {/* Datumbereik */}

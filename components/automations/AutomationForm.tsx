@@ -150,6 +150,7 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
           <button
             type="button"
             onClick={() => setTriggerType("time")}
+            aria-pressed={triggerType === "time"}
             className={cn(
               "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
               triggerType === "time"
@@ -162,6 +163,7 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
           <button
             type="button"
             onClick={() => setTriggerType("schedule")}
+            aria-pressed={triggerType === "schedule"}
             className={cn(
               "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
               triggerType === "schedule"

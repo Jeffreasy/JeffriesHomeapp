@@ -235,10 +235,11 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
               <button
                 type="button"
                 onClick={resetDefaults}
+                title="Zet de tijden terug naar de standaard (nog niet opgeslagen)"
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.07]"
               >
                 <RotateCcw size={13} />
-                Default
+                Standaardtijden
               </button>
               {installedCount > 0 && (
                 <button

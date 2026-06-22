@@ -128,7 +128,10 @@ function formatSplitCounts(events: PersonalEvent[]) {
 function groupByDate(events: PersonalEvent[], todayIso: string, direction: "asc" | "desc" = "asc", forcedDate?: string): TimelineGroup[] {
   const groups = new Map<string, PersonalEvent[]>();
   for (const event of events) {
-    const key = forcedDate ?? (event.startDatum < todayIso && getDisplayEndDate(event) >= todayIso ? todayIso : event.startDatum);
+    // The "today" view passes forcedDate to gather everything under today; other
+    // views key by the event's real start date (clamping ongoing events onto
+    // today there made them look duplicated against the calendar).
+    const key = forcedDate ?? event.startDatum;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(event);
   }
