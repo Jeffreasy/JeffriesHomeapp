@@ -37,7 +37,18 @@ export interface DeviceCommand {
 
 const API_BASE = "/api/backend";
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+// apiFetchWithStatus returns the parsed body AND the real HTTP status so callers
+// (e.g. the orval mutator) can discriminate responses instead of assuming 200.
+export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): Promise<{ data: T; status: number }> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
@@ -48,11 +59,16 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail ?? `API error ${res.status}`);
+    throw new ApiError(error.detail ?? `API error ${res.status}`, res.status);
   }
 
-  if (res.status === 204) return undefined as T;
-  return res.json();
+  if (res.status === 204) return { data: undefined as T, status: res.status };
+  return { data: await res.json(), status: res.status };
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const { data } = await apiFetchWithStatus<T>(path, init);
+  return data;
 }
 
 // ─── Rooms ────────────────────────────────────────────────────────────────────

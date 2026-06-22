@@ -55,9 +55,10 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
       // buckets for users outside UTC.
       const deadlineAt = new Date(date);
       deadlineAt.setHours(9, 0, 0, 0);
+      const titleChars = Array.from(text);
       await onCreate({
         inhoud: text,
-        titel: text.length > 80 ? text.slice(0, 77) + "..." : text,
+        titel: titleChars.length > 80 ? titleChars.slice(0, 77).join("") + "..." : text,
         deadline: deadlineAt.toISOString(),
       });
       setQuickText("");
@@ -191,6 +192,7 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
             <JournalNoteButton
               key={note.id}
               note={note}
+              columnDate={date}
               pending={pendingCompleteId === note.id}
               onEdit={onEdit}
               onToggleComplete={handleToggleComplete}
@@ -210,6 +212,7 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
                   key={note.id}
                   note={note}
                   completed
+                  columnDate={date}
                   pending={pendingCompleteId === note.id}
                   onEdit={onEdit}
                   onToggleComplete={handleToggleComplete}
@@ -243,19 +246,32 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
   );
 }
 
+function isSameAmsterdamDay(iso: string, date: Date): boolean {
+  const fmt = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return fmt(parsed) === fmt(date);
+}
+
 function JournalNoteButton({
   note,
   completed = false,
   pending,
+  columnDate,
   onEdit,
   onToggleComplete,
 }: {
   note: NoteRecord;
   completed?: boolean;
   pending: boolean;
+  columnDate: Date;
   onEdit: (note: NoteRecord) => void;
   onToggleComplete: (note: NoteRecord) => void | Promise<void>;
 }) {
+  // When the note sits in this day because of its DEADLINE, show the deadline
+  // time (not the creation time, which would be on a different day).
+  const bucketedByDeadline = Boolean(note.deadline && isSameAmsterdamDay(note.deadline, columnDate));
   const checklist = getChecklistInfo(note.inhoud);
   const previewTitle = note.titel || note.inhoud.split("\n")[0].slice(0, 50) || "Zonder titel";
   const openNote = () => onEdit(note);
@@ -314,8 +330,9 @@ function JournalNoteButton({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <span className="mt-0.5 text-[10px] text-[var(--color-text-subtle)] opacity-0 transition-opacity group-hover/item:opacity-100">
-            {formatTime(note.aangemaakt)}
+          <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-[var(--color-text-subtle)] opacity-0 transition-opacity group-hover/item:opacity-100">
+            {bucketedByDeadline && <Clock size={9} aria-hidden="true" />}
+            {bucketedByDeadline ? formatTime(note.deadline!) : formatTime(note.aangemaakt)}
           </span>
           <button
             type="button"

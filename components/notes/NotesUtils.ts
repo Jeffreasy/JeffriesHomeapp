@@ -84,11 +84,35 @@ export function formatDate(iso?: string) {
   return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
 }
 
+// Canonical checklist patterns — the single source of truth shared by the cards,
+// the editor and the metrics so progress bars and tiles can't disagree. Tolerant
+// of upper-case [X] and an empty task ("- [ ]" with no text).
+export const CHECKLIST_ITEM = /^- \[[ xX]\] ?(.*)$/;
+export const CHECKLIST_DONE = /^- \[[xX]\] ?(.*)$/;
+
 export function getChecklistInfo(text: string) {
   const lines = text.split("\n");
-  const total = lines.filter((line) => /^- \[[ x]\] /i.test(line)).length;
-  const done = lines.filter((line) => /^- \[x\] /i.test(line)).length;
+  const total = lines.filter((line) => CHECKLIST_ITEM.test(line)).length;
+  const done = lines.filter((line) => CHECKLIST_DONE.test(line)).length;
   return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+}
+
+// amsterdamDayDiff returns the whole-day difference (deadline − today) computed
+// on the Europe/Amsterdam calendar, so "Vandaag"/"Verlopen" match the timezone
+// the backend (Telegram/AI) and the rest of the app use, not the browser's.
+export function amsterdamDayDiff(iso: string, now = new Date()): number {
+  const toAmsYmd = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Amsterdam",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  const [dy, dm, dd] = toAmsYmd(new Date(iso)).split("-").map(Number);
+  const [ny, nm, nd] = toAmsYmd(now).split("-").map(Number);
+  const deadlineDay = Date.UTC(dy, dm - 1, dd);
+  const today = Date.UTC(ny, nm - 1, nd);
+  return Math.round((deadlineDay - today) / 86400000);
 }
 
 export function getDisplayTitle(note: NoteRecord) {
@@ -110,15 +134,13 @@ export function getDeadlineState(deadline?: string | null, now = new Date()) {
   }
 
   const timestamp = date.getTime();
-  const nowTime = now.getTime();
-  const today = isSameLocalDate(date, now);
-  const soonLimit = nowTime + 7 * 86400000;
+  const dayDiff = amsterdamDayDiff(deadline, now);
 
   return {
     hasDeadline: true,
-    overdue: timestamp < nowTime && !today,
-    today,
-    soon: timestamp >= nowTime && timestamp <= soonLimit,
+    overdue: dayDiff < 0,
+    today: dayDiff === 0,
+    soon: dayDiff >= 0 && dayDiff <= 7,
     timestamp,
   };
 }
@@ -165,10 +187,3 @@ export function getScopeCounts(notes: NoteRecord[], now = new Date()): Record<No
   };
 }
 
-function isSameLocalDate(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}

@@ -104,7 +104,15 @@ export type NoteUpdateData = {
   is_pinned?: boolean;
   is_archived?: boolean;
   is_completed?: boolean;
+  // Optimistic-concurrency token: the gewijzigd the editor last saw. The backend
+  // rejects the write (409) if the note changed since, so a stale full-body save
+  // can't silently clobber a concurrent change.
+  expectedGewijzigd?: string;
 };
+
+// Optimistic create inserts a placeholder note with a "temp-" id until the server
+// responds. Quick-actions against it would 404, so they are no-ops until it lands.
+const isTempId = (id: string) => id.startsWith("temp-");
 
 type NotesCache = {
   data?: ModelNote[];
@@ -396,16 +404,19 @@ export function useNotes() {
       await updateMut.mutateAsync({ id, data: data as NoteUpdateBodyWithBusinessContext });
     },
     togglePin: async (id: string) => {
+      if (isTempId(id)) return;
       const note = raw?.find(n => n.id === id);
       if (note) {
         await updateMut.mutateAsync({ id, data: { isPinned: !(note.isPinned || note.is_pinned) } });
       }
     },
     archive: async (id: string) => {
+      if (isTempId(id)) return;
       const note = raw?.find(n => n.id === id);
       await updateMut.mutateAsync({ id, data: { isArchived: !(note?.isArchived || note?.is_archived) } });
     },
     toggleComplete: async (id: string) => {
+      if (isTempId(id)) return;
       const note = raw?.find(n => n.id === id);
       if (note) {
         await updateMut.mutateAsync({ id, data: { isCompleted: !(note.isCompleted || note.is_completed) } });
@@ -437,6 +448,7 @@ export function useNotes() {
       return restored;
     },
     remove: async (id: string) => {
+      if (isTempId(id)) return;
       await deleteMut.mutateAsync({ id });
     },
   };

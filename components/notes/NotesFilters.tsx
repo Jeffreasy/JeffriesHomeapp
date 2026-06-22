@@ -97,12 +97,13 @@ export function NotesFilters({
             <input
               ref={searchRef}
               type="search"
-              placeholder="Zoek in notities..."
-              value={search}
+              placeholder={privacyOn ? "Zoeken uit in privacymodus" : "Zoek in notities..."}
+              value={privacyOn ? "" : search}
               onChange={(event) => setSearch(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-base sm:text-sm text-slate-200 outline-none placeholder:text-slate-600"
+              disabled={privacyOn}
+              className="min-w-0 flex-1 bg-transparent text-base sm:text-sm text-slate-200 outline-none placeholder:text-slate-600 disabled:opacity-60"
             />
-            {search && (
+            {search && !privacyOn && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
@@ -218,12 +219,13 @@ export function NotesFilters({
             <input
               ref={searchRef}
               type="search"
-              placeholder="Zoek in notities..."
-              value={search}
+              placeholder={privacyOn ? "Zoeken uit in privacymodus" : "Zoek in notities..."}
+              value={privacyOn ? "" : search}
               onChange={(event) => setSearch(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-base text-slate-200 outline-none placeholder:text-slate-600 sm:text-sm"
+              disabled={privacyOn}
+              className="min-w-0 flex-1 bg-transparent text-base text-slate-200 outline-none placeholder:text-slate-600 disabled:opacity-60 sm:text-sm"
             />
-            {search && (
+            {search && !privacyOn && (
               <button
                 type="button"
                 onClick={() => setSearch("")}

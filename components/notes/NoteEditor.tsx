@@ -288,7 +288,18 @@ const NOTE_TEMPLATE_GROUPS = NOTE_TEMPLATE_CATEGORIES.map((category) => ({
 type LinkSearchItem = {
   id?: string;
   titel?: string | null;
+  inhoud?: string | null;
 };
+
+// A wiki-link resolves on the title or, for untitled notes, the first content
+// line (matching the backend). Never offer a placeholder like "Zonder titel" as
+// link text — it produces a [[link]] that can never resolve.
+function noteLinkLabel(item: LinkSearchItem): string {
+  const title = (item.titel ?? "").trim();
+  if (title) return title;
+  const firstLine = (item.inhoud ?? "").split("\n")[0] ?? "";
+  return firstLine.trim().slice(0, 50);
+}
 
 type EventOptionGroup = {
   id: string;
@@ -354,6 +365,9 @@ export function NoteEditor({
   const textRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  // Tags the user explicitly removed (lower-cased) — auto-context-merge must not
+  // re-add them, otherwise removing a context tag is impossible.
+  const removedTagsRef = useRef<Set<string>>(new Set());
   const { openConfirm } = useConfirm();
 
   const [saving, setSaving] = useState(false);
@@ -563,9 +577,11 @@ export function NoteEditor({
     // Only merge tags from EXPLICIT context (a linked event / business context),
     // not from free-text #hashtags typed in the title/body — doing the latter on
     // every keystroke silently added tags the user never chose and kept the note
-    // permanently "Onopgeslagen".
-    const contextTags = primaryContext ? [primaryContext.tag] : [];
-    const nextTags = mergeTags(tags, selectedEventContextTags, contextTags);
+    // permanently "Onopgeslagen". Also skip any tag the user removed by hand.
+    const suppressed = removedTagsRef.current;
+    const contextTags = (primaryContext ? [primaryContext.tag] : []).filter((tag) => !suppressed.has(tag.toLowerCase()));
+    const eventTags = selectedEventContextTags.filter((tag) => !suppressed.has(tag.toLowerCase()));
+    const nextTags = mergeTags(tags, eventTags, contextTags);
     if (tagsKey(nextTags) !== tagsKey(tags)) {
       setTags(nextTags);
     }
@@ -580,6 +596,7 @@ export function NoteEditor({
 
   useEffect(() => {
     if (!effectiveBusinessContext?.type?.startsWith("laventecare")) return;
+    if (removedTagsRef.current.has("laventecare")) return;
     setTags((current) => {
       const next = mergeTags(current, ["laventecare"]);
       return tagsKey(next) === tagsKey(current) ? current : next;
@@ -635,7 +652,8 @@ export function NoteEditor({
         const items = getLinkSearchItems(results);
         setLinkResults(items
           .filter((item): item is LinkSearchItem & { id: string } => Boolean(item.id))
-          .map((item) => ({ id: item.id, titel: item.titel ?? "Zonder titel" })));
+          .map((item) => ({ id: item.id, titel: noteLinkLabel(item) }))
+          .filter((item) => item.titel.length > 0));
       } catch {
         setLinkResults([]);
       }
@@ -711,7 +729,11 @@ export function NoteEditor({
       await onSave({
         titel: cleanTitle || (isEditing ? "" : undefined),
         inhoud: cleanContent,
-        tags: enriched.tags.length > 0 ? enriched.tags : isEditing ? [] : undefined,
+        // Persist exactly the tags shown in the UI (these already include explicit
+        // event/business-context tags via the merge effect) — not enriched.tags,
+        // which silently appended body-hashtag tags the user never saw and made
+        // the stored record diverge from the baseline/dirty-state.
+        tags: tags.length > 0 ? tags : isEditing ? [] : undefined,
         kleur: kleur || (isEditing ? "" : undefined),
         deadline: normalizeDeadlineForSave(deadline) || (isEditing ? "" : undefined),
         linkedEventId: cleanLinkedEventId || (isEditing ? "" : undefined),
@@ -954,14 +976,20 @@ export function NoteEditor({
   };
 
   const addTag = () => {
-    const nextTags = normalizeTags([...tags, ...tagInput.split(",")]);
+    const added = tagInput.split(",").map((t) => t.trim()).filter(Boolean);
+    // A re-added tag is no longer "removed" — let auto-context manage it again.
+    for (const tag of added) removedTagsRef.current.delete(tag.toLowerCase());
+    const nextTags = normalizeTags([...tags, ...added]);
     if (nextTags.length !== tags.length || tagsKey(nextTags) !== tagsKey(tags)) {
       setTags(nextTags);
     }
     setTagInput("");
   };
 
-  const removeTag = (tag: string) => setTags(tags.filter((item) => item !== tag));
+  const removeTag = (tag: string) => {
+    removedTagsRef.current.add(tag.toLowerCase());
+    setTags(tags.filter((item) => item !== tag));
+  };
 
   const setQuickDeadline = (days: number, hour = 9) => {
     const date = new Date();

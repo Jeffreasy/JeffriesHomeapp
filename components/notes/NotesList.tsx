@@ -5,8 +5,8 @@ import { AnimatePresence } from "framer-motion";
 import { NoteCard, type NoteBacklink } from "./NoteCard";
 import { SectionTitle } from "./NotesPrimitives";
 import type { NoteRecord } from "@/hooks/useNotes";
-import type { BoardMode, ViewMode, SortMode } from "./NotesUtils";
-import { getDeadlineState, isAttentionNote, SORT_OPTIONS } from "./NotesUtils";
+import type { BoardMode, ViewMode, SortMode, NoteScope } from "./NotesUtils";
+import { getDeadlineState, isAttentionNote, SCOPE_OPTIONS, SORT_OPTIONS, VIEW_OPTIONS } from "./NotesUtils";
 import type { LucideIcon } from "lucide-react";
 
 export function NotesList({
@@ -17,6 +17,7 @@ export function NotesList({
   sortMode,
   search,
   tagFilter,
+  noteScope,
   privacyOn,
   handleNew,
   clearFilters,
@@ -37,6 +38,7 @@ export function NotesList({
   sortMode: SortMode;
   search: string;
   tagFilter: string | null;
+  noteScope: NoteScope;
   privacyOn: boolean;
   handleNew: () => void;
   clearFilters: () => void;
@@ -83,36 +85,58 @@ export function NotesList({
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
         </div>
       ) : displayed.length === 0 ? (
-        <div className="glass flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-12 text-center">
-          <Sparkles size={34} className="text-slate-700" />
-          <p className="mt-4 font-semibold text-slate-200">
-            {search || tagFilter ? "Geen notities gevonden" : "Nog geen notities"}
-          </p>
-          <p className="mt-1 max-w-md text-sm text-slate-500">
-            {search || tagFilter
-              ? "Pas je zoekterm of tagfilter aan om meer notities te zien."
-              : "Maak je eerste notitie en leg losse gedachten meteen vast."}
-          </p>
-          {search || tagFilter ? (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
-            >
-              <RotateCcw size={14} />
-              Filters wissen
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleNew}
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
-            >
-              <Plus size={14} />
-              Eerste notitie maken
-            </button>
-          )}
-        </div>
+        (() => {
+          // Branch the empty state on the engaged view + scope + filters so the
+          // message and CTA match the real reason the list is empty (not a blanket
+          // "Nog geen notities" while the user has plenty in another view/filter).
+          const hasNarrowing = Boolean(search || tagFilter || noteScope !== "all");
+          const scopeLabel = SCOPE_OPTIONS.find((option) => option.id === noteScope)?.label;
+          const viewLabel = VIEW_OPTIONS.find((option) => option.id === viewMode)?.label?.toLowerCase();
+          let title: string;
+          let subtitle: string;
+          if (hasNarrowing) {
+            title = "Geen notities gevonden";
+            subtitle =
+              noteScope !== "all" && !search && !tagFilter
+                ? `Geen notities in "${scopeLabel}" binnen ${viewLabel}.`
+                : "Pas je zoekterm, tag of scope aan om meer notities te zien.";
+          } else if (viewMode === "archived") {
+            title = "Archief is leeg";
+            subtitle = "Gearchiveerde notities bewaar je hier, buiten je actieve lijst.";
+          } else if (viewMode === "completed") {
+            title = "Nog niets afgerond";
+            subtitle = "Afgevinkte notities verschijnen hier — vindbaar, maar uit de weg.";
+          } else {
+            title = "Nog geen notities";
+            subtitle = "Maak je eerste notitie en leg losse gedachten meteen vast.";
+          }
+          return (
+            <div className="glass flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-12 text-center">
+              <Sparkles size={34} className="text-slate-700" />
+              <p className="mt-4 font-semibold text-slate-200">{title}</p>
+              <p className="mt-1 max-w-md text-sm text-slate-500">{subtitle}</p>
+              {hasNarrowing ? (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
+                >
+                  <RotateCcw size={14} />
+                  Filters wissen
+                </button>
+              ) : viewMode === "active" ? (
+                <button
+                  type="button"
+                  onClick={handleNew}
+                  className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
+                >
+                  <Plus size={14} />
+                  Eerste notitie maken
+                </button>
+              ) : null}
+            </div>
+          );
+        })()
       ) : boardMode === "board" ? (
         <>
           <div className="space-y-3 md:hidden">

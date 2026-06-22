@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { motion } from "framer-motion";
 import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2, CheckCircle2 } from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { resolveAppIconName } from "@/lib/symbols";
+import { CHECKLIST_ITEM, CHECKLIST_DONE, getChecklistInfo, amsterdamDayDiff } from "./NotesUtils";
 
 export type NoteBacklink = {
   id: string;
@@ -81,10 +82,12 @@ export function NoteCard({
     const lines = [...allLines];
     const line = lines[originalLineIndex];
     if (!line) return;
-    if (UNCHECKED.test(line)) {
-      lines[originalLineIndex] = line.replace("- [ ]", "- [x]");
-    } else if (CHECKED.test(line)) {
-      lines[originalLineIndex] = line.replace(/- \[x\]/i, "- [ ]");
+    if (/^- \[ \]/.test(line)) {
+      lines[originalLineIndex] = line.replace(/^- \[ \]/, "- [x]");
+    } else if (/^- \[[xX]\]/.test(line)) {
+      lines[originalLineIndex] = line.replace(/^- \[[xX]\]/, "- [ ]");
+    } else {
+      return;
     }
     await runAction("check", () => onUpdateContent(note.id, lines.join("\n")));
   };
@@ -315,8 +318,9 @@ function formatAge(iso: string): string {
 }
 
 function getDeadlineInfo(deadline: string): { label: string; style: string; overdue: boolean } {
-  const diff = new Date(deadline).getTime() - Date.now();
-  const days = Math.ceil(diff / 86400000);
+  // Day boundaries on the Europe/Amsterdam calendar so "Vandaag"/"Verlopen"
+  // agree with the backend (Telegram/AI) and the metric tiles.
+  const days = amsterdamDayDiff(deadline);
 
   if (days < 0) return { label: "Verlopen!", style: "text-red-400 bg-red-500/15", overdue: true };
   if (days === 0) return { label: "Vandaag", style: "text-amber-400 bg-amber-500/15", overdue: false };
@@ -329,64 +333,51 @@ function getDeadlineInfo(deadline: string): { label: string; style: string; over
   };
 }
 
-const UNCHECKED = /^- \[ \] (.+)$/;
-const CHECKED   = /^- \[x\] (.+)$/i;
-
-function getChecklistInfo(text: string) {
-  const lines = text.split("\n");
-  const total = lines.filter((l) => UNCHECKED.test(l) || CHECKED.test(l)).length;
-  const done  = lines.filter((l) => CHECKED.test(l)).length;
-  return { total, done, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
-}
-
 function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void | Promise<void>, onNavigateToNote?: (title: string) => void) {
   const previewLines = allLines.slice(0, 4);
   return previewLines.map((line, previewIdx) => {
     const originalIdx = previewIdx;
 
-    const unchecked = UNCHECKED.exec(line);
-    if (unchecked) {
-      return (
-        <div key={originalIdx} className="flex items-start gap-1.5">
-          <span
-            role="checkbox"
-            aria-checked="false"
-            aria-label={unchecked[1]}
-            tabIndex={onToggle ? 0 : undefined}
-            onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(originalIdx); } : undefined}
-            onKeyDown={onToggle ? (e) => {
+    const item = CHECKLIST_ITEM.exec(line);
+    if (item) {
+      const done = CHECKLIST_DONE.test(line);
+      const label = item[1] || "";
+      const toggleHandlers = onToggle
+        ? {
+            tabIndex: 0,
+            role: "button" as const,
+            "aria-label": `${done ? "Afgevinkt" : "Open"}: ${label || "taak"}`,
+            onClick: (e: ReactMouseEvent) => { e.stopPropagation(); onToggle(originalIdx); },
+            onKeyDown: (e: ReactKeyboardEvent) => {
               if (e.key !== "Enter" && e.key !== " ") return;
               e.preventDefault();
               e.stopPropagation();
               onToggle(originalIdx);
-            } : undefined}
-            className={`mt-0.5 w-3 h-3 rounded-[3px] border border-[var(--color-border)] shrink-0 ${onToggle ? "cursor-pointer hover:border-amber-400/50" : ""}`}
-          />
-          <span>{renderLineWithLinks(unchecked[1], onNavigateToNote)}</span>
-        </div>
-      );
-    }
-    const checked = CHECKED.exec(line);
-    if (checked) {
+            },
+          }
+        : {};
       return (
         <div key={originalIdx} className="flex items-start gap-1.5">
+          {/* Larger (~28px) hit area around a small visual box for touch a11y */}
           <span
-            role="checkbox"
-            aria-checked="true"
-            aria-label={checked[1]}
-            tabIndex={onToggle ? 0 : undefined}
-            onClick={onToggle ? (e) => { e.stopPropagation(); onToggle(originalIdx); } : undefined}
-            onKeyDown={onToggle ? (e) => {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              e.stopPropagation();
-              onToggle(originalIdx);
-            } : undefined}
-            className={`mt-0.5 w-3 h-3 rounded-[3px] bg-emerald-500/40 border border-emerald-500/50 shrink-0 flex items-center justify-center ${onToggle ? "cursor-pointer hover:bg-emerald-500/60" : ""}`}
+            {...toggleHandlers}
+            className={`-m-1 flex shrink-0 items-center justify-center p-1 ${onToggle ? "cursor-pointer" : ""}`}
           >
-            <Check size={7} className="text-emerald-300" />
+            <span
+              role="checkbox"
+              aria-checked={done}
+              className={`flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border ${
+                done
+                  ? "border-emerald-500/50 bg-emerald-500/40"
+                  : `border-[var(--color-border)] ${onToggle ? "hover:border-amber-400/50" : ""}`
+              }`}
+            >
+              {done && <Check size={8} className="text-emerald-300" />}
+            </span>
           </span>
-          <span className="line-through text-slate-600">{renderLineWithLinks(checked[1], onNavigateToNote)}</span>
+          <span className={done ? "mt-0.5 line-through text-slate-600" : "mt-0.5"}>
+            {renderLineWithLinks(label, onNavigateToNote)}
+          </span>
         </div>
       );
     }

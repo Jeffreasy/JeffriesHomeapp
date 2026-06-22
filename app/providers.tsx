@@ -29,6 +29,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
             gcTime: 1000 * 60 * 60 * 24, // 24 hours
             retry: 1,
           },
+          mutations: {
+            // Writes must NOT pause silently when offline (the default
+            // networkMode:'online' parks the promise forever, so a note save
+            // looks "saving" but is dropped on tab close). 'always' makes an
+            // offline write fail fast → the editor surfaces the error and keeps
+            // the user's typed content instead of losing it.
+            networkMode: "always",
+          },
         },
       })
   );

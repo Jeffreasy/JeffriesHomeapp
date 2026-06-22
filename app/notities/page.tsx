@@ -126,11 +126,14 @@ export default function NotitiesPage() {
       list = list.filter((note) => noteMatchesScope(note, noteScope));
     }
 
-    if (tagFilter) {
+    // Privacy mode masks card content, so the content-derived filters (search +
+    // tag) must NOT run — otherwise the "{n} zichtbaar" count varies by query and
+    // becomes an oracle that reveals whether a masked note contains a given word.
+    if (!privacyOn && tagFilter) {
       list = list.filter((note) => (note.tags ?? []).includes(tagFilter));
     }
 
-    const query = search.trim().toLowerCase();
+    const query = privacyOn ? "" : search.trim().toLowerCase();
     if (query) {
       list = list.filter((note) => {
         const haystack = `${note.titel ?? ""} ${note.inhoud} ${(note.tags ?? []).join(" ")}`.toLowerCase();
@@ -160,7 +163,7 @@ export default function NotitiesPage() {
     });
 
     return list;
-  }, [noteScope, search, sortMode, sourceNotes, tagFilter, viewMode]);
+  }, [noteScope, search, sortMode, sourceNotes, tagFilter, viewMode, privacyOn]);
 
   const boardStats = useMemo(() => {
     let checklistDone = 0;
@@ -249,8 +252,10 @@ export default function NotitiesPage() {
     try {
       const matchedBusinessContext = resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
       const enriched = enrichNoteDraft({ title: cleanText, content: cleanText, tags: extractedTags, businessContext: matchedBusinessContext });
+      // Code-point-safe truncation so a title can't split an emoji surrogate pair.
+      const titleChars = Array.from(cleanText);
       await create({
-        titel: cleanText.length > 80 ? `${cleanText.slice(0, 77)}...` : cleanText,
+        titel: titleChars.length > 80 ? `${titleChars.slice(0, 77).join("")}...` : cleanText,
         inhoud: cleanText,
         tags: enriched.tags.length > 0 ? enriched.tags : undefined,
         symbol: enriched.symbol,
@@ -268,7 +273,10 @@ export default function NotitiesPage() {
 
   const handleSave = async (data: NoteCreateData) => {
     if (editNote) {
-      await update(editNote.id, data);
+      // Send the gewijzigd we opened with so a background change to this note is
+      // not silently overwritten — the backend returns 409 and the editor keeps
+      // the draft + shows an error instead of clobbering the other write.
+      await update(editNote.id, { ...data, expectedGewijzigd: editNote.gewijzigd });
     } else {
       await create(data);
     }
@@ -289,8 +297,20 @@ export default function NotitiesPage() {
   };
 
   const handleNavigateToNote = (title: string) => {
+    // Open the linked note directly, wherever it lives (active/completed/archived)
+    // — forcing the active view + a title search used to hide targets that were
+    // completed/archived or filtered out by the current scope.
+    const key = normalizeWikiTitle(title);
+    const target = [...active, ...completed, ...archived].find(
+      (note) => normalizeWikiTitle(getWikiTitle(note)) === key,
+    );
+    if (target) {
+      handleEdit(target);
+      return;
+    }
     setActiveTab("collection");
     setViewMode("active");
+    setNoteScope("all");
     setTagFilter(null);
     setSearch(title);
     searchRef.current?.focus();
@@ -393,6 +413,7 @@ export default function NotitiesPage() {
               sortMode={sortMode}
               search={search}
               tagFilter={tagFilter}
+              noteScope={noteScope}
               privacyOn={privacyOn}
               handleNew={handleNew}
               clearFilters={clearFilters}
