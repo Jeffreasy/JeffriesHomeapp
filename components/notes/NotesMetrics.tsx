@@ -70,7 +70,7 @@ export function NotesMetricsRow({
   const scopeOf = (scope: NoteScope) =>
     onScope ? { onClick: () => onScope(scope), active: activeScope === scope } : {};
   return (
-    <section className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-5">
+    <section className="flex snap-x gap-2 overflow-x-auto pb-1 scrollbar-none [&>*]:w-[46%] [&>*]:shrink-0 [&>*]:snap-start sm:grid sm:grid-cols-3 sm:gap-3 sm:overflow-visible sm:pb-0 sm:[&>*]:w-auto sm:[&>*]:shrink xl:grid-cols-5">
       <MetricTile
         icon={StickyNote}
         label="Totaal"

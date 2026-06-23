@@ -11,6 +11,7 @@ export function MetricTile({
   tone = "slate",
   onClick,
   active = false,
+  className,
 }: {
   icon: LucideIcon;
   label: string;
@@ -19,6 +20,7 @@ export function MetricTile({
   tone?: Tone;
   onClick?: () => void;
   active?: boolean;
+  className?: string;
 }) {
   const toneClass = toneClasses[tone];
 
@@ -48,6 +50,7 @@ export function MetricTile({
           "glass min-w-0 cursor-pointer p-3 text-left outline-none transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:ring-2 focus-visible:ring-amber-400/60 sm:p-4",
           toneClass.border,
           active && "ring-1 ring-amber-400/50",
+          className,
         )}
       >
         {inner}
@@ -55,7 +58,7 @@ export function MetricTile({
     );
   }
 
-  return <div className={cn("glass min-w-0 p-3 sm:p-4", toneClass.border)}>{inner}</div>;
+  return <div className={cn("glass min-w-0 p-3 sm:p-4", toneClass.border, className)}>{inner}</div>;
 }
 
 export function SectionTitle({
