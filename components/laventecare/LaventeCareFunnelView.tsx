@@ -134,32 +134,58 @@ export function LaventeCareFunnelView({
                       </p>
                     )}
                     {lead._id && (
-                      <div className="mt-4 grid gap-2 sm:grid-cols-4">
-                        {["intake", "discovery", "voorstel"].map((status) => {
-                          const busy = processingLead === `${lead._id}:${status}`;
-                          return (
-                            <button
-                              key={status}
-                              type="button"
-                              onClick={() => handleLeadStatus(lead, status)}
-                              disabled={Boolean(processingLead)}
-                              className="btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {busy && <Loader2 size={13} className="animate-spin" />}
-                              {label(status)}
-                            </button>
-                          );
-                        })}
-                        <button
-                          type="button"
-                          onClick={() => handleLeadToProject(lead)}
-                          disabled={Boolean(processingLead)}
-                          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {processingLead === `${lead._id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
-                          Project
-                        </button>
-                      </div>
+                      <>
+                        <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                          {["intake", "discovery", "voorstel"].map((status) => {
+                            const busy = processingLead === `${lead._id}:${status}`;
+                            return (
+                              <button
+                                key={status}
+                                type="button"
+                                onClick={() => handleLeadStatus(lead, status)}
+                                disabled={Boolean(processingLead)}
+                                className="btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {busy && <Loader2 size={13} className="animate-spin" />}
+                                {label(status)}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => handleLeadToProject(lead)}
+                            disabled={Boolean(processingLead)}
+                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {processingLead === `${lead._id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
+                            Project
+                          </button>
+                        </div>
+                        {/* Close a lead out of the funnel: lost or not-a-fit. The
+                            backend marks these terminal so the lead leaves the
+                            active funnel automatically. */}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-semibold text-slate-600">Sluiten:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleLeadStatus(lead, "verloren")}
+                            disabled={Boolean(processingLead)}
+                            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/[0.06] px-2.5 text-[11px] font-semibold text-rose-200 transition-colors hover:bg-rose-500/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {processingLead === `${lead._id}:verloren` ? <Loader2 size={12} className="animate-spin" /> : <Flag size={12} />}
+                            Verloren
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleLeadStatus(lead, "gediskwalificeerd")}
+                            disabled={Boolean(processingLead)}
+                            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 text-[11px] font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {processingLead === `${lead._id}:gediskwalificeerd` ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+                            Niet-fit
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 );
