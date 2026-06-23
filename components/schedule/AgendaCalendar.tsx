@@ -135,7 +135,7 @@ export function AgendaCalendar({
   return (
     <section className="rounded-xl border border-[var(--color-border)] bg-white/[0.025] shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
       <div className="border-b border-[var(--color-border)] px-3 py-3 sm:px-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/10 text-indigo-200">
@@ -143,7 +143,8 @@ export function AgendaCalendar({
               </div>
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-semibold text-white">Kalender</h2>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
+                {/* Hidden on phone — the count duplicates the page summary chips. */}
+                <p className="mt-0.5 hidden truncate text-xs text-slate-500 sm:block">
                   {title} · {activeEventCount} zichtbare items · {activeNoteCount} notities
                 </p>
               </div>

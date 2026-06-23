@@ -53,6 +53,7 @@ import {
   NextEventCard,
   TimelineDay,
 } from "@/components/schedule/AgendaCards";
+import { StatChip } from "@/components/ui/StatChip";
 
 type AgendaView = "today" | "upcoming" | "pending" | "history";
 type CalendarMode = "month" | "week";
@@ -392,7 +393,7 @@ export default function AgendaPage() {
     <div className="text-slate-100">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#0a0a0f]/92 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#0a0a0f]/92 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -458,58 +459,7 @@ export default function AgendaPage() {
 
       {/* ── Main ───────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:py-7">
-        <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-          <button
-            onClick={() => setActiveView("today")}
-            className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors hover:bg-white/[0.045] cursor-pointer"
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Vandaag</p>
-            <p className="mt-1 text-lg font-semibold text-white tabular-nums">{todayTimelineEvents.length}</p>
-            <p className="mt-0.5 truncate text-[10px] text-slate-600">
-              {formatSplitCounts(todayTimelineEvents)}
-            </p>
-          </button>
-          <button
-            onClick={() => setActiveView("upcoming")}
-            className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors hover:bg-white/[0.045] cursor-pointer"
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">30 dagen</p>
-            <p className="mt-1 text-lg font-semibold text-white tabular-nums">{monthEvents.length}</p>
-            <p className="mt-0.5 truncate text-[10px] text-slate-600">
-              {formatSplitCounts(monthEvents)}
-            </p>
-          </button>
-          {withConflicts.length > 0 ? (
-            <button
-              onClick={() => setActiveView("upcoming")}
-              aria-label={`Conflicten: ${withConflicts.length} ${withConflicts.length === 1 ? "conflict" : "conflicten"} — bekijk`}
-              className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors hover:bg-white/[0.045] cursor-pointer"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Conflicten</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums text-amber-300">{withConflicts.length}</p>
-              <p className="mt-0.5 truncate text-[10px] text-slate-600">te controleren</p>
-            </button>
-          ) : (
-            <div
-              role="status"
-              aria-label="Conflicten: geen conflicten"
-              className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Conflicten</p>
-              <p className="mt-1 text-lg font-semibold tabular-nums text-emerald-300">0</p>
-              <p className="mt-0.5 truncate text-[10px] text-slate-600">geen conflicten</p>
-            </div>
-          )}
-          <button
-            onClick={() => setActiveView("pending")}
-            className="rounded-lg border border-[var(--color-border)] bg-white/[0.025] px-3 py-2 text-left transition-colors hover:bg-white/[0.045] cursor-pointer"
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">Wachtrij</p>
-            <p className={`mt-1 text-lg font-semibold tabular-nums ${pending.length > 0 ? "text-sky-300" : "text-white"}`}>{pending.length}</p>
-          </button>
-        </div>
-
-        <div className="mb-5">
+        <div className="mb-4">
           <AgendaCalendar
             events={calendarEvents}
             notesByDate={notesByDate}
@@ -529,6 +479,13 @@ export default function AgendaPage() {
             onEditNote={openEditNote}
           />
         </div>
+
+        {/* Compact summary chips — only the net-new counts; Vandaag/Wachtrij are
+            already shown as badges on the view-tabs in the header. */}
+        <section className="mb-5 flex flex-wrap items-center gap-1.5" aria-label="Agenda-overzicht">
+          <StatChip icon={CalendarDays} label="30 dagen" value={String(monthEvents.length)} meta={formatSplitCounts(monthEvents)} tone="sky" onClick={() => setActiveView("upcoming")} active={activeView === "upcoming"} />
+          <StatChip icon={AlertTriangle} label="Conflicten" value={String(withConflicts.length)} meta={withConflicts.length ? "te controleren" : "geen conflicten"} tone={withConflicts.length ? "amber" : "green"} onClick={withConflicts.length ? () => setActiveView("upcoming") : undefined} />
+        </section>
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
 

@@ -18,9 +18,10 @@ import { calcTotalHours, getEndKey, getHistory, getUpcoming, shiftBreakdown, tea
 import { generateUnifiedTimeline } from "@/lib/unified";
 import { cn } from "@/lib/utils";
 
-import { getAmsterdamTodayIso, formatHours, formatMetaDate, formatShortDate, pluralize, type Tab, TABS } from "@/components/schedule/RoosterUtils";
-import { EmptyRoster, SectionHeader } from "@/components/schedule/RoosterCards";
+import { getAmsterdamTodayIso, formatHours, formatMetaDate, pluralize, type Tab, TABS } from "@/components/schedule/RoosterUtils";
+import { EmptyRoster } from "@/components/schedule/RoosterCards";
 import { OverviewPanel, OverviewTab } from "@/components/schedule/RoosterOverview";
+import { StatChip } from "@/components/ui/StatChip";
 
 const tabId = (id: Tab) => `rooster-tab-${id}`;
 const tabPanelId = (id: Tab) => `rooster-panel-${id}`;
@@ -95,57 +96,24 @@ function MobileRosterSnapshot({
   hardConflicts: number;
 }) {
   return (
-    <section className="grid grid-cols-2 gap-2 md:hidden" aria-label="Rooster samenvatting">
-      <MobileMetric icon={Clock3} label="Komende uren" value={formatHours(upcomingHours)} sub={pluralize(upcomingCount, "dienst", "diensten")} tone="amber" />
-      <MobileMetric icon={Briefcase} label="Diensten" value={String(upcomingCount)} sub="komende 30 dagen" tone="blue" />
-      <MobileMetric
+    <section className="flex flex-wrap items-center gap-1.5 md:hidden" aria-label="Rooster samenvatting">
+      <StatChip icon={Clock3} label="Uren" value={formatHours(upcomingHours)} meta={`${pluralize(upcomingCount, "dienst", "diensten")} · komende 30 dagen`} tone="amber" />
+      <StatChip icon={Briefcase} label="Diensten" value={String(upcomingCount)} meta="komende 30 dagen" tone="sky" />
+      <StatChip
         icon={CalendarClock}
         label="Afspraken"
-        value={todayEventCount > 0 ? `${todayEventCount} vandaag` : String(eventCount)}
-        sub={todayEventCount > 0 ? "vandaag" : "aankomend"}
+        value={todayEventCount > 0 ? String(todayEventCount) : String(eventCount)}
+        meta={todayEventCount > 0 ? `${todayEventCount} vandaag` : `${eventCount} aankomend`}
         tone="indigo"
       />
-      <MobileMetric
+      <StatChip
         icon={AlertTriangle}
         label="Conflicten"
-        value={hardConflicts > 0 ? `${hardConflicts} hard` : String(conflicts)}
-        sub={hardConflicts > 0 ? "direct nalopen" : conflicts > 0 ? "aandacht" : "rustig"}
+        value={hardConflicts > 0 ? String(hardConflicts) : String(conflicts)}
+        meta={hardConflicts > 0 ? "direct nalopen" : conflicts > 0 ? "aandacht" : "rustig"}
         tone={hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "green"}
       />
     </section>
-  );
-}
-
-function MobileMetric({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  icon: typeof Clock3;
-  label: string;
-  value: string;
-  sub: string;
-  tone: "amber" | "blue" | "green" | "indigo" | "rose";
-}) {
-  const toneClass = {
-    amber: "border-amber-500/20 bg-amber-500/8 text-amber-200",
-    blue: "border-sky-500/20 bg-sky-500/8 text-sky-200",
-    green: "border-emerald-500/20 bg-emerald-500/8 text-emerald-200",
-    indigo: "border-indigo-500/20 bg-indigo-500/8 text-indigo-200",
-    rose: "border-rose-500/20 bg-rose-500/8 text-rose-200",
-  }[tone];
-
-  return (
-    <div className={cn("min-w-0 rounded-xl border px-3 py-2.5", toneClass)}>
-      <div className="flex items-center gap-2">
-        <Icon size={13} className="shrink-0 opacity-80" />
-        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      </div>
-      <p className="mt-2 truncate text-lg font-bold tracking-tight">{value}</p>
-      <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{sub}</p>
-    </div>
   );
 }
 
@@ -323,7 +291,7 @@ export default function RoosterPage() {
 
   return (
     <div className="text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/90 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/90 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-start gap-3">
@@ -439,45 +407,45 @@ export default function RoosterPage() {
 
         {hasScheduleData && (
           <>
-            <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_420px]">
-              <div className="order-2 hidden md:block xl:order-1">
-                <OverviewPanel
-                  upcomingHours={upcomingHours}
-                  upcomingCount={upcoming.length}
-                  eventCount={upcomingEvents.length}
-                  todayEventCount={todayEvents.length}
-                  hardConflicts={hardConflicts}
-                  conflicts={withConflicts.length}
-                  nextDienst={nextDienst}
-                  shifts={shifts}
-                  teams={teams}
-                />
-              </div>
+            {/* The next-shift hero + snapshot only belong on the Overzicht tab —
+                they're irrelevant on Statistieken/Salaris/Beheer and previously
+                rendered there too, walling off the actual content. */}
+            {tab === "overzicht" && (
+              <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_420px]">
+                <div className="order-2 hidden md:block xl:order-1">
+                  <OverviewPanel
+                    upcomingHours={upcomingHours}
+                    upcomingCount={upcoming.length}
+                    eventCount={upcomingEvents.length}
+                    todayEventCount={todayEvents.length}
+                    hardConflicts={hardConflicts}
+                    conflicts={withConflicts.length}
+                    nextDienst={nextDienst}
+                    shifts={shifts}
+                    teams={teams}
+                  />
+                </div>
 
-              <div className="order-1 space-y-4 xl:order-2">
-                <SectionHeader
-                  icon={CalendarClock}
-                  label="Volgende"
-                  title="Eerstvolgende dienst"
-                  sub={nextDienst ? formatShortDate(nextDienst.startDatum) : undefined}
-                />
-                <NextShiftCard
-                  dienst={nextDienst}
-                  onImport={handleCalendarSync}
-                  afspraken={nextShiftEvents}
-                  conflictMap={conflictMap}
-                  todayIso={todayIso}
-                />
-                <MobileRosterSnapshot
-                  upcomingHours={upcomingHours}
-                  upcomingCount={upcoming.length}
-                  eventCount={upcomingEvents.length}
-                  todayEventCount={todayEvents.length}
-                  hardConflicts={hardConflicts}
-                  conflicts={withConflicts.length}
-                />
-              </div>
-            </section>
+                <div className="order-1 space-y-3 xl:order-2">
+                  <NextShiftCard
+                    dienst={nextDienst}
+                    compact={compactTimeline}
+                    onImport={handleCalendarSync}
+                    afspraken={nextShiftEvents}
+                    conflictMap={conflictMap}
+                    todayIso={todayIso}
+                  />
+                  <MobileRosterSnapshot
+                    upcomingHours={upcomingHours}
+                    upcomingCount={upcoming.length}
+                    eventCount={upcomingEvents.length}
+                    todayEventCount={todayEvents.length}
+                    hardConflicts={hardConflicts}
+                    conflicts={withConflicts.length}
+                  />
+                </div>
+              </section>
+            )}
 
             {tab === "overzicht" && (
               <div role="tabpanel" id={tabPanelId("overzicht")} aria-labelledby={tabId("overzicht")} tabIndex={0}>

@@ -1,8 +1,7 @@
 import { AlertTriangle, CalendarClock, Link2, ListChecks, Pin, ShieldCheck, StickyNote } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { formatDate, toneClasses, type NoteScope, type Tone } from "./NotesUtils";
+import { formatDate, type NoteScope } from "./NotesUtils";
 import { MetricTile, SectionTitle } from "./NotesPrimitives";
-import { cn } from "@/lib/utils";
+import { StatChip } from "@/components/ui/StatChip";
 import type { NoteRecord } from "@/hooks/useNotes";
 
 export function NotesSignals({
@@ -82,48 +81,3 @@ export function NotesMetricsRow({
   );
 }
 
-// A compact, professional stat chip: one line of "[icon] Label Value", the
-// detail moved to a tooltip. Doubles as a scope filter when onClick is set.
-function StatChip({
-  icon: Icon,
-  label,
-  value,
-  meta,
-  tone = "slate",
-  onClick,
-  active = false,
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-  meta: string;
-  tone?: Tone;
-  onClick?: () => void;
-  active?: boolean;
-}) {
-  const t = toneClasses[tone];
-  const content = (
-    <>
-      <Icon size={14} className={cn("shrink-0", t.icon)} />
-      <span className="text-slate-400">{label}</span>
-      <span className={cn("font-semibold tabular-nums", t.text)}>{value}</span>
-    </>
-  );
-  const cls = cn(
-    "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs outline-none transition-colors sm:text-sm",
-    active ? "border-amber-500/40 bg-amber-500/15" : "border-[var(--color-border)] bg-[var(--color-surface)]",
-    onClick && "cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:ring-2 focus-visible:ring-amber-400/60",
-  );
-  if (onClick) {
-    return (
-      <button type="button" title={meta} onClick={onClick} aria-pressed={active} className={cls}>
-        {content}
-      </button>
-    );
-  }
-  return (
-    <span title={meta} className={cls}>
-      {content}
-    </span>
-  );
-}

@@ -2,11 +2,12 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
-import { Calendar, Plus, Zap } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarClock, CalendarDays, Plus, Zap } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type DienstRow } from "@/lib/schedule";
 import { useToast } from "@/components/ui/Toast";
+import { StatChip } from "@/components/ui/StatChip";
 import { PersonalEventItem } from "./PersonalEventItem";
 import { getAmsterdamTodayIso } from "./RoosterUtils";
 import { syncApi } from "@/lib/api";
@@ -73,29 +74,24 @@ export function AfsprakenView({ diensten, onEditEvent, onNewEvent }: AfsprakenVi
   return (
     <div className="space-y-5">
 
-      {/* ── Stats bar ────────────────────────────────────────────────────── */}
+      {/* ── Stats chips ──────────────────────────────────────────────────── */}
       {upcoming.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="glass rounded-xl px-4 py-3 border border-[var(--color-border)] min-w-0">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Aankomend</p>
-            <p className="text-xl font-bold text-indigo-400">{upcoming.length}</p>
-          </div>
-          <div className="glass rounded-xl px-4 py-3 border border-[var(--color-border)] min-w-0">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Deze maand</p>
-            <p className="text-xl font-bold text-slate-200">
-              {upcoming.filter(e => e.startDatum.slice(0, 7) === today.slice(0, 7)).length}
-            </p>
-          </div>
-          <div
-            className="glass rounded-xl px-4 py-3 border"
-            style={{ borderColor: withConflicts.length > 0 ? "rgba(245,158,11,0.3)" : "rgba(255,255,255,0.05)" }}
-          >
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Conflicten</p>
-            <p className="text-xl font-bold" style={{ color: withConflicts.length > 0 ? "#f59e0b" : "#475569" }}>
-              {withConflicts.length}
-            </p>
-          </div>
-        </div>
+        <section className="flex flex-wrap items-center gap-1.5" aria-label="Afspraken-overzicht">
+          <StatChip icon={CalendarClock} label="Aankomend" value={String(upcoming.length)} tone="indigo" />
+          <StatChip
+            icon={CalendarDays}
+            label="Deze maand"
+            value={String(upcoming.filter((e) => e.startDatum.slice(0, 7) === today.slice(0, 7)).length)}
+            tone="slate"
+          />
+          <StatChip
+            icon={AlertTriangle}
+            label="Conflicten"
+            value={String(withConflicts.length)}
+            meta={withConflicts.length > 0 ? "te controleren" : "geen conflicten"}
+            tone={withConflicts.length > 0 ? "amber" : "green"}
+          />
+        </section>
       )}
 
       {/* ── In wachtrij (PendingCreate) ──────────────────────────────────── */}
