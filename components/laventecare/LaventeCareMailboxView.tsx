@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, type ChangeEvent, type ReactNode, useMemo, useState } from "react";
-import { CheckCircle2, FileText, Loader2, MailCheck, MailPlus, Paperclip, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
+import { FormEvent, type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { CheckCircle2, ExternalLink, Eye, FileText, Loader2, MailCheck, MailPlus, Paperclip, Pencil, Reply, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
 import type { LCMailAISuggestion } from "@/lib/api";
 import { extractLaventeCareMailAttachmentContext, type LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
 import type {
@@ -109,6 +109,7 @@ export function LaventeCareMailboxView({
   const [attachments, setAttachments] = useState<MailAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState("");
   const [attachmentsReading, setAttachmentsReading] = useState(false);
+  const [mailModal, setMailModal] = useState<MailModalState | null>(null);
   const [variables, setVariables] = useState(
     [
       "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
@@ -161,6 +162,8 @@ export function LaventeCareMailboxView({
   const outboundVariables = useMemo(() => prepareOutboundVariables(parsedVariables, selectedInvoice), [parsedVariables, selectedInvoice]);
   const variableHints = useMemo(() => extractPlaceholders(selectedTemplate), [selectedTemplate]);
   const previewHTML = useMemo(() => renderMailPreview(selectedTemplate?.body_html ?? "", previewVariables), [selectedTemplate, previewVariables]);
+  const previewSubject = useMemo(() => renderMailSubjectPreview(selectedTemplate?.subject_template ?? "", previewVariables), [selectedTemplate, previewVariables]);
+  const recipientEcho = resolvedEmail ? (resolvedName ? `${resolvedName} <${resolvedEmail}>` : resolvedEmail) : "—";
   const sendReadiness = useMemo(
     () =>
       buildSendReadiness({
@@ -216,6 +219,96 @@ export function LaventeCareMailboxView({
       variables: outboundVariables,
       send,
       attachments: send && attachments.length ? attachments.map(({ name, content_type, content_bytes }) => ({ name, content_type, content_bytes })) : undefined,
+    });
+  };
+
+  const openPreview = () => {
+    if (!selectedTemplate) return;
+    setMailModal({
+      title: "Voorbeeld — zo ontvangt de klant de mail",
+      subtitle: selectedTemplate.name,
+      html: previewHTML,
+      meta: [
+        { label: "Aan", value: recipientEcho },
+        { label: "Onderwerp", value: previewSubject || "(geen onderwerp)" },
+        { label: "Bijlagen", value: attachments.length ? `${attachments.length}` : "geen" },
+      ],
+    });
+  };
+
+  const openSendConfirm = () => {
+    if (!selectedTemplate || !resolvedEmail) return;
+    setMailModal({
+      title: "Versturen naar klant?",
+      subtitle: selectedTemplate.name,
+      html: previewHTML,
+      meta: [
+        { label: "Aan", value: recipientEcho },
+        { label: "Onderwerp", value: previewSubject || "(geen onderwerp)" },
+        { label: "Bijlagen", value: attachments.length ? `${attachments.length}` : "geen" },
+      ],
+      primaryAction: {
+        label: "Definitief versturen",
+        variant: "send",
+        icon: <Send size={15} />,
+        onClick: () => {
+          setMailModal(null);
+          void handleSend(true);
+        },
+      },
+    });
+  };
+
+  const prefillFromOutbox = (item: MailOutboxItem) => {
+    setTemplateId(item.template_id ?? "");
+    setCompanyId(item.company_id ?? "");
+    setContactId(item.contact_id ?? "");
+    setProjectId(item.project_id ?? "");
+    setWorkstreamId(item.workstream_id ?? "");
+    setInvoiceId(item.invoice_id ?? "");
+    setToEmail(item.to_email ?? "");
+    setToName(item.to_name ?? "");
+    setMailModal(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openOutbox = (item: MailOutboxItem) => {
+    setMailModal({
+      title: item.subject || "(geen onderwerp)",
+      subtitle: `${label(item.status)} · aan ${item.to_email}`,
+      html: item.body_html,
+      meta: [
+        { label: "Aan", value: item.to_name ? `${item.to_name} <${item.to_email}>` : item.to_email },
+        { label: "Status", value: label(item.status) },
+        { label: "Datum", value: formatDate(item.sent_at ?? item.created_at) },
+      ],
+      primaryAction:
+        item.status === "concept" || item.status === "failed"
+          ? { label: "Bewerken in opsteller", icon: <Pencil size={15} />, onClick: () => prefillFromOutbox(item) }
+          : undefined,
+    });
+  };
+
+  const replyFromInbox = (item: MailInboxItem) => {
+    setToEmail(item.from_email ?? "");
+    setToName(item.from_name ?? "");
+    if (item.company_id) setCompanyId(item.company_id);
+    setMailModal(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const openInbox = (item: MailInboxItem) => {
+    setMailModal({
+      title: item.subject || "(geen onderwerp)",
+      subtitle: `van ${item.from_name || item.from_email}`,
+      text: item.body_preview || "Geen voorbeeldtekst beschikbaar. Open in Outlook voor de volledige mail.",
+      meta: [
+        { label: "Van", value: item.from_name ? `${item.from_name} <${item.from_email}>` : item.from_email },
+        { label: "Ontvangen", value: formatDate(item.received_at) },
+        ...(item.company_name ? [{ label: "Bedrijf", value: item.company_name }] : []),
+      ],
+      primaryAction: { label: "Beantwoorden", icon: <Reply size={15} />, onClick: () => replyFromInbox(item) },
+      externalLink: item.web_link ? { label: "Openen in Outlook", href: item.web_link } : undefined,
     });
   };
 
@@ -528,14 +621,21 @@ export function LaventeCareMailboxView({
             </div>
             <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-100">
               <div className="flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2">
-                <p className="text-xs font-bold uppercase text-slate-500">HTML preview</p>
-                <p className="truncate text-[11px] font-semibold text-slate-400">{selectedTemplate?.name ?? "Template"}</p>
+                <p className="text-xs font-bold uppercase text-slate-500">Voorbeeld</p>
+                <button
+                  type="button"
+                  onClick={openPreview}
+                  disabled={!selectedTemplate}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Eye size={12} /> Vergroten
+                </button>
               </div>
               <iframe
                 title="LaventeCare mail preview"
                 sandbox=""
                 srcDoc={previewHTML}
-                className="h-72 w-full bg-slate-100"
+                className="h-64 w-full bg-slate-100"
               />
             </div>
             <div className="rounded-lg border border-white/10 bg-black/20 p-3 lg:col-span-2">
@@ -574,11 +674,11 @@ export function LaventeCareMailboxView({
             <button
               type="button"
               disabled={sending || !selectedTemplate || !resolvedEmail}
-              onClick={() => void handleSend(true)}
+              onClick={openSendConfirm}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Send size={16} />
-              {sending ? "Verwerken..." : "Versturen"}
+              {sending ? "Verwerken..." : "Versturen..."}
             </button>
           </div>
         </form>
@@ -601,7 +701,7 @@ export function LaventeCareMailboxView({
               {inbox.length === 0 ? (
                 <p className="text-sm leading-6 text-slate-500">Nog geen inkomende mail. Klik op Sync om je LaventeCare-inbox op te halen.</p>
               ) : (
-                inbox.slice(0, 8).map((item) => <InboxRow key={item.id} item={item} />)
+                inbox.slice(0, 8).map((item) => <InboxRow key={item.id} item={item} onOpen={openInbox} />)
               )}
             </div>
           </section>
@@ -614,7 +714,7 @@ export function LaventeCareMailboxView({
               ) : outbox.length === 0 ? (
                 <p className="text-sm leading-6 text-slate-500">Nog geen concepten of verzonden LaventeCare-mails.</p>
               ) : (
-                outbox.slice(0, 8).map((item) => <OutboxRow key={item.id} item={item} />)
+                outbox.slice(0, 8).map((item) => <OutboxRow key={item.id} item={item} onOpen={openOutbox} />)
               )}
             </div>
           </section>
@@ -642,6 +742,8 @@ export function LaventeCareMailboxView({
           </section>
         </aside>
       </section>
+
+      <MailPreviewModal state={mailModal} onClose={() => setMailModal(null)} />
     </div>
   );
 }
@@ -710,46 +812,168 @@ function InvoiceMailStatus({ invoice, template }: { invoice?: InvoiceItem; templ
   );
 }
 
-function OutboxRow({ item }: { item: MailOutboxItem }) {
+type MailModalAction = {
+  label: string;
+  onClick: () => void;
+  variant?: "send" | "default";
+  icon?: ReactNode;
+  disabled?: boolean;
+  loading?: boolean;
+};
+
+type MailModalState = {
+  title: string;
+  subtitle?: string;
+  html?: string;
+  text?: string;
+  meta?: { label: string; value: string }[];
+  primaryAction?: MailModalAction;
+  externalLink?: { label: string; href: string };
+};
+
+// One reusable surface for: the full-fidelity send preview, the pre-send confirmation
+// (recipient echo), opening an outbox row (read-only + resend), and opening an inbox
+// message (read-only + reply). The iframe is sandboxed and renders exactly the escaped
+// HTML that gets sent — preview == artifact.
+function MailPreviewModal({ state, onClose }: { state: MailModalState | null; onClose: () => void }) {
+  useEffect(() => {
+    if (!state) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [state, onClose]);
+
+  if (!state) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="glass flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">{state.title}</p>
+            {state.subtitle ? <p className="mt-0.5 truncate text-xs text-slate-400">{state.subtitle}</p> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Sluiten"
+            className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-slate-300 transition hover:bg-white/[0.08]"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        {state.meta && state.meta.length ? (
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 border-b border-white/10 bg-white/[0.02] px-4 py-2.5 sm:px-5">
+            {state.meta.map((entry) => (
+              <div key={entry.label} className="min-w-0">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{entry.label}</span>
+                <p className="truncate text-xs font-medium text-slate-200">{entry.value}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-100">
+          {state.html ? (
+            <iframe title="LaventeCare mail" sandbox="" srcDoc={state.html} className="h-[60vh] min-h-[320px] w-full bg-slate-100" />
+          ) : (
+            <div className="whitespace-pre-wrap p-5 text-sm leading-6 text-slate-800">{state.text || "Geen inhoud beschikbaar."}</div>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3 sm:px-5">
+          {state.externalLink ? (
+            <a
+              href={state.externalLink.href}
+              target="_blank"
+              rel="noreferrer"
+              className="mr-auto inline-flex items-center gap-1.5 text-xs font-semibold text-sky-300 hover:underline"
+            >
+              <ExternalLink size={13} /> {state.externalLink.label}
+            </a>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.08]"
+          >
+            Sluiten
+          </button>
+          {state.primaryAction ? (
+            <button
+              type="button"
+              disabled={state.primaryAction.disabled || state.primaryAction.loading}
+              onClick={state.primaryAction.onClick}
+              className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                state.primaryAction.variant === "send"
+                  ? "bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
+                  : "border border-sky-500/30 bg-sky-500/15 text-sky-100 hover:bg-sky-500/25"
+              }`}
+            >
+              {state.primaryAction.loading ? <Loader2 size={15} className="animate-spin" /> : state.primaryAction.icon}
+              {state.primaryAction.loading ? "Verwerken..." : state.primaryAction.label}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OutboxRow({ item, onOpen }: { item: MailOutboxItem; onOpen: (item: MailOutboxItem) => void }) {
   const statusClass =
     item.status === "sent"
       ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
       : item.status === "failed"
         ? "border-rose-500/20 bg-rose-500/10 text-rose-200"
-        : "border-amber-500/20 bg-amber-500/10 text-amber-200";
+        : item.status === "sending"
+          ? "border-sky-500/20 bg-sky-500/10 text-sky-200"
+          : "border-amber-500/20 bg-amber-500/10 text-amber-200";
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+    <button
+      type="button"
+      onClick={() => onOpen(item)}
+      className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition hover:bg-white/[0.06]"
+    >
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-sm font-bold text-white">{item.subject}</p>
         <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold ${statusClass}`}>{label(item.status)}</span>
       </div>
       <p className="mt-1 truncate text-xs text-slate-500">Aan {item.to_email} · {formatDate(item.sent_at ?? item.created_at)}</p>
       {item.error_message ? <p className="mt-1 line-clamp-2 text-xs text-rose-300">{item.error_message}</p> : null}
-    </div>
+    </button>
   );
 }
 
-function InboxRow({ item }: { item: MailInboxItem }) {
+function InboxRow({ item, onOpen }: { item: MailInboxItem; onOpen: (item: MailInboxItem) => void }) {
   return (
-    <div className={`rounded-lg border px-3 py-2 ${item.is_read ? "border-white/10 bg-white/[0.03]" : "border-sky-500/25 bg-sky-500/[0.05]"}`}>
+    <button
+      type="button"
+      onClick={() => onOpen(item)}
+      className={`w-full rounded-lg border px-3 py-2 text-left transition hover:bg-white/[0.06] ${item.is_read ? "border-white/10 bg-white/[0.03]" : "border-sky-500/25 bg-sky-500/[0.05]"}`}
+    >
       <div className="flex items-center justify-between gap-2">
         <p className="min-w-0 truncate text-sm font-semibold text-white">{item.from_name || item.from_email}</p>
         <span className="shrink-0 text-[10px] text-slate-500">{formatDate(item.received_at)}</span>
       </div>
       <p className="mt-0.5 truncate text-xs font-medium text-slate-300">{item.subject || "(geen onderwerp)"}</p>
       {item.body_preview ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.body_preview}</p> : null}
-      <div className="mt-1.5 flex items-center gap-2">
-        {item.company_name ? (
-          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">{item.company_name}</span>
-        ) : null}
-        {item.has_attachments ? <Paperclip size={11} className="text-slate-500" /> : null}
-        {item.web_link ? (
-          <a href={item.web_link} target="_blank" rel="noreferrer" className="ml-auto text-[10px] font-semibold text-sky-300 hover:underline">
-            Openen
-          </a>
-        ) : null}
-      </div>
-    </div>
+      {item.company_name || item.has_attachments ? (
+        <div className="mt-1.5 flex items-center gap-2">
+          {item.company_name ? (
+            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">{item.company_name}</span>
+          ) : null}
+          {item.has_attachments ? <Paperclip size={11} className="text-slate-500" /> : null}
+        </div>
+      ) : null}
+    </button>
   );
 }
 
@@ -1030,11 +1254,29 @@ function readinessDotClass(value: ReadinessStatus) {
   }
 }
 
+// Keys whose value is trusted, server-built HTML and must NOT be escaped — mirrors
+// the backend rawMailHTMLKeys so the preview renders exactly what gets sent.
+const RAW_MAIL_HTML_KEYS = new Set(["pilot.access_block_html"]);
+
+// Mirrors the backend escapeMailText (html.EscapeString + \n -> <br>) so a CRM field,
+// the free-text variable editor, or an AI/PDF draft can never inject markup into the
+// preview — and, crucially, so the preview matches the escaped mail that is actually sent.
+function escapeMailHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&#34;")
+    .replace(/'/g, "&#39;")
+    .replace(/\n/g, "<br>");
+}
+
 function renderMailPreview(html: string, values: Record<string, string>) {
   let result = html;
   for (const [key, value] of Object.entries(values)) {
-    result = result.replaceAll(`{{${key}}}`, value);
-    result = result.replaceAll(`{{ ${key} }}`, value);
+    const rendered = RAW_MAIL_HTML_KEYS.has(key) ? value : escapeMailHtml(value);
+    result = result.replaceAll(`{{${key}}}`, rendered);
+    result = result.replaceAll(`{{ ${key} }}`, rendered);
   }
   result = result.replace(/<tr>\s*<td\s+align="center"[^>]*>\s*<a\s+href="([^"]*)"[^>]*>[\s\S]*?<\/a>\s*<\/td>\s*<\/tr>/gi, (block, href) => {
     return isSafePreviewUrl(href) ? block : "";
@@ -1042,8 +1284,18 @@ function renderMailPreview(html: string, values: Record<string, string>) {
   return result.replace(/\{\{\s*[a-zA-Z0-9_.-]+\s*\}\}/g, "");
 }
 
+function renderMailSubjectPreview(subject: string, values: Record<string, string>) {
+  let result = subject;
+  for (const [key, value] of Object.entries(values)) {
+    result = result.replaceAll(`{{${key}}}`, value).replaceAll(`{{ ${key} }}`, value);
+  }
+  return result.replace(/\{\{\s*[a-zA-Z0-9_.-]+\s*\}\}/g, "").replace(/\s+/g, " ").trim();
+}
+
 function isSafePreviewUrl(value: string) {
-  const trimmed = value.trim().toLowerCase();
+  // Mirror the backend isSafeMailCTAURL, which unescapes before validating — our
+  // escaped render turns "&" in an href into "&amp;".
+  const trimmed = value.trim().replace(/&amp;/g, "&").toLowerCase();
   if (!trimmed || trimmed.includes("{{") || trimmed.includes("}}")) return false;
   if (trimmed.replace(/\/+$/, "") === "https://www.laventecare.nl/contact" || trimmed.replace(/\/+$/, "") === "http://www.laventecare.nl/contact") return false;
   return trimmed.startsWith("https://") || trimmed.startsWith("http://");
