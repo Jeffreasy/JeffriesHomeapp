@@ -1110,6 +1110,8 @@ export const laventecareApi = {
   },
   syncInbox: () =>
     apiFetch<{ synced: number; ok: boolean; reason?: string }>("/laventecare/mailbox/inbox-sync", { method: "POST" }),
+  markInboxRead: (id: string) =>
+    apiFetch<{ ok: boolean }>(`/laventecare/mailbox/inbox/${encodeURIComponent(id)}/read`, { method: "PATCH" }),
   createMailTemplate: (data: {
     template_key?: string;
     name: string;

@@ -296,6 +296,11 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare", "mailbox"] }),
   });
 
+  const markInboxReadMut = useMutation({
+    mutationFn: (id: string) => laventecareApi.markInboxRead(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare", "mailbox"] }),
+  });
+
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
   const companies = useMemo(
     () =>
@@ -496,6 +501,7 @@ export function useLaventeCare() {
     mailInbox,
     syncInbox: () => syncInboxMut.mutateAsync(),
     syncingInbox: syncInboxMut.isPending,
+    markInboxRead: (id: string) => markInboxReadMut.mutate(id),
     quotes,
     quoteLines,
     timeEntries,

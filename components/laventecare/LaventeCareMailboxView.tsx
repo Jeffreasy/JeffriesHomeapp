@@ -76,6 +76,7 @@ export function LaventeCareMailboxView({
   onSuggestMailContent,
   onSendTemplatedMail,
   onSyncInbox,
+  onMarkInboxRead,
 }: {
   mailbox?: MailboxItem;
   mailboxLoading: boolean;
@@ -94,6 +95,7 @@ export function LaventeCareMailboxView({
   onSuggestMailContent: (payload: SuggestPayload) => Promise<LCMailAISuggestion>;
   onSendTemplatedMail: (payload: SendPayload) => Promise<void>;
   onSyncInbox: () => Promise<void>;
+  onMarkInboxRead: (id: string) => void;
 }) {
   const [templateId, setTemplateId] = useState("");
   const [companyId, setCompanyId] = useState("");
@@ -298,6 +300,7 @@ export function LaventeCareMailboxView({
   };
 
   const openInbox = (item: MailInboxItem) => {
+    if (!item.is_read) onMarkInboxRead(item.id);
     setMailModal({
       title: item.subject || "(geen onderwerp)",
       subtitle: `van ${item.from_name || item.from_email}`,

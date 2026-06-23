@@ -92,6 +92,7 @@ export default function LaventeCarePage() {
     mailInbox,
     syncInbox,
     syncingInbox,
+    markInboxRead,
     quotes,
     timeEntries,
     invoices,
@@ -1696,6 +1697,7 @@ export default function LaventeCarePage() {
                 onSuggestMailContent={handleSuggestMailContent}
                 onSendTemplatedMail={handleSendTemplatedMail}
                 onSyncInbox={handleSyncInbox}
+                onMarkInboxRead={markInboxRead}
               />
             ) : null}
 
