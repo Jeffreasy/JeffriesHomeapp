@@ -575,28 +575,9 @@ function NotesCaptureCard({
   const canSave = Boolean(parsed.cleanText);
 
   return (
-    <section className="glass border-amber-500/20 bg-amber-500/[0.045] p-3 sm:p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10">
-            <StickyNote size={17} className="text-amber-300" />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-white">Snel noteren</h2>
-            <p className="mt-0.5 text-sm text-slate-500">Typ, druk op Enter, klaar.</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onOpenEditor}
-          className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
-        >
-          <ArrowUpRight size={14} />
-          Editor
-        </button>
-      </div>
-
-      <div className="mt-3 flex min-h-12 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 focus-within:border-amber-500/45">
+    <section className="glass border-amber-500/20 bg-amber-500/[0.045] p-2">
+      <div className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 focus-within:border-amber-500/45">
+        <StickyNote size={16} className="shrink-0 text-amber-300/80" />
         <input
           type="text"
           value={value}
@@ -607,23 +588,33 @@ function NotesCaptureCard({
               void onSave();
             }
           }}
-          placeholder="Nieuwe notitie... gebruik #tag voor labels"
+          placeholder="Snel noteren... #tag voor labels"
           disabled={saving}
+          aria-label="Snel noteren"
           className="min-w-0 flex-1 bg-transparent text-base text-slate-100 outline-none placeholder:text-slate-600 disabled:opacity-50 sm:text-sm"
         />
         <button
           type="button"
+          onClick={onOpenEditor}
+          title="Open in editor"
+          aria-label="Open in editor"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
+        >
+          <ArrowUpRight size={16} />
+        </button>
+        <button
+          type="button"
           onClick={() => void onSave()}
           disabled={!canSave || saving}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-[var(--color-primary-foreground)] transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-35"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-[var(--color-primary-foreground)] transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-35"
           aria-label="Snelle notitie opslaan"
         >
-          <Plus size={17} />
+          <Plus size={16} />
         </button>
       </div>
 
       {(parsed.extractedTags.length > 0 || quickContext) && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
           {parsed.extractedTags.map((tag) => (
             <span key={tag} className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200">
               #{tag}
