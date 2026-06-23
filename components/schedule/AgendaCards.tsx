@@ -116,7 +116,7 @@ export function NextEventCard({ event }: { event: PersonalEvent | null }) {
   });
 
   return (
-    <div className="rounded-lg border border-indigo-500/15 bg-indigo-500/[0.06] p-4">
+    <div className="rounded-xl border border-indigo-500/15 bg-indigo-500/[0.06] px-4 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400/70 mb-2">
         Volgende afspraak
       </p>

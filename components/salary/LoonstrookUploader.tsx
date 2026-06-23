@@ -128,7 +128,7 @@ export function LoonstrookUploader() {
           >
             <Upload className="dropzone__icon" size={28} />
             <p className="dropzone__title">Sleep je loonstroken PDF&apos;s hier naartoe</p>
-            <p className="dropzone__sub" style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: 4 }}>
+            <p className="dropzone__sub" style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginTop: 4 }}>
               Meerdere bestanden tegelijk mogelijk
             </p>
             <label className="btn btn--primary" htmlFor="pdf-input">Kies bestanden</label>
@@ -157,11 +157,11 @@ export function LoonstrookUploader() {
               <table style={{ width: "100%", fontSize: "0.78rem", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-                    <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-muted)" }}>Periode</th>
-                    <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--text-muted)" }}>Netto</th>
-                    <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--text-muted)" }}>Salaris</th>
-                    <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--text-muted)" }}>ORT</th>
-                    <th style={{ textAlign: "center", padding: "6px 8px", color: "var(--text-muted)" }}>FWP</th>
+                    <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--color-text-muted)" }}>Periode</th>
+                    <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--color-text-muted)" }}>Netto</th>
+                    <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--color-text-muted)" }}>Salaris</th>
+                    <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--color-text-muted)" }}>ORT</th>
+                    <th style={{ textAlign: "center", padding: "6px 8px", color: "var(--color-text-muted)" }}>FWP</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -171,7 +171,7 @@ export function LoonstrookUploader() {
                       <td style={{ padding: "6px 8px", textAlign: "right", color: "#34d399" }}>{fmt(ls.netto)}</td>
                       <td style={{ padding: "6px 8px", textAlign: "right" }}>{fmt(ls.salarisBasis)}</td>
                       <td style={{ padding: "6px 8px", textAlign: "right", color: "#60a5fa" }}>{fmt(ls.ortTotaal)}</td>
-                      <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                      <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "0.7rem", color: "var(--color-text-muted)" }}>
                         {ls.schaalnummer}-{ls.trede}
                       </td>
                     </tr>

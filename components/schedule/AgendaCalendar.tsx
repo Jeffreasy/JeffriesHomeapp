@@ -171,7 +171,7 @@ export function AgendaCalendar({
                 onClick={() => setMobileView("agenda")}
                 aria-pressed={mobileView === "agenda"}
                 className={cn(
-                  "inline-flex min-w-[4rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
+                  "inline-flex min-w-[4rem] items-center justify-center rounded-md px-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-400/60",
                   mobileView === "agenda" ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
                 )}
               >
@@ -182,7 +182,7 @@ export function AgendaCalendar({
                 onClick={() => setMobileView("maand")}
                 aria-pressed={mobileView === "maand"}
                 className={cn(
-                  "inline-flex min-w-[4rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
+                  "inline-flex min-w-[4rem] items-center justify-center rounded-md px-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-400/60",
                   mobileView === "maand" ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
                 )}
               >
@@ -200,7 +200,7 @@ export function AgendaCalendar({
                 onClick={() => setMode("month")}
                 aria-pressed={mode === "month"}
                 className={cn(
-                  "inline-flex min-w-[4.5rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
+                  "inline-flex min-w-[4.5rem] items-center justify-center rounded-md px-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-400/60",
                   mode === "month" ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
                 )}
               >
@@ -211,7 +211,7 @@ export function AgendaCalendar({
                 onClick={() => setMode("week")}
                 aria-pressed={mode === "week"}
                 className={cn(
-                  "inline-flex min-w-[4.5rem] items-center justify-center rounded-md px-2 text-xs font-semibold transition-colors",
+                  "inline-flex min-w-[4.5rem] items-center justify-center rounded-md px-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-400/60",
                   mode === "week" ? "bg-white/[0.08] text-white" : "text-slate-500 hover:text-slate-300",
                 )}
               >
@@ -382,7 +382,7 @@ export function AgendaCalendar({
             ))}
           </div>
 
-          <div className={cn("grid grid-cols-7", mode === "month" ? "auto-rows-[minmax(120px,1fr)] lg:auto-rows-[minmax(132px,1fr)]" : "auto-rows-[minmax(130px,1fr)]")}>
+          <div className={cn("grid grid-cols-7", mode === "month" ? "auto-rows-[minmax(96px,1fr)] lg:auto-rows-[minmax(108px,1fr)]" : "auto-rows-[minmax(130px,1fr)]")}>
             {days.map((day) => (
               <CalendarDayCell
                 key={day.date}

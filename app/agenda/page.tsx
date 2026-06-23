@@ -5,9 +5,7 @@ import {
   AlertTriangle,
   Archive,
   CalendarDays,
-  CheckCircle2,
   FileText,
-  History,
   ListChecks,
   Loader2,
   Pin,
@@ -399,7 +397,7 @@ export default function AgendaPage() {
             <div className="min-w-0">
               <h1 className="text-base font-semibold text-white sm:text-lg">Agenda</h1>
               <p className="mt-0.5 truncate text-xs text-slate-500">
-                {formatDateLabel(todayIso)} · {formatSplitCounts(todayTimelineEvents)}
+                {formatDateLabel(todayIso)}
               </p>
             </div>
 
@@ -445,7 +443,7 @@ export default function AgendaPage() {
                 >
                   <Icon size={13} aria-hidden="true" />
                   <span>{label}</span>
-                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] tabular-nums ${
+                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] tabular-nums ${
                     active ? "bg-sky-400/12 text-sky-100" : "bg-white/[0.04] text-slate-500"
                   }`}>
                     {count}
@@ -665,54 +663,17 @@ export default function AgendaPage() {
               </Panel>
             )}
 
-            {/* Sync details — compact */}
-            <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-                  Google Calendar
-                </p>
-                <StatusPill status={syncStatus?.status} />
-              </div>
-              <div className="space-y-1.5 text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Laatste sync</span>
-                  <span className="text-slate-400">{formatDateTime(syncStatus?.lastSuccessAt)}</span>
+            {/* Sync error — only surfaced when actionable; the header StatusPill
+                already shows the at-a-glance state, and Recent-voorbij lives on
+                the Historie tab + the no-conflict state on the Conflicten chip. */}
+            {syncStatus?.lastError && (
+              <div className="rounded-lg border border-rose-500/20 bg-rose-500/[0.05] px-4 py-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <AlertTriangle size={13} className="shrink-0 text-rose-400" />
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-300">Sync-fout</p>
                 </div>
-                {syncStatus?.lastError && (
-                  <p className="text-[10px] text-red-400/80 mt-1 leading-relaxed">
-                    {syncStatus.lastError}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* History — compact, only when present */}
-            {history.length > 0 && (
-              <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <History size={12} className="text-slate-600" />
-                  <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-                    Recent voorbij
-                  </p>
-                </div>
-                <div className="space-y-1 opacity-60">
-                  {history.slice(0, 3).map((event) => (
-                    <PersonalEventItem
-                      key={event.eventId}
-                      event={event}
-                      onEdit={openEditEvent}
-                      onRefetch={refetchEvents}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* No-conflict state */}
-            {withConflicts.length === 0 && (
-              <div className="flex items-center gap-2 rounded-lg bg-emerald-500/[0.04] border border-emerald-500/10 px-4 py-3">
-                <CheckCircle2 size={14} className="text-emerald-500/50" />
-                <p className="text-[11px] text-emerald-400/60 font-medium">Geen conflicten met diensten</p>
+                <p className="text-[10px] leading-relaxed text-rose-400/80">{syncStatus.lastError}</p>
+                <p className="mt-1 text-[10px] text-slate-500">Laatst geslaagd: {formatDateTime(syncStatus?.lastSuccessAt)}</p>
               </div>
             )}
           </aside>

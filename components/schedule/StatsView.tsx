@@ -109,7 +109,7 @@ function MonthDetailStream({ stats }: { stats: MonthStats }) {
       className="h-full border-l border-white/10 bg-black/40 p-4 sm:p-6"
     >
       <div className="mb-6 border-b border-white/10 pb-4 sm:mb-8">
-        <h3 className="mb-2 text-2xl font-black uppercase tracking-tight text-white sm:text-3xl">{stats.label}</h3>
+        <h3 className="mb-2 text-xl font-bold tracking-tight text-white sm:text-2xl">{stats.label}</h3>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
           <span>Totaal: {hoursValue(stats.totalHours)}u</span>
           <span>Diensten: {stats.count}</span>
@@ -177,7 +177,7 @@ function YearSummaryHero({ year }: { year: YearStats }) {
           <Crosshair size={14} className="text-slate-400" />
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Jaarvolume · {year.year}</p>
         </div>
-        <p className="text-5xl font-black leading-none tracking-tight text-white tabular-nums sm:text-7xl md:text-8xl">
+        <p className="text-4xl font-black leading-none tracking-tight text-white tabular-nums sm:text-5xl">
           {hoursValue(year.totalHours)}<span className="ml-2 text-2xl font-bold text-slate-600 sm:text-3xl">u</span>
         </p>
       </div>
@@ -225,9 +225,9 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
 
   if (!years.length) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center border border-white/5 bg-black/20">
+      <div className="glass flex flex-col items-center justify-center rounded-2xl border border-[var(--color-border)] py-24 text-center">
         <TrendingUp size={32} className="text-slate-700 mb-4" />
-        <p className="text-sm font-bold uppercase tracking-widest text-slate-400">Geen roosterdata</p>
+        <p className="text-sm font-semibold text-slate-400">Geen roosterdata</p>
       </div>
     );
   }
@@ -241,10 +241,10 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
           <button
             key={y.year}
             onClick={() => { setActiveYear(y.year); setActiveMonth(null); }}
-            className={`shrink-0 px-5 py-2 text-[10px] font-black uppercase tracking-widest transition-all sm:px-6 ${
+            className={`shrink-0 rounded-lg border px-4 py-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
               y.year === activeYear
-                ? "bg-white text-black"
-                : "bg-transparent text-slate-500 hover:text-white border border-white/10"
+                ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
+                : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:text-slate-200"
             }`}
           >
             {y.year}

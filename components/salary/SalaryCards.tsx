@@ -112,7 +112,7 @@ function MetricPill({ label, value, accent }: { label: string; value: string; ac
         ? "border-amber-400/20 bg-amber-400/10"
         : "border-[var(--color-border)] bg-[var(--color-surface)]"
     )}>
-      <p className="text-[9px] uppercase tracking-wider text-slate-500">{label}</p>
+      <p className="text-[10px] uppercase tracking-wider text-slate-400">{label}</p>
       <p className={cn("mt-0.5 text-sm font-bold tabular-nums", accent ? "text-amber-200" : "text-slate-200")}>{value}</p>
     </div>
   );
@@ -293,10 +293,10 @@ export function VergelijkingSectie({
         <table style={{ width: "100%", fontSize: "0.75rem", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-              <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--text-muted, #64748b)" }}>Periode</th>
+              <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--color-text-muted)" }}>Periode</th>
               <th style={{ textAlign: "right", padding: "6px 8px", color: "#f59e0b" }}>Berekend</th>
               <th style={{ textAlign: "right", padding: "6px 8px", color: "#34d399" }}>Werkelijk</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--text-muted, #64748b)" }}>Delta</th>
+              <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--color-text-muted)" }}>Delta</th>
             </tr>
           </thead>
           <tbody>

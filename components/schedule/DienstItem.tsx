@@ -47,23 +47,23 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
             <span className={`text-sm font-black leading-none ${isWeekend ? "text-yellow-300" : "text-white"}`}>
               {dienst.startDatum.slice(8)}
             </span>
-            <span className={`mt-1 text-[9px] font-bold uppercase tracking-widest ${isWeekend ? "text-yellow-600" : "text-slate-500"}`}>
+            <span className={`mt-1 text-[10px] font-semibold uppercase tracking-wide ${isWeekend ? "text-amber-500/80" : "text-slate-400"}`}>
               {dienst.dag?.slice(0, 2)}
             </span>
-            {isZondag && <span className="mt-1 text-[8px] font-black text-yellow-500">ORT</span>}
+            {isZondag && <span className="mt-1 text-[9px] font-bold text-amber-400">ORT</span>}
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               <span
-                className="shrink-0 rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-widest"
+                className="shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: shift.accent + "12", color: shift.accent, borderColor: shift.accent + "35" }}
               >
                 {dienst.shiftType}
               </span>
               {team && dienst.team && (
                 <span
-                  className="shrink-0 rounded-md border px-2 py-1 text-[10px] font-black uppercase tracking-widest"
+                  className="shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide"
                   style={{ background: team.bg, color: team.text, borderColor: team.border }}
                 >
                   {dienst.team}
