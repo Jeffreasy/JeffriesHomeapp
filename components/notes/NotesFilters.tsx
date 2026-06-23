@@ -74,9 +74,10 @@ export function NotesFilters({
     <div className="glass p-2">
       {/* Compact primary toolbar: search + view + a single Filters disclosure.
           Everything else lives behind "Filters" so the note list stays near the
-          top of the screen instead of below a full panel. */}
-      <div className="flex items-center gap-2">
-        <div className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3">
+          top of the screen. On phones it wraps to two rows (search, then view +
+          Filters) so the view labels stay readable without overflowing. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex h-10 w-full min-w-0 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 sm:w-auto sm:flex-1">
           <Search size={15} className="shrink-0 text-slate-500" />
           <input
             ref={searchRef}
@@ -117,7 +118,7 @@ export function NotesFilters({
                 )}
               >
                 <option.icon size={15} className="shrink-0" />
-                <span className="hidden md:inline">{option.label}</span>
+                <span>{option.id === "completed" ? "Klaar" : option.label}</span>
                 <span className="text-xs tabular-nums opacity-70">{count}</span>
               </button>
             );
