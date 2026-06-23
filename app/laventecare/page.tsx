@@ -89,6 +89,9 @@ export default function LaventeCarePage() {
     mailbox,
     mailTemplates,
     mailOutbox,
+    mailInbox,
+    syncInbox,
+    syncingInbox,
     quotes,
     timeEntries,
     invoices,
@@ -1394,6 +1397,19 @@ export default function LaventeCarePage() {
     }
   };
 
+  const handleSyncInbox = async () => {
+    try {
+      const result = await syncInbox();
+      if (result.ok) {
+        success(result.synced > 0 ? `${result.synced} inkomende mail(s) opgehaald` : "Inbox is up-to-date");
+      } else {
+        toastError(result.reason ?? "Inbox-sync is niet beschikbaar");
+      }
+    } catch {
+      toastError("Inbox synchroniseren is mislukt");
+    }
+  };
+
   const handleSuggestMailContent = async (
     payload: Parameters<typeof suggestMailContentMut.mutateAsync>[0],
   ) => {
@@ -1673,10 +1689,13 @@ export default function LaventeCarePage() {
                 prefillInvoiceId={mailboxInvoiceId}
                 templates={mailTemplates}
                 outbox={mailOutbox}
+                inbox={mailInbox}
                 sending={sendTemplatedMailMut.isPending}
                 aiSuggesting={suggestMailContentMut.isPending}
+                syncingInbox={syncingInbox}
                 onSuggestMailContent={handleSuggestMailContent}
                 onSendTemplatedMail={handleSendTemplatedMail}
+                onSyncInbox={handleSyncInbox}
               />
             ) : null}
 

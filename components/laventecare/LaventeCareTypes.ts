@@ -18,6 +18,7 @@ import {
   type LCMailbox,
   type LCMailTemplate,
   type LCMailOutboxItem,
+  type LCMailInboxItem,
   type LCDossierAdvice,
 } from "@/lib/api";
 
@@ -39,6 +40,7 @@ export type InvoiceLineItem = LCInvoiceLine;
 export type MailboxItem = LCMailbox;
 export type MailTemplateItem = LCMailTemplate;
 export type MailOutboxItem = LCMailOutboxItem;
+export type MailInboxItem = LCMailInboxItem;
 
 export type CompanyItem = LCCompany & {
   _id?: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, type ChangeEvent, type ReactNode, useMemo, useState } from "react";
-import { CheckCircle2, FileText, MailCheck, MailPlus, Paperclip, Send, Sparkles, TriangleAlert, X } from "lucide-react";
+import { CheckCircle2, FileText, Loader2, MailCheck, MailPlus, Paperclip, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
 import type { LCMailAISuggestion } from "@/lib/api";
 import { extractLaventeCareMailAttachmentContext, type LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
 import type {
@@ -9,6 +9,7 @@ import type {
   ContactItem,
   InvoiceItem,
   MailboxItem,
+  MailInboxItem,
   MailOutboxItem,
   MailTemplateItem,
   ProjectItem,
@@ -68,10 +69,13 @@ export function LaventeCareMailboxView({
   prefillInvoiceId,
   templates,
   outbox,
+  inbox,
   sending,
   aiSuggesting,
+  syncingInbox,
   onSuggestMailContent,
   onSendTemplatedMail,
+  onSyncInbox,
 }: {
   mailbox?: MailboxItem;
   mailboxLoading: boolean;
@@ -83,10 +87,13 @@ export function LaventeCareMailboxView({
   prefillInvoiceId?: string;
   templates: MailTemplateItem[];
   outbox: MailOutboxItem[];
+  inbox: MailInboxItem[];
   sending: boolean;
   aiSuggesting: boolean;
+  syncingInbox: boolean;
   onSuggestMailContent: (payload: SuggestPayload) => Promise<LCMailAISuggestion>;
   onSendTemplatedMail: (payload: SendPayload) => Promise<void>;
+  onSyncInbox: () => Promise<void>;
 }) {
   const [templateId, setTemplateId] = useState("");
   const [companyId, setCompanyId] = useState("");
@@ -578,6 +585,28 @@ export function LaventeCareMailboxView({
 
         <aside className="min-w-0 space-y-4">
           <section className="glass min-w-0 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase text-slate-500">Inkomende mail</p>
+              <button
+                type="button"
+                onClick={() => { void onSyncInbox(); }}
+                disabled={syncingInbox}
+                className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 text-[11px] font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {syncingInbox ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                Sync
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {inbox.length === 0 ? (
+                <p className="text-sm leading-6 text-slate-500">Nog geen inkomende mail. Klik op Sync om je LaventeCare-inbox op te halen.</p>
+              ) : (
+                inbox.slice(0, 8).map((item) => <InboxRow key={item.id} item={item} />)
+              )}
+            </div>
+          </section>
+
+          <section className="glass min-w-0 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Outbox</p>
             <div className="mt-3 space-y-2">
               {mailboxLoading ? (
@@ -696,6 +725,30 @@ function OutboxRow({ item }: { item: MailOutboxItem }) {
       </div>
       <p className="mt-1 truncate text-xs text-slate-500">Aan {item.to_email} · {formatDate(item.sent_at ?? item.created_at)}</p>
       {item.error_message ? <p className="mt-1 line-clamp-2 text-xs text-rose-300">{item.error_message}</p> : null}
+    </div>
+  );
+}
+
+function InboxRow({ item }: { item: MailInboxItem }) {
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${item.is_read ? "border-white/10 bg-white/[0.03]" : "border-sky-500/25 bg-sky-500/[0.05]"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-sm font-semibold text-white">{item.from_name || item.from_email}</p>
+        <span className="shrink-0 text-[10px] text-slate-500">{formatDate(item.received_at)}</span>
+      </div>
+      <p className="mt-0.5 truncate text-xs font-medium text-slate-300">{item.subject || "(geen onderwerp)"}</p>
+      {item.body_preview ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.body_preview}</p> : null}
+      <div className="mt-1.5 flex items-center gap-2">
+        {item.company_name ? (
+          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">{item.company_name}</span>
+        ) : null}
+        {item.has_attachments ? <Paperclip size={11} className="text-slate-500" /> : null}
+        {item.web_link ? (
+          <a href={item.web_link} target="_blank" rel="noreferrer" className="ml-auto text-[10px] font-semibold text-sky-300 hover:underline">
+            Openen
+          </a>
+        ) : null}
+      </div>
     </div>
   );
 }

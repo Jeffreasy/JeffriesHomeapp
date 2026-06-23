@@ -29,6 +29,7 @@ import type {
   MailboxItem,
   MailTemplateItem,
   MailOutboxItem,
+  MailInboxItem,
 } from "@/components/laventecare/LaventeCareTypes";
 
 const closedWorkstreamStatuses = new Set(["afgerond", "done", "gesloten", "gearchiveerd", "omgezet_project"]);
@@ -290,6 +291,11 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const syncInboxMut = useMutation({
+    mutationFn: () => laventecareApi.syncInbox(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare", "mailbox"] }),
+  });
+
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
   const companies = useMemo(
     () =>
@@ -332,6 +338,7 @@ export function useLaventeCare() {
   const mailboxData = useMemo(() => mailbox as MailboxItem | undefined, [mailbox]);
   const mailTemplates = useMemo(() => (mailbox?.templates ?? []) as MailTemplateItem[], [mailbox]);
   const mailOutbox = useMemo(() => (mailbox?.outbox ?? []) as MailOutboxItem[], [mailbox]);
+  const mailInbox = useMemo(() => (mailbox?.inbox ?? []) as MailInboxItem[], [mailbox]);
   const quotes = useMemo(() => (billing?.quotes ?? []) as QuoteItem[], [billing]);
   const quoteLines = useMemo(() => (billing?.quoteLines ?? []) as QuoteLineItem[], [billing]);
   const timeEntries = useMemo(() => (billing?.timeEntries ?? []) as TimeEntryItem[], [billing]);
@@ -486,6 +493,9 @@ export function useLaventeCare() {
     mailbox: mailboxData,
     mailTemplates,
     mailOutbox,
+    mailInbox,
+    syncInbox: () => syncInboxMut.mutateAsync(),
+    syncingInbox: syncInboxMut.isPending,
     quotes,
     quoteLines,
     timeEntries,

@@ -1049,10 +1049,31 @@ export interface LCMailOutboxItem {
   contact_name?: string | null;
 }
 
+export interface LCMailInboxItem {
+  id: string;
+  user_id: string;
+  message_id: string;
+  conversation_id: string | null;
+  company_id: string | null;
+  contact_id: string | null;
+  from_email: string;
+  from_name: string | null;
+  subject: string | null;
+  body_preview: string | null;
+  web_link: string | null;
+  has_attachments: boolean;
+  is_read: boolean;
+  received_at: string;
+  created_at: string;
+  updated_at: string;
+  company_name?: string | null;
+}
+
 export interface LCMailbox {
   summary: LCMailboxSummary;
   templates: LCMailTemplate[];
   outbox: LCMailOutboxItem[];
+  inbox: LCMailInboxItem[];
 }
 
 export interface LCMailAISource {
@@ -1087,6 +1108,8 @@ export const laventecareApi = {
     const query = search.toString();
     return apiFetch<LCMailbox>(`/laventecare/mailbox${query ? `?${query}` : ""}`);
   },
+  syncInbox: () =>
+    apiFetch<{ synced: number; ok: boolean; reason?: string }>("/laventecare/mailbox/inbox-sync", { method: "POST" }),
   createMailTemplate: (data: {
     template_key?: string;
     name: string;
