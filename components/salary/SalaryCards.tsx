@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SalarisRecord } from "@/hooks/useSalary";
 import type { LoonstrookRecord } from "@/hooks/useLoonstroken";
@@ -67,35 +68,44 @@ export function PrognoseCard({ record }: { record: SalarisDisplayRecord }) {
         </div>
       )}
 
-      <div className="space-y-1.5 text-xs">
-        <BreakdownRow label="Basisalaris (44,44%)" bedrag={record.basisLoon} />
-        <BreakdownRow label="Amt Zeerintensief (5%)" bedrag={record.amtZeerintensief} />
-        {record.toeslagBalansvif > 0 && <BreakdownRow label="Balansverlof toeslag" bedrag={record.toeslagBalansvif} />}
-        {record.toeslagVakatieUren > 0 && <BreakdownRow label="Vakantie-uren toeslag" bedrag={record.toeslagVakatieUren} />}
-        <BreakdownRow label="ORT toeslagen" bedrag={record.ortTotaal} />
-        {record.extraUrenBedrag > 0 && <BreakdownRow label="Extra uren" bedrag={record.extraUrenBedrag} />}
-        <BreakdownRow label="Reiskosten" bedrag={record.reiskosten} />
-        {record.eenmaligTotaal > 0 && (
-          <BreakdownRow label={eenmalig.map((e) => e.label).join(" + ") || "Eenmalig"} bedrag={record.eenmaligTotaal} accent />
-        )}
-        <div className="border-t border-[var(--color-border)] pt-1.5 mt-1.5" />
-        <BreakdownRow label="Pensioen PFZW (12,95%)" bedrag={-record.pensioenpremie} negatief />
-        <BreakdownRow label={isWerkelijk ? "Loonheffing" : "≈ Loonheffing (schatting)"} bedrag={-record.loonheffingSchat} negatief />
-      </div>
+      {/* Full breakdown is collapsed by default — the card opens on netto/bruto
+          + the metric pills, content-first. */}
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-200">
+          <span>Opbouw{Object.keys(ort).length > 0 ? " & ORT-detail" : ""}</span>
+          <ChevronDown size={14} className="shrink-0 transition-transform group-open:rotate-180" />
+        </summary>
 
-      {Object.keys(ort).length > 0 && (
-        <div className="bg-[var(--color-surface)] rounded-lg p-3 border border-[var(--color-border)] space-y-1">
-          <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-2">ORT detail</p>
-          {Object.entries(ort).map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-4 text-[11px]">
-              <span className="text-slate-500">{k}</span>
-              <span className="text-right text-slate-400">
-                {ortHours[k] ? `${formatHours(ortHours[k])}u · ` : ""}{fmt(v)}
-              </span>
-            </div>
-          ))}
+        <div className="mt-2 space-y-1.5 text-xs">
+          <BreakdownRow label="Basisalaris (44,44%)" bedrag={record.basisLoon} />
+          <BreakdownRow label="Amt Zeerintensief (5%)" bedrag={record.amtZeerintensief} />
+          {record.toeslagBalansvif > 0 && <BreakdownRow label="Balansverlof toeslag" bedrag={record.toeslagBalansvif} />}
+          {record.toeslagVakatieUren > 0 && <BreakdownRow label="Vakantie-uren toeslag" bedrag={record.toeslagVakatieUren} />}
+          <BreakdownRow label="ORT toeslagen" bedrag={record.ortTotaal} />
+          {record.extraUrenBedrag > 0 && <BreakdownRow label="Extra uren" bedrag={record.extraUrenBedrag} />}
+          <BreakdownRow label="Reiskosten" bedrag={record.reiskosten} />
+          {record.eenmaligTotaal > 0 && (
+            <BreakdownRow label={eenmalig.map((e) => e.label).join(" + ") || "Eenmalig"} bedrag={record.eenmaligTotaal} accent />
+          )}
+          <div className="border-t border-[var(--color-border)] pt-1.5 mt-1.5" />
+          <BreakdownRow label="Pensioen PFZW (12,95%)" bedrag={-record.pensioenpremie} negatief />
+          <BreakdownRow label={isWerkelijk ? "Loonheffing" : "≈ Loonheffing (schatting)"} bedrag={-record.loonheffingSchat} negatief />
         </div>
-      )}
+
+        {Object.keys(ort).length > 0 && (
+          <div className="mt-2 bg-[var(--color-surface)] rounded-lg p-3 border border-[var(--color-border)] space-y-1">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">ORT detail</p>
+            {Object.entries(ort).map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-4 text-[11px]">
+                <span className="text-slate-400">{k}</span>
+                <span className="text-right text-slate-300">
+                  {ortHours[k] ? `${formatHours(ortHours[k])}u · ` : ""}{fmt(v)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </details>
     </div>
   );
 }
@@ -289,7 +299,8 @@ export function VergelijkingSectie({
       <p className="text-[10px] text-teal-400/70 uppercase tracking-wider font-bold mb-3">
         Berekend vs Werkelijk
       </p>
-      <div style={{ overflowX: "auto" }}>
+      {/* Desktop: dense table */}
+      <div className="hidden overflow-x-auto sm:block">
         <table style={{ width: "100%", fontSize: "0.75rem", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
@@ -310,6 +321,22 @@ export function VergelijkingSectie({
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Phone: stacked card rows — no horizontal scroll */}
+      <div className="space-y-2 sm:hidden">
+        {rows.map((r) => (
+          <div key={r.periode} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-slate-300">{MAANDEN[r.maand - 1]} {r.jaar}</span>
+              <DeltaBadge delta={r.deltaNetto} />
+            </div>
+            <div className="mt-1.5 flex items-center gap-4 text-[11px] tabular-nums">
+              <span className="text-slate-500">Berekend <span className="font-medium text-amber-300">{fmt(r.berekend.nettoPrognose)}</span></span>
+              <span className="text-slate-500">Werkelijk <span className="font-medium text-emerald-300">{fmt(r.werkelijk.netto)}</span></span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
