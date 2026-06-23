@@ -94,14 +94,21 @@ export function NoteCard({
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`glass group relative rounded-xl border border-[var(--color-border)] transition-all ${
+      role="button"
+      tabIndex={pendingAction ? -1 : 0}
+      aria-label={masked ? "Notitie openen" : `Notitie openen: ${displayTitle}`}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        if (!pendingAction) onEdit(note);
+      }}
+      className={`glass group relative rounded-xl border border-[var(--color-border)] outline-none transition-all focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
         pendingAction
           ? "cursor-progress opacity-80"
-          : `cursor-pointer hover:border-[var(--color-border-hover)] ${isCompleted ? "opacity-80" : ""}`
+          : "cursor-pointer hover:border-[var(--color-border-hover)]"
       }`}
       style={{
         background: note.kleur
@@ -136,16 +143,10 @@ export function NoteCard({
               title={`Prioriteit: ${prio.label}`}
             />
           )}
-          <h3 className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); if (!pendingAction) onEdit(note); }}
-              disabled={Boolean(pendingAction)}
-              className={`block w-full truncate text-left text-sm font-semibold text-slate-200 outline-none focus-visible:underline disabled:cursor-not-allowed ${isCompleted ? "text-slate-400 line-through decoration-emerald-400/50" : ""}`}
-              aria-label={masked ? "Notitie openen" : `Notitie openen: ${displayTitle}`}
-            >
-              {masked ? "••••••" : displayTitle}
-            </button>
+          {/* The whole card is the (keyboard-accessible) open target, so the
+              title is plain text — no second tab stop. */}
+          <h3 className={`min-w-0 flex-1 truncate text-sm font-semibold ${isCompleted ? "text-slate-400 line-through decoration-emerald-400/50" : "text-slate-200"}`}>
+            {masked ? "••••••" : displayTitle}
           </h3>
         </div>
 
@@ -179,7 +180,7 @@ export function NoteCard({
         )}
 
         {/* Content preview with checklist + wiki-link support */}
-        <div className={`mb-2 break-words text-xs leading-relaxed text-slate-500 ${compact ? "line-clamp-3" : "line-clamp-4"}`}>
+        <div className={`mb-2 break-words text-xs leading-relaxed text-slate-400 ${compact ? "line-clamp-3" : "line-clamp-4"}`}>
           {masked ? "•••• •••• ••••" : renderPreview(allLines, onUpdateContent ? toggleCheckbox : undefined, onNavigateToNote)}
         </div>
 
@@ -342,11 +343,15 @@ function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) 
     if (item) {
       const done = CHECKLIST_DONE.test(line);
       const label = item[1] || "";
-      const toggleHandlers = onToggle
+      // The single interactive element IS the ~28px hit area, carrying the
+      // checkbox role; the small visual box inside is decorative (aria-hidden) —
+      // no nested interactive roles.
+      const checkboxProps = onToggle
         ? {
+            role: "checkbox" as const,
+            "aria-checked": done,
+            "aria-label": label || "taak",
             tabIndex: 0,
-            role: "button" as const,
-            "aria-label": `${done ? "Afgevinkt" : "Open"}: ${label || "taak"}`,
             onClick: (e: ReactMouseEvent) => { e.stopPropagation(); onToggle(originalIdx); },
             onKeyDown: (e: ReactKeyboardEvent) => {
               if (e.key !== "Enter" && e.key !== " ") return;
@@ -355,21 +360,19 @@ function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) 
               onToggle(originalIdx);
             },
           }
-        : {};
+        : { role: "checkbox" as const, "aria-checked": done, "aria-label": label || "taak" };
       return (
         <div key={originalIdx} className="flex items-start gap-1.5">
-          {/* Larger (~28px) hit area around a small visual box for touch a11y */}
           <span
-            {...toggleHandlers}
-            className={`-m-1 flex shrink-0 items-center justify-center p-1 ${onToggle ? "cursor-pointer" : ""}`}
+            {...checkboxProps}
+            className={`group/cb -m-1 flex shrink-0 items-center justify-center rounded p-1 outline-none ${onToggle ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400/60" : ""}`}
           >
             <span
-              role="checkbox"
-              aria-checked={done}
+              aria-hidden
               className={`flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border ${
                 done
                   ? "border-emerald-500/50 bg-emerald-500/40"
-                  : `border-[var(--color-border)] ${onToggle ? "hover:border-amber-400/50" : ""}`
+                  : `border-[var(--color-border)] ${onToggle ? "group-hover/cb:border-amber-400/50" : ""}`
               }`}
             >
               {done && <Check size={8} className="text-emerald-300" />}

@@ -1,6 +1,7 @@
 "use client";
 
 import { ClerkProvider } from "@clerk/nextjs";
+import { MotionConfig } from "framer-motion";
 import { defaultShouldDehydrateQuery, QueryClient, QueryClientProvider, type QueryKey } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
@@ -71,7 +72,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <ToastProvider>
             <ConfirmProvider>
               <PwaRegistry />
-              <ErrorBoundary>{children}</ErrorBoundary>
+              <ErrorBoundary>
+              <MotionConfig reducedMotion="user">{children}</MotionConfig>
+            </ErrorBoundary>
             </ConfirmProvider>
           </ToastProvider>
         </PersistQueryClientProvider>
@@ -80,7 +83,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <ToastProvider>
             <ConfirmProvider>
               <PwaRegistry />
-              <ErrorBoundary>{children}</ErrorBoundary>
+              <ErrorBoundary>
+              <MotionConfig reducedMotion="user">{children}</MotionConfig>
+            </ErrorBoundary>
             </ConfirmProvider>
           </ToastProvider>
         </QueryClientProvider>

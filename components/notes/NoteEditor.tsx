@@ -1112,6 +1112,7 @@ export function NoteEditor({
               <input
                 type="text"
                 placeholder="Titel"
+                aria-label="Titel"
                 value={titel}
                 onChange={(event) => setTitel(event.target.value)}
                 className="min-h-[48px] w-full rounded-xl border border-transparent bg-transparent px-1 text-xl font-bold text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border)] focus:bg-black/10 focus:px-3 sm:text-2xl"
@@ -1212,6 +1213,7 @@ export function NoteEditor({
                   <textarea
                     ref={textRef}
                     placeholder="Schrijf je notitie..."
+                    aria-label="Notitie-inhoud"
                     value={inhoud}
                     onChange={(event) => handleContentChange(event.target.value)}
                     onKeyDown={(event) => {
@@ -1287,6 +1289,7 @@ export function NoteEditor({
                         <Clock size={15} className="text-[var(--color-text-subtle)]" />
                         <input
                           type="datetime-local"
+                          aria-label="Deadline"
                           value={formatDeadlineForInput(deadline)}
                           onChange={(event) => setDeadline(event.target.value ? localDateTimeToIso(event.target.value) : "")}
                           className="min-h-[44px] min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text)] outline-none [color-scheme:dark]"
@@ -1437,6 +1440,7 @@ export function NoteEditor({
                           <input
                             type="text"
                             placeholder="Nieuwe tag"
+                            aria-label="Nieuwe tag"
                             value={tagInput}
                             onChange={(event) => setTagInput(event.target.value)}
                             onKeyDown={(event) => {
@@ -1791,6 +1795,7 @@ function EventLinkPicker({
                 <Search size={14} className="shrink-0 text-[var(--color-text-subtle)]" />
                 <input
                   type="search"
+                  aria-label="Zoek een afspraak om te koppelen"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => {

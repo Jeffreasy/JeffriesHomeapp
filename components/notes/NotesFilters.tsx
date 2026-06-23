@@ -65,6 +65,9 @@ export function NotesFilters({
   const visibleScopeOptions = SCOPE_OPTIONS.filter(
     (option) => option.id === "all" || noteScope === option.id || (scopeCounts[option.id] ?? 0) > 0,
   );
+  // Only show tags that actually occur in the current view (plus the active one,
+  // so it stays unselectable) — no dead "0"-count chips.
+  const visibleTags = allTags.filter((tag) => (tagCounts.get(tag) ?? 0) > 0 || tagFilter === tag);
 
   return (
     <>
@@ -172,7 +175,7 @@ export function NotesFilters({
                 ))}
               </div>
 
-              {allTags.length > 0 && (
+              {visibleTags.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase text-slate-500">Tags</p>
                   <div className="grid grid-cols-2 gap-2">
@@ -189,7 +192,7 @@ export function NotesFilters({
                       <FolderOpen size={14} />
                       Alle
                     </button>
-                    {allTags.map((tag, index) => (
+                    {visibleTags.map((tag, index) => (
                       <button
                         key={tag}
                         type="button"
@@ -288,24 +291,12 @@ export function NotesFilters({
         </div>
       </div>
 
-      {allTags.length > 0 && (
+      {visibleTags.length > 0 && (
         <section className="col-span-full hidden glass p-3 sm:block sm:p-4">
           <SectionTitle
             icon={Tag}
             title="Tags"
             subtitle={tagFilter ? `Filter actief: ${privacyOn ? "verborgen tag" : tagFilter}` : "Klik een tag om te filteren"}
-            action={
-              tagFilter ? (
-                <button
-                type="button"
-                onClick={() => setTagFilter(null)}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
-                >
-                  <X size={14} />
-                  Wissen
-                </button>
-              ) : null
-            }
           />
           <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:flex sm:overflow-x-auto sm:pb-1 sm:scrollbar-none">
             <button
@@ -321,7 +312,7 @@ export function NotesFilters({
               <FolderOpen size={14} />
               Alle
             </button>
-            {allTags.map((tag, index) => (
+            {visibleTags.map((tag, index) => (
               <button
                 key={tag}
               type="button"

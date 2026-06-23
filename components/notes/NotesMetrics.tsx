@@ -1,5 +1,5 @@
 import { AlertTriangle, CalendarClock, Link2, ListChecks, Pin, ShieldCheck, StickyNote } from "lucide-react";
-import { formatDate } from "./NotesUtils";
+import { formatDate, type NoteScope } from "./NotesUtils";
 import { MetricTile, SectionTitle } from "./NotesPrimitives";
 import type { NoteRecord } from "@/hooks/useNotes";
 
@@ -48,6 +48,8 @@ export function NotesMetricsRow({
   deadlineNext,
   tagsCount,
   linkedCount,
+  onScope,
+  activeScope,
 }: {
   totalCount: number;
   activeCount: number;
@@ -61,7 +63,12 @@ export function NotesMetricsRow({
   deadlineNext: NoteRecord | null;
   tagsCount: number;
   linkedCount: number;
+  onScope?: (scope: NoteScope) => void;
+  activeScope?: NoteScope;
 }) {
+  // Each tile doubles as a scope shortcut into the board.
+  const scopeOf = (scope: NoteScope) =>
+    onScope ? { onClick: () => onScope(scope), active: activeScope === scope } : {};
   return (
     <section className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 xl:grid-cols-5">
       <MetricTile
@@ -70,6 +77,7 @@ export function NotesMetricsRow({
         value={`${totalCount}`}
         meta={`${activeCount} actief, ${completedCount} afgerond, ${archivedCount} archief`}
         tone="amber"
+        {...scopeOf("all")}
       />
       <MetricTile
         icon={AlertTriangle}
@@ -77,6 +85,7 @@ export function NotesMetricsRow({
         value={`${attentionCount}`}
         meta={attentionCount > 0 ? "Hoog, vandaag of verlopen" : "Geen urgente notities"}
         tone={attentionCount > 0 ? "rose" : "green"}
+        {...scopeOf("attention")}
       />
       <MetricTile
         icon={ListChecks}
@@ -84,6 +93,7 @@ export function NotesMetricsRow({
         value={`${checklistDone}/${checklistTotal}`}
         meta={checklistTotal > 0 ? "Open checklist-items in actieve notities" : "Geen checklist-items actief"}
         tone={checklistTotal > 0 && checklistDone === checklistTotal ? "green" : "sky"}
+        {...scopeOf("checklists")}
       />
       <MetricTile
         icon={CalendarClock}
@@ -91,6 +101,7 @@ export function NotesMetricsRow({
         value={`${deadlineSoon}`}
         meta={deadlineNext ? `Volgende: ${formatDate(deadlineNext.deadline ?? undefined)}` : "Geen aankomende deadlines"}
         tone={deadlineOverdue > 0 ? "rose" : deadlineSoon > 0 ? "amber" : "slate"}
+        {...scopeOf("deadlines")}
       />
       <MetricTile
         icon={Link2}
@@ -98,6 +109,7 @@ export function NotesMetricsRow({
         value={`${linkedCount}`}
         meta={tagsCount > 0 ? `${tagsCount} tags beschikbaar` : "Nog geen tags actief"}
         tone="indigo"
+        {...scopeOf("linked")}
       />
     </section>
   );

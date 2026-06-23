@@ -36,7 +36,7 @@ export function NotesHeader({
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/95 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         {/* Top row */}
         <div className="flex items-center justify-between gap-3 py-3">
@@ -55,6 +55,7 @@ export function NotesHeader({
               onClick={togglePrivacy}
               title={privacyOn ? "Notities tonen" : "Notities verbergen"}
               aria-label={privacyOn ? "Notities tonen" : "Notities verbergen"}
+              aria-pressed={privacyOn}
               className={cn(
                 "inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors cursor-pointer",
                 privacyOn
@@ -68,6 +69,8 @@ export function NotesHeader({
               type="button"
               whileTap={{ scale: 0.94 }}
               onClick={handleNew}
+              title="Nieuwe notitie (toets n)"
+              aria-keyshortcuts="n"
               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 cursor-pointer"
             >
               <AppIcon name="add" tone="amber" size="sm" />
@@ -77,10 +80,13 @@ export function NotesHeader({
         </div>
 
         {/* Tab bar */}
-        <div className="flex gap-1 -mb-px">
+        <div className="flex gap-1 -mb-px" role="tablist" aria-label="Notitie-weergave">
           {tabs.map(({ id, label, icon }) => (
             <button
               key={id}
+              role="tab"
+              aria-selected={activeTab === id}
+              aria-current={activeTab === id ? "page" : undefined}
               onClick={() => onTabChange(id)}
               className={cn(
                 "relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",

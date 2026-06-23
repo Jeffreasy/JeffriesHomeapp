@@ -9,29 +9,53 @@ export function MetricTile({
   value,
   meta,
   tone = "slate",
+  onClick,
+  active = false,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   meta: string;
   tone?: Tone;
+  onClick?: () => void;
+  active?: boolean;
 }) {
   const toneClass = toneClasses[tone];
 
-  return (
-    <div className={cn("glass min-w-0 p-3 sm:p-4", toneClass.border)}>
-      <div className="flex items-start gap-2.5 sm:gap-3">
-        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10", toneClass.surface)}>
-          <Icon size={16} className={toneClass.icon} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-          <p className={cn("mt-1 truncate text-xl font-bold leading-tight sm:mt-2 sm:text-2xl", toneClass.text)}>{value}</p>
-          <p className="mt-1 hidden text-xs leading-relaxed text-slate-500 sm:block">{meta}</p>
-        </div>
+  const inner = (
+    <div className="flex items-start gap-2.5 sm:gap-3">
+      <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10", toneClass.surface)}>
+        <Icon size={16} className={toneClass.icon} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+        <p className={cn("mt-1 truncate text-xl font-bold leading-tight sm:mt-2 sm:text-2xl", toneClass.text)}>{value}</p>
+        <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-slate-500 sm:line-clamp-none">{meta}</p>
       </div>
     </div>
   );
+
+  if (onClick) {
+    // Actionable tiles double as scope shortcuts, so they get real button
+    // affordance (hover + focus ring + pressed state) instead of looking
+    // clickable while being inert.
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={active}
+        className={cn(
+          "glass min-w-0 cursor-pointer p-3 text-left outline-none transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:ring-2 focus-visible:ring-amber-400/60 sm:p-4",
+          toneClass.border,
+          active && "ring-1 ring-amber-400/50",
+        )}
+      >
+        {inner}
+      </button>
+    );
+  }
+
+  return <div className={cn("glass min-w-0 p-3 sm:p-4", toneClass.border)}>{inner}</div>;
 }
 
 export function SectionTitle({
@@ -78,8 +102,9 @@ export function SegmentedButton({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        "inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
+        "inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-400/60",
         active
           ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
           : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200",

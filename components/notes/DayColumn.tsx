@@ -293,9 +293,7 @@ function JournalNoteButton({
       aria-label={`Notitie openen: ${previewTitle}`}
       onClick={openNote}
       onKeyDown={handleKeyDown}
-      className={`group/item w-full cursor-pointer rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5 ${
-        completed ? "opacity-80" : ""
-      }`}
+      className="group/item w-full cursor-pointer rounded-lg px-2.5 py-2 text-left outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-amber-400/60"
     >
       <div className="flex items-start gap-2">
         <AppIcon

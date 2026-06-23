@@ -12,6 +12,7 @@ import type { LucideIcon } from "lucide-react";
 export function NotesList({
   displayed,
   isLoading,
+  isError,
   viewMode,
   boardMode,
   sortMode,
@@ -33,6 +34,7 @@ export function NotesList({
 }: {
   displayed: NoteRecord[];
   isLoading: boolean;
+  isError?: boolean;
   viewMode: ViewMode;
   boardMode: BoardMode;
   sortMode: SortMode;
@@ -53,7 +55,7 @@ export function NotesList({
   backlinksById?: Map<string, NoteBacklink[]>;
 }) {
   const activeSort = SORT_OPTIONS.find((option) => option.id === sortMode) ?? SORT_OPTIONS[0];
-  const boardGroups = buildBoardGroups(displayed, viewMode);
+  const boardGroups = buildBoardGroups(displayed, viewMode, noteScope);
   const mobileBoardGroups = boardGroups.filter((group) => group.notes.length > 0);
 
   return (
@@ -65,7 +67,7 @@ export function NotesList({
           subtitle={
             isLoading
               ? "Laden..."
-              : `${displayed.length} zichtbaar - ${boardMode === "board" ? "board" : "grid"} - ${activeSort.label.toLowerCase()}`
+              : `${displayed.length} zichtbaar · ${boardMode === "board" ? "board · gegroepeerd" : `grid · ${activeSort.label.toLowerCase()}`}`
           }
           action={
             <button
@@ -80,9 +82,16 @@ export function NotesList({
         />
       </div>
 
-      {isLoading ? (
-        <div className="glass flex min-h-[260px] items-center justify-center p-4">
+      {isError ? (
+        <div role="alert" className="glass flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/[0.04] px-4 py-12 text-center">
+          <AlertTriangle size={34} className="text-rose-400/70" />
+          <p className="mt-4 font-semibold text-slate-200">Notities konden niet geladen worden</p>
+          <p className="mt-1 max-w-md text-sm text-slate-500">Controleer je verbinding — de lijst probeert automatisch opnieuw te laden.</p>
+        </div>
+      ) : isLoading ? (
+        <div role="status" aria-live="polite" className="glass flex min-h-[260px] items-center justify-center p-4">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
+          <span className="sr-only">Notities laden…</span>
         </div>
       ) : displayed.length === 0 ? (
         (() => {
@@ -171,7 +180,7 @@ export function NotesList({
             ))}
           </div>
 
-          <div className="hidden grid-cols-1 gap-3 md:grid md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+          <div className="hidden grid-cols-1 gap-3 md:grid md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {boardGroups.map((group) => (
               <section
                 key={group.id}
@@ -270,7 +279,24 @@ type BoardGroup = {
   notes: NoteRecord[];
 };
 
-function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode): BoardGroup[] {
+function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: NoteScope = "all"): BoardGroup[] {
+  // When a scope filter is active, re-bucketing by the exclusive priority chain
+  // would contradict the filter (a pinned-with-deadline note matching scope
+  // "Deadlines" still lands in "Vastgezet"). Show one coherent column instead so
+  // the board and the scope chip never disagree.
+  if (viewMode === "active" && noteScope !== "all") {
+    const option = SCOPE_OPTIONS.find((scope) => scope.id === noteScope);
+    return [{
+      id: noteScope,
+      title: option?.label ?? "Resultaten",
+      subtitle: "Gefilterd op scope",
+      icon: option?.icon ?? Inbox,
+      iconClass: "text-amber-300",
+      surface: "bg-amber-500/10",
+      notes,
+    }];
+  }
+
   if (viewMode === "archived") {
     return [{
       id: "archive",

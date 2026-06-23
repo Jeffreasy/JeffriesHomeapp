@@ -42,6 +42,7 @@ export default function NotitiesPage() {
     pinned,
     allTags,
     isLoading,
+    isError,
     count,
     create,
     update,
@@ -87,7 +88,7 @@ export default function NotitiesPage() {
       const target = event.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
-      if (event.key === "n" || event.key === "N") {
+      if ((event.key === "n" || event.key === "N") && activeTab === "collection") {
         event.preventDefault();
         setEditNote(null);
         setEditorOpen(true);
@@ -106,7 +107,16 @@ export default function NotitiesPage() {
   }, [activeTab]);
 
   // ── Collection: filtered & sorted notes ────────────────────
-  const sourceNotes = viewMode === "active" ? active : viewMode === "completed" ? completed : archived;
+  // A non-empty search retrieves across ALL buckets (active+completed+archived)
+  // so a note that's since been completed/archived stays findable; clearing the
+  // search returns to the scoped view. (Privacy mode disables search entirely.)
+  const sourceNotes = useMemo(
+    () =>
+      !privacyOn && search.trim()
+        ? [...active, ...completed, ...archived]
+        : viewMode === "active" ? active : viewMode === "completed" ? completed : archived,
+    [privacyOn, search, viewMode, active, completed, archived],
+  );
   const scopeCounts = useMemo(() => getScopeCounts(sourceNotes), [sourceNotes]);
 
   const tagCounts = useMemo(() => {
@@ -378,6 +388,8 @@ export default function NotitiesPage() {
               deadlineNext={boardStats.deadlineNext}
               tagsCount={allTags.length}
               linkedCount={boardStats.linkedCount}
+              onScope={(scope) => { setViewMode("active"); setNoteScope(scope); }}
+              activeScope={viewMode === "active" ? noteScope : undefined}
             />
 
             <NotesFilters
@@ -408,6 +420,7 @@ export default function NotitiesPage() {
             <NotesList
               displayed={displayed}
               isLoading={isLoading}
+              isError={isError}
               viewMode={viewMode}
               boardMode={boardMode}
               sortMode={sortMode}

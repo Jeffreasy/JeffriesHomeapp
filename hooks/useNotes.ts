@@ -243,7 +243,7 @@ export function useNotes() {
   const queryKey = getGetNotesQueryKey({ userId });
   const tagsQueryKey = getGetNotesTagsQueryKey({ userId });
 
-  const { data: notesRaw, isLoading: loadingNotes } = useGetNotes({ userId }, { query: { enabled: !!userId } });
+  const { data: notesRaw, isLoading: loadingNotes, isError: notesError } = useGetNotes({ userId }, { query: { enabled: !!userId } });
   const { data: tagsRaw, isLoading: loadingTags } = useGetNotesTags({ userId }, { query: { enabled: !!userId } });
 
   const raw = useMemo<NoteRecord[]>(() => {
@@ -395,6 +395,7 @@ export function useNotes() {
     pinned,
     allTags,
     isLoading: loadingNotes || loadingTags,
+    isError: notesError,
     count: active.length,
 
     create: async (data: NoteCreateData) => {
