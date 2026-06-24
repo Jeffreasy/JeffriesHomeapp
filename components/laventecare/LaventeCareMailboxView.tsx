@@ -113,6 +113,7 @@ export function LaventeCareMailboxView({
   const [attachmentsReading, setAttachmentsReading] = useState(false);
   const [mailModal, setMailModal] = useState<MailModalState | null>(null);
   const [threadConv, setThreadConv] = useState<MailConversation | null>(null);
+  const [showAllConversations, setShowAllConversations] = useState(false);
   const [variables, setVariables] = useState(
     [
       "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
@@ -171,6 +172,14 @@ export function LaventeCareMailboxView({
   const draftOutbox = useMemo(() => outbox.filter((item) => item.status !== "sent"), [outbox]);
   const unreadCount = useMemo(() => inbox.filter((item) => !item.is_read).length, [inbox]);
   const failedCount = useMemo(() => outbox.filter((item) => item.status === "failed").length, [outbox]);
+
+  const insertVariable = (key: string) => {
+    setVariables((current) => {
+      const lines = current.split("\n");
+      if (lines.some((line) => line.split("=")[0]?.trim() === key)) return current;
+      return current.trim() ? `${current.replace(/\n+$/, "")}\n${key}=` : `${key}=`;
+    });
+  };
   const sendReadiness = useMemo(
     () =>
       buildSendReadiness({
@@ -554,14 +563,19 @@ export function LaventeCareMailboxView({
             </div>
           </div>
 
-          <Field label="Variabelen" className="mt-3">
+          <Field label="Variabelen overschrijven (optioneel)" className="mt-3">
             <textarea
               value={variables}
               onChange={(event) => setVariables(event.target.value)}
               rows={6}
+              placeholder="bijv. next_step=Ik bel je donderdag"
               className={`${inputClass} min-h-36 resize-y leading-6`}
             />
           </Field>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">
+            Eén per regel als <span className="font-mono text-slate-400">sleutel=waarde</span>. De meeste velden vullen automatisch uit klant, opdracht en AI —
+            vul hier alleen wat je wilt overschrijven. Klik een veld bij &ldquo;Template context&rdquo; hieronder om het toe te voegen.
+          </p>
 
           <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/[0.06] p-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -641,9 +655,15 @@ export function LaventeCareMailboxView({
               {selectedCompany ? <p className="mt-2 text-xs text-slate-500">Klantcontext: {selectedCompany.naam}</p> : null}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {variableHints.slice(0, 18).map((hint) => (
-                  <span key={hint} className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold text-sky-100">
+                  <button
+                    key={hint}
+                    type="button"
+                    onClick={() => insertVariable(hint)}
+                    title="Klik om te overschrijven in het variabelenveld"
+                    className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold text-sky-100 transition hover:border-sky-400/40 hover:bg-sky-500/20"
+                  >
                     {hint}
-                  </span>
+                  </button>
                 ))}
                 {variableHints.length > 18 ? (
                   <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-slate-400">
@@ -721,6 +741,7 @@ export function LaventeCareMailboxView({
             <div className="flex items-center justify-between gap-2">
               <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-500">
                 <MessagesSquare size={13} /> Gesprekken
+                {conversations.length > 0 ? <span className="text-slate-600">({conversations.length})</span> : null}
               </p>
               <button
                 type="button"
@@ -738,11 +759,20 @@ export function LaventeCareMailboxView({
               ) : conversations.length === 0 ? (
                 <p className="text-sm leading-6 text-slate-500">Nog geen verzonden of ontvangen mail. Sync haalt je LaventeCare-inbox op.</p>
               ) : (
-                conversations.slice(0, 10).map((conversation) => (
+                (showAllConversations ? conversations : conversations.slice(0, 10)).map((conversation) => (
                   <ConversationRow key={conversation.key} conversation={conversation} onOpen={openThread} />
                 ))
               )}
             </div>
+            {conversations.length > 10 ? (
+              <button
+                type="button"
+                onClick={() => setShowAllConversations((value) => !value)}
+                className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+              >
+                {showAllConversations ? "Toon minder" : `Toon alle ${conversations.length} gesprekken`}
+              </button>
+            ) : null}
           </section>
 
           {draftOutbox.length > 0 ? (
