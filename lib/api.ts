@@ -1040,6 +1040,7 @@ export interface LCMailOutboxItem {
   status: string;
   provider: string;
   provider_message_id: string | null;
+  conversation_id: string | null;
   error_message: string | null;
   sent_at: string | null;
   created_at: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ExternalLink, Eye, FileText, Loader2, MailCheck, MailPlus, Paperclip, Pencil, Reply, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ExternalLink, Eye, FileText, Loader2, MailCheck, MailPlus, MessagesSquare, Paperclip, Pencil, Reply, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
 import type { LCMailAISuggestion } from "@/lib/api";
 import { extractLaventeCareMailAttachmentContext, type LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
 import type {
@@ -112,6 +112,7 @@ export function LaventeCareMailboxView({
   const [attachmentError, setAttachmentError] = useState("");
   const [attachmentsReading, setAttachmentsReading] = useState(false);
   const [mailModal, setMailModal] = useState<MailModalState | null>(null);
+  const [threadConv, setThreadConv] = useState<MailConversation | null>(null);
   const [variables, setVariables] = useState(
     [
       "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
@@ -166,6 +167,10 @@ export function LaventeCareMailboxView({
   const previewHTML = useMemo(() => renderMailPreview(selectedTemplate?.body_html ?? "", previewVariables), [selectedTemplate, previewVariables]);
   const previewSubject = useMemo(() => renderMailSubjectPreview(selectedTemplate?.subject_template ?? "", previewVariables), [selectedTemplate, previewVariables]);
   const recipientEcho = resolvedEmail ? (resolvedName ? `${resolvedName} <${resolvedEmail}>` : resolvedEmail) : "—";
+  const conversations = useMemo(() => buildConversations(outbox, inbox), [outbox, inbox]);
+  const draftOutbox = useMemo(() => outbox.filter((item) => item.status !== "sent"), [outbox]);
+  const unreadCount = useMemo(() => inbox.filter((item) => !item.is_read).length, [inbox]);
+  const failedCount = useMemo(() => outbox.filter((item) => item.status === "failed").length, [outbox]);
   const sendReadiness = useMemo(
     () =>
       buildSendReadiness({
@@ -315,6 +320,31 @@ export function LaventeCareMailboxView({
     });
   };
 
+  const openThread = (conversation: MailConversation) => setThreadConv(conversation);
+
+  const openThreadEntry = (entry: ThreadEntry) => {
+    if (entry.kind === "in") openInbox(entry.inbox);
+    else openOutbox(entry.outbox);
+  };
+
+  const replyToConversation = (conversation: MailConversation) => {
+    const reversed = [...conversation.entries].reverse();
+    const lastIn = reversed.find((entry) => entry.kind === "in");
+    const lastOut = reversed.find((entry) => entry.kind === "out");
+    if (lastIn && lastIn.kind === "in") {
+      setToEmail(lastIn.inbox.from_email ?? "");
+      setToName(lastIn.inbox.from_name ?? "");
+      if (lastIn.inbox.company_id) setCompanyId(lastIn.inbox.company_id);
+    } else if (lastOut && lastOut.kind === "out") {
+      setToEmail(lastOut.outbox.to_email ?? "");
+      setToName(lastOut.outbox.to_name ?? "");
+      if (lastOut.outbox.company_id) setCompanyId(lastOut.outbox.company_id);
+    }
+    setThreadConv(null);
+    setMailModal(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleAttachmentFiles = async (event: ChangeEvent<HTMLInputElement>) => {
     setAttachmentError("");
     const files = Array.from(event.target.files ?? []);
@@ -342,9 +372,9 @@ export function LaventeCareMailboxView({
   return (
     <div className="min-w-0 space-y-4">
       <section className="grid min-w-0 gap-3 lg:grid-cols-4">
-        <MailboxMetric label="Templates" value={mailbox?.summary.activeTemplates ?? activeTemplates.length} detail="actief" />
-        <MailboxMetric label="Outbox" value={mailbox?.summary.outbox ?? outbox.length} detail={`${mailbox?.summary.sent ?? 0} verzonden`} />
-        <MailboxMetric label="Concepten" value={mailbox?.summary.drafts ?? 0} detail="klaar voor controle" />
+        <MailboxMetric label="Gesprekken" value={conversations.length} detail={unreadCount ? `${unreadCount} ongelezen` : "geen ongelezen"} tone={unreadCount ? "warn" : "default"} />
+        <MailboxMetric label="Verzonden" value={mailbox?.summary.sent ?? 0} detail={failedCount ? `${failedCount} mislukt` : "bezorgd"} tone={failedCount ? "warn" : "default"} />
+        <MailboxMetric label="Concepten" value={mailbox?.summary.drafts ?? draftOutbox.length} detail="wachten op verzending" />
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
           <div className="flex items-start gap-3">
             {mailbox?.summary.configured ? (
@@ -689,7 +719,9 @@ export function LaventeCareMailboxView({
         <aside className="min-w-0 space-y-4">
           <section className="glass min-w-0 p-4">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase text-slate-500">Inkomende mail</p>
+              <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-500">
+                <MessagesSquare size={13} /> Gesprekken
+              </p>
               <button
                 type="button"
                 onClick={() => { void onSyncInbox(); }}
@@ -697,30 +729,32 @@ export function LaventeCareMailboxView({
                 className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 text-[11px] font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {syncingInbox ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                Sync
+                Sync inbox
               </button>
             </div>
             <div className="mt-3 space-y-2">
-              {inbox.length === 0 ? (
-                <p className="text-sm leading-6 text-slate-500">Nog geen inkomende mail. Klik op Sync om je LaventeCare-inbox op te halen.</p>
+              {mailboxLoading ? (
+                <p className="text-sm text-slate-500">Mailbox laden...</p>
+              ) : conversations.length === 0 ? (
+                <p className="text-sm leading-6 text-slate-500">Nog geen verzonden of ontvangen mail. Sync haalt je LaventeCare-inbox op.</p>
               ) : (
-                inbox.slice(0, 8).map((item) => <InboxRow key={item.id} item={item} onOpen={openInbox} />)
+                conversations.slice(0, 10).map((conversation) => (
+                  <ConversationRow key={conversation.key} conversation={conversation} onOpen={openThread} />
+                ))
               )}
             </div>
           </section>
 
-          <section className="glass min-w-0 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-500">Outbox</p>
-            <div className="mt-3 space-y-2">
-              {mailboxLoading ? (
-                <p className="text-sm text-slate-500">Mailbox laden...</p>
-              ) : outbox.length === 0 ? (
-                <p className="text-sm leading-6 text-slate-500">Nog geen concepten of verzonden LaventeCare-mails.</p>
-              ) : (
-                outbox.slice(0, 8).map((item) => <OutboxRow key={item.id} item={item} onOpen={openOutbox} />)
-              )}
-            </div>
-          </section>
+          {draftOutbox.length > 0 ? (
+            <section className="glass min-w-0 p-4">
+              <p className="text-xs font-semibold uppercase text-slate-500">Concepten &amp; mislukt</p>
+              <div className="mt-3 space-y-2">
+                {draftOutbox.slice(0, 6).map((item) => (
+                  <OutboxRow key={item.id} item={item} onOpen={openOutbox} />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section className="glass min-w-0 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Templatebibliotheek</p>
@@ -746,6 +780,12 @@ export function LaventeCareMailboxView({
         </aside>
       </section>
 
+      <MailThreadModal
+        conversation={threadConv}
+        onClose={() => setThreadConv(null)}
+        onOpenEntry={openThreadEntry}
+        onReply={replyToConversation}
+      />
       <MailPreviewModal state={mailModal} onClose={() => setMailModal(null)} />
     </div>
   );
@@ -760,12 +800,12 @@ function Field({ label, children, className = "" }: { label: string; children: R
   );
 }
 
-function MailboxMetric({ label, value, detail }: { label: string; value: number | string; detail: string }) {
+function MailboxMetric({ label, value, detail, tone = "default" }: { label: string; value: number | string; detail: string; tone?: "default" | "warn" }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
       <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
       <p className="mt-2 text-2xl font-bold text-white">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{detail}</p>
+      <p className={`mt-1 text-xs ${tone === "warn" ? "font-semibold text-amber-300" : "text-slate-500"}`}>{detail}</p>
     </div>
   );
 }
@@ -813,6 +853,66 @@ function InvoiceMailStatus({ invoice, template }: { invoice?: InvoiceItem; templ
       </div>
     </div>
   );
+}
+
+type ThreadEntry =
+  | { kind: "out"; at: string; outbox: MailOutboxItem }
+  | { kind: "in"; at: string; inbox: MailInboxItem };
+
+type MailConversation = {
+  key: string;
+  party: string;
+  subject: string;
+  latestAt: string;
+  count: number;
+  hasUnread: boolean;
+  latestKind: "out" | "in";
+  entries: ThreadEntry[];
+};
+
+// Groups SENT outbox mails + received inbox mails into conversations by conversation_id
+// (a message with none becomes its own single-message thread), newest activity first.
+// Drafts/failed outbox rows have no conversation yet and are handled separately.
+function buildConversations(outbox: MailOutboxItem[], inbox: MailInboxItem[]): MailConversation[] {
+  const groups = new Map<string, ThreadEntry[]>();
+  const add = (key: string, entry: ThreadEntry) => {
+    const arr = groups.get(key);
+    if (arr) arr.push(entry);
+    else groups.set(key, [entry]);
+  };
+  for (const o of outbox) {
+    if (o.status !== "sent") continue;
+    add(o.conversation_id || `out:${o.id}`, { kind: "out", at: o.sent_at ?? o.created_at, outbox: o });
+  }
+  for (const i of inbox) {
+    add(i.conversation_id || `in:${i.id}`, { kind: "in", at: i.received_at, inbox: i });
+  }
+  const conversations: MailConversation[] = [];
+  for (const [key, entries] of groups) {
+    entries.sort((a, b) => a.at.localeCompare(b.at));
+    const latest = entries[entries.length - 1];
+    const companyName = entries
+      .map((e) => (e.kind === "in" ? e.inbox.company_name : e.outbox.company_name))
+      .find(Boolean);
+    const party =
+      companyName ||
+      (latest.kind === "in"
+        ? latest.inbox.from_name || latest.inbox.from_email
+        : latest.outbox.to_name || latest.outbox.to_email);
+    const subject = latest.kind === "in" ? latest.inbox.subject || "(geen onderwerp)" : latest.outbox.subject;
+    conversations.push({
+      key,
+      party,
+      subject,
+      latestAt: latest.at,
+      count: entries.length,
+      hasUnread: entries.some((e) => e.kind === "in" && !e.inbox.is_read),
+      latestKind: latest.kind,
+      entries,
+    });
+  }
+  conversations.sort((a, b) => b.latestAt.localeCompare(a.latestAt));
+  return conversations;
 }
 
 type MailModalAction = {
@@ -930,6 +1030,157 @@ function MailPreviewModal({ state, onClose }: { state: MailModalState | null; on
   );
 }
 
+function ConversationRow({ conversation, onOpen }: { conversation: MailConversation; onOpen: (c: MailConversation) => void }) {
+  const c = conversation;
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(c)}
+      className={`w-full rounded-lg border px-3 py-2 text-left transition hover:bg-white/[0.06] ${c.hasUnread ? "border-sky-500/25 bg-sky-500/[0.05]" : "border-white/10 bg-white/[0.03]"}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-sm font-semibold text-white">{c.party}</p>
+        <span className="shrink-0 text-[10px] text-slate-500">{formatDate(c.latestAt)}</span>
+      </div>
+      <div className="mt-0.5 flex items-center gap-1.5">
+        {c.latestKind === "in" ? (
+          <ArrowDownLeft size={12} className="shrink-0 text-emerald-300" />
+        ) : (
+          <ArrowUpRight size={12} className="shrink-0 text-sky-300" />
+        )}
+        <p className="min-w-0 truncate text-xs font-medium text-slate-300">{c.subject}</p>
+      </div>
+      {c.count > 1 || c.hasUnread ? (
+        <div className="mt-1.5 flex items-center gap-2">
+          {c.count > 1 ? (
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">{c.count} berichten</span>
+          ) : null}
+          {c.hasUnread ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" /> ongelezen
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </button>
+  );
+}
+
+function ThreadEntryCard({ entry, onOpen }: { entry: ThreadEntry; onOpen: () => void }) {
+  if (entry.kind === "in") {
+    const m = entry.inbox;
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full rounded-lg border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2 text-left transition hover:bg-emerald-500/[0.09]"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+            <ArrowDownLeft size={11} /> Ontvangen
+          </span>
+          <span className="text-[10px] text-slate-500">{formatDate(m.received_at)}</span>
+        </div>
+        <p className="mt-1 truncate text-xs font-semibold text-white">{m.from_name || m.from_email}</p>
+        <p className="truncate text-xs text-slate-400">{m.subject || "(geen onderwerp)"}</p>
+        {m.body_preview ? <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{m.body_preview}</p> : null}
+      </button>
+    );
+  }
+  const m = entry.outbox;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full rounded-lg border border-sky-500/20 bg-sky-500/[0.05] px-3 py-2 text-left transition hover:bg-sky-500/[0.09]"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-sky-300">
+          <ArrowUpRight size={11} /> Verzonden{m.status === "failed" ? " · mislukt" : ""}
+        </span>
+        <span className="text-[10px] text-slate-500">{formatDate(m.sent_at ?? m.created_at)}</span>
+      </div>
+      <p className="mt-1 truncate text-xs font-semibold text-white">Aan {m.to_name || m.to_email}</p>
+      <p className="truncate text-xs text-slate-400">{m.subject}</p>
+    </button>
+  );
+}
+
+function MailThreadModal({
+  conversation,
+  onClose,
+  onOpenEntry,
+  onReply,
+}: {
+  conversation: MailConversation | null;
+  onClose: () => void;
+  onOpenEntry: (entry: ThreadEntry) => void;
+  onReply: (conversation: MailConversation) => void;
+}) {
+  useEffect(() => {
+    if (!conversation) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [conversation, onClose]);
+
+  if (!conversation) return null;
+  const ordered = [...conversation.entries].reverse();
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="glass flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">{conversation.party}</p>
+            <p className="mt-0.5 truncate text-xs text-slate-400">
+              {conversation.count} bericht{conversation.count === 1 ? "" : "en"} · {conversation.subject}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Sluiten"
+            className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-slate-300 transition hover:bg-white/[0.08]"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-2 overflow-auto p-4 sm:p-5">
+          {ordered.map((entry, idx) => (
+            <ThreadEntryCard key={`${entry.kind}-${idx}`} entry={entry} onOpen={() => onOpenEntry(entry)} />
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3 sm:px-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.08]"
+          >
+            Sluiten
+          </button>
+          <button
+            type="button"
+            onClick={() => onReply(conversation)}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/15 px-4 text-sm font-bold text-sky-100 transition hover:bg-sky-500/25"
+          >
+            <Reply size={15} /> Beantwoorden
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OutboxRow({ item, onOpen }: { item: MailOutboxItem; onOpen: (item: MailOutboxItem) => void }) {
   const statusClass =
     item.status === "sent"
@@ -951,31 +1202,6 @@ function OutboxRow({ item, onOpen }: { item: MailOutboxItem; onOpen: (item: Mail
       </div>
       <p className="mt-1 truncate text-xs text-slate-500">Aan {item.to_email} · {formatDate(item.sent_at ?? item.created_at)}</p>
       {item.error_message ? <p className="mt-1 line-clamp-2 text-xs text-rose-300">{item.error_message}</p> : null}
-    </button>
-  );
-}
-
-function InboxRow({ item, onOpen }: { item: MailInboxItem; onOpen: (item: MailInboxItem) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(item)}
-      className={`w-full rounded-lg border px-3 py-2 text-left transition hover:bg-white/[0.06] ${item.is_read ? "border-white/10 bg-white/[0.03]" : "border-sky-500/25 bg-sky-500/[0.05]"}`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold text-white">{item.from_name || item.from_email}</p>
-        <span className="shrink-0 text-[10px] text-slate-500">{formatDate(item.received_at)}</span>
-      </div>
-      <p className="mt-0.5 truncate text-xs font-medium text-slate-300">{item.subject || "(geen onderwerp)"}</p>
-      {item.body_preview ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.body_preview}</p> : null}
-      {item.company_name || item.has_attachments ? (
-        <div className="mt-1.5 flex items-center gap-2">
-          {item.company_name ? (
-            <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-200">{item.company_name}</span>
-          ) : null}
-          {item.has_attachments ? <Paperclip size={11} className="text-slate-500" /> : null}
-        </div>
-      ) : null}
     </button>
   );
 }
