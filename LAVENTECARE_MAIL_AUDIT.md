@@ -15,9 +15,12 @@ _Read-only multi-agent audit (5 lenzen), adversarieel geverifieerd. 46 confirmed
 - ✅ **Thread-grouping-UI** (`8082cd5`): unified **"Gesprekken"**-paneel — verzonden + ontvangen gegroepeerd op `conversationId`, met `MailThreadModal` (alle berichten in volgorde) + "Beantwoorden". Concepten/mislukt apart. De twee-aparte-lijsten zijn weg.
 - ✅ **Metrics-polish** (`8082cd5`): Gesprekken (+ongelezen), Verzonden (+mislukt, amber), Concepten — geen hardcoded "klaar voor controle" meer.
 
-**Bewust nog open** (lagere prioriteit):
-- ⏳ Eén-klik-resend van een mislukte send (nu opgelost via veilige "Bewerken in opsteller"-prefill).
-- ⏳ Lage-prio polish: variabelen-editor als formulier i.p.v. key=value-textarea, paginatie voorbij 8-10 items, template-beheer-UI.
+- ✅ **Variabelen discoverbaar** (`ba2c528`): editor herkaderd als "overschrijven (optioneel)" + klikbare placeholder-chips die `sleutel=` invoegen.
+- ✅ **Paginatie** (`ba2c528`): gesprekken-teller in de header + "Toon alle N gesprekken"-toggle.
+
+**Bewust niet gebouwd** (afweging):
+- ⏳ Eén-klik-resend van een mislukte send — opgelost via de veiligere "Bewerken in opsteller"-prefill (geen stille her-render-divergentie).
+- ⏳ **Template-beheer-UI** — de endpoints bestaan, maar een web-editor voor de branded `body_html` is geavanceerd en risicovol (een malformede template breekt de klant-mail of de escaping-aannames); voor een solo-gebruiker zijn templates een stabiel seed/DB-asset. Bewust niet blootgesteld. Een veilige subset (alleen status/naam, geen HTML) kan alsnog op verzoek.
 - ⚠️ Vereist jouw Azure-actie: **Mail.Read (application)** grant — gate voor inbound-sync én voor het zichtbaar worden van klant-replies in de thread.
 
 ## Verdict
