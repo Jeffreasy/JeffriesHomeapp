@@ -12,11 +12,12 @@ _Read-only multi-agent audit (5 lenzen), adversarieel geverifieerd. 46 confirmed
 - ✅ **Herbruikbare preview-modal** (full-fidelity, gesandboxed) — 4× ingezet; "Vergroten" op de inline-preview. Modal `z-[80]` (boven de mobiele nav).
 - ✅ **Actiegerichte rijen:** outbox/inbox klikbaar → modal; concept/mislukt → "Bewerken in opsteller"; inbox → "Beantwoorden" + mark-as-read bij openen (`PATCH /mailbox/inbox/{id}/read`).
 - ✅ **Threading-data:** echte Graph message-id + `conversationId` (create-draft + send i.p.v. sendMail); `lc_mail_outbox.conversation_id` opgeslagen, gedeeld met de inbox. Misleidende comment gecorrigeerd.
+- ✅ **Thread-grouping-UI** (`8082cd5`): unified **"Gesprekken"**-paneel — verzonden + ontvangen gegroepeerd op `conversationId`, met `MailThreadModal` (alle berichten in volgorde) + "Beantwoorden". Concepten/mislukt apart. De twee-aparte-lijsten zijn weg.
+- ✅ **Metrics-polish** (`8082cd5`): Gesprekken (+ongelezen), Verzonden (+mislukt, amber), Concepten — geen hardcoded "klaar voor controle" meer.
 
-**Bewust nog open** (lagere prioriteit / grotere herontwerpen):
-- ⏳ **Thread-grouping-UI** — de data threadt nu op `conversationId`, maar de weergave toont nog twee aparte lijsten (outbox / inbox). Het samenvoegen tot één conversatie-weergave is het resterende "larger" item.
+**Bewust nog open** (lagere prioriteit):
 - ⏳ Eén-klik-resend van een mislukte send (nu opgelost via veilige "Bewerken in opsteller"-prefill).
-- ⏳ Lage-prio polish: variabelen-editor als formulier i.p.v. key=value-textarea, StatChip-unificatie in de metrics-rij, paginatie voorbij 8 items, template-beheer-UI.
+- ⏳ Lage-prio polish: variabelen-editor als formulier i.p.v. key=value-textarea, paginatie voorbij 8-10 items, template-beheer-UI.
 - ⚠️ Vereist jouw Azure-actie: **Mail.Read (application)** grant — gate voor inbound-sync én voor het zichtbaar worden van klant-replies in de thread.
 
 ## Verdict
