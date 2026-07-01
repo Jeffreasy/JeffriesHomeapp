@@ -1141,11 +1141,37 @@ export default function LaventeCarePage() {
   };
 
   const handleCreateActivityEvent = async (
-    payload: Parameters<typeof createActivityEventMut.mutateAsync>[0],
+    payload: Parameters<typeof createActivityEventMut.mutateAsync>[0] & {
+      follow_up?: {
+        title: string;
+        due_date?: string;
+        due_time?: string;
+        priority: string;
+      };
+    },
   ) => {
+    const { follow_up: followUp, ...activityPayload } = payload;
     try {
-      await createActivityEventMut.mutateAsync(payload);
-      success("Klantmoment vastgelegd");
+      let actionItemId: string | undefined;
+      if (followUp && followUp.title.trim()) {
+        const action = await createActionMut.mutateAsync({
+          source: "handmatig",
+          title: followUp.title.trim(),
+          action_type: "opvolgen",
+          priority: followUp.priority || "normaal",
+          due_date: followUp.due_date || undefined,
+          due_time: followUp.due_time || undefined,
+          linked_company_id: activityPayload.company_id,
+          linked_project_id: activityPayload.project_id,
+          linked_workstream_id: activityPayload.workstream_id,
+        });
+        actionItemId = action.id;
+      }
+      await createActivityEventMut.mutateAsync({
+        ...activityPayload,
+        action_item_id: actionItemId ?? activityPayload.action_item_id,
+      });
+      success(followUp ? "Klantmoment + vervolgactie vastgelegd" : "Klantmoment vastgelegd");
     } catch {
       toastError("Klantmoment vastleggen is mislukt");
       throw new Error("Klantmoment vastleggen is mislukt");

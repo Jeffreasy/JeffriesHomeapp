@@ -59,6 +59,11 @@ type ActivityFormState = {
   contactId: string;
   projectId: string;
   workstreamId: string;
+  createFollowUp: boolean;
+  followUpTitle: string;
+  followUpDueDate: string;
+  followUpDueTime: string;
+  followUpPriority: string;
 };
 
 const emptyActivityForm: ActivityFormState = {
@@ -70,6 +75,20 @@ const emptyActivityForm: ActivityFormState = {
   contactId: "",
   projectId: "",
   workstreamId: "",
+  createFollowUp: false,
+  followUpTitle: "",
+  followUpDueDate: "",
+  followUpDueTime: "",
+  followUpPriority: "normaal",
+};
+
+export type ActivityEventSubmitPayload = LCActivityEventCreate & {
+  follow_up?: {
+    title: string;
+    due_date?: string;
+    due_time?: string;
+    priority: string;
+  };
 };
 
 export function LaventeCareCustomerDossier({
@@ -108,7 +127,7 @@ export function LaventeCareCustomerDossier({
   onEditCompany: (company: CompanyItem) => void;
   onAddContact: (company: CompanyItem) => void;
   onStartWorkstream: (company: CompanyItem) => void;
-  onCreateActivity: (payload: LCActivityEventCreate) => Promise<void>;
+  onCreateActivity: (payload: ActivityEventSubmitPayload) => Promise<void>;
   onCreateAccessCredential: (payload: {
     company_id: string;
     contact_id?: string;
@@ -207,6 +226,7 @@ export function LaventeCareCustomerDossier({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.title.trim()) return;
+    if (form.createFollowUp && !form.followUpTitle.trim()) return;
 
     await onCreateActivity({
       company_id: companyId,
@@ -218,6 +238,14 @@ export function LaventeCareCustomerDossier({
       title: form.title.trim(),
       body: form.body.trim() || undefined,
       occurred_at: form.occurredAt ? new Date(form.occurredAt).toISOString() : undefined,
+      follow_up: form.createFollowUp
+        ? {
+            title: form.followUpTitle.trim(),
+            due_date: form.followUpDueDate || undefined,
+            due_time: form.followUpDueTime || undefined,
+            priority: form.followUpPriority,
+          }
+        : undefined,
     });
     setForm(emptyActivityForm);
   };
@@ -611,11 +639,74 @@ function ActivityForm({
             ))}
           </select>
         </label>
+
+        <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+          <input
+            type="checkbox"
+            checked={form.createFollowUp}
+            onChange={(event) => {
+              const checked = event.target.checked;
+              setForm((current) => ({
+                ...current,
+                createFollowUp: checked,
+                followUpTitle: checked && !current.followUpTitle && current.title ? `Opvolgen: ${current.title}` : current.followUpTitle,
+              }));
+            }}
+            className="h-4 w-4 rounded border-white/20 bg-transparent accent-amber-500"
+          />
+          <span className="text-xs font-semibold text-slate-300">Vervolgactie aanmaken vanuit dit moment</span>
+        </label>
+
+        {form.createFollowUp ? (
+          <div className="space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-3">
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Actie-titel</span>
+              <input
+                value={form.followUpTitle}
+                onChange={(event) => setForm((current) => ({ ...current, followUpTitle: event.target.value }))}
+                placeholder="Bijv. Prijsindicatie terugkoppelen"
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-400">Vervaldatum</span>
+                <input
+                  type="date"
+                  value={form.followUpDueDate}
+                  onChange={(event) => setForm((current) => ({ ...current, followUpDueDate: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-400">Tijdstip</span>
+                <input
+                  type="time"
+                  value={form.followUpDueTime}
+                  onChange={(event) => setForm((current) => ({ ...current, followUpDueTime: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+                />
+              </label>
+            </div>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-400">Prioriteit</span>
+              <select
+                value={form.followUpPriority}
+                onChange={(event) => setForm((current) => ({ ...current, followUpPriority: event.target.value }))}
+                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+              >
+                <option value="laag">Laag</option>
+                <option value="normaal">Normaal</option>
+                <option value="hoog">Hoog</option>
+              </select>
+            </label>
+          </div>
+        ) : null}
       </div>
 
       <button
         type="submit"
-        disabled={saving || !form.title.trim()}
+        disabled={saving || !form.title.trim() || (form.createFollowUp && !form.followUpTitle.trim())}
         className="btn mt-4 w-full border-transparent bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
@@ -1045,7 +1136,14 @@ function buildTimeline(input: {
       title: event.title,
       body: event.body,
       date: event.occurred_at,
-      meta: [event.contact_name, event.project_name, event.workstream_name].filter(Boolean).join(" - "),
+      meta: [
+        event.contact_name,
+        event.project_name,
+        event.workstream_name,
+        event.linked_action_title ? `→ actie: ${event.linked_action_title} (${label(event.linked_action_status ?? "")})` : null,
+      ]
+        .filter(Boolean)
+        .join(" - "),
       tone: activityTone(event.event_type),
     });
   }
@@ -1081,7 +1179,13 @@ function buildTimeline(input: {
       title: action.title,
       body: action.summary,
       date: action.updatedAt ?? action.updated_at ?? action.created_at,
-      meta: `${label(action.status)} - ${label(action.priority)}`,
+      meta: [
+        `${label(action.status)} - ${label(action.priority)}`,
+        action.due_date ? `Vervalt: ${formatDate(action.due_date)}${action.due_time ? ` ${action.due_time}` : ""}` : null,
+        action.source_activity_title ? `← vanuit moment: ${action.source_activity_title}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       tone: action.status === "done" || action.status === "afgerond" ? "emerald" : "sky",
     });
   }

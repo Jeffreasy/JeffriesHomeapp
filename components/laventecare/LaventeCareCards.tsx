@@ -177,10 +177,19 @@ export function ActionItemCard({
             </span>
           </div>
           <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-white">{action.title}</h3>
+          {(action.company_name || action.project_name || action.workstream_title || action.lead_title) && (
+            <p className="mt-1 truncate text-xs font-semibold text-amber-300/80">
+              {[action.company_name, action.project_name ?? action.workstream_title ?? action.lead_title].filter(Boolean).join(" · ")}
+            </p>
+          )}
           {action.summary && <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{action.summary}</p>}
           <p className="mt-3 text-xs font-semibold text-slate-500">
-            {label(action.source)}{action.dueDate ? ` - ${formatDate(action.dueDate)}` : ""}
+            {label(action.source)}
+            {action.dueDate ? ` - ${formatDate(action.dueDate)}${action.due_time ? ` ${action.due_time}` : ""}` : ""}
           </p>
+          {action.source_activity_title && (
+            <p className="mt-1 truncate text-xs text-slate-500">← vanuit moment: {action.source_activity_title}</p>
+          )}
         </div>
         <button
           type="button"

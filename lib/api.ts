@@ -589,12 +589,20 @@ export interface LCActionItem {
   status: string;
   priority: string;
   due_date: string | null;
+  due_time: string | null;
   linked_lead_id: string | null;
   linked_project_id: string | null;
   linked_workstream_id: string | null;
   linked_company_id: string | null;
   created_at: string;
   updated_at: string;
+  company_name?: string | null;
+  project_name?: string | null;
+  workstream_title?: string | null;
+  lead_title?: string | null;
+  source_activity_id?: string | null;
+  source_activity_title?: string | null;
+  source_activity_at?: string | null;
 }
 
 export interface LCDocument {
@@ -698,6 +706,8 @@ export interface LCActivityEvent {
   contact_name?: string | null;
   project_name?: string | null;
   workstream_name?: string | null;
+  linked_action_title?: string | null;
+  linked_action_status?: string | null;
 }
 
 export type LCActivityEventCreate = {
@@ -1472,6 +1482,9 @@ export const laventecareApi = {
     action_type: string;
     priority: string;
     due_date?: string;
+    due_time?: string;
+    linked_lead_id?: string;
+    linked_project_id?: string;
     linked_workstream_id?: string;
     linked_company_id?: string;
   }) =>
