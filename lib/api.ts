@@ -1449,7 +1449,7 @@ export const laventecareApi = {
     bron?: string;
   }) =>
     apiFetch<LCLead>("/laventecare/leads", { method: "POST", body: JSON.stringify(data) }),
-  updateLead: (id: string, data: { status?: string; fit_score?: number; pijnpunt?: string; prioriteit?: string }) =>
+  updateLead: (id: string, data: { status?: string; fit_score?: number; pijnpunt?: string; prioriteit?: string; bron?: string }) =>
     apiFetch<{ status: string }>(`/laventecare/leads/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   convertLeadToProject: (id: string, data: { naam: string; fase?: string; status?: string; samenvatting?: string }) =>
     apiFetch<LCProject>(`/laventecare/leads/${id}/convert`, { method: "POST", body: JSON.stringify(data) }),
