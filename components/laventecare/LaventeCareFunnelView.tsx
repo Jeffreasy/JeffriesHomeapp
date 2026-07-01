@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck, Plus } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck, Plus } from "lucide-react";
 import { LAVENTECARE_FIT_CRITERIA, LAVENTECARE_NO_FIT_SIGNALS, LAVENTECARE_PROCESS_STAGES } from "@/lib/laventecare";
 import { cn } from "@/lib/utils";
-import { fitTone, formatDate, formatMoney, label, toneClasses } from "./LaventeCareUtils";
+import { fitTone, formatDate, formatMoney, label, projectFaseLabel, projectStatusLabel, toneClasses } from "./LaventeCareUtils";
 import { EmptyState } from "./LaventeCareCards";
 import type { LeadItem, ProjectItem } from "./LaventeCareTypes";
 import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES } from "./LaventeCareTypes";
@@ -115,6 +115,7 @@ export function LaventeCareFunnelView({
             ) : (
               activeLeads.map((lead) => {
                 const tone = toneClasses[fitTone(lead.fitScore)];
+                const leadBusy = Boolean(lead._id && processingLead?.startsWith(`${lead._id}:`));
                 return (
                   <div key={lead._id ?? lead.titel} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -143,7 +144,7 @@ export function LaventeCareFunnelView({
                                 key={status}
                                 type="button"
                                 onClick={() => handleLeadStatus(lead, status)}
-                                disabled={Boolean(processingLead)}
+                                disabled={leadBusy}
                                 className="btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {busy && <Loader2 size={13} className="animate-spin" />}
@@ -154,7 +155,7 @@ export function LaventeCareFunnelView({
                           <button
                             type="button"
                             onClick={() => handleLeadToProject(lead)}
-                            disabled={Boolean(processingLead)}
+                            disabled={leadBusy}
                             className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {processingLead === `${lead._id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
@@ -169,7 +170,7 @@ export function LaventeCareFunnelView({
                           <button
                             type="button"
                             onClick={() => handleLeadStatus(lead, "verloren")}
-                            disabled={Boolean(processingLead)}
+                            disabled={leadBusy}
                             className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/[0.06] px-2.5 text-[11px] font-semibold text-rose-200 transition-colors hover:bg-rose-500/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {processingLead === `${lead._id}:verloren` ? <Loader2 size={12} className="animate-spin" /> : <Flag size={12} />}
@@ -178,7 +179,7 @@ export function LaventeCareFunnelView({
                           <button
                             type="button"
                             onClick={() => handleLeadStatus(lead, "gediskwalificeerd")}
-                            disabled={Boolean(processingLead)}
+                            disabled={leadBusy}
                             className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 text-[11px] font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {processingLead === `${lead._id}:gediskwalificeerd` ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
@@ -221,12 +222,13 @@ export function LaventeCareFunnelView({
             ) : (
               activeProjects.map((project) => {
                 const projectId = project._id ?? project.id;
+                const projectBusy = Boolean(projectId && processingProject?.startsWith(`${projectId}:`));
                 return (
                   <div key={projectId ?? project.naam} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="font-semibold text-white">{project.naam}</h3>
-                        <p className="mt-1 text-xs text-slate-500">{label(project.fase)} - {label(project.status)}</p>
+                        <p className="mt-1 text-xs text-slate-500">{projectFaseLabel(project.fase)} - {projectStatusLabel(project.status)}</p>
                       </div>
                       <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-200">
                         {formatMoney(project.waardeIndicatie)}
@@ -238,35 +240,41 @@ export function LaventeCareFunnelView({
                       <div className="mt-4 grid gap-2 sm:grid-cols-2">
                         <label className="block">
                           <span className="sr-only">Projectfase</span>
-                          <select
-                            value={project.fase}
-                            onChange={(event) => handleProjectStatus(project, { fase: event.target.value })}
-                            disabled={Boolean(processingProject)}
-                            className="min-h-9 w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 text-xs font-bold text-slate-200 outline-none transition focus:border-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {LAVENTECARE_PROJECT_PHASES.map((phase) => (
-                              <option key={phase.value} value={phase.value}>
-                                Fase: {phase.label}
-                              </option>
-                            ))}
-                          </select>
+                          <span className="relative block">
+                            <select
+                              value={project.fase}
+                              onChange={(event) => handleProjectStatus(project, { fase: event.target.value })}
+                              disabled={projectBusy}
+                              className="min-h-9 w-full appearance-none rounded-lg border border-white/10 bg-white/[0.03] py-2 pl-3 pr-8 text-xs font-bold text-slate-200 outline-none transition hover:border-white/20 focus:border-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {LAVENTECARE_PROJECT_PHASES.map((phase) => (
+                                <option key={phase.value} value={phase.value}>
+                                  {phase.label}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                          </span>
                         </label>
                         <label className="block">
                           <span className="sr-only">Projectstatus</span>
-                          <select
-                            value={project.status}
-                            onChange={(event) => handleProjectStatus(project, { status: event.target.value })}
-                            disabled={Boolean(processingProject)}
-                            className="min-h-9 w-full rounded-lg border border-white/10 bg-white/[0.03] px-2 text-xs font-bold text-slate-200 outline-none transition focus:border-amber-400/50 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {LAVENTECARE_PROJECT_STATUSES.map((status) => (
-                              <option key={status.value} value={status.value}>
-                                Status: {status.label}
-                              </option>
-                            ))}
-                          </select>
+                          <span className="relative block">
+                            <select
+                              value={project.status}
+                              onChange={(event) => handleProjectStatus(project, { status: event.target.value })}
+                              disabled={projectBusy}
+                              className="min-h-9 w-full appearance-none rounded-lg border border-white/10 bg-white/[0.03] py-2 pl-3 pr-8 text-xs font-bold text-slate-200 outline-none transition hover:border-white/20 focus:border-amber-400/50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {LAVENTECARE_PROJECT_STATUSES.map((status) => (
+                                <option key={status.value} value={status.value}>
+                                  {status.label}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                          </span>
                         </label>
-                        {processingProject?.startsWith(`${projectId}:`) ? (
+                        {projectBusy ? (
                           <p className="sm:col-span-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
                             <Loader2 size={13} className="animate-spin" />
                             Project wordt bijgewerkt

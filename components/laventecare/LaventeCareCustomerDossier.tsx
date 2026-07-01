@@ -36,7 +36,7 @@ import {
   type ProjectItem,
   type WorkstreamItem,
 } from "./LaventeCareTypes";
-import { formatDate, formatMoney, label } from "./LaventeCareUtils";
+import { formatDate, formatMoney, label, projectFaseLabel, projectStatusLabel } from "./LaventeCareUtils";
 
 type DossierTab = "overview" | "timeline" | "work" | "documents" | "access";
 
@@ -413,7 +413,7 @@ export function LaventeCareCustomerDossier({
             <WorkColumn title="Projecten" empty="Geen actieve projecten" items={companyProjects.map((project) => ({
               id: project._id ?? project.id,
               title: project.naam,
-              meta: `${label(project.fase)} - ${formatMoney(project.waarde_indicatie ?? undefined)}`,
+              meta: `${projectFaseLabel(project.fase)} - ${formatMoney(project.waarde_indicatie ?? undefined)}`,
               body: project.samenvatting,
             }))} />
           </div>
@@ -1197,7 +1197,7 @@ function buildTimeline(input: {
       title: project.naam,
       body: project.samenvatting,
       date: project.updated_at ?? project.created_at,
-      meta: `${label(project.fase)} - ${label(project.status)}`,
+      meta: `${projectFaseLabel(project.fase)} - ${projectStatusLabel(project.status)}`,
       tone: "violet",
     });
   }

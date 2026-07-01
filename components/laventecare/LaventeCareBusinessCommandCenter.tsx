@@ -16,7 +16,7 @@ import {
   LAVENTECARE_PROFILE,
 } from "@/lib/laventecare";
 import type { CompanyItem, DossierDocumentItem, LeadItem, ProjectItem, WorkstreamItem } from "./LaventeCareTypes";
-import { formatDate, formatMoney, label } from "./LaventeCareUtils";
+import { formatDate, formatMoney, label, projectFaseLabel, projectStatusLabel } from "./LaventeCareUtils";
 
 const priorityDocuments = [
   "introductie",
@@ -100,7 +100,7 @@ function buildProjectContextOption(project: ProjectItem): DossierContextOption {
   return {
     key: `project:${id}`,
     label: project.naam,
-    subtext: `Project - ${label(project.fase)} - ${label(project.status)}`,
+    subtext: `Project - ${projectFaseLabel(project.fase)} - ${projectStatusLabel(project.status)}`,
     context: {
       kind: "project",
       id,

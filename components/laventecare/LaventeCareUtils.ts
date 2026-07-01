@@ -1,4 +1,4 @@
-import { type Tone } from "./LaventeCareTypes";
+import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES, type Tone } from "./LaventeCareTypes";
 
 export const toneClasses: Record<Tone, { border: string; surface: string; text: string; icon: string }> = {
   amber: {
@@ -76,7 +76,22 @@ export function formatMinutes(minutes?: number) {
 
 export function label(value?: string) {
   if (!value) return "Onbekend";
-  return value.replace(/_/g, " ");
+  const text = value.replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Project fase/status have a canonical, hand-written label (e.g. fase "sla" reads
+// "SLA en beheer", "evolution" reads "Doorontwikkeling") that a mechanical label()
+// transform of the raw value can't reproduce — look it up, falling back to label()
+// for any value that isn't in the known list.
+export function projectFaseLabel(value?: string) {
+  if (!value) return "Onbekend";
+  return LAVENTECARE_PROJECT_PHASES.find((phase) => phase.value === value)?.label ?? label(value);
+}
+
+export function projectStatusLabel(value?: string) {
+  if (!value) return "Onbekend";
+  return LAVENTECARE_PROJECT_STATUSES.find((status) => status.value === value)?.label ?? label(value);
 }
 
 export function fitTone(score?: number): Tone {
