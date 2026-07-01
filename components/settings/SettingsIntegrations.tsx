@@ -23,7 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Panel, SectionHeader, StatusPill, type StatusPillTone } from "./SettingsCards";
-import type { AiAgentCapability, AiDiagnosticCheck, AiDiagnosticsRecommendation, AiDiagnosticsResult, SyncStatusView, TelegramStatusResult } from "./SettingsUtils";
+import type { AiAgentCapability, AiDiagnosticCheck, AiDiagnosticsRecommendation, AiDiagnosticsResult, AiUsageWindow, SyncStatusView, TelegramStatusResult } from "./SettingsUtils";
 import { cn } from "@/lib/utils";
 
 type IntegrationRowProps = {
@@ -65,6 +65,27 @@ function MiniInfo({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-2">
       <p className="truncate text-xs font-medium text-slate-500">{label}</p>
       <p className="mt-0.5 truncate text-sm font-semibold text-slate-200">{value}</p>
+    </div>
+  );
+}
+
+function UsageWindowCard({ label, window, priced }: { label: string; window?: AiUsageWindow; priced: boolean }) {
+  if (!window) {
+    return (
+      <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-2">
+        <p className="text-xs font-medium text-slate-500">{label}</p>
+        <p className="mt-1 text-sm text-slate-500">Geen data</p>
+      </div>
+    );
+  }
+  return (
+    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-2">
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-slate-200">
+        {window.calls} calls{window.errors > 0 ? ` — ${window.errors} fouten` : ""}
+      </p>
+      <p className="mt-0.5 truncate text-xs text-slate-400">{window.totalTokens.toLocaleString("nl-NL")} tokens</p>
+      {priced && <p className="mt-0.5 truncate text-xs text-emerald-300">€{window.estCost.toFixed(2)}</p>}
     </div>
   );
 }
@@ -454,6 +475,20 @@ export function SettingsIntegrations({
             <MiniInfo label="Reasoning" value={aiDiagnostics.config.grokReasoningEffort || "default"} />
             <MiniInfo label="Agents" value={String(aiDiagnostics.capabilities.agents)} />
             <MiniInfo label="Tools" value={`${aiDiagnostics.capabilities.tools} totaal`} />
+          </div>
+        )}
+
+        {aiDiagnostics?.usage && (
+          <div className="mt-4">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+              <Banknote size={13} />
+              AI-gebruik {aiDiagnostics.usage.priced ? "" : "(geen prijzen ingesteld — alleen tokens/calls)"}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <UsageWindowCard label="Vandaag" window={aiDiagnostics.usage.today} priced={aiDiagnostics.usage.priced} />
+              <UsageWindowCard label="7 dagen" window={aiDiagnostics.usage.last7d} priced={aiDiagnostics.usage.priced} />
+              <UsageWindowCard label="30 dagen" window={aiDiagnostics.usage.last30d} priced={aiDiagnostics.usage.priced} />
+            </div>
           </div>
         )}
 

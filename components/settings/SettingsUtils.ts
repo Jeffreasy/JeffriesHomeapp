@@ -87,6 +87,24 @@ export type AiDiagnosticsRecommendation = {
   detail: string;
 };
 
+export type AiUsageWindow = {
+  calls: number;
+  errors: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  avgDurationMs: number;
+  maxDurationMs: number;
+  estCost: number;
+};
+
+export type AiUsage = {
+  priced: boolean;
+  today?: AiUsageWindow;
+  last7d?: AiUsageWindow;
+  last30d?: AiUsageWindow;
+};
+
 export type AiDiagnosticsResult = {
   ok: boolean;
   generatedAt: string;
@@ -128,6 +146,7 @@ export type AiDiagnosticsResult = {
   };
   agents: AiAgentCapability[];
   recommendations?: AiDiagnosticsRecommendation[];
+  usage?: AiUsage;
 };
 
 export const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string }> = {

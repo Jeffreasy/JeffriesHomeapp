@@ -85,6 +85,20 @@ export default function SettingsPage() {
     refetchInterval: 6000,
   });
 
+  // Auto-populates on mount (like every other metric on this page) instead
+  // of showing an empty panel until the user knows to click "Test AI" —
+  // that manual-only pattern meant "is Grok healthy / what did it cost me
+  // today" required an extra click every single visit.
+  const {
+    data: aiDiagnostics = null,
+    isFetching: aiChecking,
+    refetch: refetchAiDiagnostics,
+  } = useQuery({
+    queryKey: ["ai-diagnostics"],
+    queryFn: async () => (await settingsApi.aiDiagnostics()) as unknown as AiDiagnosticsResult,
+    refetchInterval: 60000,
+  });
+
   const telegramStatusAction = async () => settingsApi.telegramStatus();
   const updatePrivacySettings = async (_args: Record<string, unknown>) => ({});
   const auditLogs: any[] = [];
@@ -94,8 +108,6 @@ export default function SettingsPage() {
   const [pendingBusyId, setPendingBusyId] = useState<string | null>(null);
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatusResult | null>(null);
   const [telegramChecking, setTelegramChecking] = useState(false);
-  const [aiDiagnostics, setAiDiagnostics] = useState<AiDiagnosticsResult | null>(null);
-  const [aiChecking, setAiChecking] = useState(false);
   const [backupRequested, setBackupRequested] = useState(false);
   const backupData = undefined as any; // TODO: Move backup to Go API
 
@@ -253,15 +265,13 @@ export default function SettingsPage() {
   };
 
   const handleAICheck = async () => {
-    setAiChecking(true);
-    try {
-      const result = await settingsApi.aiDiagnostics() as unknown as AiDiagnosticsResult;
-      setAiDiagnostics(result);
-      success(result.ok ? "AI diagnose groen" : "AI diagnose heeft aandachtspunten");
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : "AI diagnose mislukt");
-    } finally {
-      setAiChecking(false);
+    const result = await refetchAiDiagnostics();
+    if (result.error) {
+      toastError(result.error instanceof Error ? result.error.message : "AI diagnose mislukt");
+      return;
+    }
+    if (result.data) {
+      success(result.data.ok ? "AI diagnose groen" : "AI diagnose heeft aandachtspunten");
     }
   };
 

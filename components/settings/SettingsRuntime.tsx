@@ -94,6 +94,16 @@ export function SettingsPendingActions({
                   <p className="mt-1 text-xs text-slate-500">
                     {action.agentId} - {action.toolName} - verloopt {formatDateTime(action.expiresAt)}
                   </p>
+                  {action.args && Object.keys(action.args).length > 0 && (
+                    <details className="mt-2 min-w-0">
+                      <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-300">
+                        Toon exacte parameters
+                      </summary>
+                      <pre className="mt-1 max-h-48 overflow-auto rounded-lg border border-[var(--color-border)] bg-black/20 p-2 text-[11px] text-slate-400">
+                        {JSON.stringify(action.args, null, 2)}
+                      </pre>
+                    </details>
+                  )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button
