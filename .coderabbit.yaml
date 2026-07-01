@@ -1,0 +1,98 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: false
+
+reviews:
+  profile: "assertive"
+  high_level_summary: true
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+  finishing_touches:
+    # This codebase deliberately writes terse, comment-free code — don't
+    # nudge every PR toward doc comments that clash with the established style.
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: true
+
+  tools:
+    eslint:
+      enabled: true
+    reactDoctor:
+      enabled: true
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    osvScanner:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+
+  path_filters:
+    - "!.next/**"
+    - "!node_modules/**"
+    - "!playwright-report/**"
+    - "!test-results/**"
+    - "!public/sw.js"
+    - "!lib/api/generated/**"
+
+  path_instructions:
+    - path: "app/api/backend/[...path]/route.ts"
+      instructions: |
+        This is THE security boundary between the browser and the Go backend:
+        it must re-derive userId server-side from the Clerk session (never
+        trust a client-supplied userId), enforce the hardcoded owner-only
+        allowlist, and inject the backend secret (BACKEND_API_KEY/
+        APP_SECRET_KEY) only from server-only env vars — flag any change that
+        reads a NEXT_PUBLIC_* var for the secret, forwards a client-supplied
+        userId unchanged, or weakens the owner check.
+
+    - path: "lib/api.ts"
+      instructions: |
+        Two parallel API clients coexist in this repo: this hand-written
+        lib/api.ts (dominant, ~1700 LOC, most features incl. all of
+        LaventeCare) and the orval-generated lib/api/generated/* (only a
+        handful of real call sites today). Flag any new code that
+        reimplements a third fetch pattern instead of using one of the two
+        existing ones, and flag drift where a domain here duplicates logic
+        already covered by the generated client for the same endpoint.
+
+    - path: "components/laventecare/**"
+      instructions: |
+        This is the LaventeCare CRM mail UI. A real XSS was previously found
+        and fixed in the backend's mail-template rendering (unescaped merge
+        variables in HTML email bodies) — the frontend mirrors that same
+        escaping logic for its own preview. Flag any new HTML rendering of
+        AI-generated or user-supplied text (mail bodies, previews, templates)
+        that doesn't run through the established escape helper before being
+        rendered as HTML.
+
+    - path: "hooks/**"
+      instructions: |
+        Mutation hooks in this app have a known systemic weak spot: errors
+        silently swallowed with no user feedback. Flag any useMutation whose
+        onError doesn't surface a toast/error state, and any mutation missing
+        an in-flight guard against double-submission (double-tap on mobile).
+
+    - path: "app/settings/**"
+      instructions: |
+        Flag any settings toggle/handler that's wired to a stub (e.g. an
+        async function that immediately returns {} without an actual API
+        call) — this page has previously shipped UI controls whose backend
+        wiring was never implemented.
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
