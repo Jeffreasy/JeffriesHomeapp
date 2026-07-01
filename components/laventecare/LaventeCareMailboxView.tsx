@@ -26,6 +26,10 @@ type SendPayload = {
   invoice_id?: string;
   to_email?: string;
   to_name?: string;
+  /** Onderwerp-override, bijv. "Re: <origineel>" bij een reply (M-E). */
+  subject?: string;
+  /** Conversation-id zodat het antwoord in dezelfde thread groepeert (M-E). */
+  conversation_id?: string;
   variables?: Record<string, string>;
   send?: boolean;
   attachments?: MailAttachmentPayload[];
@@ -57,6 +61,9 @@ const inputClass =
   "w-full min-w-0 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-500/20";
 const MAX_MAIL_ATTACHMENTS = 6;
 const MAX_MAIL_ATTACHMENT_BYTES = 3 * 1024 * 1024;
+// L3: harde grens op het GEZAMENLIJKE bijlagegewicht — Graph weigert grote
+// payloads pas server-side, dus we vangen dit vooraf af.
+const MAX_MAIL_ATTACHMENT_TOTAL_BYTES = 10 * 1024 * 1024;
 
 export function LaventeCareMailboxView({
   mailbox,
@@ -73,10 +80,14 @@ export function LaventeCareMailboxView({
   sending,
   aiSuggesting,
   syncingInbox,
+  inboundBlocked,
+  inboxError,
+  justSent,
   onSuggestMailContent,
   onSendTemplatedMail,
   onSyncInbox,
   onMarkInboxRead,
+  onDirtyChange,
 }: {
   mailbox?: MailboxItem;
   mailboxLoading: boolean;
@@ -92,10 +103,19 @@ export function LaventeCareMailboxView({
   sending: boolean;
   aiSuggesting: boolean;
   syncingInbox: boolean;
+  /** True zodra een inbox-sync meldde dat de Mail.Read-machtiging ontbreekt (M15). */
+  inboundBlocked?: boolean;
+  /** Fout van de laatste inbox-sync uit de mailbox-payload (R8). */
+  inboxError?: string | null;
+  /** Kort "Verzonden"-signaal; leeft op de pagina zodat het de key-remount van
+   *  deze view overleeft (diff L-7). */
+  justSent?: boolean;
   onSuggestMailContent: (payload: SuggestPayload) => Promise<LCMailAISuggestion>;
   onSendTemplatedMail: (payload: SendPayload) => Promise<void>;
   onSyncInbox: () => Promise<void>;
   onMarkInboxRead: (id: string) => void;
+  /** M-D: meldt de pagina of de opsteller niet-verzonden invoer bevat. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [templateId, setTemplateId] = useState("");
   const [companyId, setCompanyId] = useState("");
@@ -105,6 +125,19 @@ export function LaventeCareMailboxView({
   const [invoiceId, setInvoiceId] = useState(prefillInvoiceId ?? "");
   const [toEmail, setToEmail] = useState("");
   const [toName, setToName] = useState("");
+  // Snap-back fix: zodra de gebruiker het ontvangerveld zelf aanpast (ook
+  // leegmaken), valt het niet meer terug op het contact-e-mailadres totdat
+  // het contact wisselt.
+  const [emailEdited, setEmailEdited] = useState(false);
+  const [nameEdited, setNameEdited] = useState(false);
+  // M-E: reply-context — het onderwerp en de conversation-id van het bericht
+  // waarop dit een antwoord is, zodat de mail als echte reply in dezelfde
+  // thread terechtkomt i.p.v. een nieuwe thread te starten.
+  const [replyContext, setReplyContext] = useState<{
+    subject: string;
+    conversationId: string | null;
+  } | null>(null);
+  const [showAllDrafts, setShowAllDrafts] = useState(false);
   const [aiIntent, setAiIntent] = useState("Maak een klantmail op basis van de gekoppelde LaventeCare context.");
   const [aiTone, setAiTone] = useState("professioneel, warm en concreet");
   const [aiSuggestion, setAiSuggestion] = useState<LCMailAISuggestion | null>(null);
@@ -159,8 +192,10 @@ export function LaventeCareMailboxView({
         .slice(0, 20),
     [companyId, invoices, projectId, workstreamId]
   );
-  const resolvedEmail = toEmail.trim() || selectedContact?.email || "";
-  const resolvedName = toName.trim() || selectedContact?.naam || "";
+  const displayEmail = emailEdited ? toEmail : toEmail || selectedContact?.email || "";
+  const displayName = nameEdited ? toName : toName || selectedContact?.naam || "";
+  const resolvedEmail = displayEmail.trim();
+  const resolvedName = displayName.trim();
   const parsedVariables = useMemo(() => parseVariables(variables), [variables]);
   const previewVariables = useMemo(() => applyInvoicePreviewVariables(parsedVariables, selectedInvoice), [parsedVariables, selectedInvoice]);
   const outboundVariables = useMemo(() => prepareOutboundVariables(parsedVariables, selectedInvoice), [parsedVariables, selectedInvoice]);
@@ -172,6 +207,21 @@ export function LaventeCareMailboxView({
   const draftOutbox = useMemo(() => outbox.filter((item) => item.status !== "sent"), [outbox]);
   const unreadCount = useMemo(() => inbox.filter((item) => !item.is_read).length, [inbox]);
   const failedCount = useMemo(() => outbox.filter((item) => item.status === "failed").length, [outbox]);
+  // M-E: bij een reply overschrijft "Re: <origineel>" het template-onderwerp.
+  const effectiveSubject = replyContext?.subject ?? previewSubject;
+  // L7: sleutels in het variabelenveld die niet in de geselecteerde template
+  // voorkomen — meestal een typfout of een restant van een andere template.
+  const unknownVariableKeys = useMemo(
+    () => Object.keys(parsedVariables).filter((key) => !variableHints.includes(key)),
+    [parsedVariables, variableHints],
+  );
+
+  // M-D: meld de pagina dat de opsteller niet-verzonden invoer bevat, zodat
+  // een tabwissel eerst om bevestiging vraagt.
+  const composerDirty = Boolean(resolvedEmail || attachments.length > 0);
+  useEffect(() => {
+    onDirtyChange?.(composerDirty);
+  }, [composerDirty, onDirtyChange]);
 
   const insertVariable = (key: string) => {
     setVariables((current) => {
@@ -223,19 +273,43 @@ export function LaventeCareMailboxView({
 
   const handleSend = async (send: boolean) => {
     if (!selectedTemplate) return;
-    await onSendTemplatedMail({
-      template_id: selectedTemplate.id,
-      company_id: effectiveCompanyId || undefined,
-      contact_id: contactId || undefined,
-      project_id: effectiveProjectId || undefined,
-      workstream_id: effectiveWorkstreamId || undefined,
-      invoice_id: invoiceId || undefined,
-      to_email: resolvedEmail || undefined,
-      to_name: resolvedName || undefined,
-      variables: outboundVariables,
-      send,
-      attachments: send && attachments.length ? attachments.map(({ name, content_type, content_bytes }) => ({ name, content_type, content_bytes })) : undefined,
-    });
+    try {
+      await onSendTemplatedMail({
+        template_id: selectedTemplate.id,
+        company_id: effectiveCompanyId || undefined,
+        contact_id: contactId || undefined,
+        project_id: effectiveProjectId || undefined,
+        workstream_id: effectiveWorkstreamId || undefined,
+        invoice_id: invoiceId || undefined,
+        to_email: resolvedEmail || undefined,
+        to_name: resolvedName || undefined,
+        // M-E: reply-context meesturen zodat threads niet fragmenteren.
+        subject: replyContext?.subject || undefined,
+        conversation_id: replyContext?.conversationId || undefined,
+        variables: outboundVariables,
+        send,
+        attachments: send && attachments.length ? attachments.map(({ name, content_type, content_bytes }) => ({ name, content_type, content_bytes })) : undefined,
+      });
+    } catch {
+      // De pagina toont al een fout-toast; de composer blijft intact zodat
+      // niets verloren gaat.
+      return;
+    }
+    if (send) {
+      // M7: na een echte verzending resetten we ontvanger, koppelingen en
+      // bijlagen zodat een tweede bevestiging geen dubbele mail kan sturen.
+      // Het "Verzonden"-signaal zelf leeft op de pagina (diff L-7).
+      setToEmail("");
+      setToName("");
+      setEmailEdited(false);
+      setNameEdited(false);
+      setContactId("");
+      setInvoiceId("");
+      setAttachments([]);
+      setAttachmentError("");
+      setAiSuggestion(null);
+      setReplyContext(null);
+    }
   };
 
   const openPreview = () => {
@@ -246,7 +320,7 @@ export function LaventeCareMailboxView({
       html: previewHTML,
       meta: [
         { label: "Aan", value: recipientEcho },
-        { label: "Onderwerp", value: previewSubject || "(geen onderwerp)" },
+        { label: "Onderwerp", value: effectiveSubject || "(geen onderwerp)" },
         { label: "Bijlagen", value: attachments.length ? `${attachments.length}` : "geen" },
       ],
     });
@@ -260,7 +334,7 @@ export function LaventeCareMailboxView({
       html: previewHTML,
       meta: [
         { label: "Aan", value: recipientEcho },
-        { label: "Onderwerp", value: previewSubject || "(geen onderwerp)" },
+        { label: "Onderwerp", value: effectiveSubject || "(geen onderwerp)" },
         { label: "Bijlagen", value: attachments.length ? `${attachments.length}` : "geen" },
       ],
       primaryAction: {
@@ -275,6 +349,10 @@ export function LaventeCareMailboxView({
     });
   };
 
+  // M-E-kanttekening: de outbox bewaart alleen de gerénderde mail (body_html)
+  // — de losse variabelen en bijlagen worden niet opgeslagen, dus die kunnen
+  // hier niet worden teruggezet. Template, klant, contact, factuur en
+  // ontvanger wél.
   const prefillFromOutbox = (item: MailOutboxItem) => {
     setTemplateId(item.template_id ?? "");
     setCompanyId(item.company_id ?? "");
@@ -284,6 +362,8 @@ export function LaventeCareMailboxView({
     setInvoiceId(item.invoice_id ?? "");
     setToEmail(item.to_email ?? "");
     setToName(item.to_name ?? "");
+    setEmailEdited(false);
+    setNameEdited(false);
     setMailModal(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -308,7 +388,14 @@ export function LaventeCareMailboxView({
   const replyFromInbox = (item: MailInboxItem) => {
     setToEmail(item.from_email ?? "");
     setToName(item.from_name ?? "");
+    setEmailEdited(false);
+    setNameEdited(false);
     if (item.company_id) setCompanyId(item.company_id);
+    // M-E: echte reply — zelfde thread (conversation_id) en "Re:"-onderwerp.
+    setReplyContext({
+      subject: buildReplySubject(item.subject),
+      conversationId: item.conversation_id ?? null,
+    });
     setMailModal(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -340,15 +427,28 @@ export function LaventeCareMailboxView({
     const reversed = [...conversation.entries].reverse();
     const lastIn = reversed.find((entry) => entry.kind === "in");
     const lastOut = reversed.find((entry) => entry.kind === "out");
+    let replySubject = conversation.subject;
+    let replyConversationId: string | null = null;
     if (lastIn && lastIn.kind === "in") {
       setToEmail(lastIn.inbox.from_email ?? "");
       setToName(lastIn.inbox.from_name ?? "");
       if (lastIn.inbox.company_id) setCompanyId(lastIn.inbox.company_id);
+      replySubject = lastIn.inbox.subject ?? conversation.subject;
+      replyConversationId = lastIn.inbox.conversation_id ?? null;
     } else if (lastOut && lastOut.kind === "out") {
       setToEmail(lastOut.outbox.to_email ?? "");
       setToName(lastOut.outbox.to_name ?? "");
       if (lastOut.outbox.company_id) setCompanyId(lastOut.outbox.company_id);
+      replySubject = lastOut.outbox.subject;
+      replyConversationId = lastOut.outbox.conversation_id ?? null;
     }
+    setEmailEdited(false);
+    setNameEdited(false);
+    // M-E: echte reply — zelfde thread (conversation_id) en "Re:"-onderwerp.
+    setReplyContext({
+      subject: buildReplySubject(replySubject),
+      conversationId: replyConversationId,
+    });
     setThreadConv(null);
     setMailModal(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
@@ -363,16 +463,37 @@ export function LaventeCareMailboxView({
       setAttachmentError(`Maximaal ${MAX_MAIL_ATTACHMENTS} bijlagen per mail.`);
       return;
     }
+    // L3: cap op het gezamenlijke gewicht (bestaande + nieuwe bijlagen).
+    const currentBytes = attachments.reduce((total, item) => total + item.size, 0);
+    const incomingBytes = files.reduce((total, file) => total + file.size, 0);
+    if (currentBytes + incomingBytes > MAX_MAIL_ATTACHMENT_TOTAL_BYTES) {
+      setAttachmentError(
+        `Bijlagen samen maximaal ${Math.round(MAX_MAIL_ATTACHMENT_TOTAL_BYTES / (1024 * 1024))}MB — verwijder eerst een bijlage of kies kleinere bestanden.`,
+      );
+      return;
+    }
     setAttachmentsReading(true);
     try {
-      const next = await Promise.all(files.map(readMailAttachment));
-      setAttachments((current) => [...current, ...next]);
-      const documentNames = [...attachments, ...next].map((item) => readableAttachmentName(item.name)).join(", ");
-      if (documentNames) {
-        setVariables((current) => upsertVariables(current, { "documentation.attachments": documentNames }));
+      // L3: per bestand afhandelen — één onleesbare PDF blokkeert de rest niet.
+      const results = await Promise.allSettled(files.map(readMailAttachment));
+      const next = results
+        .filter((result): result is PromiseFulfilledResult<MailAttachment> => result.status === "fulfilled")
+        .map((result) => result.value);
+      const failures = results
+        .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+        .map((result) =>
+          result.reason instanceof Error ? result.reason.message : "Bijlage kon niet worden gelezen.",
+        );
+      if (next.length > 0) {
+        setAttachments((current) => [...current, ...next]);
+        const documentNames = [...attachments, ...next].map((item) => readableAttachmentName(item.name)).join(", ");
+        if (documentNames) {
+          setVariables((current) => upsertVariables(current, { "documentation.attachments": documentNames }));
+        }
       }
-    } catch (error) {
-      setAttachmentError(error instanceof Error ? error.message : "Bijlage kon niet worden gelezen.");
+      if (failures.length > 0) {
+        setAttachmentError(failures.join(" "));
+      }
     } finally {
       setAttachmentsReading(false);
     }
@@ -421,6 +542,27 @@ export function LaventeCareMailboxView({
             <MailPlus className="hidden h-8 w-8 shrink-0 text-sky-300 sm:block" />
           </div>
 
+          {/* M-E: zichtbare reply-context; het kruisje maakt er weer een
+              losse nieuwe mail van. */}
+          {replyContext ? (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-sky-400/25 bg-sky-500/[0.08] px-3 py-2">
+              <Reply size={14} className="mt-0.5 shrink-0 text-sky-300" />
+              <p className="min-w-0 flex-1 text-xs leading-5 text-sky-100">
+                Antwoord in bestaande conversatie — onderwerp wordt{" "}
+                <span className="font-bold">{replyContext.subject}</span>
+                {replyContext.conversationId ? " en het bericht groepeert in dezelfde thread." : "."}
+              </p>
+              <button
+                type="button"
+                onClick={() => setReplyContext(null)}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+                aria-label="Reply-context verwijderen"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ) : null}
+
           <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="Template">
               <select value={selectedTemplate?.id ?? ""} onChange={(event) => setTemplateId(event.target.value)} className={inputClass}>
@@ -449,7 +591,19 @@ export function LaventeCareMailboxView({
               </select>
             </Field>
             <Field label="Contactpersoon">
-              <select value={contactId} onChange={(event) => setContactId(event.target.value)} className={inputClass}>
+              <select
+                value={contactId}
+                onChange={(event) => {
+                  setContactId(event.target.value);
+                  // Nieuw contact: handmatige overrides vervallen zodat het
+                  // contact-e-mailadres weer leidend is.
+                  setToEmail("");
+                  setToName("");
+                  setEmailEdited(false);
+                  setNameEdited(false);
+                }}
+                className={inputClass}
+              >
                 <option value="">Handmatige ontvanger</option>
                 {companyContacts.map((contact) => (
                   <option key={contact._id ?? contact.id} value={contact._id ?? contact.id}>
@@ -459,10 +613,27 @@ export function LaventeCareMailboxView({
               </select>
             </Field>
             <Field label="Ontvanger">
-              <input value={resolvedEmail} onChange={(event) => setToEmail(event.target.value)} placeholder="naam@bedrijf.nl" className={inputClass} />
+              <input
+                type="email"
+                value={displayEmail}
+                onChange={(event) => {
+                  setToEmail(event.target.value);
+                  setEmailEdited(true);
+                }}
+                placeholder="naam@bedrijf.nl"
+                className={inputClass}
+              />
             </Field>
             <Field label="Naam ontvanger">
-              <input value={resolvedName} onChange={(event) => setToName(event.target.value)} placeholder="Voornaam achternaam" className={inputClass} />
+              <input
+                value={displayName}
+                onChange={(event) => {
+                  setToName(event.target.value);
+                  setNameEdited(true);
+                }}
+                placeholder="Voornaam achternaam"
+                className={inputClass}
+              />
             </Field>
             <Field label="Project">
               <select
@@ -536,7 +707,9 @@ export function LaventeCareMailboxView({
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {attachments.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500 sm:col-span-2">
-                  Voor HenkeWonen: quickstart, workflowhandleiding, pilotafspraken en vrijgave/datakwaliteit selecteren.
+                  {selectedCompany
+                    ? `Nog geen bijlagen. Voeg hier de PDF-documenten voor ${selectedCompany.naam} toe (bijv. handleiding, afspraken of vrijgave).`
+                    : "Nog geen bijlagen. Voeg hier de klant-PDF-documenten toe die met deze mail mee moeten."}
                 </div>
               ) : (
                 attachments.map((attachment, index) => (
@@ -576,6 +749,19 @@ export function LaventeCareMailboxView({
             Eén per regel als <span className="font-mono text-slate-400">sleutel=waarde</span>. De meeste velden vullen automatisch uit klant, opdracht en AI —
             vul hier alleen wat je wilt overschrijven. Klik een veld bij &ldquo;Template context&rdquo; hieronder om het toe te voegen.
           </p>
+          {/* L7: sleutels die deze template niet kent — vaak een typfout of
+              restant van een andere template; ze doen in de mail niets. */}
+          {unknownVariableKeys.length > 0 ? (
+            <p className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-2.5 py-1.5 text-[11px] leading-4 text-amber-100">
+              <TriangleAlert size={12} className="mt-0.5 shrink-0 text-amber-300" />
+              <span className="min-w-0">
+                {unknownVariableKeys.length === 1 ? "Sleutel" : "Sleutels"}{" "}
+                <span className="font-mono">{unknownVariableKeys.slice(0, 6).join(", ")}</span>
+                {unknownVariableKeys.length > 6 ? ` (+${unknownVariableKeys.length - 6})` : ""}{" "}
+                {unknownVariableKeys.length === 1 ? "komt" : "komen"} niet voor in deze template en {unknownVariableKeys.length === 1 ? "wordt" : "worden"} genegeerd.
+              </span>
+            </p>
+          ) : null}
 
           <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/[0.06] p-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -734,6 +920,15 @@ export function LaventeCareMailboxView({
               {sending ? "Verwerken..." : "Versturen..."}
             </button>
           </div>
+          {justSent ? (
+            <p
+              role="status"
+              className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm font-semibold text-emerald-100"
+            >
+              <CheckCircle2 size={15} className="shrink-0" />
+              Verzonden — de opsteller is leeggemaakt voor de volgende mail.
+            </p>
+          ) : null}
         </form>
 
         <aside className="min-w-0 space-y-4">
@@ -753,11 +948,37 @@ export function LaventeCareMailboxView({
                 Sync inbox
               </button>
             </div>
+            {/* M15/R8: de Mail.Read-melding alléén als een sync dat expliciet
+                meldde — een gewone lege inbox betekent niet dat de machtiging
+                nog "pending" is. */}
+            {inboundBlocked ? (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/25 bg-amber-400/[0.08] px-3 py-2">
+                <TriangleAlert size={14} className="mt-0.5 shrink-0 text-amber-300" />
+                <p className="text-xs leading-5 text-amber-100">
+                  Inkomende mail wacht op Microsoft-machtiging (Mail.Read). Verzonden mail werkt wel.
+                </p>
+              </div>
+            ) : null}
+            {/* R8: fout van de laatste inbox-sync uit de payload zelf. */}
+            {!inboundBlocked && inboxError ? (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-400/25 bg-rose-400/[0.08] px-3 py-2">
+                <TriangleAlert size={14} className="mt-0.5 shrink-0 text-rose-300" />
+                <p className="text-xs leading-5 text-rose-100">
+                  Inbox-sync meldde een fout: {inboxError}
+                </p>
+              </div>
+            ) : null}
+            {/* R8: neutrale lege-inbox-melding voor het gewone geen-mail-geval. */}
+            {!inboundBlocked && !inboxError && !mailboxLoading && inbox.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500">
+                Nog geen inkomende mail. Gebruik &ldquo;Sync inbox&rdquo; om nieuwe berichten op te halen.
+              </p>
+            ) : null}
             <div className="mt-3 space-y-2">
               {mailboxLoading ? (
                 <p className="text-sm text-slate-500">Mailbox laden...</p>
               ) : conversations.length === 0 ? (
-                <p className="text-sm leading-6 text-slate-500">Nog geen verzonden of ontvangen mail. Sync haalt je LaventeCare-inbox op.</p>
+                <p className="text-sm leading-6 text-slate-500">Nog geen gesprekken. Verzonden mail verschijnt hier direct.</p>
               ) : (
                 (showAllConversations ? conversations : conversations.slice(0, 10)).map((conversation) => (
                   <ConversationRow key={conversation.key} conversation={conversation} onOpen={openThread} />
@@ -779,10 +1000,19 @@ export function LaventeCareMailboxView({
             <section className="glass min-w-0 p-4">
               <p className="text-xs font-semibold uppercase text-slate-500">Concepten &amp; mislukt</p>
               <div className="mt-3 space-y-2">
-                {draftOutbox.slice(0, 6).map((item) => (
+                {(showAllDrafts ? draftOutbox : draftOutbox.slice(0, 6)).map((item) => (
                   <OutboxRow key={item.id} item={item} onOpen={openOutbox} />
                 ))}
               </div>
+              {draftOutbox.length > 6 ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllDrafts((value) => !value)}
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+                >
+                  {showAllDrafts ? "Toon minder" : `Toon alle ${draftOutbox.length} concepten`}
+                </button>
+              ) : null}
             </section>
           ) : null}
 
@@ -1236,6 +1466,12 @@ function OutboxRow({ item, onOpen }: { item: MailOutboxItem; onOpen: (item: Mail
   );
 }
 
+// M-E: "Re: " voorvoegsel zonder te stapelen ("Re: Re: ...").
+function buildReplySubject(subject?: string | null) {
+  const base = (subject ?? "").trim() || "(geen onderwerp)";
+  return /^re:/i.test(base) ? base : `Re: ${base}`;
+}
+
 function parseVariables(value: string) {
   const vars: Record<string, string> = {};
   for (const line of value.split(/\n/)) {
@@ -1345,11 +1581,16 @@ function buildSendReadiness({
   const documentationTemplate = placeholders.some((placeholder) => placeholder.startsWith("documentation."));
   const sensitiveAccessDetected = hasSensitiveAccessValue(Object.values(variables).join("\n"));
 
+  const emailFormatValid = isPlausibleEmail(resolvedEmail);
   const items: Array<{ label: string; detail: string; status: ReadinessStatus }> = [
     {
       label: "Ontvanger",
-      detail: resolvedEmail ? resolvedEmail : "Nog geen e-mailadres geselecteerd.",
-      status: resolvedEmail ? "ok" : "missing",
+      detail: !resolvedEmail
+        ? "Nog geen e-mailadres geselecteerd."
+        : emailFormatValid
+          ? resolvedEmail
+          : `"${resolvedEmail}" lijkt geen geldig e-mailadres (verwacht naam@domein.nl).`,
+      status: !resolvedEmail ? "missing" : emailFormatValid ? "ok" : "missing",
     },
     {
       label: "Klantcontext",
@@ -1468,7 +1709,9 @@ function upsertVariables(current: string, nextValues: Record<string, string>) {
 function readableAttachmentName(name: string) {
   return name
     .replace(/\.pdf$/i, "")
-    .replace(/henke-wonen-portal-/i, "")
+    // Generiek i.p.v. klantspecifiek: strip elk "<klant>-portal-" voorvoegsel
+    // (bijv. "henke-wonen-portal-quickstart" -> "quickstart").
+    .replace(/^.*?-portal-/i, "")
     .replace(/-Print$/i, "")
     .replace(/-/g, " ")
     .trim();
@@ -1558,6 +1801,12 @@ function isSafePreviewUrl(value: string) {
   if (!trimmed || trimmed.includes("{{") || trimmed.includes("}}")) return false;
   if (trimmed.replace(/\/+$/, "") === "https://www.laventecare.nl/contact" || trimmed.replace(/\/+$/, "") === "http://www.laventecare.nl/contact") return false;
   return trimmed.startsWith("https://") || trimmed.startsWith("http://");
+}
+
+// Bewust simpele formaatcheck (M28): vangt vergissingen als "jan" of
+// "jan@bedrijf" af zonder legitieme adressen te blokkeren.
+function isPlausibleEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.trim());
 }
 
 function hasSensitiveAccessValue(value: string) {

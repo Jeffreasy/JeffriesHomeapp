@@ -64,7 +64,15 @@ export function formatMetaDate(iso?: string) {
   if (!iso) return "nooit";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "onbekend";
-  return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  // Vastgepind op Europe/Amsterdam (net als AgendaUtils.formatDateTime) zodat
+  // de sync-timestamp niet meeschuift met de device-timezone (audit N13).
+  return date.toLocaleDateString("nl-NL", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Amsterdam",
+  });
 }
 
 /** Format a number of hours in nl-NL notation (comma decimal), e.g. 7.5 → "7,5". */

@@ -1,7 +1,7 @@
 "use client";
 
-import { AlertTriangle, ArrowUpRight, BookOpenText, BrainCircuit, CheckCircle2, ClipboardList, Download, FileText, Layers3, Printer, RotateCcw, Search, ShieldCheck } from "lucide-react";
-import type { Dispatch, SetStateAction } from "react";
+import { AlertTriangle, ArrowUpRight, BookOpenText, BrainCircuit, CheckCircle2, ClipboardList, Download, FileText, Layers3, Loader2, Printer, RotateCcw, Search, ShieldCheck } from "lucide-react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import {
   getLaventeCarePdfUrl,
   getLaventeCarePdfViewerUrl,
@@ -10,7 +10,7 @@ import {
   LAVENTECARE_LEGAL_STACK,
   LAVENTECARE_PRICING,
 } from "@/lib/laventecare";
-import { formatDate, label } from "./LaventeCareUtils";
+import { dossierDocumentViewerHref, formatDate, label } from "./LaventeCareUtils";
 import { EmptyState } from "./LaventeCareCards";
 import type { DossierAdviceItem, DossierDocumentItem, DocumentItem } from "./LaventeCareTypes";
 import { LaventeCareDocumentSuitePanel } from "./LaventeCareDocumentSuitePanel";
@@ -36,6 +36,17 @@ export function LaventeCareKnowledgeView({
   dossierAdviceError?: boolean;
   onRetryDossierAdvice?: () => void;
 }) {
+  // Directe feedback op PDF-links: generatie kan even duren, dus de geklikte
+  // link toont een paar seconden een spinner.
+  const [busyPdfKey, setBusyPdfKey] = useState<string | null>(null);
+  const markPdfBusy = (key: string) => {
+    setBusyPdfKey(key);
+    window.setTimeout(
+      () => setBusyPdfKey((current) => (current === key ? null : current)),
+      4000,
+    );
+  };
+
   const dossierKeys = new Set(dossierDocuments.map((document) => document.document_key));
   const indexedKeys = new Set(documents.map((document) => documentKeyOf(document)).filter(Boolean));
   const knownDefinitions = documents
@@ -125,23 +136,41 @@ export function LaventeCareKnowledgeView({
                       <div className="mt-4 flex flex-wrap gap-2 border-t border-white/5 pt-3">
                         <a
                           href={getLaventeCarePdfViewerUrl({ documentKey, theme: "screen" })}
+                          onClick={() => markPdfBusy(`${documentKey}:preview`)}
+                          title="PDF-generatie kan even duren"
                           className="inline-flex h-9 items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 text-xs font-semibold text-sky-300 transition hover:bg-sky-500/20"
                         >
-                          <ArrowUpRight size={14} />
+                          {busyPdfKey === `${documentKey}:preview` ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <ArrowUpRight size={14} />
+                          )}
                           Preview
                         </a>
                         <a
                           href={getLaventeCarePdfUrl({ documentKey, theme: "screen", delivery: "download" })}
+                          onClick={() => markPdfBusy(`${documentKey}:screen`)}
+                          title="PDF-generatie kan even duren"
                           className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-xs font-semibold text-slate-300 transition hover:bg-white/[0.06]"
                         >
-                          <Download size={14} />
+                          {busyPdfKey === `${documentKey}:screen` ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Download size={14} />
+                          )}
                           Screen
                         </a>
                         <a
                           href={getLaventeCarePdfUrl({ documentKey, theme: "print", delivery: "download" })}
+                          onClick={() => markPdfBusy(`${documentKey}:print`)}
+                          title="PDF-generatie kan even duren"
                           className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/20"
                         >
-                          <Printer size={14} />
+                          {busyPdfKey === `${documentKey}:print` ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <Printer size={14} />
+                          )}
                           Print
                         </a>
                       </div>
@@ -179,7 +208,9 @@ export function LaventeCareKnowledgeView({
               dossierDocuments.slice(0, 5).map((document) => (
                 <a
                   key={document.id}
-                  href={getLaventeCarePdfViewerUrl({ documentKey: document.document_key, theme: document.theme === "print" ? "print" : "screen" })}
+                  // L2: viewer-URL MET de gelogde contextparams uit de
+                  // opgeslagen pdf_url (gepersonaliseerd document).
+                  href={dossierDocumentViewerHref(document)}
                   className="block rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition hover:bg-white/[0.06]"
                 >
                   <span className="block truncate text-xs font-semibold text-slate-200">{document.titel}</span>

@@ -281,12 +281,4 @@ function NoteChip({ note, onEdit, tone }: { note: NoteRecord; onEdit?: (note: No
   );
 }
 
-/* ─── Legacy exports (keep DayBlock for other consumers) ──────────────── */
-
 export { type PersonalEvent } from "@/hooks/usePersonalEvents";
-
-// Re-export unused but previously exported names so any stale imports don't break
-export const MetricTile = () => null;
-export const SectionHeader = () => null;
-export const ToolbarButton = () => null;
-export const DayBlock = TimelineDay;

@@ -7,7 +7,8 @@ import { type DeviceCommand } from "@/lib/api";
 interface ShortcutOptions {
   devices: Device[];
   allOn: boolean;
-  sendCommand: (args: { id: string; cmd: DeviceCommand }) => void;
+  /** Batch-sender uit useLampCommand — één invalidate i.p.v. N refetches. */
+  sendBatch: (targets: Device[], cmd: DeviceCommand) => void;
 }
 
 /**
@@ -16,20 +17,27 @@ interface ShortcutOptions {
  * Shortcuts:
  *   - Spatiebalk → toggle alle lampen aan/uit
  */
-export function useGlobalShortcuts({ devices, allOn, sendCommand }: ShortcutOptions) {
+export function useGlobalShortcuts({ devices, allOn, sendBatch }: ShortcutOptions) {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      // Skip als gebruiker in een invoerveld typt
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+
+      // Skip als gebruiker in een invoerveld typt of een knop/link gefocust
+      // heeft: spatie moet dan het element activeren, niet alle lampen flippen.
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON" || tag === "A") return;
+      if (target?.isContentEditable) return;
+      // Skip zolang er een dialog/sheet open staat (detailpaneel, confirm,
+      // form) — zelfde brede selector als FocusModeControl.
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [aria-modal="true"]')) return;
 
       if (e.code === "Space") {
         e.preventDefault();
-        devices.forEach((d) => sendCommand({ id: d.id, cmd: { on: !allOn } }));
+        sendBatch(devices, { on: !allOn });
       }
     };
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [devices, allOn, sendCommand]);
+  }, [devices, allOn, sendBatch]);
 }

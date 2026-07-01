@@ -28,7 +28,7 @@ export function LampCommandCenter({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Command center
+              Bediening
             </p>
             <h2 className="mt-1 text-xl font-bold text-white">Woningverlichting</h2>
             <p className="mt-1 text-sm text-slate-500">

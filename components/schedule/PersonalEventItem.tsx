@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { personalEventsApi } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Clock, CalendarDays, AlertTriangle, Trash2, Loader2, X, Check, Pencil } from "lucide-react";
@@ -9,6 +10,7 @@ import { type ConflictInfo } from "@/lib/conflictDetection";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { resolveAppIconName } from "@/lib/symbols";
 import {
+  applyEventStatusToCache,
   type PersonalEvent,
   formatDateRange,
   getTimeLabel,
@@ -46,6 +48,7 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
   const symbol = resolveAppIconName(event.symbol, isRooster ? "roster" : "agenda");
 
   const { success, error, toast } = useToast();
+  const queryClient = useQueryClient();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -57,8 +60,11 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
     }
 
     setIsDeleting(true);
+    // Optimistic: de rij verdwijnt direct uit de lijst; bij een fout wordt de
+    // cache-snapshot teruggezet (audit M16).
+    const nextStatus = event.status === "PendingCreate" ? "VERWIJDERD" : "PendingDelete";
+    const rollback = applyEventStatusToCache(queryClient, event.userId, event.eventId, nextStatus);
     try {
-      const nextStatus = event.status === "PendingCreate" ? "VERWIJDERD" : "PendingDelete";
       const result = await personalEventsApi.updateStatus(event.userId, event.eventId, nextStatus);
       if (result.instantSync || nextStatus === "VERWIJDERD") {
         success(nextStatus === "PendingDelete" ? "Afspraak direct verwijderd uit Google Calendar" : "Afspraak verwijderd");
@@ -72,6 +78,7 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
       }
       await onRefetch?.();
     } catch (e) {
+      rollback();
       error(`Mislukt: ${e instanceof Error ? e.message : "onbekende fout"}`);
       setConfirmDelete(false);
     } finally {
@@ -210,9 +217,12 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
         </div>
       </div>
 
-      {/* Actions — visible on hover */}
-      {!isRooster && !compact && (
-        <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
+      {/* Actions — altijd op touch, hover-reveal op desktop. Ook in compact
+          modus (mobiele weeklijst) zichtbaar zodat verwijderen/wijzigen daar
+          niet onbereikbaar is (audit K13). group-focus-within houdt de knoppen
+          zichtbaar zodra ze per toetsenbord gefocust zijn (audit F4). */}
+      {!isRooster && (
+        <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
           <AnimatePresence mode="wait">
             {isDeleting ? (
               <motion.div key="loader" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>

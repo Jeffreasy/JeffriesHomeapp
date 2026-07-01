@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { StickyNote, Plus, ChevronRight, Pin, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
+import { usePrivacy } from "@/hooks/usePrivacy";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
 import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
@@ -12,7 +13,9 @@ import { resolveAppIconName } from "@/lib/symbols";
 import { businessContextLabel, enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
 
 export function QuickNote() {
-  const { notes, create, isLoading } = useNotes();
+  const { notes, active, create, isLoading } = useNotes();
+  // N5: het dashboard moet dezelfde notes-privacyscope respecteren als /notities.
+  const { hidden: privacyOn } = usePrivacy("notes");
   const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -24,8 +27,12 @@ export function QuickNote() {
     try {
       const { cleanText, extractedTags } = parseHashTags(text.trim());
       const matchedBusinessContext = resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
-      const enriched = enrichNoteDraft({ content: cleanText, tags: extractedTags, businessContext: matchedBusinessContext });
+      const enriched = enrichNoteDraft({ title: cleanText, content: cleanText, tags: extractedTags, businessContext: matchedBusinessContext });
+      // Consistent met /notities (low): leid een titel af uit de eerste regel,
+      // code-point-safe afgekapt zodat een emoji-surrogaatpaar niet splitst.
+      const titleChars = Array.from(cleanText);
       await create({
+        titel: titleChars.length > 80 ? `${titleChars.slice(0, 77).join("")}...` : cleanText,
         inhoud: cleanText,
         tags: enriched.tags.length > 0 ? enriched.tags : undefined,
         symbol: enriched.symbol,
@@ -34,12 +41,19 @@ export function QuickNote() {
         businessContextTitle: enriched.businessContext?.title ?? undefined,
       });
       setText("");
+    } catch {
+      // useNotes toast de fout al — deze catch voorkomt alleen een unhandled
+      // rejection (N5).
     } finally {
       setSaving(false);
     }
   };
 
-  const recent = notes.slice(0, 3);
+  // "Recent" (low): écht recent — gearchiveerd/afgerond uitgesloten (active) en
+  // gesorteerd op laatst gewijzigd, niet de pinned-first serverordening.
+  const recent = [...active]
+    .sort((a, b) => (b.gewijzigd || b.aangemaakt).localeCompare(a.gewijzigd || a.aangemaakt))
+    .slice(0, 3);
   const totalPinned = notes.filter((n) => n.isPinned).length;
   const quickParsed = parseHashTags(text);
   const quickContext = getPrimaryWorkspaceContext(text, quickParsed.extractedTags);
@@ -76,6 +90,7 @@ export function QuickNote() {
           <input
             type="text"
             placeholder="Snel noteren... (#tag voor labels)"
+            aria-label="Snel noteren"
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -91,11 +106,12 @@ export function QuickNote() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               whileTap={{ scale: 0.9 }}
-              onClick={handleQuickSave}
+              onClick={() => void handleQuickSave()}
               disabled={saving}
+              aria-label="Snelle notitie opslaan"
               className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer"
             >
-              <Plus size={14} />
+              <Plus size={14} aria-hidden="true" />
             </motion.button>
           )}
         </div>
@@ -132,7 +148,7 @@ export function QuickNote() {
       {!isLoading && recent.length > 0 && (
         <div className="space-y-1">
           {recent.map((note) => (
-            <RecentNoteRow key={note._id} note={note} />
+            <RecentNoteRow key={note._id} note={note} masked={privacyOn} />
           ))}
         </div>
       )}
@@ -140,9 +156,9 @@ export function QuickNote() {
   );
 }
 
-function RecentNoteRow({ note }: { note: NoteRecord }) {
-  const displayTitle = note.titel || note.inhoud.slice(0, 50);
-  const checklistInfo = getQuickChecklistInfo(note.inhoud);
+function RecentNoteRow({ note, masked = false }: { note: NoteRecord; masked?: boolean }) {
+  const displayTitle = masked ? "••••••" : note.titel || note.inhoud.slice(0, 50);
+  const checklistInfo = masked ? null : getQuickChecklistInfo(note.inhoud);
 
   return (
     <Link href="/notities">

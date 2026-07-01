@@ -8,6 +8,7 @@ import {
   useGetScheduleMeta,
   postScheduleImport,
 } from "@/lib/api/generated/schedule/schedule";
+import { scheduleApi } from "@/lib/api";
 import {
   type DienstRow,
   type ScheduleMeta,
@@ -53,12 +54,24 @@ export function useSchedule() {
   // Force refetch trigger
   const [version, setVersion] = useState(0);
 
-  const { data: scheduleRaw, isLoading: loadingSchedule, refetch: refetchSchedule } = useGetSchedule(
+  const {
+    data: scheduleRaw,
+    isLoading: loadingSchedule,
+    isError: scheduleIsError,
+    error: scheduleError,
+    refetch: refetchSchedule,
+  } = useGetSchedule(
     { userId },
     { query: { enabled: !!userId } }
   );
-  
-  const { data: metaRaw, isLoading: loadingMeta, refetch: refetchMeta } = useGetScheduleMeta(
+
+  const {
+    data: metaRaw,
+    isLoading: loadingMeta,
+    isError: metaIsError,
+    error: metaError,
+    refetch: refetchMeta,
+  } = useGetScheduleMeta(
     { userId },
     { query: { enabled: !!userId } }
   );
@@ -94,6 +107,10 @@ export function useSchedule() {
     : null;
 
   const isLoading = loadingSchedule || loadingMeta;
+  // Failed ≠ empty (audit R2 DEEL 2 #2): expose fetch failures so the pages
+  // can render an error branch instead of the misleading empty-state CTA.
+  const isError = scheduleIsError || metaIsError;
+  const error: unknown = scheduleError ?? metaError ?? null;
 
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/schedule"] });
@@ -106,7 +123,9 @@ export function useSchedule() {
 
   const clear = useCallback(async () => {
     if (!userId) return;
-    await postScheduleImport({ userId, fileName: "", rows: [] } as unknown as Parameters<typeof postScheduleImport>[0]);
+    // Echte wis-actie (audit N2): DELETE /schedule verwijdert alle diensten
+    // (204). De oude POST met lege rows werd door de backend hard geweigerd.
+    await scheduleApi.clear(userId);
     invalidateAll();
     setVersion(v => v + 1);
   }, [userId, invalidateAll]);
@@ -167,6 +186,8 @@ export function useSchedule() {
     thisWeek:   getThisWeek(diensten),
     upcoming:   getUpcoming(diensten, 30),
     isLoading,
+    isError,
+    error,
     importCsv,
     clear,
     toggleStatus,

@@ -80,11 +80,13 @@ interface DeviceLike {
     r?: number;
     g?: number;
     b?: number;
+    /** WiZ native effect-ID — aanwezig wanneer een ingebouwde scene actief is. */
+    scene_id?: number;
   };
 }
 
 /**
- * Vergelijk de actuele staat van lampen met alle presets.
+ * Vergelijk de actuele staat van lampen met alle presets (custom én WiZ).
  * Geeft het id terug van de preset die het meest overeenkomt (>= 70% match),
  * of null als geen overeenkomst gevonden.
  */
@@ -95,7 +97,7 @@ export function detectActiveScene(devices: DeviceLike[]): string | null {
   const allOff = online.every((d) => !d.current_state?.on);
   if (allOff) return "uit";
 
-  for (const preset of CUSTOM_SCENES) {
+  for (const preset of [...CUSTOM_SCENES, ...WIZ_SCENES]) {
     const cmd = preset.command;
     const threshold = Math.ceil(online.length * 0.7); // 70% moet matchen
 
@@ -103,6 +105,12 @@ export function detectActiveScene(devices: DeviceLike[]): string | null {
       const s = d.current_state;
       if (!s) return false;
       if (cmd.on !== undefined && Boolean(s.on) !== cmd.on) return false;
+      // WiZ native scenes: match op effect-ID.
+      if (cmd.scene_id !== undefined) {
+        return (s.scene_id ?? 0) === cmd.scene_id;
+      }
+      // Custom presets: een lamp die in een WiZ-effect staat telt niet mee.
+      if ((s.scene_id ?? 0) !== 0) return false;
       if (cmd.brightness !== undefined && Math.abs((s.brightness ?? 100) - cmd.brightness) > 8) return false;
       if (cmd.color_temp_mireds !== undefined) {
         const targetK = Math.round(1_000_000 / cmd.color_temp_mireds);

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import {
   Area,
@@ -9,7 +10,6 @@ import {
   CartesianGrid,
   Cell,
   Label,
-  Legend,
   Pie,
   PieChart,
   ReferenceLine,
@@ -20,11 +20,32 @@ import {
 } from "recharts";
 import { SectionTitle } from "./FinanceCards";
 import { ChartTooltip, PieTooltip } from "./ChartTooltips";
+import { formatMonth } from "./FinanceUtils";
 import { cn } from "@/lib/utils";
 import { getCatColor, ibanLabel } from "@/lib/finance-constants";
 import type { TransactionFilter } from "@/hooks/useTransactions";
 
 type ChartView = "saldo" | "inuit";
+
+// Aantal echte categorie-slices in de pie; de rest wordt samengevoegd in één
+// "Overige categorieën"-slice zodat pie, legenda en center-totaal kloppen.
+const PIE_TOP_SLICES = 7;
+const PIE_REST_LABEL = "Overige categorieën";
+// Duidelijk anders dan de échte categorie "Overig" (#64748b) — de
+// geaggregeerde rest-slice mag niet met die categorie verward worden (C2).
+const PIE_REST_COLOR = "#cbd5e1";
+
+// C3: uitgaven in oranje i.p.v. rood — rood/groen naast elkaar is voor
+// rood-groen-kleurenblinden niet te onderscheiden; oranje/groen wél.
+const INCOME_COLOR = "#22c55e";
+const EXPENSE_COLOR = "#f97316";
+
+// Onder de €2.000 zegt "€0k"/"€1k" niets — toon dan hele euro's.
+function yAxisEuro(value: number) {
+  return Math.abs(value) < 2000
+    ? `€${Math.round(value).toLocaleString("nl-NL")}`
+    : `€${(value / 1000).toFixed(0)}k`;
+}
 
 export function FinanceCharts({
   stats,
@@ -51,6 +72,27 @@ export function FinanceCharts({
   formatPrivateEuro: (value: number) => string;
   formatPrivateEuroExact: (value: number) => string;
 }) {
+  // Top-N categorieën + één geaggregeerde rest-slice, zodat de pie, de
+  // legenda én het center-totaal exact dezelfde dataset beschrijven.
+  const pieData = useMemo(() => {
+    const all: any[] = stats.uitPerCategorie ?? [];
+    const top = all.slice(0, PIE_TOP_SLICES);
+    const rest = all.slice(PIE_TOP_SLICES);
+    if (rest.length === 0) return top;
+    // C2: één overgebleven categorie niet wegaggregeren tot "Overige
+    // categorieën" — toon hem gewoon als zichzelf (zelfde aantal slices).
+    if (rest.length === 1) return [...top, ...rest];
+    const restBedrag = rest.reduce((sum: number, c: any) => sum + (c.bedrag ?? 0), 0);
+    const restCount = rest.reduce((sum: number, c: any) => sum + (c.count ?? 0), 0);
+    const restPct = stats.totaalUit > 0
+      ? Math.round((restBedrag / stats.totaalUit) * 1000) / 10
+      : 0;
+    return [
+      ...top,
+      { categorie: PIE_REST_LABEL, bedrag: restBedrag, count: restCount, percentage: restPct, isRest: true },
+    ];
+  }, [stats.uitPerCategorie, stats.totaalUit]);
+
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="glass p-4">
@@ -84,7 +126,15 @@ export function FinanceCharts({
           }
         />
 
-        <div className="mt-5 h-[320px] min-h-[320px]">
+        <div
+          className="mt-5 h-[320px] min-h-[320px]"
+          role="img"
+          aria-label={
+            chartView === "saldo"
+              ? `Lijndiagram: saldoverloop per maand, ${stats.saldoPerMaand.length} maanden`
+              : `Staafdiagram: inkomsten (groen) en uitgaven (oranje) per maand, ${inUitMetSalaris.length} maanden`
+          }
+        >
           <ResponsiveContainer width="100%" height="100%">
             {chartView === "saldo" ? (
               <AreaChart data={stats.saldoPerMaand} margin={{ top: 10, right: 14, bottom: 0, left: 0 }}>
@@ -95,12 +145,12 @@ export function FinanceCharts({
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="maand" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
+                <XAxis dataKey="maand" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatMonth} />
                 <YAxis
                   tick={{ fill: "#64748b", fontSize: 11 }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(value) => privacyOn ? "••••" : `€${(Number(value) / 1000).toFixed(0)}k`}
+                  tickFormatter={(value) => privacyOn ? "••••" : yAxisEuro(Number(value))}
                 />
                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.14)" />
                 <Tooltip content={<ChartTooltip valueFormatter={formatPrivateEuro} />} />
@@ -117,17 +167,19 @@ export function FinanceCharts({
             ) : (
               <BarChart data={inUitMetSalaris} margin={{ top: 10, right: 14, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="maand" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} />
+                <XAxis dataKey="maand" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatMonth} />
                 <YAxis
                   tick={{ fill: "#64748b", fontSize: 11 }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(value) => privacyOn ? "••••" : `€${(Number(value) / 1000).toFixed(0)}k`}
+                  tickFormatter={(value) => privacyOn ? "••••" : yAxisEuro(Number(value))}
                 />
                 <Tooltip content={<ChartTooltip valueFormatter={formatPrivateEuro} />} />
-                <Legend wrapperStyle={{ fontSize: "0.75rem", color: "#64748b" }} />
-                <Bar dataKey="inkomsten" name="Inkomsten" fill="#22c55e" radius={[4, 4, 0, 0]} opacity={0.86} />
-                <Bar dataKey="uitgaven" name="Uitgaven" fill="#ef4444" radius={[4, 4, 0, 0]} opacity={0.72} />
+                {/* C1: geen decoratieve recharts-Legend — tooltip, gekleurde
+                    series en het aria-label dekken de betekenis al; de enige
+                    legend-conventie die overblijft is de interactieve pie. */}
+                <Bar dataKey="inkomsten" name="Inkomsten" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} opacity={0.86} />
+                <Bar dataKey="uitgaven" name="Uitgaven" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} opacity={0.86} />
                 {loonstrokenCount > 0 && (
                   <Bar dataKey="salaris" name="Netto salaris" fill="#818cf8" radius={[4, 4, 0, 0]} opacity={0.76} />
                 )}
@@ -141,13 +193,17 @@ export function FinanceCharts({
         <SectionTitle
           icon={PieChartIcon}
           title="Verdeling"
-          subtitle={`${stats.aantalCategorieen} categorieen`}
+          subtitle={`${stats.aantalCategorieen} categorieën`}
         />
-        <div className="mt-4 h-[238px] min-h-[238px]">
+        <div
+          className="mt-4 h-[238px] min-h-[238px]"
+          role="img"
+          aria-label={`Cirkeldiagram: uitgavenverdeling over ${stats.aantalCategorieen} categorieën, totaal ${formatPrivateEuro(stats.totaalUit)}`}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
-                data={stats.uitPerCategorie.slice(0, 12)}
+                data={pieData}
                 cx="50%"
                 cy="50%"
                 innerRadius={60}
@@ -157,8 +213,12 @@ export function FinanceCharts({
                 nameKey="categorie"
                 strokeWidth={0}
               >
-                {stats.uitPerCategorie.slice(0, 12).map((entry: any) => (
-                  <Cell key={entry.categorie} fill={getCatColor(entry.categorie)} opacity={0.86} />
+                {pieData.map((entry: any) => (
+                  <Cell
+                    key={entry.categorie}
+                    fill={entry.isRest ? PIE_REST_COLOR : getCatColor(entry.categorie)}
+                    opacity={0.86}
+                  />
                 ))}
                 <Label
                   position="center"
@@ -168,7 +228,7 @@ export function FinanceCharts({
                         {formatPrivateEuro(stats.totaalUit)}
                       </tspan>
                       <tspan x="50%" dy="16" fill="#64748b" fontSize="0.62rem">
-                        totaal uit
+                        totaal uitgaven (periode)
                       </tspan>
                     </text>
                   )}
@@ -179,21 +239,35 @@ export function FinanceCharts({
           </ResponsiveContainer>
         </div>
         <div className="mt-4 space-y-1">
-          {stats.uitPerCategorie.slice(0, 7).map((entry: any) => (
-            <button
-              key={entry.categorie}
-              type="button"
-              onClick={() => toggleCategoryFilter(entry.categorie)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors",
-                filters.categorieFilter === entry.categorie ? "bg-amber-500/10" : "hover:bg-[rgba(255,255,255,0.04)]"
-              )}
-            >
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: getCatColor(entry.categorie) }} />
-              <span className="min-w-0 flex-1 truncate text-sm text-slate-300">{entry.categorie}</span>
-              <span className="text-xs font-semibold text-slate-500">{entry.percentage}%</span>
-            </button>
-          ))}
+          {/* Legenda toont exact dezelfde slices als de pie, inclusief de
+              geaggregeerde rest-slice (die is niet klikbaar: het is geen
+              echte categorie om op te filteren). */}
+          {pieData.map((entry: any) =>
+            entry.isRest ? (
+              <div
+                key={entry.categorie}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left"
+              >
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PIE_REST_COLOR }} />
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-400">{entry.categorie}</span>
+                <span className="text-xs font-semibold text-slate-500">{entry.percentage}%</span>
+              </div>
+            ) : (
+              <button
+                key={entry.categorie}
+                type="button"
+                onClick={() => toggleCategoryFilter(entry.categorie)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors",
+                  filters.categorieFilter === entry.categorie ? "bg-amber-500/10" : "hover:bg-[rgba(255,255,255,0.04)]"
+                )}
+              >
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: getCatColor(entry.categorie) }} />
+                <span className="min-w-0 flex-1 truncate text-sm text-slate-300">{entry.categorie}</span>
+                <span className="text-xs font-semibold text-slate-500">{entry.percentage}%</span>
+              </button>
+            )
+          )}
         </div>
       </div>
     </section>

@@ -1,14 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Filter, X, ChevronDown, ChevronUp,
   ArrowUpRight, ArrowDownRight, ArrowLeftRight,
   Tag, Calendar, Euro, FileText, RotateCcw,
 } from "lucide-react";
-import { CATEGORIE_OPTIES, CODE_LABELS } from "@/lib/finance-constants";
+import { CATEGORIE_OPTIES, CODE_LABELS, eurExact } from "@/lib/finance-constants";
 import type { TransactionFilter } from "@/hooks/useTransactions";
+
+// Accepteert Nederlandse invoer: "1.234,56" → 1234.56, "12,50" → 12.5. Zonder
+// komma wordt een punt als decimaalteken gelezen ("12.50" blijft werken).
+function parseAmountInput(raw: string): number | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const normalized = trimmed.includes(",")
+    ? trimmed.replace(/\./g, "").replace(",", ".")
+    : trimmed;
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function amountToInput(value: number | undefined): string {
+  return value === undefined ? "" : String(value).replace(".", ",");
+}
 
 // ─── Active Filter Chip ──────────────────────────────────────────────────────
 
@@ -53,6 +69,22 @@ interface FilterPanelProps {
 export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] }: FilterPanelProps) {
   const [expanded, setExpanded] = useState(false);
 
+  // Lokale tekst-state voor de bedragvelden: zo kan de gebruiker vrij typen
+  // ("1.234,56") terwijl het geparste getal naar de filters gaat. Extern
+  // resetten (chips/Reset-knop) synct de tekst terug.
+  const [minText, setMinText] = useState(() => amountToInput(filters.minBedrag));
+  const [maxText, setMaxText] = useState(() => amountToInput(filters.maxBedrag));
+  useEffect(() => {
+    setMinText((current) =>
+      parseAmountInput(current) === filters.minBedrag ? current : amountToInput(filters.minBedrag)
+    );
+  }, [filters.minBedrag]);
+  useEffect(() => {
+    setMaxText((current) =>
+      parseAmountInput(current) === filters.maxBedrag ? current : amountToInput(filters.maxBedrag)
+    );
+  }, [filters.maxBedrag]);
+
   const activeCount = [
     filters.categorieFilter,
     filters.richting,
@@ -69,13 +101,16 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
   const chips: Array<{ label: string; onRemove: () => void }> = [];
   if (filters.categorieFilter) chips.push({ label: `Categorie: ${filters.categorieFilter}`, onRemove: () => onChange({ categorieFilter: undefined }) });
   if (filters.richting) chips.push({ label: filters.richting === "in" ? "Alleen inkomsten" : "Alleen uitgaven", onRemove: () => onChange({ richting: undefined }) });
-  if (filters.minBedrag !== undefined) chips.push({ label: `Min: €${filters.minBedrag}`, onRemove: () => onChange({ minBedrag: undefined }) });
-  if (filters.maxBedrag !== undefined) chips.push({ label: `Max: €${filters.maxBedrag}`, onRemove: () => onChange({ maxBedrag: undefined }) });
+  if (filters.minBedrag !== undefined) chips.push({ label: `Min: ${eurExact(filters.minBedrag)}`, onRemove: () => onChange({ minBedrag: undefined }) });
+  if (filters.maxBedrag !== undefined) chips.push({ label: `Max: ${eurExact(filters.maxBedrag)}`, onRemove: () => onChange({ maxBedrag: undefined }) });
   if (filters.datumVan) chips.push({ label: `Vanaf: ${filters.datumVan}`, onRemove: () => onChange({ datumVan: undefined }) });
   if (filters.datumTot) chips.push({ label: `Tot: ${filters.datumTot}`, onRemove: () => onChange({ datumTot: undefined }) });
   if (filters.maandFilter) chips.push({ label: `Maand: ${filters.maandFilter}`, onRemove: () => onChange({ maandFilter: undefined }) });
   if (filters.codeFilter) chips.push({ label: `Type: ${CODE_LABELS[filters.codeFilter] ?? filters.codeFilter}`, onRemove: () => onChange({ codeFilter: undefined }) });
   if (filters.onlyStorneringen) chips.push({ label: "Storneringen", onRemove: () => onChange({ onlyStorneringen: false }) });
+  // excludeIntern === false telt mee in de badge, dus moet ook als chip
+  // zichtbaar (en verwijderbaar) zijn — anders klopt de teller niet.
+  if (filters.excludeIntern === false) chips.push({ label: "Interne overboekingen zichtbaar", onRemove: () => onChange({ excludeIntern: true }) });
 
   return (
     <div className="filter-panel">
@@ -152,26 +187,30 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
               <div className="filter-range__field">
                 <label className="filter-range__label">Min (€)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   className="filter-range__input"
-                  placeholder="0"
-                  value={filters.minBedrag ?? ""}
-                  onChange={(e) => onChange({ minBedrag: e.target.value ? Number(e.target.value) : undefined })}
-                  min={0}
-                  step="0.01"
+                  placeholder="0,00"
+                  value={minText}
+                  onChange={(e) => {
+                    setMinText(e.target.value);
+                    onChange({ minBedrag: parseAmountInput(e.target.value) });
+                  }}
                 />
               </div>
               <span className="filter-range__sep">–</span>
               <div className="filter-range__field">
                 <label className="filter-range__label">Max (€)</label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   className="filter-range__input"
                   placeholder="∞"
-                  value={filters.maxBedrag ?? ""}
-                  onChange={(e) => onChange({ maxBedrag: e.target.value ? Number(e.target.value) : undefined })}
-                  min={filters.minBedrag ?? 0}
-                  step="0.01"
+                  value={maxText}
+                  onChange={(e) => {
+                    setMaxText(e.target.value);
+                    onChange({ maxBedrag: parseAmountInput(e.target.value) });
+                  }}
                   aria-invalid={filters.minBedrag != null && filters.maxBedrag != null && filters.minBedrag > filters.maxBedrag}
                 />
               </div>

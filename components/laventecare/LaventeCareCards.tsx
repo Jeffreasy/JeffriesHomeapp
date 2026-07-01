@@ -130,12 +130,23 @@ export function SignalCard({
   );
 }
 
+// Dutch labels for the raw follow-up source enum (mirrors sourceTypeLabel in
+// LaventeCareMailboxView) — no raw "company"/"workstream" on cards.
+const followUpSourceLabels: Record<FollowUpSignal["source"], string> = {
+  company: "Klant",
+  lead: "Lead",
+  workstream: "Opdracht",
+  project: "Project",
+};
+
 export function FollowUpCard({ followUp }: { followUp: FollowUpSignal }) {
   return (
     <div className="glass min-w-0 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{followUp.source}</p>
+          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">
+            {followUpSourceLabels[followUp.source] ?? label(followUp.source)}
+          </p>
           <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-white">{followUp.title}</h3>
         </div>
         <span className={cn(

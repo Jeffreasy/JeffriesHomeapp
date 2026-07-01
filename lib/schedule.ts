@@ -276,9 +276,10 @@ export function getUpcoming(diensten: DienstRow[], days = 30): DienstRow[] {
 }
 
 export function getNextDienst(diensten: DienstRow[]): DienstRow | null {
-  const upcoming = getUpcoming(diensten);
+  const upcoming = getUpcoming(diensten).filter(d => !d.heledag);
   return upcoming.find(d => d.status === "Bezig") ?? upcoming[0] ?? null;
 }
+
 
 export function getThisWeek(diensten: DienstRow[]): DienstRow[] {
   return getUpcoming(diensten, 7);
@@ -298,32 +299,34 @@ export function formatDienst(d: DienstRow): string {
 
 // ─── Stats & Grouping helpers ─────────────────────────────────────────────────
 
-/** Group diensten by weeknr, sorted ascending */
-
-/** Normalise weeknr: converts full date-strings to "YYYY-WW" */
-function normalizeWeekNr(raw: string): string {
-  if (!raw) return "?";
-  // Already compact (e.g. "2026-14" or "14")
-  if (raw.length <= 10 && !raw.includes(":")) return raw;
-  // Try to parse as date
+/**
+ * ISO-8601 week key "YYYY-WW" for a date string ("YYYY-MM-DD"). Single shared
+ * implementation (audit F5) — also used by lib/unified.ts for the timeline.
+ * ISO year ≠ calendar year around the year boundary (e.g. 2026-12-29 → 2027-01).
+ */
+export function getIsoWeek(dateStr: string): string {
   try {
-    const d = new Date(raw);
-    if (isNaN(d.getTime())) return raw.slice(0, 10);
-    // ISO week calculation
-    const jan4   = new Date(d.getFullYear(), 0, 4);
-    const monday = new Date(jan4);
-    monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-    const weekNum = Math.floor((d.getTime() - monday.getTime()) / (7 * 86_400_000)) + 1;
-    return `${d.getFullYear()}-${String(weekNum).padStart(2, "0")}`;
+    const d = new Date(dateStr + "T12:00:00"); // veilige parse
+    if (isNaN(d.getTime())) return "Onbekend";
+
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNum = Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+
+    return `${date.getUTCFullYear()}-${String(weekNum).padStart(2, "0")}`;
   } catch {
-    return raw.slice(0, 10);
+    return "Onbekend";
   }
 }
 
+/** Group diensten by ISO week, sorted ascending. The week is always computed
+ *  from startDatum — the CSV "Weeknr" column is ignored because it has proven
+ *  unreliable around year boundaries (audit F5). */
 export function groupByWeekNr(diensten: DienstRow[]): { weeknr: string; rows: DienstRow[] }[] {
   const map = new Map<string, DienstRow[]>();
   for (const d of diensten) { if (d.status === "VERWIJDERD") continue;
-    const key = normalizeWeekNr(d.weeknr || "?");
+    const key = d.startDatum ? getIsoWeek(d.startDatum) : "?";
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(d);
   }
@@ -473,6 +476,8 @@ export interface WeeklyBalance {
   actualHours: number;
   expectedHours: number;
   delta: number;
+  /** Week ligt ná de huidige ISO-week — gepland, telt niet mee in totalDelta (audit F6). */
+  future: boolean;
 }
 
 export interface ContractStats {
@@ -481,14 +486,11 @@ export interface ContractStats {
   totalDelta: number;
 }
 
-/** Current ISO week key in the same "YYYY-WW" format groupByWeekNr produces */
+/** Current ISO week key in the same "YYYY-WW" format groupByWeekNr produces.
+ *  Delegates to the shared getIsoWeek helper so the year-boundary weeks
+ *  (e.g. 29 dec → "2027-01", not "2026-53") are correct (audit F5). */
 export function getCurrentWeekNr(date = new Date()): string {
-  const d = new Date(getAmsterdamParts(date).date);
-  const jan4   = new Date(d.getFullYear(), 0, 4);
-  const monday = new Date(jan4);
-  monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-  const weekNum = Math.floor((d.getTime() - monday.getTime()) / (7 * 86_400_000)) + 1;
-  return `${d.getFullYear()}-${String(weekNum).padStart(2, "0")}`;
+  return getIsoWeek(getAmsterdamParts(date).date);
 }
 
 /**
@@ -514,23 +516,29 @@ export function getCurrentWeekBalance(
   return stats.weeklyBalances[0];
 }
 
-export function analyzeContract(diensten: DienstRow[], contractUren = 16): ContractStats {
+export function analyzeContract(diensten: DienstRow[], contractUren = 16, date = new Date()): ContractStats {
   const weeks = groupByWeekNr(diensten);
-  
+  const currentWeekNr = getCurrentWeekNr(date);
+
   let totalDelta = 0;
   const weeklyBalances: WeeklyBalance[] = [];
 
   for (const week of weeks) {
     const actualHours = calcTotalHours(week.rows);
     const delta = Math.round((actualHours - contractUren) * 10) / 10;
-    
-    totalDelta += delta;
-    
+    // Toekomstige (nog niet begonnen) weken zijn "gepland": ze tellen niet mee
+    // in de totaalbalans, anders drukt elke lege toekomstige week de balans
+    // met -contractUren omlaag (audit F6).
+    const future = week.weeknr.localeCompare(currentWeekNr, undefined, { numeric: true }) > 0;
+
+    if (!future) totalDelta += delta;
+
     weeklyBalances.push({
       weeknr: week.weeknr,
       actualHours,
       expectedHours: contractUren,
       delta,
+      future,
     });
   }
 

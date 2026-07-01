@@ -3,7 +3,11 @@ import type { TransactionFilter } from "@/hooks/useTransactions";
 import { eurExact } from "@/lib/finance-constants";
 
 export function exportCsv(transactions: TransactionRow[]) {
-  const header = "Datum,Tegenpartij,Omschrijving,Bedrag,Code,Categorie";
+  // Semicolon-separated with a leading "sep=;" hint: the Dutch Excel
+  // convention (nl-NL uses the decimal comma, so ";" is the list separator).
+  // Comma-separated files open as one single column there.
+  const SEP = ";";
+  const header = ["Datum", "Tegenpartij", "Omschrijving", "Bedrag", "Code", "Categorie"].join(SEP);
   const DQ = String.fromCharCode(34);
   // Escape embedded double-quotes and collapse any CR/LF inside a field to a
   // single space, so the value stays on one CSV line for naive consumers.
@@ -13,12 +17,13 @@ export function exportCsv(transactions: TransactionRow[]) {
       tx.datum,
       `"${escQ(tx.tegenpartijNaam ?? "Onbekend")}"`,
       `"${escQ(tx.omschrijving)}"`,
-      tx.bedrag.toFixed(2).replace(".", ","),
+      `"${tx.bedrag.toFixed(2).replace(".", ",")}"`,
       tx.code,
       tx.categorie ?? "Overig",
-    ].join(",")
+    ].join(SEP)
   );
-  const csv = [header, ...rows].join("\n");
+
+  const csv = [`sep=${SEP}`, header, ...rows].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -48,7 +53,10 @@ export function formatPercent(value: number) {
 }
 
 export function signedEuro(value: number) {
-  return `${value >= 0 ? "+" : ""}${eurExact(value)}`;
+  // Normaliseer -0 (komt uit sommen/afrondingen) — anders rendert dit als
+  // "+€ -0,00".
+  const normalized = Object.is(value, -0) ? 0 : value;
+  return `${normalized >= 0 ? "+" : ""}${eurExact(normalized)}`;
 }
 
 export function activeFilterCount(filters: TransactionFilter) {

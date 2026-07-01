@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Banknote,
   CheckCircle2,
@@ -9,10 +9,15 @@ import {
   FileSignature,
   FileText,
   Loader2,
+  Pencil,
   RefreshCw,
   ReceiptText,
+  RotateCcw,
+  Search,
   Send,
   ShieldCheck,
+  Trash2,
+  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
@@ -32,9 +37,11 @@ import {
   type WorkstreamItem,
 } from "./LaventeCareTypes";
 import {
+  daysPastDue,
   formatCents,
   formatDate,
   formatMinutes,
+  isPastDate,
   label,
 } from "./LaventeCareUtils";
 
@@ -111,6 +118,7 @@ export function LaventeCareBillingView({
   updatingInvoiceId,
   requestingPaymentInvoiceId,
   generatingInvoiceDocumentId,
+  downloadingInvoiceUBLId,
   refreshingPaymentInvoiceId,
   onCreateQuote,
   onCreateTimeEntry,
@@ -123,6 +131,12 @@ export function LaventeCareBillingView({
   onDownloadInvoiceUBL,
   onRefreshInvoicePayment,
   onOpenMailboxForInvoice,
+  updatingTimeEntryId,
+  onUpdateTimeEntry,
+  onWriteOffTimeEntry,
+  onReopenTimeEntry,
+  onDeleteTimeEntry,
+  onDirtyChange,
 }: {
   billing?: BillingItem;
   billingLoading: boolean;
@@ -140,6 +154,7 @@ export function LaventeCareBillingView({
   updatingInvoiceId: string | null;
   requestingPaymentInvoiceId: string | null;
   generatingInvoiceDocumentId: string | null;
+  downloadingInvoiceUBLId: string | null;
   refreshingPaymentInvoiceId: string | null;
   onCreateQuote: (payload: QuotePayload) => Promise<void>;
   onCreateTimeEntry: (payload: TimeEntryPayload) => Promise<void>;
@@ -152,6 +167,14 @@ export function LaventeCareBillingView({
   onDownloadInvoiceUBL: (id: string) => Promise<void>;
   onRefreshInvoicePayment: (id: string) => Promise<void>;
   onOpenMailboxForInvoice?: (id: string) => void;
+  /** N10: urenregels bewerken/afschrijven/verwijderen. */
+  updatingTimeEntryId?: string | null;
+  onUpdateTimeEntry?: (id: string, data: { omschrijving?: string; minuten?: number }) => Promise<void>;
+  onWriteOffTimeEntry?: (entry: TimeEntryItem) => Promise<void>;
+  onReopenTimeEntry?: (entry: TimeEntryItem) => Promise<void>;
+  onDeleteTimeEntry?: (entry: TimeEntryItem) => Promise<void>;
+  /** M-D: meldt de pagina of er half ingevulde formulierinvoer staat. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { success, error: toastError } = useToast();
   const [mode, setMode] = useState<BillingMode>("uren");
@@ -163,6 +186,17 @@ export function LaventeCareBillingView({
   const [invoiceForm, setInvoiceForm] = useState<BillingInvoiceForm>(
     emptyBillingInvoiceForm,
   );
+  // Inline veldfouten (M28): toast blijft, maar het schuldige veld kleurt rood
+  // en krijgt focus.
+  const [timeErrors, setTimeErrors] = useState<Record<string, string>>({});
+  const [quoteErrors, setQuoteErrors] = useState<Record<string, string>>({});
+  const [invoiceErrors, setInvoiceErrors] = useState<Record<string, string>>({});
+  // FH6: standaard 8 open urenregels tonen, met expander voor de rest.
+  const [showAllUninvoiced, setShowAllUninvoiced] = useState(false);
+
+  const focusField = (id: string) => {
+    window.setTimeout(() => document.getElementById(id)?.focus(), 0);
+  };
 
   const projectScopeById = useMemo(() => {
     const result = new Map<string, { companyId: string | null }>();
@@ -212,8 +246,6 @@ export function LaventeCareBillingView({
     return new Set(uninvoicedEntries.map((entry) => entry.id));
   }, [uninvoicedEntries]);
 
-  const recentQuotes = quotes.slice(0, 5);
-  const recentInvoices = invoices.slice(0, 5);
   const invoicesByQuoteId = useMemo(() => {
     const byQuote = new Map<string, InvoiceItem>();
     for (const invoice of invoices) {
@@ -224,16 +256,73 @@ export function LaventeCareBillingView({
     return byQuote;
   }, [invoices]);
 
+  // N9(c): open facturen eerst, daarbinnen oplopend op vervaldatum (zonder
+  // vervaldatum achteraan); afgesloten facturen behouden hun bestaande
+  // (recentste-eerst) volgorde via de stabiele sort.
+  const sortedInvoices = useMemo(() => {
+    const isOpen = (invoice: InvoiceItem) =>
+      invoice.status !== "betaald" && invoice.status !== "geannuleerd";
+    return [...invoices].sort((a, b) => {
+      const aOpen = isOpen(a);
+      const bOpen = isOpen(b);
+      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+      if (aOpen) {
+        const aDue = a.due_date?.slice(0, 10) ?? "9999-12-31";
+        const bDue = b.due_date?.slice(0, 10) ?? "9999-12-31";
+        if (aDue !== bDue) return aDue < bDue ? -1 : 1;
+      }
+      return 0;
+    });
+  }, [invoices]);
+
+  // N9(b): "waarvan N te laat" op de Open facturen-metric.
+  const overdueOpenInvoices = useMemo(
+    () =>
+      invoices.filter(
+        (invoice) =>
+          invoice.status !== "betaald" &&
+          invoice.status !== "geannuleerd" &&
+          isPastDate(invoice.due_date),
+      ).length,
+    [invoices],
+  );
+
+  // M-D: signaleer half ingevulde formulieren aan de pagina, zodat een
+  // tabwissel eerst om bevestiging vraagt. Doelvelden (klant/project) alleen
+  // tellen niet als dataverlies; getypte tekst en geselecteerde uren wel.
+  const formsDirty =
+    Boolean(timeForm.description.trim()) ||
+    Boolean(
+      quoteForm.titel.trim() ||
+        quoteForm.description.trim() ||
+        quoteForm.notes.trim(),
+    ) ||
+    Boolean(
+      invoiceForm.description.trim() ||
+        invoiceForm.notes.trim() ||
+        invoiceForm.selectedTimeEntryIds.length > 0,
+    );
+  useEffect(() => {
+    onDirtyChange?.(formsDirty);
+  }, [formsDirty, onDirtyChange]);
+
   const handleTimeSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const minutes = asNumber(timeForm.minutes);
     const rate = asNumber(timeForm.hourlyRate);
-    if (!timeForm.companyId) {
+    const errors: Record<string, string> = {};
+    if (!timeForm.companyId) errors.companyId = "Kies een klant";
+    if (!timeForm.description.trim()) errors.description = "Omschrijving is verplicht";
+    if (minutes <= 0) errors.minutes = "Vul een aantal minuten in";
+    setTimeErrors(errors);
+    if (errors.companyId) {
       toastError("Kies eerst een klant voor deze urenregel");
+      focusField("billing-time-company");
       return;
     }
-    if (!timeForm.description.trim() || minutes <= 0) {
+    if (errors.description || errors.minutes) {
       toastError("Omschrijving en minuten zijn verplicht");
+      focusField(errors.description ? "billing-time-description" : "billing-time-minutes");
       return;
     }
     try {
@@ -248,7 +337,15 @@ export function LaventeCareBillingView({
         billable: timeForm.billable,
         status: "concept",
       });
-      setTimeForm(emptyBillingTimeForm);
+      // L4: klant/project/opdracht (en tarief/datum) blijven staan voor de
+      // volgende regel van dezelfde sessie; alleen omschrijving en minuten
+      // worden leeggemaakt.
+      setTimeForm((current) => ({
+        ...current,
+        description: "",
+        minutes: emptyBillingTimeForm.minutes,
+      }));
+      setTimeErrors({});
       success("Urenregel vastgelegd");
     } catch {
       toastError("Urenregel vastleggen is mislukt");
@@ -259,12 +356,19 @@ export function LaventeCareBillingView({
     event.preventDefault();
     const quantity = asNumber(quoteForm.quantity);
     const amount = asNumber(quoteForm.unitAmount);
-    if (!quoteForm.companyId) {
+    const errors: Record<string, string> = {};
+    if (!quoteForm.companyId) errors.companyId = "Kies een klant";
+    if (!quoteForm.titel.trim()) errors.titel = "Titel is verplicht";
+    if (!quoteForm.description.trim()) errors.description = "Offerteregel is verplicht";
+    setQuoteErrors(errors);
+    if (errors.companyId) {
       toastError("Kies eerst een klant voor deze offerte");
+      focusField("billing-quote-company");
       return;
     }
-    if (!quoteForm.titel.trim() || !quoteForm.description.trim()) {
+    if (errors.titel || errors.description) {
       toastError("Titel en offerteregel zijn verplicht");
+      focusField(errors.titel ? "billing-quote-titel" : "billing-quote-description");
       return;
     }
     try {
@@ -288,6 +392,7 @@ export function LaventeCareBillingView({
         ],
       });
       setQuoteForm(emptyBillingQuoteForm);
+      setQuoteErrors({});
       success("Offerteconcept aangemaakt");
     } catch {
       toastError("Offerte aanmaken is mislukt");
@@ -301,15 +406,32 @@ export function LaventeCareBillingView({
     );
     const minutes = asNumber(invoiceForm.minutes);
     const amount = asNumber(invoiceForm.hourlyRate);
-    if (!invoiceForm.companyId) {
-      toastError("Kies eerst een klant voor deze factuur");
-      return;
-    }
+    const errors: Record<string, string> = {};
+    if (!invoiceForm.companyId) errors.companyId = "Kies een klant";
     if (
       selectedIds.length === 0 &&
       (!invoiceForm.description.trim() || minutes <= 0)
     ) {
+      errors.lines = "Selecteer open uren of vul een handmatige factuurregel in";
+    }
+    // L5: een handmatige regel met tarief 0 zou een €0-factuur maken.
+    if (selectedIds.length === 0 && !errors.lines && amount <= 0) {
+      errors.rate = "Vul een uurtarief groter dan 0 in";
+    }
+    setInvoiceErrors(errors);
+    if (errors.companyId) {
+      toastError("Kies eerst een klant voor deze factuur");
+      focusField("billing-invoice-company");
+      return;
+    }
+    if (errors.lines) {
       toastError("Gebruik geselecteerde uren of vul een factuurregel in");
+      focusField("billing-invoice-description");
+      return;
+    }
+    if (errors.rate) {
+      toastError("Vul een uurtarief groter dan 0 in voor de handmatige regel");
+      focusField("billing-invoice-rate");
       return;
     }
     try {
@@ -336,6 +458,7 @@ export function LaventeCareBillingView({
               ],
       });
       setInvoiceForm(emptyBillingInvoiceForm);
+      setInvoiceErrors({});
       success(
         "Factuurconcept aangemaakt. Maak daarna het Bunq betaalverzoek en koppel de factuur in Mailbox.",
       );
@@ -350,14 +473,32 @@ export function LaventeCareBillingView({
         <BillingMetric
           icon={Clock3}
           label="Niet gefactureerd"
-          value={formatMinutes(billing?.summary.uninvoicedMinutes)}
-          detail={`${uninvoicedEntries.length} open urenregels`}
+          value={
+            billingLoading
+              ? "..."
+              : formatMinutes(billing?.summary.uninvoicedMinutes)
+          }
+          detail={
+            // N11: openUninvoicedEntries (alle open regels), niet de op het
+            // factuurformulier gefilterde subset die leeg is zonder klantkeuze.
+            billingLoading ? "laden..." : `${openUninvoicedEntries.length} open urenregels`
+          }
         />
         <BillingMetric
           icon={ReceiptText}
           label="Open facturen"
-          value={formatCents(billing?.summary.outstandingCents)}
-          detail={`${billing?.summary.openInvoices ?? 0} facturen niet betaald`}
+          value={
+            billingLoading
+              ? "..."
+              : formatCents(billing?.summary.outstandingCents)
+          }
+          detail={
+            billingLoading
+              ? "laden..."
+              : `${billing?.summary.openInvoices ?? 0} facturen niet betaald (incl. btw)${
+                  overdueOpenInvoices > 0 ? `, waarvan ${overdueOpenInvoices} te laat` : ""
+                }`
+          }
         />
         <BillingMetric
           icon={FileSignature}
@@ -410,7 +551,7 @@ export function LaventeCareBillingView({
           </div>
 
           {mode === "uren" ? (
-            <form onSubmit={handleTimeSubmit} className="mt-5 space-y-4">
+            <form onSubmit={handleTimeSubmit} noValidate className="mt-5 space-y-4">
               <TargetFields
                 companyId={timeForm.companyId}
                 projectId={timeForm.projectId}
@@ -418,15 +559,20 @@ export function LaventeCareBillingView({
                 companies={companies}
                 projects={activeProjects}
                 workstreams={activeWorkstreams}
+                companySelectId="billing-time-company"
+                companyError={timeErrors.companyId}
                 onChange={(fields) =>
                   setTimeForm((current) => ({ ...current, ...fields }))
                 }
               />
               <label className="block">
                 <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Werk gedaan
+                  Werk gedaan <span className="text-rose-300">*</span>
                 </span>
                 <input
+                  id="billing-time-description"
+                  required
+                  aria-invalid={Boolean(timeErrors.description)}
                   value={timeForm.description}
                   onChange={(event) =>
                     setTimeForm((current) => ({
@@ -434,9 +580,18 @@ export function LaventeCareBillingView({
                       description: event.target.value,
                     }))
                   }
-                  className={inputClass}
+                  className={cn(
+                    inputClass,
+                    timeErrors.description &&
+                      "border-rose-400/60 focus:border-rose-400/60",
+                  )}
                   placeholder="Bijv. integratiecheck, advies, configuratie..."
                 />
+                {timeErrors.description ? (
+                  <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+                    {timeErrors.description}
+                  </p>
+                ) : null}
               </label>
               <div className="grid gap-3 sm:grid-cols-3">
                 <label className="block">
@@ -457,6 +612,9 @@ export function LaventeCareBillingView({
                 </label>
                 <NumberField
                   label="Minuten"
+                  id="billing-time-minutes"
+                  required
+                  error={timeErrors.minutes}
                   value={timeForm.minutes}
                   onChange={(minutes) =>
                     setTimeForm((current) => ({ ...current, minutes }))
@@ -464,6 +622,7 @@ export function LaventeCareBillingView({
                 />
                 <NumberField
                   label="Uurtarief"
+                  hint="excl. 21% btw"
                   value={timeForm.hourlyRate}
                   onChange={(hourlyRate) =>
                     setTimeForm((current) => ({ ...current, hourlyRate }))
@@ -502,7 +661,7 @@ export function LaventeCareBillingView({
           ) : null}
 
           {mode === "offerte" ? (
-            <form onSubmit={handleQuoteSubmit} className="mt-5 space-y-4">
+            <form onSubmit={handleQuoteSubmit} noValidate className="mt-5 space-y-4">
               <TargetFields
                 companyId={quoteForm.companyId}
                 projectId={quoteForm.projectId}
@@ -510,15 +669,20 @@ export function LaventeCareBillingView({
                 companies={companies}
                 projects={activeProjects}
                 workstreams={activeWorkstreams}
+                companySelectId="billing-quote-company"
+                companyError={quoteErrors.companyId}
                 onChange={(fields) =>
                   setQuoteForm((current) => ({ ...current, ...fields }))
                 }
               />
               <label className="block">
                 <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Offertetitel
+                  Offertetitel <span className="text-rose-300">*</span>
                 </span>
                 <input
+                  id="billing-quote-titel"
+                  required
+                  aria-invalid={Boolean(quoteErrors.titel)}
                   value={quoteForm.titel}
                   onChange={(event) =>
                     setQuoteForm((current) => ({
@@ -526,15 +690,27 @@ export function LaventeCareBillingView({
                       titel: event.target.value,
                     }))
                   }
-                  className={inputClass}
+                  className={cn(
+                    inputClass,
+                    quoteErrors.titel &&
+                      "border-rose-400/60 focus:border-rose-400/60",
+                  )}
                   placeholder="Bijv. Advies en integratie audit"
                 />
+                {quoteErrors.titel ? (
+                  <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+                    {quoteErrors.titel}
+                  </p>
+                ) : null}
               </label>
               <label className="block">
                 <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Regel
+                  Regel <span className="text-rose-300">*</span>
                 </span>
                 <textarea
+                  id="billing-quote-description"
+                  required
+                  aria-invalid={Boolean(quoteErrors.description)}
                   value={quoteForm.description}
                   onChange={(event) =>
                     setQuoteForm((current) => ({
@@ -542,9 +718,19 @@ export function LaventeCareBillingView({
                       description: event.target.value,
                     }))
                   }
-                  className={cn(inputClass, "min-h-24 resize-none")}
+                  className={cn(
+                    inputClass,
+                    "min-h-24 resize-none",
+                    quoteErrors.description &&
+                      "border-rose-400/60 focus:border-rose-400/60",
+                  )}
                   placeholder="Scope, deliverable of vaste projectregel"
                 />
+                {quoteErrors.description ? (
+                  <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+                    {quoteErrors.description}
+                  </p>
+                ) : null}
               </label>
               <div className="grid gap-3 sm:grid-cols-3">
                 <NumberField
@@ -556,6 +742,7 @@ export function LaventeCareBillingView({
                 />
                 <NumberField
                   label="Bedrag"
+                  hint="excl. 21% btw"
                   value={quoteForm.unitAmount}
                   onChange={(unitAmount) =>
                     setQuoteForm((current) => ({ ...current, unitAmount }))
@@ -612,7 +799,7 @@ export function LaventeCareBillingView({
           ) : null}
 
           {mode === "factuur" ? (
-            <form onSubmit={handleInvoiceSubmit} className="mt-5 space-y-4">
+            <form onSubmit={handleInvoiceSubmit} noValidate className="mt-5 space-y-4">
               <TargetFields
                 companyId={invoiceForm.companyId}
                 projectId={invoiceForm.projectId}
@@ -620,6 +807,8 @@ export function LaventeCareBillingView({
                 companies={companies}
                 projects={activeProjects}
                 workstreams={activeWorkstreams}
+                companySelectId="billing-invoice-company"
+                companyError={invoiceErrors.companyId}
                 onChange={(fields) =>
                   setInvoiceForm((current) => ({
                     ...current,
@@ -640,13 +829,39 @@ export function LaventeCareBillingView({
                       context
                     </span>
                   </div>
+                  {uninvoicedEntries.length > 0 ? (
+                    <label className="mt-2 inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={
+                          uninvoicedEntries.length > 0 &&
+                          uninvoicedEntries.every((entry) =>
+                            invoiceForm.selectedTimeEntryIds.includes(entry.id),
+                          )
+                        }
+                        onChange={(event) =>
+                          setInvoiceForm((current) => ({
+                            ...current,
+                            selectedTimeEntryIds: event.target.checked
+                              ? uninvoicedEntries.map((entry) => entry.id)
+                              : [],
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-white/20 bg-black/20 text-amber-400"
+                      />
+                      Selecteer alles ({uninvoicedEntries.length} regels)
+                    </label>
+                  ) : null}
                   <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
                     {uninvoicedEntries.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500">
                         Geen open urenregels voor deze klant/project/opdracht.
                       </div>
                     ) : (
-                      uninvoicedEntries.slice(0, 8).map((entry) => {
+                      (showAllUninvoiced
+                        ? uninvoicedEntries
+                        : uninvoicedEntries.slice(0, 8)
+                      ).map((entry) => {
                         const selected =
                           invoiceForm.selectedTimeEntryIds.includes(entry.id);
                         return (
@@ -692,6 +907,18 @@ export function LaventeCareBillingView({
                       })
                     )}
                   </div>
+                  {uninvoicedEntries.length > 8 ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllUninvoiced((value) => !value)}
+                      aria-expanded={showAllUninvoiced}
+                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+                    >
+                      {showAllUninvoiced
+                        ? "Toon minder"
+                        : `Toon alle ${uninvoicedEntries.length} regels`}
+                    </button>
+                  ) : null}
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500">
@@ -701,9 +928,14 @@ export function LaventeCareBillingView({
               )}
               <label className="block">
                 <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Handmatige factuurregel
+                  Handmatige factuurregel{" "}
+                  <span className="normal-case text-slate-600">
+                    (verplicht als je geen uren selecteert)
+                  </span>
                 </span>
                 <input
+                  id="billing-invoice-description"
+                  aria-invalid={Boolean(invoiceErrors.lines)}
                   value={invoiceForm.description}
                   disabled={invoiceForm.selectedTimeEntryIds.length > 0}
                   onChange={(event) =>
@@ -712,9 +944,18 @@ export function LaventeCareBillingView({
                       description: event.target.value,
                     }))
                   }
-                  className={inputClass}
+                  className={cn(
+                    inputClass,
+                    invoiceErrors.lines &&
+                      "border-rose-400/60 focus:border-rose-400/60",
+                  )}
                   placeholder="Bijv. Advies, implementatie of beheer"
                 />
+                {invoiceErrors.lines ? (
+                  <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+                    {invoiceErrors.lines}
+                  </p>
+                ) : null}
               </label>
               <div className="grid gap-3 sm:grid-cols-3">
                 <NumberField
@@ -727,6 +968,9 @@ export function LaventeCareBillingView({
                 />
                 <NumberField
                   label="Uurtarief"
+                  hint="excl. 21% btw"
+                  id="billing-invoice-rate"
+                  error={invoiceErrors.rate}
                   value={invoiceForm.hourlyRate}
                   disabled={invoiceForm.selectedTimeEntryIds.length > 0}
                   onChange={(hourlyRate) =>
@@ -786,48 +1030,99 @@ export function LaventeCareBillingView({
 
         <div className="min-w-0 space-y-4">
           <ProviderStatus billing={billing} />
+          {/* FH7: ALLE offertes/facturen zijn benaderbaar — de panelen tonen de
+              5 recentste en klappen uit naar de volledige lijst met dezelfde
+              acties, zodat een oudere open factuur alsnog gemaild of op
+              betaald gezet kan worden. */}
           <ListPanel
             title="Recente offertes"
+            expandedTitle="Alle offertes"
             empty="Nog geen offertes"
-            items={recentQuotes.map((quote) => {
+            initialCount={5}
+            expandNoun="offertes"
+            searchPlaceholder="Zoek op nummer, titel of klant..."
+            filterChips={[
+              { key: "concept", label: "Concept" },
+              { key: "verstuurd", label: "Verstuurd" },
+              { key: "geaccepteerd", label: "Geaccepteerd" },
+              { key: "verlopen", label: "Verlopen" },
+            ]}
+            items={quotes.map((quote) => {
               const linkedInvoice = invoicesByQuoteId.get(quote.id);
+              // N9(d): valid_until zichtbaar + "Verlopen"-marker zodra de
+              // geldigheid verstreken is terwijl de offerte nog openstaat.
+              const expired =
+                isPastDate(quote.valid_until) &&
+                (quote.status === "concept" || quote.status === "verstuurd");
+              const busy = updatingQuoteId === quote.id;
+              const actions: Array<{ label: string; busy: boolean; onClick: () => void }> = [];
+              if (quote.status === "concept") {
+                actions.push({
+                  label: "Verstuurd",
+                  busy,
+                  onClick: () => onUpdateQuoteStatus(quote.id, "verstuurd"),
+                });
+              } else if (quote.status === "verstuurd") {
+                actions.push({
+                  label: "Akkoord",
+                  busy,
+                  onClick: () => onUpdateQuoteStatus(quote.id, "geaccepteerd"),
+                });
+                // M-I: een verstuurde offerte kan nu ook expliciet worden
+                // afgesloten als afgewezen of verlopen (backend accepteert
+                // beide statussen vanuit "verstuurd").
+                actions.push({
+                  label: "Afgewezen",
+                  busy,
+                  onClick: () => onUpdateQuoteStatus(quote.id, "afgewezen"),
+                });
+                actions.push({
+                  label: "Verlopen",
+                  busy,
+                  onClick: () => onUpdateQuoteStatus(quote.id, "verlopen"),
+                });
+              } else if (quote.status === "geaccepteerd" && !linkedInvoice) {
+                actions.push({
+                  label: "Factuur",
+                  busy: creatingInvoiceFromQuoteId === quote.id,
+                  onClick: () => onCreateInvoiceFromQuote(quote.id),
+                });
+              }
               return {
                 id: quote.id,
                 title: quote.titel,
-                meta: `${quote.quote_number} - ${label(quote.status)} - ${formatCents(quote.total_cents)}${
-                  linkedInvoice
-                    ? ` - gefactureerd via ${linkedInvoice.invoice_number}`
-                    : ""
-                }`,
-                action:
-                  quote.status === "concept"
-                    ? {
-                        label: "Verstuurd",
-                        busy: updatingQuoteId === quote.id,
-                        onClick: () =>
-                          onUpdateQuoteStatus(quote.id, "verstuurd"),
-                      }
-                    : quote.status === "verstuurd"
-                      ? {
-                          label: "Akkoord",
-                          busy: updatingQuoteId === quote.id,
-                          onClick: () =>
-                            onUpdateQuoteStatus(quote.id, "geaccepteerd"),
-                        }
-                      : quote.status === "geaccepteerd" && !linkedInvoice
-                        ? {
-                            label: "Factuur",
-                            busy: creatingInvoiceFromQuoteId === quote.id,
-                            onClick: () => onCreateInvoiceFromQuote(quote.id),
-                          }
-                        : undefined,
+                // M-G: excl./incl. btw naast elkaar i.p.v. alleen het
+                // ongelabelde totaal.
+                meta: [
+                  quote.quote_number,
+                  label(quote.status),
+                  `${formatCents(quote.subtotal_cents)} excl. · ${formatCents(quote.total_cents)} incl. btw`,
+                  quote.valid_until ? `geldig tot ${formatDate(quote.valid_until)}` : null,
+                  linkedInvoice ? `gefactureerd via ${linkedInvoice.invoice_number}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" - "),
+                badge: expired ? { label: "Verlopen", tone: "rose" as const } : undefined,
+                filterKeys: [quote.status, ...(expired ? ["verlopen"] : [])],
+                searchText: `${quote.quote_number} ${quote.titel} ${quote.company_name ?? ""}`,
+                actions: actions.length > 0 ? actions : undefined,
               };
             })}
           />
           <ListPanel
             title="Recente facturen"
+            expandedTitle="Alle facturen"
             empty="Nog geen facturen"
-            items={recentInvoices.map((invoice) => {
+            initialCount={5}
+            expandNoun="facturen"
+            searchPlaceholder="Zoek op nummer of klant..."
+            filterChips={[
+              { key: "concept", label: "Concept" },
+              { key: "verstuurd", label: "Verstuurd" },
+              { key: "betaald", label: "Betaald" },
+              { key: "te_laat", label: "Te laat" },
+            ]}
+            items={sortedInvoices.map((invoice) => {
               const hasPaymentRequest = Boolean(
                 invoice.provider_request_id || invoice.payment_url,
               );
@@ -854,7 +1149,7 @@ export function LaventeCareBillingView({
               });
               actions.push({
                 label: "UBL",
-                busy: generatingInvoiceDocumentId === invoice.id,
+                busy: downloadingInvoiceUBLId === invoice.id,
                 onClick: () => onDownloadInvoiceUBL(invoice.id),
               });
               if (
@@ -874,6 +1169,16 @@ export function LaventeCareBillingView({
                     onClick: () => onRefreshInvoicePayment(invoice.id),
                   });
                 }
+                if (invoice.status === "concept") {
+                  // M20: handmatig verstuurde facturen (buiten de bunq-flow om)
+                  // kunnen zo alsnog naar "verstuurd" en daarna naar "betaald".
+                  actions.push({
+                    label: "Verstuurd",
+                    busy: updatingInvoiceId === invoice.id,
+                    onClick: () =>
+                      onUpdateInvoiceStatus(invoice.id, "verstuurd"),
+                  });
+                }
                 if (invoice.status === "verstuurd") {
                   actions.push({
                     label: "Betaald",
@@ -889,14 +1194,49 @@ export function LaventeCareBillingView({
                   onClick: () => onOpenMailboxForInvoice(invoice.id),
                 });
               }
+              // N9(a): vervaldatum in de meta + rode "X dagen te laat"-badge
+              // zodra de vervaldatum (Amsterdam) verstreken is en de factuur
+              // nog niet betaald/geannuleerd is.
+              const overdueDays =
+                invoice.status !== "betaald" && invoice.status !== "geannuleerd"
+                  ? daysPastDue(invoice.due_date)
+                  : 0;
               return {
                 id: invoice.id,
                 title: invoice.invoice_number,
-                meta: `${label(invoice.status)} - ${formatCents(invoice.total_cents)} - ${invoice.company_name ?? "geen klant"}${providerLabel}${paymentStatusLabel}${documentLabel}`,
+                meta: [
+                  label(invoice.status),
+                  // M-G: excl./incl. btw expliciet gelabeld.
+                  `${formatCents(invoice.subtotal_cents)} excl. · ${formatCents(invoice.total_cents)} incl. btw`,
+                  invoice.due_date ? `vervalt ${formatDate(invoice.due_date)}` : "geen vervaldatum",
+                  invoice.company_name ?? "geen klant",
+                ].join(" - ") + `${providerLabel}${paymentStatusLabel}${documentLabel}`,
+                badge:
+                  overdueDays > 0
+                    ? {
+                        label: `${overdueDays} ${overdueDays === 1 ? "dag" : "dagen"} te laat`,
+                        tone: "rose" as const,
+                      }
+                    : undefined,
+                filterKeys: [invoice.status, ...(overdueDays > 0 ? ["te_laat"] : [])],
+                searchText: `${invoice.invoice_number} ${invoice.company_name ?? ""} ${invoice.notes ?? ""}`,
                 actions,
               };
             })}
           />
+          {/* N10: zelfstandige urenlijst met bewerken, afschrijven en
+              verwijderen — een typfout hoeft niet meer permanent in "Niet
+              gefactureerd" te blijven staan. */}
+          {onUpdateTimeEntry && onWriteOffTimeEntry && onDeleteTimeEntry ? (
+            <TimeEntriesPanel
+              timeEntries={timeEntries}
+              busyId={updatingTimeEntryId ?? null}
+              onUpdate={onUpdateTimeEntry}
+              onWriteOff={onWriteOffTimeEntry}
+              onReopen={onReopenTimeEntry}
+              onDelete={onDeleteTimeEntry}
+            />
+          ) : null}
         </div>
       </div>
     </div>
@@ -974,6 +1314,8 @@ function TargetFields({
   projects,
   workstreams,
   onChange,
+  companySelectId,
+  companyError,
 }: {
   companyId: string;
   projectId: string;
@@ -986,6 +1328,8 @@ function TargetFields({
     projectId?: string;
     workstreamId?: string;
   }) => void;
+  companySelectId?: string;
+  companyError?: string;
 }) {
   const filteredProjects = companyId
     ? projects.filter((project) => project.company_id === companyId)
@@ -997,9 +1341,12 @@ function TargetFields({
     <div className="grid gap-3 md:grid-cols-3">
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-          Klant
+          Klant <span className="text-rose-300">*</span>
         </span>
         <select
+          id={companySelectId}
+          required
+          aria-invalid={Boolean(companyError)}
           value={companyId}
           onChange={(event) =>
             onChange({
@@ -1008,7 +1355,10 @@ function TargetFields({
               workstreamId: "",
             })
           }
-          className={selectClass}
+          className={cn(
+            selectClass,
+            companyError && "border-rose-400/60 focus:border-rose-400/60",
+          )}
         >
           <option value="">Kies klant</option>
           {companies.map((company) => (
@@ -1020,6 +1370,11 @@ function TargetFields({
             </option>
           ))}
         </select>
+        {companyError ? (
+          <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+            {companyError}
+          </p>
+        ) : null}
       </label>
       <label className="block">
         <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
@@ -1070,61 +1425,198 @@ function NumberField({
   value,
   disabled,
   onChange,
+  id,
+  required,
+  error,
+  hint,
 }: {
   label: string;
   value: number | "";
   disabled?: boolean;
   onChange: (value: number | "") => void;
+  id?: string;
+  required?: boolean;
+  error?: string;
+  /** Kleine toelichting achter het label, bijv. "excl. 21% btw" (M-G). */
+  hint?: string;
 }) {
   return (
     <label className="block">
       <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
         {fieldLabel}
+        {required ? <span className="text-rose-300"> *</span> : null}
+        {hint ? (
+          <span className="ml-1 normal-case tracking-normal text-slate-600">({hint})</span>
+        ) : null}
       </span>
       <input
+        id={id}
         type="number"
         min={0}
         step="0.01"
         value={value}
         disabled={disabled}
+        required={required}
+        aria-invalid={Boolean(error)}
         onChange={(event) =>
           onChange(event.target.value === "" ? "" : Number(event.target.value))
         }
-        className={inputClass}
+        className={cn(
+          inputClass,
+          error && "border-rose-400/60 focus:border-rose-400/60",
+        )}
       />
+      {error ? (
+        <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+          {error}
+        </p>
+      ) : null}
     </label>
   );
 }
 
+type ListPanelItem = {
+  id: string;
+  title: string;
+  meta: string;
+  /** Klein statuslabel naast de titel, bijv. "12 dagen te laat" (N9). */
+  badge?: { label: string; tone: "rose" | "amber" | "emerald" };
+  /** Sleutels waarop de filterchips matchen (M-H). */
+  filterKeys?: string[];
+  /** Tekst waarop het zoekveld matcht (M-H); valt terug op titel + meta. */
+  searchText?: string;
+  action?: { label: string; busy: boolean; onClick: () => void };
+  actions?: Array<{ label: string; busy: boolean; onClick: () => void }>;
+};
+
+const listBadgeClasses = {
+  rose: "border-rose-500/25 bg-rose-500/10 text-rose-300",
+  amber: "border-amber-500/25 bg-amber-500/10 text-amber-200",
+  emerald: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
+} as const;
+
 function ListPanel({
   title,
+  expandedTitle,
   empty,
   items,
+  initialCount,
+  expandNoun = "regels",
+  filterChips,
+  searchPlaceholder,
 }: {
   title: string;
+  /** Paneltitel zodra de volledige lijst uitgeklapt is (diff L-8). */
+  expandedTitle?: string;
   empty: string;
-  items: Array<{
-    id: string;
-    title: string;
-    meta: string;
-    action?: { label: string; busy: boolean; onClick: () => void };
-    actions?: Array<{ label: string; busy: boolean; onClick: () => void }>;
-  }>;
+  items: ListPanelItem[];
+  /** Show only the first N items with a "Toon alle X" expander (FH7). */
+  initialCount?: number;
+  expandNoun?: string;
+  /** M-H: statuschips boven de volledige (uitgeklapte) lijst. */
+  filterChips?: Array<{ key: string; label: string }>;
+  searchPlaceholder?: string;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [activeChip, setActiveChip] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const capped = typeof initialCount === "number" && items.length > initialCount;
+  const needle = query.trim().toLowerCase();
+  const filteredItems = expanded
+    ? items.filter((item) => {
+        if (activeChip && !(item.filterKeys ?? []).includes(activeChip)) return false;
+        if (!needle) return true;
+        return (item.searchText ?? `${item.title} ${item.meta}`)
+          .toLowerCase()
+          .includes(needle);
+      })
+    : items;
+  const visibleItems = capped && !expanded ? filteredItems.slice(0, initialCount) : filteredItems;
+  const isFiltering = expanded && (activeChip !== null || needle.length > 0);
   return (
     <div className="glass p-4">
-      <h4 className="text-sm font-bold text-white">{title}</h4>
+      <h4 className="text-sm font-bold text-white">
+        {expanded && expandedTitle ? expandedTitle : title}
+      </h4>
+      {expanded && (filterChips?.length || searchPlaceholder) ? (
+        <div className="mt-2 space-y-2">
+          {filterChips?.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveChip(null)}
+                aria-pressed={activeChip === null}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+                  activeChip === null
+                    ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
+                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
+                )}
+              >
+                Alles
+              </button>
+              {filterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() =>
+                    setActiveChip((current) => (current === chip.key ? null : chip.key))
+                  }
+                  aria-pressed={activeChip === chip.key}
+                  className={cn(
+                    "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+                    activeChip === chip.key
+                      ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
+                      : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
+                  )}
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {searchPlaceholder ? (
+            <div className="relative">
+              <Search
+                size={13}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"
+              />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
+                className="w-full rounded-lg border border-white/10 bg-black/20 py-1.5 pl-8 pr-3 text-xs text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/50"
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <div className="mt-3 space-y-2">
-        {items.length > 0 ? (
-          items.map((item) => (
+        {isFiltering && filteredItems.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-3 text-sm text-slate-500">
+            Geen {expandNoun} voor deze filter.
+          </p>
+        ) : items.length > 0 ? (
+          visibleItems.map((item) => (
             <div
               key={item.id}
               className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">
-                    {item.title}
+                  <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-white">
+                    <span className="truncate">{item.title}</span>
+                    {item.badge ? (
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold",
+                          listBadgeClasses[item.badge.tone],
+                        )}
+                      >
+                        {item.badge.label}
+                      </span>
+                    ) : null}
                   </p>
                   <p className="mt-1 line-clamp-2 text-xs text-slate-500">
                     {item.meta}
@@ -1155,6 +1647,10 @@ function ListPanel({
                           <Download size={13} />
                         ) : action.label === "Check betaling" ? (
                           <RefreshCw size={13} />
+                        ) : action.label === "Afgewezen" ? (
+                          <XCircle size={13} />
+                        ) : action.label === "Verlopen" ? (
+                          <Clock3 size={13} />
                         ) : (
                           <Send size={13} />
                         )}
@@ -1172,6 +1668,275 @@ function ListPanel({
           </p>
         )}
       </div>
+      {capped ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+        >
+          {expanded
+            ? "Toon minder"
+            : `Toon alle ${items.length} ${expandNoun}`}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// ─── Urenregels-paneel (N10) ─────────────────────────────────────────────────
+// Open urenregels zijn bewerkbaar (omschrijving/minuten), afschrijfbaar en
+// verwijderbaar; afgeschreven regels zitten achter een toggle en kunnen terug
+// naar open; gefactureerde regels zijn read-only (backend geeft 409).
+
+type TimeEntryTab = "open" | "afgeschreven" | "gefactureerd";
+
+const TIME_ENTRIES_INITIAL_COUNT = 6;
+
+function TimeEntriesPanel({
+  timeEntries,
+  busyId,
+  onUpdate,
+  onWriteOff,
+  onReopen,
+  onDelete,
+}: {
+  timeEntries: TimeEntryItem[];
+  busyId: string | null;
+  onUpdate: (id: string, data: { omschrijving?: string; minuten?: number }) => Promise<void>;
+  onWriteOff: (entry: TimeEntryItem) => Promise<void>;
+  onReopen?: (entry: TimeEntryItem) => Promise<void>;
+  onDelete: (entry: TimeEntryItem) => Promise<void>;
+}) {
+  const [tab, setTab] = useState<TimeEntryTab>("open");
+  const [showAll, setShowAll] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDescription, setEditDescription] = useState("");
+  const [editMinutes, setEditMinutes] = useState<number | "">("");
+  const [editError, setEditError] = useState("");
+
+  const openEntries = useMemo(
+    () => timeEntries.filter((entry) => !entry.invoice_id && entry.status !== "afgeschreven"),
+    [timeEntries],
+  );
+  const writtenOffEntries = useMemo(
+    () => timeEntries.filter((entry) => !entry.invoice_id && entry.status === "afgeschreven"),
+    [timeEntries],
+  );
+  const invoicedEntries = useMemo(
+    () => timeEntries.filter((entry) => Boolean(entry.invoice_id)),
+    [timeEntries],
+  );
+
+  const tabEntries =
+    tab === "open" ? openEntries : tab === "afgeschreven" ? writtenOffEntries : invoicedEntries;
+  const visibleEntries = showAll ? tabEntries : tabEntries.slice(0, TIME_ENTRIES_INITIAL_COUNT);
+
+  const startEdit = (entry: TimeEntryItem) => {
+    setEditingId(entry.id);
+    setEditDescription(entry.description);
+    setEditMinutes(entry.minutes);
+    setEditError("");
+  };
+
+  const saveEdit = async (entry: TimeEntryItem) => {
+    const minutes = editMinutes === "" ? 0 : Number(editMinutes);
+    if (!editDescription.trim()) {
+      setEditError("Omschrijving is verplicht");
+      return;
+    }
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      setEditError("Vul een aantal minuten groter dan 0 in");
+      return;
+    }
+    setEditError("");
+    try {
+      await onUpdate(entry.id, {
+        omschrijving: editDescription.trim(),
+        minuten: Math.round(minutes),
+      });
+      setEditingId(null);
+    } catch {
+      // De pagina toont al een fout-toast; de invoer blijft staan.
+    }
+  };
+
+  const switchTab = (next: TimeEntryTab) => {
+    setTab(next);
+    setShowAll(false);
+    setEditingId(null);
+    setEditError("");
+  };
+
+  return (
+    <div className="glass p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-bold text-white">Urenregels</h4>
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              { key: "open", label: `Open (${openEntries.length})` },
+              { key: "afgeschreven", label: `Afgeschreven (${writtenOffEntries.length})` },
+              { key: "gefactureerd", label: `Gefactureerd (${invoicedEntries.length})` },
+            ] as Array<{ key: TimeEntryTab; label: string }>
+          ).map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => switchTab(chip.key)}
+              aria-pressed={tab === chip.key}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+                tab === chip.key
+                  ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
+                  : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
+              )}
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 space-y-2">
+        {tabEntries.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-3 text-sm text-slate-500">
+            {tab === "open"
+              ? "Geen open urenregels."
+              : tab === "afgeschreven"
+                ? "Geen afgeschreven urenregels."
+                : "Nog geen gefactureerde urenregels."}
+          </p>
+        ) : (
+          visibleEntries.map((entry) => {
+            const busy = busyId === entry.id;
+            const editing = editingId === entry.id;
+            return (
+              <div
+                key={entry.id}
+                className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">
+                      {entry.description}
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                      {[
+                        formatDate(entry.entry_date),
+                        formatMinutes(entry.minutes),
+                        `${formatCents(Math.round((entry.minutes * entry.hourly_rate_cents) / 60))} excl. btw`,
+                        entry.company_name ?? null,
+                        entry.billable ? null : "niet factureerbaar",
+                        tab === "gefactureerd" ? "op factuur — alleen-lezen" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" - ")}
+                    </p>
+                  </div>
+                  {tab !== "gefactureerd" ? (
+                    <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                      {tab === "open" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => (editing ? setEditingId(null) : startEdit(entry))}
+                            disabled={busy}
+                            className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
+                          >
+                            <Pencil size={13} />
+                            {editing ? "Sluit" : "Bewerk"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void onWriteOff(entry)}
+                            disabled={busy}
+                            className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
+                          >
+                            {busy ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
+                            Afschrijven
+                          </button>
+                        </>
+                      ) : onReopen ? (
+                        <button
+                          type="button"
+                          onClick={() => void onReopen(entry)}
+                          disabled={busy}
+                          className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
+                        >
+                          {busy ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                          Heropenen
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void onDelete(entry)}
+                        disabled={busy}
+                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-rose-500/25 bg-rose-500/10 px-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-60"
+                      >
+                        {busy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                        Verwijder
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {editing && tab === "open" ? (
+                  <div className="mt-3 grid gap-2 border-t border-white/5 pt-3 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
+                    <label className="block">
+                      <span className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">
+                        Omschrijving
+                      </span>
+                      <input
+                        value={editDescription}
+                        onChange={(event) => setEditDescription(event.target.value)}
+                        className={inputClass}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">
+                        Minuten
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={editMinutes}
+                        onChange={(event) =>
+                          setEditMinutes(event.target.value === "" ? "" : Number(event.target.value))
+                        }
+                        className={inputClass}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void saveEdit(entry)}
+                      disabled={busy}
+                      className="btn btn--primary self-end justify-center"
+                    >
+                      {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                      Opslaan
+                    </button>
+                    {editError ? (
+                      <p className="text-xs font-semibold text-rose-300 sm:col-span-3" role="alert">
+                        {editError}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
+      {tabEntries.length > TIME_ENTRIES_INITIAL_COUNT ? (
+        <button
+          type="button"
+          onClick={() => setShowAll((value) => !value)}
+          aria-expanded={showAll}
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+        >
+          {showAll ? "Toon minder" : `Toon alle ${tabEntries.length} regels`}
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -29,6 +29,8 @@ export function HabitsOverzichtTab({
   toggle,
   increment,
   incident,
+  removeIncident,
+  incidentAllowed = true,
   pause,
   archive,
   setConfirmDelete,
@@ -36,7 +38,7 @@ export function HabitsOverzichtTab({
   dayHealth,
   habits,
   todayHabits,
-  pendingHabitId,
+  pendingHabitIds,
 }: {
   groupedHabits: GroupedHabits;
   isLoading: boolean;
@@ -45,6 +47,8 @@ export function HabitsOverzichtTab({
   toggle: (id: string) => void;
   increment: (id: string, step: number) => void;
   incident: (id: string, trigger?: string, note?: string) => void;
+  removeIncident?: (id: string) => void;
+  incidentAllowed?: boolean;
   pause: (id: string) => void;
   archive: (id: string) => void;
   setConfirmDelete: (id: string) => void;
@@ -52,7 +56,7 @@ export function HabitsOverzichtTab({
   dayHealth: DayHealth;
   habits: HabitRecord[];
   todayHabits: HabitWithLog[];
-  pendingHabitId: string | null;
+  pendingHabitIds: ReadonlySet<string>;
 }) {
   const todayById = new Map(todayHabits.map((habit) => [habit._id, habit]));
 
@@ -80,14 +84,25 @@ export function HabitsOverzichtTab({
                 return (
                   <HabitCard
                     key={habit._id}
-                    habit={{ ...habit, log: todayVersion?.log ?? null }}
+                    habit={{
+                      ...habit,
+                      log: todayVersion?.log ?? null,
+                      periodVoltooidCount: todayVersion?.periodVoltooidCount,
+                    }}
                     masked={privacyOn}
-                    pending={pendingHabitId === habit._id}
+                    pending={pendingHabitIds.has(habit._id)}
+                    // M-C: geen for-date-entry = vandaag niet gepland; de kaart
+                    // schakelt de toggle uit (behalve voor week/maand-habits).
+                    notDueToday={!todayVersion}
                     onToggle={() => toggle(habit._id!)}
                     onIncrement={(stap) => increment(habit._id!, stap)}
                     onIncident={(trigger, notitie) =>
                       incident(habit._id!, trigger, notitie)
                     }
+                    onRemoveIncident={
+                      removeIncident ? () => removeIncident(habit._id!) : undefined
+                    }
+                    incidentDisabled={!incidentAllowed}
                     onPause={() => pause(habit._id!)}
                     onArchive={() => archive(habit._id!)}
                     onRemove={() => setConfirmDelete(habit._id!)}
@@ -151,7 +166,7 @@ export function HabitsOverzichtTab({
                 habit={{ ...habit, log: null }}
                 masked={privacyOn}
                 paused
-                pending={pendingHabitId === habit._id}
+                pending={pendingHabitIds.has(habit._id)}
                 onToggle={() => undefined}
                 onIncrement={() => undefined}
                 onIncident={() => undefined}

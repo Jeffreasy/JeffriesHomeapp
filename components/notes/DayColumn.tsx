@@ -47,25 +47,34 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
 
     setSaving(true);
     try {
-      // Anchor the quick-add deadline at 09:00 local and store it as a full ISO
-      // string so it matches the format the note editor produces
-      // (normalizeDeadlineForSave -> toISOString). A bare "YYYY-MM-DD" would sort
-      // lexically ahead of any "...T..:..:..Z" deadline on the same day and would
-      // be parsed as UTC-midnight by getDeadlineState, skewing the soon/overdue
-      // buckets for users outside UTC.
-      const deadlineAt = new Date(date);
-      deadlineAt.setHours(9, 0, 0, 0);
+      // K1: a quick-add in TODAY's column is a journal entry, not a task — it
+      // buckets via `aangemaakt` (WeekJournal falls back to it) and gets NO
+      // artificial deadline. The old 09:00-today deadline inflated the
+      // "Aandacht" bucket (deadline-today counts as attention) for every
+      // journal jot. Only a quick-add on ANOTHER day still needs a deadline
+      // anchor, otherwise it would land in the wrong column; 09:00 local as a
+      // full ISO string matches the editor's normalizeDeadlineForSave output
+      // (a bare "YYYY-MM-DD" would parse as UTC-midnight and skew buckets).
       const titleChars = Array.from(text);
+      let deadline: string | undefined;
+      if (!isToday) {
+        const deadlineAt = new Date(date);
+        deadlineAt.setHours(9, 0, 0, 0);
+        deadline = deadlineAt.toISOString();
+      }
       await onCreate({
         inhoud: text,
         titel: titleChars.length > 80 ? titleChars.slice(0, 77).join("") + "..." : text,
-        deadline: deadlineAt.toISOString(),
+        deadline,
       });
       setQuickText("");
+    } catch {
+      // useNotes' create-mutatie toast de fout al — deze catch voorkomt alleen
+      // een unhandled rejection; de invoer blijft staan voor een retry (low).
     } finally {
       setSaving(false);
     }
-  }, [quickText, saving, onCreate, date]);
+  }, [quickText, saving, onCreate, date, isToday]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -328,7 +337,9 @@ function JournalNoteButton({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-[var(--color-text-subtle)] opacity-0 transition-opacity group-hover/item:opacity-100">
+          {/* K3: [@media(hover:hover)]-guard zoals NoteCard — touch-apparaten
+              (geen hover) zien tijd en Afronden-knop altijd. */}
+          <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-[var(--color-text-subtle)] opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100">
             {bucketedByDeadline && <Clock size={9} aria-hidden="true" />}
             {bucketedByDeadline ? formatTime(note.deadline!) : formatTime(note.aangemaakt)}
           </span>
@@ -339,7 +350,7 @@ function JournalNoteButton({
               void onToggleComplete(note);
             }}
             disabled={pending}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 opacity-100 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40 sm:opacity-0 sm:group-hover/item:opacity-100"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 opacity-100 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40 sm:[@media(hover:hover)]:opacity-0 sm:group-hover/item:opacity-100"
             aria-label={completed ? "Heropenen" : "Afronden"}
             title={completed ? "Heropenen" : "Afronden"}
           >

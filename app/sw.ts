@@ -14,7 +14,7 @@ declare const self: WorkerGlobalScope & typeof globalThis;
 
 const runtimeCaching: RuntimeCaching[] = [
   {
-    matcher: ({ sameOrigin, url: { pathname } }) => sameOrigin && pathname.startsWith("/api/backend/"),
+    matcher: ({ sameOrigin, url: { pathname } }) => sameOrigin && pathname.startsWith("/api/"),
     method: "GET",
     handler: new NetworkOnly(),
   },
@@ -27,6 +27,39 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching,
+  // Offline fallback (M5): navigations that miss both network and cache get a
+  // minimal Dutch offline document instead of the browser's error page.
+  // public/offline.html is precached via the injected manifest (public/ files
+  // are included by @serwist/next's default globPublicPatterns).
+  fallbacks: {
+    entries: [
+      {
+        url: "/offline.html",
+        matcher({ request }) {
+          return request.destination === "document";
+        },
+      },
+    ],
+  },
 });
 
 serwist.addEventListeners();
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "CLEAR_ALL_CACHES") {
+    (event as any).waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            // Only wipe runtime caches (cached API/user data). The serwist
+            // precache holds the app shell + offline fallback; deleting it
+            // would break offline navigation until the next SW update (L6).
+            .filter((cacheName) => !cacheName.includes("precache"))
+            .map((cacheName) => {
+              return caches.delete(cacheName);
+            })
+        );
+      })
+    );
+  }
+});

@@ -1,11 +1,12 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Building2,
   CalendarClock,
   CheckCircle2,
+  Clock3,
   FileCheck2,
   FolderKanban,
   History,
@@ -15,6 +16,7 @@ import {
   NotebookPen,
   Phone,
   Plus,
+  ReceiptText,
   Save,
   UserRound,
   Workflow,
@@ -32,23 +34,57 @@ import {
   type CompanyItem,
   type ContactItem,
   type DossierDocumentItem,
+  type InvoiceItem,
   type LeadItem,
   type ProjectItem,
+  type TimeEntryItem,
   type WorkstreamItem,
 } from "./LaventeCareTypes";
-import { formatDate, formatMoney, label, projectFaseLabel, projectStatusLabel } from "./LaventeCareUtils";
+import {
+  formatCents,
+  formatDate,
+  formatMinutes,
+  formatMoney,
+  isDossierDocumentForCompany,
+  label,
+  projectFaseLabel,
+  projectStatusLabel,
+} from "./LaventeCareUtils";
 
 type DossierTab = "overview" | "timeline" | "work" | "documents" | "access";
+
+// M-J: groepen voor de timeline-filterchips.
+type TimelineGroup =
+  | "moment"
+  | "actie"
+  | "document"
+  | "werk"
+  | "uren"
+  | "factuur"
+  | "relatie";
 
 type TimelineItem = {
   id: string;
   kind: string;
+  group: TimelineGroup;
   title: string;
   body?: string | null;
   date: string;
   meta?: string;
+  /** M-L: klikbare verwijzing naar een ander timeline-item (moment↔actie). */
+  link?: { label: string; targetId: string };
   tone: "amber" | "emerald" | "sky" | "violet" | "slate" | "rose";
 };
+
+const TIMELINE_GROUPS: Array<{ key: TimelineGroup; label: string }> = [
+  { key: "moment", label: "Momenten" },
+  { key: "actie", label: "Acties" },
+  { key: "document", label: "Documenten" },
+  { key: "werk", label: "Werk" },
+  { key: "uren", label: "Uren" },
+  { key: "factuur", label: "Facturen" },
+  { key: "relatie", label: "Relatie" },
+];
 
 type ActivityFormState = {
   eventType: string;
@@ -102,14 +138,18 @@ export function LaventeCareCustomerDossier({
   actions,
   dossierDocuments,
   activityEvents,
+  timeEntries = [],
+  invoices = [],
   savingActivity,
   savingAccessCredential,
+  updatingAccessCredentialId,
   onClose,
   onEditCompany,
   onAddContact,
   onStartWorkstream,
   onCreateActivity,
   onCreateAccessCredential,
+  onUpdateAccessCredential,
 }: {
   isOpen: boolean;
   company: CompanyItem | null;
@@ -121,8 +161,12 @@ export function LaventeCareCustomerDossier({
   actions: ActionItem[];
   dossierDocuments: DossierDocumentItem[];
   activityEvents: ActivityEventItem[];
+  /** M-J: uren en facturen van deze klant als timeline-soorten. */
+  timeEntries?: TimeEntryItem[];
+  invoices?: InvoiceItem[];
   savingActivity: boolean;
   savingAccessCredential: boolean;
+  updatingAccessCredentialId?: string | null;
   onClose: () => void;
   onEditCompany: (company: CompanyItem) => void;
   onAddContact: (company: CompanyItem) => void;
@@ -148,10 +192,24 @@ export function LaventeCareCustomerDossier({
     expires_at?: string;
     notes?: string;
   }) => Promise<void>;
+  onUpdateAccessCredential?: (
+    id: string,
+    data: { status?: string; secret_label?: string; secret_hint?: string; notes?: string },
+  ) => Promise<void>;
 }) {
   const [activeTab, setActiveTab] = useState<DossierTab>("overview");
   const [form, setForm] = useState<ActivityFormState>(emptyActivityForm);
+  // M-B: dirty-status van het toegang-formulier (leeft in AccessCredentialPanel),
+  // gelift zodat de modal-dirty-guard hem meeneemt.
+  const [accessFormDirty, setAccessFormDirty] = useState(false);
   const companyId = company?._id ?? company?.id ?? "";
+
+  // Nooit een stale moment-draft van een ander/dezelfde klantdossier
+  // terug laten komen: reset zodra het dossier wisselt of sluit.
+  useEffect(() => {
+    setForm(emptyActivityForm);
+    setAccessFormDirty(false);
+  }, [companyId, isOpen]);
   const companyName = company?.naam ?? "";
 
   const companyContacts = useMemo(
@@ -201,6 +259,27 @@ export function LaventeCareCustomerDossier({
     () => accessCredentials.filter((item) => item.company_id === companyId),
     [accessCredentials, companyId]
   );
+  // M-J: uren en facturen van deze klant (direct of via project/opdracht).
+  const companyTimeEntries = useMemo(
+    () =>
+      timeEntries.filter(
+        (entry) =>
+          entry.company_id === companyId ||
+          Boolean(entry.project_id && projectIds.has(entry.project_id)) ||
+          Boolean(entry.workstream_id && workstreamIds.has(entry.workstream_id))
+      ),
+    [timeEntries, companyId, projectIds, workstreamIds]
+  );
+  const companyInvoices = useMemo(
+    () =>
+      invoices.filter(
+        (invoice) =>
+          invoice.company_id === companyId ||
+          Boolean(invoice.project_id && projectIds.has(invoice.project_id)) ||
+          Boolean(invoice.workstream_id && workstreamIds.has(invoice.workstream_id))
+      ),
+    [invoices, companyId, projectIds, workstreamIds]
+  );
 
   const timeline = useMemo(
     () =>
@@ -214,8 +293,10 @@ export function LaventeCareCustomerDossier({
         documents: companyDocuments,
         activities: companyActivity,
         accessCredentials: companyAccess,
+        timeEntries: companyTimeEntries,
+        invoices: companyInvoices,
       }),
-    [company, companyAccess, companyActions, companyActivity, companyContacts, companyDocuments, companyLeads, companyProjects, companyWorkstreams]
+    [company, companyAccess, companyActions, companyActivity, companyContacts, companyDocuments, companyInvoices, companyLeads, companyProjects, companyTimeEntries, companyWorkstreams]
   );
 
   if (!company) return null;
@@ -228,25 +309,31 @@ export function LaventeCareCustomerDossier({
     if (!form.title.trim()) return;
     if (form.createFollowUp && !form.followUpTitle.trim()) return;
 
-    await onCreateActivity({
-      company_id: companyId,
-      contact_id: form.contactId || undefined,
-      project_id: form.projectId || undefined,
-      workstream_id: form.workstreamId || undefined,
-      event_type: form.eventType,
-      channel: form.channel,
-      title: form.title.trim(),
-      body: form.body.trim() || undefined,
-      occurred_at: form.occurredAt ? new Date(form.occurredAt).toISOString() : undefined,
-      follow_up: form.createFollowUp
-        ? {
-            title: form.followUpTitle.trim(),
-            due_date: form.followUpDueDate || undefined,
-            due_time: form.followUpDueTime || undefined,
-            priority: form.followUpPriority,
-          }
-        : undefined,
-    });
+    // M-C: alleen resetten na een geslaagde save — bij een fout (de pagina
+    // toont al een toast en rethrowt) blijft de invoer staan.
+    try {
+      await onCreateActivity({
+        company_id: companyId,
+        contact_id: form.contactId || undefined,
+        project_id: form.projectId || undefined,
+        workstream_id: form.workstreamId || undefined,
+        event_type: form.eventType,
+        channel: form.channel,
+        title: form.title.trim(),
+        body: form.body.trim() || undefined,
+        occurred_at: form.occurredAt ? new Date(form.occurredAt).toISOString() : undefined,
+        follow_up: form.createFollowUp
+          ? {
+              title: form.followUpTitle.trim(),
+              due_date: form.followUpDueDate || undefined,
+              due_time: form.followUpDueTime || undefined,
+              priority: form.followUpPriority,
+            }
+          : undefined,
+      });
+    } catch {
+      return;
+    }
     setForm(emptyActivityForm);
   };
 
@@ -254,6 +341,10 @@ export function LaventeCareCustomerDossier({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      // M-B: de guard dekt zowel het moment-formulier als het
+      // toegang-formulier (dat zijn dirty-status hierheen lift).
+      dirty={JSON.stringify(form) !== JSON.stringify(emptyActivityForm) || accessFormDirty}
+      dirtyMessage="Het dossier bevat niet-opgeslagen formulierinvoer."
       title={`Klantdossier: ${company.naam}`}
       icon={<Building2 size={18} className="text-amber-300" />}
       theme="amber"
@@ -423,7 +514,13 @@ export function LaventeCareCustomerDossier({
           <div className="space-y-3">
             {companyDocuments.length > 0 ? (
               companyDocuments.map((doc) => (
-                <DocumentCard key={doc.id} doc={doc} />
+                <DocumentCard
+                  key={doc.id}
+                  doc={doc}
+                  // L8: bij meerdere versies van dezelfde template is direct
+                  // zichtbaar welke de nieuwste is.
+                  versionBadge={documentVersionBadge(doc, companyDocuments)}
+                />
               ))
             ) : (
               <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-500">
@@ -433,7 +530,10 @@ export function LaventeCareCustomerDossier({
           </div>
         ) : null}
 
-        {activeTab === "access" ? (
+        {/* Blijft gemount (alleen visueel verborgen) zodat een half ingevuld
+            toegang-formulier een tabwissel binnen het dossier overleeft en de
+            dirty-guard (M-B) waarheidsgetrouw is. */}
+        <div className={activeTab === "access" ? undefined : "hidden"}>
           <AccessCredentialPanel
             companyId={companyId}
             contacts={companyContacts}
@@ -442,9 +542,12 @@ export function LaventeCareCustomerDossier({
             credentials={companyAccess}
             defaultLoginUrl={company.default_login_url ?? company.portal_url ?? ""}
             saving={savingAccessCredential}
+            updatingCredentialId={updatingAccessCredentialId}
             onCreate={onCreateAccessCredential}
+            onUpdate={onUpdateAccessCredential}
+            onDirtyChange={setAccessFormDirty}
           />
-        ) : null}
+        </div>
       </div>
     </Modal>
   );
@@ -490,7 +593,23 @@ function TabButton({
   );
 }
 
+const TIMELINE_INITIAL_COUNT = 40;
+
 function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
+  const [showAll, setShowAll] = useState(false);
+  // M-J: filterchips per soort timeline-item.
+  const [groupFilter, setGroupFilter] = useState<TimelineGroup | null>(null);
+  // M-L: kort gehighlight item na een moment↔actie-sprong.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const highlightTimer = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (highlightTimer.current !== null) window.clearTimeout(highlightTimer.current);
+    },
+    []
+  );
+
   if (timeline.length === 0) {
     return (
       <div className="order-2 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-500 lg:order-1">
@@ -499,10 +618,78 @@ function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
     );
   }
 
+  const presentGroups = TIMELINE_GROUPS.filter((group) =>
+    timeline.some((item) => item.group === group.key)
+  );
+  const filtered = groupFilter
+    ? timeline.filter((item) => item.group === groupFilter)
+    : timeline;
+  const visible = showAll ? filtered : filtered.slice(0, TIMELINE_INITIAL_COUNT);
+
+  // M-L: spring naar het gelinkte item — filter en afkapping eerst opheffen,
+  // daarna scrollen en kort highlighten.
+  const jumpTo = (targetId: string) => {
+    setGroupFilter(null);
+    setShowAll(true);
+    window.setTimeout(() => {
+      const element = document.getElementById(`dossier-timeline-${targetId}`);
+      if (!element) return;
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightId(targetId);
+      if (highlightTimer.current !== null) window.clearTimeout(highlightTimer.current);
+      highlightTimer.current = window.setTimeout(() => setHighlightId(null), 2200);
+    }, 60);
+  };
+
   return (
     <div className="order-2 space-y-3 lg:order-1">
-      {timeline.map((item) => (
-        <div key={item.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      {presentGroups.length > 1 ? (
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => setGroupFilter(null)}
+            aria-pressed={groupFilter === null}
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+              groupFilter === null
+                ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
+                : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
+            )}
+          >
+            Alles ({timeline.length})
+          </button>
+          {presentGroups.map((group) => {
+            const count = timeline.filter((item) => item.group === group.key).length;
+            return (
+              <button
+                key={group.key}
+                type="button"
+                onClick={() =>
+                  setGroupFilter((current) => (current === group.key ? null : group.key))
+                }
+                aria-pressed={groupFilter === group.key}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+                  groupFilter === group.key
+                    ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
+                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
+                )}
+              >
+                {group.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      {visible.map((item) => (
+        <div
+          key={item.id}
+          id={`dossier-timeline-${item.id}`}
+          className={cn(
+            "rounded-xl border border-white/10 bg-white/[0.03] p-4 transition-colors duration-500",
+            highlightId === item.id && "border-amber-400/50 bg-amber-500/[0.08]"
+          )}
+        >
           <div className="flex gap-3">
             <span className={cn("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", toneClass(item.tone))}>
               {timelineIcon(item.kind)}
@@ -516,12 +703,46 @@ function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
               </div>
               <h3 className="mt-2 line-clamp-2 text-sm font-bold text-white">{item.title}</h3>
               {item.meta ? <p className="mt-1 text-xs font-semibold text-slate-500">{item.meta}</p> : null}
+              {item.link ? (
+                <TimelineLinkButton link={item.link} onJump={jumpTo} />
+              ) : null}
               {item.body ? <p className="mt-2 line-clamp-3 text-sm leading-5 text-slate-400">{item.body}</p> : null}
             </div>
           </div>
         </div>
       ))}
+      {filtered.length > TIMELINE_INITIAL_COUNT ? (
+        <button
+          type="button"
+          onClick={() => setShowAll((value) => !value)}
+          aria-expanded={showAll}
+          className="w-full rounded-lg border border-white/10 bg-white/[0.02] py-2 text-xs font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+        >
+          {showAll
+            ? "Toon minder"
+            : `Toon alle ${filtered.length} momenten`}
+        </button>
+      ) : null}
     </div>
+  );
+}
+
+// M-L: klikbare moment↔actie-verwijzing binnen de dossiertimeline.
+function TimelineLinkButton({
+  link,
+  onJump,
+}: {
+  link: { label: string; targetId: string };
+  onJump: (targetId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onJump(link.targetId)}
+      className="mt-1 inline-flex max-w-full items-center text-left text-xs font-semibold text-sky-300 underline decoration-sky-300/40 underline-offset-2 transition hover:text-sky-200"
+    >
+      <span className="truncate">{link.label}</span>
+    </button>
   );
 }
 
@@ -724,7 +945,10 @@ function AccessCredentialPanel({
   credentials,
   defaultLoginUrl,
   saving,
+  updatingCredentialId,
   onCreate,
+  onUpdate,
+  onDirtyChange,
 }: {
   companyId: string;
   contacts: ContactItem[];
@@ -753,6 +977,13 @@ function AccessCredentialPanel({
     expires_at?: string;
     notes?: string;
   }) => Promise<void>;
+  updatingCredentialId?: string | null;
+  onUpdate?: (
+    id: string,
+    data: { status?: string; secret_label?: string; secret_hint?: string; notes?: string },
+  ) => Promise<void>;
+  /** M-B: lift de dirty-status naar de dossier-modal-guard. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [form, setForm] = useState<AccessCredentialForm>({
     ...emptyAccessCredentialForm,
@@ -760,29 +991,46 @@ function AccessCredentialPanel({
     loginUrl: defaultLoginUrl,
   });
 
+  // M-B: dirty t.o.v. de (geprefillde) beginstand van dit dossier.
+  const baseline = JSON.stringify({
+    ...emptyAccessCredentialForm,
+    companyId,
+    loginUrl: defaultLoginUrl,
+  });
+  const dirty = JSON.stringify(form) !== baseline;
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!form.title.trim()) return;
-    await onCreate({
-      company_id: companyId,
-      contact_id: optionalPayload(form.contactId),
-      project_id: optionalPayload(form.projectId),
-      workstream_id: optionalPayload(form.workstreamId),
-      title: form.title.trim(),
-      login_url: optionalPayload(form.loginUrl),
-      username: optionalPayload(form.username),
-      role: optionalPayload(form.role),
-      environment: form.environment,
-      status: form.status,
-      owner_contact: optionalPayload(form.ownerContact),
-      secret_label: optionalPayload(form.secretLabel),
-      secret_value: optionalPayload(form.secretValue),
-      secret_hint: optionalPayload(form.secretHint),
-      sharing_policy: form.sharingPolicy,
-      last_checked_at: optionalPayload(form.lastCheckedAt),
-      expires_at: optionalPayload(form.expiresAt),
-      notes: optionalPayload(form.notes),
-    });
+    // M-C: alleen resetten na een geslaagde save — bij een fout (de pagina
+    // toont al een toast en rethrowt) blijft de invoer staan.
+    try {
+      await onCreate({
+        company_id: companyId,
+        contact_id: optionalPayload(form.contactId),
+        project_id: optionalPayload(form.projectId),
+        workstream_id: optionalPayload(form.workstreamId),
+        title: form.title.trim(),
+        login_url: optionalPayload(form.loginUrl),
+        username: optionalPayload(form.username),
+        role: optionalPayload(form.role),
+        environment: form.environment,
+        status: form.status,
+        owner_contact: optionalPayload(form.ownerContact),
+        secret_label: optionalPayload(form.secretLabel),
+        secret_value: optionalPayload(form.secretValue),
+        secret_hint: optionalPayload(form.secretHint),
+        sharing_policy: form.sharingPolicy,
+        last_checked_at: optionalPayload(form.lastCheckedAt),
+        expires_at: optionalPayload(form.expiresAt),
+        notes: optionalPayload(form.notes),
+      });
+    } catch {
+      return;
+    }
     setForm({ ...emptyAccessCredentialForm, companyId, loginUrl: defaultLoginUrl });
   };
 
@@ -791,47 +1039,12 @@ function AccessCredentialPanel({
       <div className="space-y-3">
         {credentials.length > 0 ? (
           credentials.map((item) => (
-            <div key={item._id ?? item.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <KeyRound size={16} className="text-amber-300" />
-                    <h3 className="truncate text-sm font-bold text-white">{item.title}</h3>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {label(item.environment)} - {label(item.status)}
-                    {item.role ? ` - ${item.role}` : ""}
-                  </p>
-                </div>
-                <span className={cn(
-                  "inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[11px] font-bold",
-                  item.secret_configured
-                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-                    : "border-amber-500/25 bg-amber-500/10 text-amber-200"
-                )}>
-                  {item.secret_configured ? "Secret aanwezig" : "Via veilig kanaal"}
-                </span>
-              </div>
-
-              <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                <AccessRow label="Gebruiker" value={item.username ?? "Niet gevuld"} />
-                <AccessRow label="Eigenaar" value={item.owner_contact ?? item.contact_name ?? "Niet gevuld"} />
-                <AccessRow label="Vervalt" value={formatDate(item.expires_at ?? undefined)} />
-                <AccessRow label="Laatst getest" value={formatDate(item.last_checked_at ?? undefined)} />
-              </div>
-
-              {item.login_url ? (
-                <a
-                  href={toExternalHref(item.login_url)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 block truncate rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-bold text-sky-200 transition hover:bg-sky-500/20"
-                >
-                  {item.login_url}
-                </a>
-              ) : null}
-              {item.notes ? <p className="mt-3 text-xs leading-5 text-slate-500">{item.notes}</p> : null}
-            </div>
+            <AccessCredentialCard
+              key={item._id ?? item.id}
+              item={item}
+              busy={updatingCredentialId === (item._id ?? item.id)}
+              onUpdate={onUpdate}
+            />
           ))
         ) : (
           <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm leading-6 text-slate-500">
@@ -1005,6 +1218,160 @@ function AccessCredentialPanel({
   );
 }
 
+const ACCESS_CREDENTIAL_STATUSES = [
+  { value: "actief", label: "Actief" },
+  { value: "tijdelijk", label: "Tijdelijk" },
+  { value: "te_controleren", label: "Te controleren" },
+  { value: "verlopen", label: "Verlopen" },
+  { value: "ingetrokken", label: "Ingetrokken" },
+] as const;
+
+// Wires the (previously unused) update-mutation into the credential cards:
+// quick status changes (verlopen/ingetrokken/...) plus editing label & hint.
+function AccessCredentialCard({
+  item,
+  busy,
+  onUpdate,
+}: {
+  item: AccessCredentialItem;
+  busy: boolean;
+  onUpdate?: (
+    id: string,
+    data: { status?: string; secret_label?: string; secret_hint?: string; notes?: string },
+  ) => Promise<void>;
+}) {
+  const id = item._id ?? item.id;
+  const [editing, setEditing] = useState(false);
+  const [secretLabel, setSecretLabel] = useState(item.secret_label ?? "");
+  const [secretHint, setSecretHint] = useState(item.secret_hint ?? "");
+
+  const startEdit = () => {
+    setSecretLabel(item.secret_label ?? "");
+    setSecretHint(item.secret_hint ?? "");
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!onUpdate || !id) return;
+    await onUpdate(id, {
+      secret_label: secretLabel.trim() || undefined,
+      secret_hint: secretHint.trim() || undefined,
+    });
+    setEditing(false);
+  };
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <KeyRound size={16} className="text-amber-300" />
+            <h3 className="truncate text-sm font-bold text-white">{item.title}</h3>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {label(item.environment)} - {label(item.status)}
+            {item.role ? ` - ${item.role}` : ""}
+          </p>
+        </div>
+        <span className={cn(
+          "inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[11px] font-bold",
+          item.secret_configured
+            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+            : "border-amber-500/25 bg-amber-500/10 text-amber-200"
+        )}>
+          {item.secret_configured ? "Secret aanwezig" : "Via veilig kanaal"}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+        <AccessRow label="Gebruiker" value={item.username ?? "Niet gevuld"} />
+        <AccessRow label="Eigenaar" value={item.owner_contact ?? item.contact_name ?? "Niet gevuld"} />
+        <AccessRow label="Vervalt" value={formatDate(item.expires_at ?? undefined)} />
+        <AccessRow label="Laatst getest" value={formatDate(item.last_checked_at ?? undefined)} />
+      </div>
+
+      {item.login_url ? (
+        <a
+          href={toExternalHref(item.login_url)}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 block truncate rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-bold text-sky-200 transition hover:bg-sky-500/20"
+        >
+          {item.login_url}
+        </a>
+      ) : null}
+      {item.notes ? <p className="mt-3 text-xs leading-5 text-slate-500">{item.notes}</p> : null}
+
+      {onUpdate && id ? (
+        <div className="mt-3 border-t border-white/5 pt-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex min-w-0 items-center gap-2 text-[11px] font-semibold text-slate-500">
+              Status
+              <select
+                value={item.status}
+                disabled={busy}
+                onChange={(event) => {
+                  void onUpdate(id, { status: event.target.value });
+                }}
+                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-xs font-semibold text-white outline-none focus:border-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {ACCESS_CREDENTIAL_STATUSES.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
+                {ACCESS_CREDENTIAL_STATUSES.every((status) => status.value !== item.status) ? (
+                  <option value={item.status}>{label(item.status)}</option>
+                ) : null}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => (editing ? setEditing(false) : startEdit())}
+              disabled={busy}
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 text-[11px] font-semibold text-slate-300 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {editing ? "Annuleren" : "Label/hint bewerken"}
+            </button>
+            {busy ? <Loader2 size={13} className="animate-spin text-slate-400" /> : null}
+          </div>
+          {editing ? (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[11px] font-semibold text-slate-500">Secret label</span>
+                <input
+                  value={secretLabel}
+                  onChange={(event) => setSecretLabel(event.target.value)}
+                  placeholder="wachtwoord, API key..."
+                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold text-slate-500">Secret hint</span>
+                <input
+                  value={secretHint}
+                  onChange={(event) => setSecretHint(event.target.value)}
+                  placeholder="Bijv. gedeeld via veilige mail"
+                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void saveEdit()}
+                disabled={busy}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-xs font-bold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
+              >
+                {busy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                Wijzigingen opslaan
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AccessRow({ label: rowLabel, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 px-3 py-2">
@@ -1060,7 +1427,27 @@ function WorkColumn({ title, empty, items }: { title: string; empty: string; ite
   );
 }
 
-function DocumentCard({ doc }: { doc: DossierDocumentItem }) {
+// L8: bij meerdere dossierstukken met dezelfde document_key krijgt het
+// recentste stuk "Nieuwste versie" en de rest "Oudere versie".
+function documentVersionBadge(
+  doc: DossierDocumentItem,
+  allDocuments: DossierDocumentItem[]
+): "nieuwste" | "ouder" | null {
+  const siblings = allDocuments.filter((item) => item.document_key === doc.document_key);
+  if (siblings.length < 2) return null;
+  const newest = siblings.reduce((latest, item) =>
+    (item.created_at ?? "") > (latest.created_at ?? "") ? item : latest
+  );
+  return newest.id === doc.id ? "nieuwste" : "ouder";
+}
+
+function DocumentCard({
+  doc,
+  versionBadge,
+}: {
+  doc: DossierDocumentItem;
+  versionBadge?: "nieuwste" | "ouder" | null;
+}) {
   return (
     <a
       href={doc.pdf_url}
@@ -1073,7 +1460,21 @@ function DocumentCard({ doc }: { doc: DossierDocumentItem }) {
           <FileCheck2 size={17} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-bold text-white">{doc.titel}</span>
+          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="truncate text-sm font-bold text-white">{doc.titel}</span>
+            {versionBadge ? (
+              <span
+                className={cn(
+                  "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold",
+                  versionBadge === "nieuwste"
+                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+                    : "border-white/10 bg-white/[0.04] text-slate-400"
+                )}
+              >
+                {versionBadge === "nieuwste" ? "Nieuwste versie" : "Oudere versie"}
+              </span>
+            ) : null}
+          </span>
           <span className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
             <span>{doc.template_label ?? label(doc.context_type)}</span>
             <span aria-hidden="true">-</span>
@@ -1089,32 +1490,6 @@ function DocumentCard({ doc }: { doc: DossierDocumentItem }) {
   );
 }
 
-function isDossierDocumentForCompany(
-  doc: DossierDocumentItem,
-  companyId: string,
-  companyName: string,
-  leadIds: Set<string>,
-  projectIds: Set<string>,
-  workstreamIds: Set<string>
-) {
-  if (!companyId) return false;
-  if (doc.company_id === companyId) return true;
-  if (doc.context_id === companyId && ["company", "klant", "klantdossier", "laventecare_company"].includes(doc.context_type)) return true;
-  if (doc.lead_id && leadIds.has(doc.lead_id)) return true;
-  if (doc.project_id && projectIds.has(doc.project_id)) return true;
-  if (doc.workstream_id && workstreamIds.has(doc.workstream_id)) return true;
-  // Name-match fallback only for documents with NO id-based context at all. A
-  // document already tied to another entity by id must not also be pulled into
-  // this dossier by a coincidental or same-name title (cross-customer misfile).
-  const hasIdContext = Boolean(doc.company_id || doc.context_id || doc.lead_id || doc.project_id || doc.workstream_id);
-  if (hasIdContext) return false;
-  return Boolean(doc.context_title && normalizeDossierText(doc.context_title) === normalizeDossierText(companyName));
-}
-
-function normalizeDossierText(value: string) {
-  return value.trim().toLowerCase();
-}
-
 function buildTimeline(input: {
   company: CompanyItem | null;
   contacts: ContactItem[];
@@ -1125,6 +1500,8 @@ function buildTimeline(input: {
   documents: DossierDocumentItem[];
   activities: ActivityEventItem[];
   accessCredentials: AccessCredentialItem[];
+  timeEntries: TimeEntryItem[];
+  invoices: InvoiceItem[];
 }) {
   const items: TimelineItem[] = [];
   if (!input.company) return items;
@@ -1133,6 +1510,7 @@ function buildTimeline(input: {
     items.push({
       id: `activity:${event.id}`,
       kind: event.event_type,
+      group: "moment",
       title: event.title,
       body: event.body,
       date: event.occurred_at,
@@ -1140,10 +1518,17 @@ function buildTimeline(input: {
         event.contact_name,
         event.project_name,
         event.workstream_name,
-        event.linked_action_title ? `→ actie: ${event.linked_action_title} (${label(event.linked_action_status ?? "")})` : null,
       ]
         .filter(Boolean)
         .join(" - "),
+      // M-L: klikbaar — springt naar de gekoppelde actie in deze timeline.
+      link:
+        event.action_item_id && event.linked_action_title
+          ? {
+              label: `→ actie: ${event.linked_action_title} (${label(event.linked_action_status ?? "")})`,
+              targetId: `action:${event.action_item_id}`,
+            }
+          : undefined,
       tone: activityTone(event.event_type),
     });
   }
@@ -1152,6 +1537,7 @@ function buildTimeline(input: {
     items.push({
       id: `document:${doc.id}`,
       kind: "document",
+      group: "document",
       title: doc.titel,
       body: doc.notes,
       date: doc.created_at,
@@ -1164,6 +1550,7 @@ function buildTimeline(input: {
     items.push({
       id: `access:${access._id ?? access.id}`,
       kind: "toegang",
+      group: "relatie",
       title: access.title,
       body: access.login_url,
       date: access.updated_at ?? access.created_at,
@@ -1176,16 +1563,24 @@ function buildTimeline(input: {
     items.push({
       id: `action:${action._id ?? action.id}`,
       kind: "actie",
+      group: "actie",
       title: action.title,
       body: action.summary,
       date: action.updatedAt ?? action.updated_at ?? action.created_at,
       meta: [
         `${label(action.status)} - ${label(action.priority)}`,
         action.due_date ? `Vervalt: ${formatDate(action.due_date)}${action.due_time ? ` ${action.due_time}` : ""}` : null,
-        action.source_activity_title ? `← vanuit moment: ${action.source_activity_title}` : null,
       ]
         .filter(Boolean)
         .join(" · "),
+      // M-L: klikbaar — springt naar het bronmoment in deze timeline.
+      link:
+        action.source_activity_id && action.source_activity_title
+          ? {
+              label: `← vanuit moment: ${action.source_activity_title}`,
+              targetId: `activity:${action.source_activity_id}`,
+            }
+          : undefined,
       tone: action.status === "done" || action.status === "afgerond" ? "emerald" : "sky",
     });
   }
@@ -1194,6 +1589,7 @@ function buildTimeline(input: {
     items.push({
       id: `project:${project._id ?? project.id}`,
       kind: "project",
+      group: "werk",
       title: project.naam,
       body: project.samenvatting,
       date: project.updated_at ?? project.created_at,
@@ -1206,6 +1602,7 @@ function buildTimeline(input: {
     items.push({
       id: `workstream:${workstream._id ?? workstream.id}`,
       kind: "opdracht",
+      group: "werk",
       title: workstream.titel,
       body: workstream.volgende_stap ?? workstream.doel,
       date: workstream.updated_at ?? workstream.created_at,
@@ -1218,6 +1615,7 @@ function buildTimeline(input: {
     items.push({
       id: `lead:${lead._id ?? lead.id}`,
       kind: "lead",
+      group: "werk",
       title: lead.titel,
       body: lead.pijnpunt,
       date: lead.updated_at ?? lead.created_at,
@@ -1226,10 +1624,51 @@ function buildTimeline(input: {
     });
   }
 
+  // M-J: uren en facturen maken "wat deed ik vorige maand voor X?"
+  // beantwoordbaar vanuit het dossier.
+  for (const entry of input.timeEntries) {
+    items.push({
+      id: `time:${entry.id}`,
+      kind: "urenregel",
+      group: "uren",
+      title: entry.description,
+      date: entry.entry_date ?? entry.created_at,
+      meta: [
+        formatMinutes(entry.minutes),
+        `${formatCents(Math.round((entry.minutes * entry.hourly_rate_cents) / 60))} excl. btw`,
+        label(entry.status),
+        entry.invoice_id ? "gefactureerd" : null,
+      ]
+        .filter(Boolean)
+        .join(" - "),
+      tone: entry.invoice_id ? "emerald" : "slate",
+    });
+  }
+
+  for (const invoice of input.invoices) {
+    items.push({
+      id: `invoice:${invoice.id}`,
+      kind: "factuur",
+      group: "factuur",
+      title: invoice.invoice_number,
+      body: invoice.notes,
+      date: invoice.issue_date ?? invoice.created_at,
+      meta: [
+        label(invoice.status),
+        `${formatCents(invoice.total_cents)} incl. btw`,
+        invoice.due_date ? `vervalt ${formatDate(invoice.due_date)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" - "),
+      tone: invoice.status === "betaald" ? "emerald" : "rose",
+    });
+  }
+
   for (const contact of input.contacts) {
     items.push({
       id: `contact:${contact._id ?? contact.id}`,
       kind: "contact",
+      group: "relatie",
       title: contact.naam,
       body: contact.notities,
       date: contact.updated_at ?? contact.created_at,
@@ -1241,6 +1680,7 @@ function buildTimeline(input: {
   items.push({
     id: `company:${input.company._id ?? input.company.id}`,
     kind: "klant",
+    group: "relatie",
     title: `${input.company.naam} aangemaakt`,
     body: input.company.notities,
     date: input.company.created_at,
@@ -1248,10 +1688,11 @@ function buildTimeline(input: {
     tone: "amber",
   });
 
+  // Geen harde cap meer: TimelineList toont de eerste 40 met een
+  // "Toon alle N"-toggle voor de rest.
   return items
     .filter((item) => Boolean(item.date))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 40);
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 function activityTone(eventType: string): TimelineItem["tone"] {
@@ -1281,5 +1722,7 @@ function timelineIcon(kind: string) {
   if (kind === "lead") return <Activity size={16} />;
   if (kind === "toegang") return <KeyRound size={16} />;
   if (kind === "klant") return <Building2 size={16} />;
+  if (kind === "urenregel") return <Clock3 size={16} />;
+  if (kind === "factuur") return <ReceiptText size={16} />;
   return <CalendarClock size={16} />;
 }

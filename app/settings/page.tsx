@@ -10,7 +10,6 @@ import {
   Download,
   Eye,
   EyeOff,
-  FileJson,
   Home,
   KeyRound,
   Lightbulb,
@@ -28,7 +27,7 @@ import {
 
 import { useDevices } from "@/hooks/useDevices";
 import { useRooms, useDeleteRoom } from "@/hooks/useRooms";
-import { usePrivacy } from "@/hooks/usePrivacy";
+import { usePrivacy, privacyQueryKey, clearPrivacyOverride, notifyPrivacyChange } from "@/hooks/usePrivacy";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
@@ -37,7 +36,6 @@ import { DeviceRow } from "@/components/settings/DeviceRow";
 import { AddDeviceForm } from "@/components/settings/AddDeviceForm";
 import { AddRoomForm } from "@/components/settings/AddRoomForm";
 import { RoomRow } from "@/components/settings/RoomRow";
-import { DeviceDiscoveryPanel } from "@/components/settings/DeviceDiscoveryPanel";
 import { type Room, privacyApi, settingsApi, syncApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -52,10 +50,20 @@ import {
   type SyncTarget,
   type TelegramStatusResult,
 } from "@/components/settings/SettingsUtils";
-import { EmptyState, MetricCard, Panel, RouteTile, SectionHeader, StatusPill, StatusRow } from "@/components/settings/SettingsCards";
+import { EmptyState, MetricCard, Panel, RouteTile, SectionHeader, StatusRow } from "@/components/settings/SettingsCards";
 import { SettingsRuntime, SettingsPendingActions, SettingsBridge } from "@/components/settings/SettingsRuntime";
 import { SettingsIntegrations } from "@/components/settings/SettingsIntegrations";
 import { SettingsSync } from "@/components/settings/SettingsSync";
+
+// Dutch labels for the privacy-center scope buttons (L9) — the raw English
+// scope keys ("finance", "notes") are API identifiers, not UI copy.
+const PRIVACY_SCOPE_LABELS: Record<PrivacyScope, string> = {
+  finance: "Financiën",
+  habits: "Habits",
+  notes: "Notities",
+  email: "E-mail",
+  account: "Account",
+};
 
 export default function SettingsPage() {
   const { data: devices = [], isLoading: devicesLoading } = useDevices();
@@ -67,7 +75,12 @@ export default function SettingsPage() {
   const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("account");
   const queryClient = useQueryClient();
 
-  const { data: overview, isLoading: overviewLoading } = useQuery({
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    isError: overviewFailed,
+    refetch: refetchOverview,
+  } = useQuery({
     queryKey: ["settings-overview"],
     queryFn: () => settingsApi.overview(),
     refetchInterval: 10000,
@@ -105,8 +118,10 @@ export default function SettingsPage() {
 
   const telegramStatusAction = async () => settingsApi.telegramStatus();
 
+  // Shared key with usePrivacy() (M23) — invalidating it here updates the
+  // masking state on every mounted page, not just this one.
   const { data: privacySettings } = useQuery({
-    queryKey: ["privacy-settings", user?.id],
+    queryKey: privacyQueryKey(user?.id ?? ""),
     queryFn: () => privacyApi.get(user!.id),
     enabled: Boolean(user?.id),
   });
@@ -116,18 +131,31 @@ export default function SettingsPage() {
       throw new Error("Geen ingelogde gebruiker");
     }
     const result = await privacyApi.update(user.id, args);
-    await queryClient.invalidateQueries({ queryKey: ["privacy-settings", user.id] });
+    await queryClient.invalidateQueries({ queryKey: privacyQueryKey(user.id) });
+    // Wake up usePrivacy() listeners in this tab immediately (M23).
+    notifyPrivacyChange();
     return result;
   };
-
-  const auditLogs: any[] = [];
 
   const [syncing, setSyncing] = useState<SyncTarget | null>(null);
   const [pendingBusyId, setPendingBusyId] = useState<string | null>(null);
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatusResult | null>(null);
   const [telegramChecking, setTelegramChecking] = useState(false);
   const [backupRequested, setBackupRequested] = useState(false);
-  const backupData = undefined as any; // TODO: Move backup to Go API
+  const [backupData, setBackupData] = useState<any>(null);
+
+  const handleBackupExport = async () => {
+    if (!user?.id) return;
+    setBackupRequested(true);
+    try {
+      const data = await settingsApi.backup(user.id);
+      setBackupData(data);
+    } catch (err) {
+      toastError("Backup export mislukt");
+      setBackupRequested(false);
+    }
+  };
+
 
   const onlineDevices = devices.filter((device) => device.status === "online").length;
   const activeDevices = devices.filter((device) => device.current_state?.on).length;
@@ -177,8 +205,10 @@ export default function SettingsPage() {
     anchor.click();
     URL.revokeObjectURL(url);
     setBackupRequested(false);
+    setBackupData(null);
     success("Backup export klaargezet");
   }, [backupData, backupRequested, success]);
+
 
   const runSync = async (target: SyncTarget, task: () => Promise<void>, doneMessage: string) => {
     setSyncing(target);
@@ -218,7 +248,19 @@ export default function SettingsPage() {
       "all",
       async () => {
         if (!user?.id) throw new Error("Niet ingelogd");
-        await Promise.allSettled([syncApi.calendar(user.id), syncApi.gmail(user.id)]);
+        // allSettled so one failing source doesn't abort the other, but the
+        // results MUST be inspected (M2) — otherwise a failed Gmail sync
+        // still toasts "gesynchroniseerd" and the user trusts stale data.
+        const [calendarResult, gmailResult] = await Promise.allSettled([
+          syncApi.calendar(user.id),
+          syncApi.gmail(user.id),
+        ]);
+        const failed: string[] = [];
+        if (calendarResult.status === "rejected") failed.push("Agenda/rooster");
+        if (gmailResult.status === "rejected") failed.push("Gmail");
+        if (failed.length > 0) {
+          throw new Error(`${failed.join(" en ")} kon niet worden gesynchroniseerd`);
+        }
       },
       "Belangrijkste databronnen gesynchroniseerd"
     );
@@ -299,34 +341,53 @@ export default function SettingsPage() {
   };
 
   const togglePrivacyScope = async (scope: PrivacyScope) => {
-    const current = privacySettings?.[scope] ?? true;
+    if (!privacySettings) return;
+    const current = privacySettings[scope] ?? false;
     // The backend PUT /privacy upserts ALL five columns from the request
     // body (no partial-patch support) — sending only the changed scope would
     // silently reset every other scope to false. Always send the full,
     // merged set of current values with just this one flipped.
     const merged: Record<PrivacyScope, boolean> = {
-      finance: privacySettings?.finance ?? true,
-      habits: privacySettings?.habits ?? true,
-      notes: privacySettings?.notes ?? true,
-      email: privacySettings?.email ?? true,
-      account: privacySettings?.account ?? true,
+      finance: privacySettings.finance ?? false,
+      habits: privacySettings.habits ?? false,
+      notes: privacySettings.notes ?? false,
+      email: privacySettings.email ?? false,
+      account: privacySettings.account ?? false,
       [scope]: !current,
     };
     try {
+
       await updatePrivacySettings(merged);
+      // The server value for this scope just changed — drop any local
+      // eye-toggle override so it can't permanently shadow the new server
+      // preference (M23).
+      clearPrivacyOverride(scope);
       success("Privacy voorkeur bijgewerkt");
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Privacy voorkeur opslaan mislukt");
     }
   };
 
-  if (overview === null) {
+  // Failed ≠ empty: without this branch a backend outage would render the
+  // whole page with confident fake zeros. Only shown when there is no
+  // (cached) overview at all — stale data beats a hard error screen.
+  if (overviewFailed && !overview) {
     return (
       <div className="px-4 py-12 text-slate-100">
-        <div className="mx-auto max-w-lg rounded-lg border border-white/10 bg-white/[0.035] p-6 text-center">
-          <ShieldCheck size={34} className="mx-auto text-amber-300" />
-          <h1 className="mt-4 text-xl font-bold text-white">Instellingen vergrendeld</h1>
-          <p className="mt-2 text-sm text-slate-500">Log in om je lokale Homeapp configuratie te beheren.</p>
+        <div className="mx-auto max-w-lg rounded-lg border border-rose-500/20 bg-rose-500/[0.06] p-6 text-center">
+          <TriangleAlert size={34} className="mx-auto text-rose-300" />
+          <h1 className="mt-4 text-xl font-bold text-white">Instellingen laden mislukt</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            De systeemstatus kon niet worden opgehaald. Controleer je verbinding en probeer het opnieuw.
+          </p>
+          <button
+            type="button"
+            onClick={() => refetchOverview()}
+            className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
+          >
+            <RefreshCw size={15} />
+            Opnieuw proberen
+          </button>
         </div>
       </div>
     );
@@ -341,12 +402,17 @@ export default function SettingsPage() {
               <Settings size={19} className="text-amber-300" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-slate-500">System cockpit</p>
+              <p className="text-xs font-semibold uppercase text-slate-500">Systeemoverzicht</p>
               <h1 className="mt-0.5 truncate text-xl font-bold text-white sm:mt-1 sm:text-2xl">Instellingen</h1>
               <p className="mt-0.5 line-clamp-1 text-sm text-slate-500 sm:mt-1">
                 {isLoading
                   ? "Configuratie laden"
-                  : `${plural(overviewDevices.total, "lamp", "lampen")} - ${plural(overviewRooms.total, "kamer", "kamers")} - Go API live`}
+                  : `${plural(overviewDevices.total, "lamp", "lampen")} - ${plural(overviewRooms.total, "kamer", "kamers")} - ${
+                      // "Go API live" may only be claimed when the overview
+                      // query actually succeeded (L8) — with a stale cached
+                      // overview after a failure we genuinely don't know.
+                      overview && !overviewFailed ? "Go API live" : "Go API status onbekend"
+                    }`}
               </p>
             </div>
           </div>
@@ -530,7 +596,10 @@ export default function SettingsPage() {
                     <EmptyState icon={Lightbulb} title="Geen lampen gekoppeld" />
                   )}
                   <AddDeviceForm rooms={rooms} />
-                  <DeviceDiscoveryPanel existingDevices={devices} />
+                  {/* DeviceDiscoveryPanel removed (M3): it only re-fetched the
+                      already-registered device list and compared it with itself —
+                      a structural no-op, since there is no real discovery
+                      endpoint. Re-add a panel here once the backend can scan. */}
                 </div>
               </Panel>
             </ErrorBoundary>
@@ -600,13 +669,12 @@ export default function SettingsPage() {
 
         <CollapsibleSection
           title="Privacy & Beveiliging"
-          subtitle="Privacy center, Backups en Laatste acties"
+          subtitle="Privacy center en Backups"
           icon={<ShieldCheck size={18} />}
           theme="rose"
           defaultOpen={false}
         >
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <Panel>
+          <Panel>
               <SectionHeader icon={ShieldCheck} label="Privacy" title="Privacy center" sub="centrale voorkeuren" />
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                 {(["finance", "habits", "notes", "email", "account"] as const satisfies readonly PrivacyScope[]).map((scope) => (
@@ -614,18 +682,20 @@ export default function SettingsPage() {
                     key={scope}
                     type="button"
                     onClick={() => togglePrivacyScope(scope)}
+                    disabled={!privacySettings}
                     className={cn(
-                      "rounded-lg border px-3 py-3 text-left transition-colors",
-                      privacySettings?.[scope] ?? true
+                      "rounded-lg border px-3 py-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
+                      privacySettings?.[scope] ?? false
                         ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-100"
                         : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
                     )}
                   >
-                    <span className="block text-xs font-bold uppercase">{scope}</span>
+                    <span className="block text-xs font-bold uppercase">{PRIVACY_SCOPE_LABELS[scope]}</span>
                     <span className="mt-1 block text-sm font-semibold">
-                      {(privacySettings?.[scope] ?? true) ? "Maskeren" : "Zichtbaar"}
+                      {(privacySettings?.[scope] ?? false) ? "Maskeren" : "Zichtbaar"}
                     </span>
                   </button>
+
                 ))}
               </div>
               <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
@@ -635,37 +705,16 @@ export default function SettingsPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setBackupRequested(true)}
+                  onClick={handleBackupExport}
                   disabled={backupRequested}
+
                   className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50"
                 >
                   {backupRequested ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
                   JSON export
                 </button>
               </div>
-            </Panel>
-
-            <Panel>
-              <SectionHeader icon={FileJson} label="Audit" title="Laatste acties" sub={`${auditLogs.length} zichtbaar`} />
-              <div className="mt-4 space-y-2">
-                {auditLogs.length === 0 ? (
-                  <EmptyState icon={FileJson} title="Nog geen auditregels" />
-                ) : (
-                  auditLogs.map((log) => (
-                    <div key={log._id} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="min-w-0 truncate text-sm font-semibold text-slate-200">{log.summary}</p>
-                        <StatusPill ok={log.status === "success" || log.status === "confirmed"} label={log.status} />
-                      </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {log.actor} - {log.action} - {formatDateTime(log.createdAt)}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Panel>
-          </div>
+          </Panel>
         </CollapsibleSection>
 
         {telegramNeedsAttention ? (

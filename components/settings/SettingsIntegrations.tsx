@@ -69,6 +69,12 @@ function MiniInfo({ label, value }: { label: string; value: string }) {
   );
 }
 
+const euroFormatter = new Intl.NumberFormat("nl-NL", {
+  style: "currency",
+  currency: "EUR",
+  maximumFractionDigits: 2,
+});
+
 function UsageWindowCard({ label, window, priced }: { label: string; window?: AiUsageWindow; priced: boolean }) {
   if (!window) {
     return (
@@ -85,7 +91,7 @@ function UsageWindowCard({ label, window, priced }: { label: string; window?: Ai
         {window.calls} calls{window.errors > 0 ? ` — ${window.errors} fouten` : ""}
       </p>
       <p className="mt-0.5 truncate text-xs text-slate-400">{window.totalTokens.toLocaleString("nl-NL")} tokens</p>
-      {priced && <p className="mt-0.5 truncate text-xs text-emerald-300">€{window.estCost.toFixed(2)}</p>}
+      {priced && <p className="mt-0.5 truncate text-xs text-emerald-300">{euroFormatter.format(window.estCost)}</p>}
     </div>
   );
 }

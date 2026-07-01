@@ -13,24 +13,37 @@ export function OverviewCell({
   label,
   value,
   sub,
+  href,
 }: {
   icon: LucideIcon;
   tone: Tone;
   label: string;
   value: string;
   sub: string;
+  /** H3: de cellen zijn echte links naar hun module — met hover/focus-affordance. */
+  href: string;
 }) {
   const classes = toneClasses[tone];
 
   return (
-    <div className="min-h-[116px] min-w-0 bg-[#0f0f16]/95 p-3 sm:min-h-[132px] sm:p-5">
-      <div className={`flex h-8 w-8 items-center justify-center rounded-xl border sm:h-9 sm:w-9 ${classes.border} ${classes.surface}`}>
-        <Icon size={16} className={classes.icon} />
+    <Link
+      href={href}
+      className="group block min-h-[116px] min-w-0 bg-[#0f0f16]/95 p-3 transition-colors hover:bg-[#16161f] focus-visible:bg-[#16161f] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-400/70 sm:min-h-[132px] sm:p-5"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className={`flex h-8 w-8 items-center justify-center rounded-xl border sm:h-9 sm:w-9 ${classes.border} ${classes.surface}`}>
+          <Icon size={16} className={classes.icon} />
+        </div>
+        <ArrowRight
+          size={14}
+          aria-hidden="true"
+          className="mt-1 text-slate-700 transition-colors group-hover:text-slate-300 group-focus-visible:text-slate-300"
+        />
       </div>
-      <p className="mt-3 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:mt-4 sm:text-[10px]">{label}</p>
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:mt-4">{label}</p>
       <p className={`mt-1 line-clamp-2 break-words text-sm font-bold leading-tight sm:text-base ${classes.text}`}>{value}</p>
       <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs">{sub}</p>
-    </div>
+    </Link>
   );
 }
 
@@ -47,6 +60,11 @@ export function OverviewPanel({
   hardConflicts,
   todayIso,
   appointmentsLoading,
+  appointmentsFailed,
+  scheduleLoading,
+  scheduleFailed,
+  devicesLoading,
+  devicesFailed,
 }: {
   nextDienst: ReturnType<typeof useSchedule>["nextDienst"];
   nextEvent: PersonalEvent | null;
@@ -60,8 +78,57 @@ export function OverviewPanel({
   hardConflicts: number;
   todayIso?: string;
   appointmentsLoading?: boolean;
+  appointmentsFailed?: boolean;
+  scheduleLoading?: boolean;
+  scheduleFailed?: boolean;
+  devicesLoading?: boolean;
+  devicesFailed?: boolean;
 }) {
   const conflictLabel = hardConflicts > 0 ? `${hardConflicts} harde overlap` : `${conflicts} aandachtspunt(en)`;
+
+  // H5/DEEL2#1: laden ≠ leeg ≠ mislukt — elke cel kent zijn drie toestanden.
+  const dienstValue = scheduleLoading
+    ? "Laden…"
+    : scheduleFailed
+      ? "Kon niet laden"
+      : nextDienst
+        ? `${nextDienst.startTijd} - ${nextDienst.eindTijd}`
+        : "Geen dienst";
+  const dienstSub = scheduleLoading
+    ? "Rooster wordt geladen"
+    : scheduleFailed
+      ? "Rooster niet beschikbaar"
+      : nextDienst
+        ? formatRelativeDateLabel(nextDienst.startDatum, todayIso)
+        : "Rooster rustig";
+
+  const eventValue = appointmentsLoading
+    ? "Laden…"
+    : appointmentsFailed
+      ? "Kon niet laden"
+      : nextEvent?.titel ?? "Geen afspraak";
+  const eventSub = appointmentsLoading
+    ? "Google Calendar laden"
+    : appointmentsFailed
+      ? "Agenda niet beschikbaar"
+      : nextEvent
+        ? formatEventMeta(nextEvent, todayIso)
+        : conflicts > 0
+          ? conflictLabel
+          : "Agenda rustig";
+
+  const lampValue = devicesLoading
+    ? "Laden…"
+    : devicesFailed
+      ? "Kon niet laden"
+      : lampsTotal === 0
+        ? "Geen lampen"
+        : `${lampsOn}/${lampsTotal} aan`;
+  const lampSub = devicesLoading
+    ? "Lampen worden geladen"
+    : devicesFailed
+      ? "Lampen niet beschikbaar"
+      : `${devicesOnline} online`;
 
   return (
     <Panel className="overflow-hidden p-0">
@@ -86,17 +153,19 @@ export function OverviewPanel({
       <div className="grid grid-cols-2 gap-px bg-[var(--color-border)] xl:grid-cols-4">
         <OverviewCell
           icon={Clock3}
-          tone="indigo"
+          tone={scheduleFailed ? "rose" : "indigo"}
           label="Volgende dienst"
-          value={nextDienst ? `${nextDienst.startTijd} - ${nextDienst.eindTijd}` : "Geen dienst"}
-          sub={nextDienst ? formatRelativeDateLabel(nextDienst.startDatum, todayIso) : "Rooster rustig"}
+          value={dienstValue}
+          sub={dienstSub}
+          href="/rooster"
         />
         <OverviewCell
           icon={Calendar}
-          tone={hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "blue"}
+          tone={appointmentsFailed ? "rose" : hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "blue"}
           label="Volgende afspraak"
-          value={appointmentsLoading ? "Laden..." : nextEvent?.titel ?? "Geen afspraak"}
-          sub={appointmentsLoading ? "Google Calendar laden" : nextEvent ? formatEventMeta(nextEvent, todayIso) : conflicts > 0 ? conflictLabel : "Agenda rustig"}
+          value={eventValue}
+          sub={eventSub}
+          href="/agenda"
         />
         <OverviewCell
           icon={Wallet}
@@ -104,13 +173,15 @@ export function OverviewPanel({
           label={nettoLabel}
           value={nettoValue}
           sub={nettoSub}
+          href="/finance"
         />
         <OverviewCell
           icon={Lightbulb}
-          tone={lampsOn > 0 ? "amber" : "slate"}
+          tone={devicesFailed ? "rose" : lampsOn > 0 ? "amber" : "slate"}
           label="Woning"
-          value={lampsTotal === 0 ? "Geen lampen" : `${lampsOn}/${lampsTotal} aan`}
-          sub={`${devicesOnline} online`}
+          value={lampValue}
+          sub={lampSub}
+          href="/lampen"
         />
       </div>
     </Panel>

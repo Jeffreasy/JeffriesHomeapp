@@ -40,6 +40,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
 
   const openConfirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
+      // A second openConfirm while one is still pending replaces the dialog —
+      // resolve the first promise as "cancelled" instead of leaving its caller
+      // hanging on a promise that can never settle.
+      resolveRef.current?.(false);
       resolveRef.current = resolve;
       setState({ ...options, resolve });
     });
@@ -47,6 +51,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
 
   const handleClose = useCallback((confirmed: boolean) => {
     resolveRef.current?.(confirmed);
+    resolveRef.current = null;
     setState(null);
   }, []);
 

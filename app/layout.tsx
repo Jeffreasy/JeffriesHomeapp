@@ -19,12 +19,16 @@ export const viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Homeapp — Smart Home Control",
-  description: "Control your WiZ smart lights from anywhere on your local network.",
+  title: "Jeffries Dashboard",
+  description:
+    "Persoonlijk dashboard: rooster, agenda, notities, habits, financiën, smart home en LaventeCare.",
+  icons: {
+    apple: "/icon-192x192.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Homeapp",
+    title: "Jeffries",
   },
 };
 
@@ -32,6 +36,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="nl" className={inter.variable} suppressHydrationWarning>
       <body className="font-sans bg-background text-slate-100">
+        {/* Skip-link (M8): first tab stop jumps keyboard/screen-reader users
+            past the navigation straight to the page content. */}
+        <a
+          href="#main"
+          className="visually-hidden focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[120] focus:rounded-lg focus:border focus:border-amber-500/30 focus:bg-[#12121a] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-amber-300"
+        >
+          Naar inhoud
+        </a>
         <Providers>
           <ClientShell>{children}</ClientShell>
         </Providers>

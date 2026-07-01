@@ -39,7 +39,13 @@ export const FREQUENTIE_LABELS: Record<string, string> = {
   x_per_maand:   "X keer per maand",
 };
 
+// Index = backend/JS weekday (0 = zondag) — aangepaste_dagen stores THESE
+// indexes; never reorder this array itself.
 export const DAG_LABELS = ["Zo", "Ma", "Di", "Wo", "Do", "Vr", "Za"];
+
+// Display order for day pickers: Monday-first (NL conventie), while the values
+// keep the 0=zondag backend mapping above.
+export const DAG_INDEXES_MA_EERST = [1, 2, 3, 4, 5, 6, 0] as const;
 
 export const TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
   positief: { label: "Positief",  emoji: "✅" },

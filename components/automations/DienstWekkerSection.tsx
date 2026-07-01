@@ -159,7 +159,10 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
   };
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.24)] sm:p-5">
+    <section
+      id="dienst-wekker-cockpit"
+      className="scroll-mt-28 rounded-xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.24)] sm:p-5"
+    >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-500/10 text-amber-200">
@@ -207,7 +210,7 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
                 </div>
                 {items.length > 0 && (
                   <span className={cn("rounded-md px-2 py-1 text-[11px] font-semibold", items.some((item) => item.enabled) ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-500/10 text-slate-400")}>
-                    {items.some((item) => item.enabled) ? "Live" : "Pauze"}
+                    {items.some((item) => item.enabled) ? "Actief" : "Pauze"}
                   </span>
                 )}
               </div>
@@ -228,6 +231,13 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-bold text-white">{activeProfile.label}</h3>
                   <p className="text-xs text-slate-500">{enabledCount}/{activeTemplates.length} stappen actief · laatste run {formatLastRun(activeItems)}</p>
+                  {/* M4: eerlijk over wat "Actief" betekent — of er een passende
+                      dienst aankomt is hier niet te verifiëren zonder rooster. */}
+                  {enabledCount > 0 && (
+                    <p className="mt-1 text-[11px] text-amber-300/80">
+                      Vuurt alleen op dagen met een passende {activeType}-dienst in het rooster.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -265,7 +275,9 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
             </div>
           </div>
 
-          <div className="mt-4 space-y-2">
+          <p className="mt-3 text-[10px] text-slate-500">Tijden in Nederlandse tijd (Europe/Amsterdam)</p>
+
+          <div className="mt-2 space-y-2">
             {activeTemplates.map((template, index) => {
               const installed = findTemplateAutomation(activeItems, activeType, template.id, index);
               return (

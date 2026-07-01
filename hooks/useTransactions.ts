@@ -1,18 +1,19 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState, useEffect, useCallback } from "react";
+import { useDeferredValue, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
+import { useToast } from "@/components/ui/Toast";
+
 import {
   getTransactions,
   getTransactionsStats,
-  postTransactionsImport,
   patchTransactionsTxID,
 } from "@/lib/api/generated/transactions/transactions";
 import type {
   GetTransactionsParams,
+  GetTransactionsStatsParams,
   ModelTransaction,
   StoreTransactionStats as TransactionFullStats,
-  PostTransactionsImportBody,
 } from "@/lib/api/model";
 
 export type TransactionFilter = Omit<GetTransactionsParams, "userId"> & { maandFilter?: string };
@@ -29,6 +30,11 @@ export type TransactionRow = ModelTransaction & {
 export type { TransactionFullStats };
 
 const PAGE_SIZE = 50;
+// Page size used when exporting the full filtered set (fewer round-trips).
+const EXPORT_PAGE_SIZE = 500;
+// Safety cap for CSV exports; beyond this the export is truncated and the
+// caller is expected to tell the user to narrow the filters.
+export const EXPORT_MAX_ROWS = 10_000;
 
 // monthEnd returns the real last calendar day of a "YYYY-MM" month, e.g.
 // "2026-02" -> "2026-02-28". Using a hardcoded "-31" produces invalid dates
@@ -38,6 +44,40 @@ function monthEnd(maand: string): string {
   if (!y || !m) return `${maand}-28`;
   const lastDay = new Date(y, m, 0).getDate(); // day 0 of next month = last day of this month
   return `${maand}-${String(lastDay).padStart(2, "0")}`;
+}
+
+// Converts the UI-level maandFilter / jaarFilter into the datumVan/datumTot
+// range the API understands (explicit date filters win over both).
+function applyPeriodRange(apiFilter: GetTransactionsParams, filter: TransactionFilter) {
+  if (filter.maandFilter) {
+    if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.maandFilter}-01`;
+    if (!apiFilter.datumTot) apiFilter.datumTot = monthEnd(filter.maandFilter);
+  }
+  if (filter.jaarFilter) {
+    if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.jaarFilter}-01-01`;
+    if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.jaarFilter}-12-31`;
+  }
+}
+
+// The backend stats endpoint accepts optional datumVan/datumTot that constrain
+// all aggregations (F1). The generated params type has not been regenerated yet,
+// so widen it locally instead of editing the generated model.
+type StatsParams = GetTransactionsStatsParams & { datumVan?: string; datumTot?: string };
+
+// Builds the stats params for the CURRENT period selection: same iban/jaar as
+// before, plus the exact datumVan/datumTot range the transaction list uses
+// (maand takes precedence over jaar, explicit dates win over both) so the
+// metric cards/charts describe the same period as the list (F1).
+function buildStatsParams(userId: string, filter: TransactionFilter): StatsParams {
+  const statsParams: StatsParams = {
+    userId,
+    ibanFilter: filter.ibanFilter,
+    jaarFilter: filter.jaarFilter,
+    datumVan: filter.datumVan,
+    datumTot: filter.datumTot,
+  };
+  applyPeriodRange(statsParams as GetTransactionsParams, filter);
+  return statsParams;
 }
 
 function mapTransaction(tx: ModelTransaction): TransactionRow {
@@ -59,7 +99,9 @@ function mapTransaction(tx: ModelTransaction): TransactionRow {
 export function useTransactions(filter: TransactionFilter = {} as TransactionFilter) {
   const { user } = useUser();
   const userId = user?.id ?? "";
+  const { error: toastError } = useToast();
   const deferredZoek = useDeferredValue(filter.zoekterm ?? "");
+
 
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -118,21 +160,11 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
           offset: 0,
         };
 
-        // Convert maandFilter to date range
-        if (filter.maandFilter) {
-          if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.maandFilter}-01`;
-          if (!apiFilter.datumTot) apiFilter.datumTot = monthEnd(filter.maandFilter);
-        }
-
-        // If jaarFilter is set, compute datumVan/datumTot
-        if (filter.jaarFilter) {
-          if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.jaarFilter}-01-01`;
-          if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.jaarFilter}-12-31`;
-        }
+        applyPeriodRange(apiFilter, filter);
 
         const [listResult, statsResult] = await Promise.all([
           getTransactions(apiFilter),
-          getTransactionsStats({ userId, ibanFilter: filter.ibanFilter, jaarFilter: filter.jaarFilter }),
+          getTransactionsStats(buildStatsParams(userId, filter)),
         ]);
 
         if (cancelled || typeof listResult.data === "string" || typeof statsResult.data === "string") return;
@@ -172,14 +204,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
       limit: PAGE_SIZE,
       offset,
     };
-    if (filter.maandFilter) {
-      if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.maandFilter}-01`;
-      if (!apiFilter.datumTot) apiFilter.datumTot = monthEnd(filter.maandFilter);
-    }
-    if (filter.jaarFilter) {
-      if (!apiFilter.datumVan) apiFilter.datumVan = `${filter.jaarFilter}-01-01`;
-      if (!apiFilter.datumTot) apiFilter.datumTot = `${filter.jaarFilter}-12-31`;
-    }
+    applyPeriodRange(apiFilter, filter);
 
     const result = await getTransactions(apiFilter);
     if (typeof result.data === "string") return;
@@ -190,23 +215,100 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     setOffset(prev => prev + pageItems.length);
   }, [userId, isDone, offset, filter, deferredZoek]);
 
-  const importBatch = useCallback(
-    async (txs: PostTransactionsImportBody["transactions"]) => {
-      if (!userId) return { data: { ok: false, inserted: 0, total: 0, skipped: 0 } };
-      return postTransactionsImport({ userId, transactions: txs });
+  // F5: export-annulering. Een simpele vlag (AbortController-patroon) die de
+  // fetchAll-lus tussen twee pagina's controleert; ook gezet bij unmount zodat
+  // een wegnavigatie geen pagina's blijft ophalen.
+  const exportAbortRef = useRef(false);
+  const cancelExport = useCallback(() => {
+    exportAbortRef.current = true;
+  }, []);
+  useEffect(() => {
+    return () => {
+      exportAbortRef.current = true;
+    };
+  }, []);
+
+  // fetchAll pages through the complete result set for the *current* filter
+  // (server-side, EXPORT_PAGE_SIZE per call) so exports cover everything the
+  // filter matches, not just the rows loaded in the list. Truncates at
+  // EXPORT_MAX_ROWS as a safety cap. Returns `aborted: true` when the user
+  // cancelled mid-export (caller decides what to do with the partial rows).
+  const fetchAll = useCallback(
+    async (onProgress?: (loaded: number, total: number) => void) => {
+      if (!userId) return { rows: [] as TransactionRow[], totalCount: 0, truncated: false, aborted: false };
+
+      exportAbortRef.current = false;
+      const rows: TransactionRow[] = [];
+      let exportOffset = 0;
+      let total = 0;
+
+      for (;;) {
+        if (exportAbortRef.current) {
+          return { rows, totalCount: total, truncated: false, aborted: true };
+        }
+        const apiFilter: GetTransactionsParams = {
+          ...filter,
+          userId,
+          zoekterm: deferredZoek.trim() || undefined,
+          limit: EXPORT_PAGE_SIZE,
+          offset: exportOffset,
+        };
+        applyPeriodRange(apiFilter, filter);
+
+        const result = await getTransactions(apiFilter);
+        if (typeof result.data === "string") {
+          throw new Error("Onverwacht antwoord van de server.");
+        }
+        const pageItems = (result.data.page ?? []).map(mapTransaction);
+        rows.push(...pageItems);
+        total = result.data.totalCount ?? rows.length;
+        onProgress?.(Math.min(rows.length, EXPORT_MAX_ROWS), Math.min(total, EXPORT_MAX_ROWS));
+
+        if (rows.length >= EXPORT_MAX_ROWS) {
+          return { rows: rows.slice(0, EXPORT_MAX_ROWS), totalCount: total, truncated: total > EXPORT_MAX_ROWS, aborted: false };
+        }
+        if ((result.data.isDone ?? true) || pageItems.length === 0) {
+          return { rows, totalCount: total, truncated: false, aborted: false };
+        }
+        exportOffset += pageItems.length;
+      }
     },
-    [userId]
+    [userId, filter, deferredZoek]
   );
 
   const updateCategorie = useCallback(
     async (id: string, categorie: string) => {
-      await patchTransactionsTxID(id, { categorie });
-      setTransactions(prev =>
-        prev.map(t => (t.id === id ? { ...t, categorie } : t))
-      );
+      try {
+        await patchTransactionsTxID(id, { categorie });
+        setTransactions(prev =>
+          prev.map(t => (t.id === id ? { ...t, categorie } : t))
+        );
+        // F7: met een actieve categorie-filter hoort een rij die niet langer
+        // matcht uit de lijst te verdwijnen — herlaad dan lijst + stats samen.
+        if (filter.categorieFilter) {
+          setRefreshTick((t) => t + 1);
+          return;
+        }
+        // Refresh the aggregates so the pie chart / category cards reflect the
+        // edited row instead of showing the old category until a full refresh.
+        try {
+          const statsResult = await getTransactionsStats(buildStatsParams(userId, filter));
+          if (typeof statsResult.data !== "string") setStats(statsResult.data);
+        } catch {
+          // Best-effort: the row itself was saved; stale aggregates resolve on
+          // the next refresh.
+        }
+      } catch {
+        // No caller consumes the rejection (the dropdown fires and forgets),
+        // so swallow it here after surfacing the toast — rethrowing would only
+        // produce an unhandled-rejection console error.
+        toastError("Kon categorie niet bijwerken.");
+      }
     },
-    []
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [toastError, userId, filterKey]
   );
+
 
   const resetPagination = useCallback(() => {
     setOffset(0);
@@ -226,7 +328,8 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     isSearching: (filter.zoekterm ?? "") !== deferredZoek,
     stats,
     totalCount: totalCount || stats?.aantalTxs || stats?.aantalAlleTxs || 0,
-    importBatch,
+    fetchAll,
+    cancelExport,
     updateCategorie,
     loadMore,
     resetPagination,

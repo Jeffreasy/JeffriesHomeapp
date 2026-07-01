@@ -59,12 +59,13 @@ function detectConflict(
   // No overlap of the two datetime ranges → not a conflict.
   if (evStart >= dEnd || dStart >= evEnd) return null;
 
-  // Hele-dag / event zonder tijden → zacht conflict (geen exacte tijdsoverlap).
-  if (event.heledag || !event.startTijd || !event.eindTijd) return "soft";
+  // Hele-dag / event/dienst zonder tijden → zacht conflict (geen exacte tijdsoverlap).
+  if (event.heledag || !event.startTijd || !event.eindTijd || dienst.heledag || !dienst.startTijd || !dienst.eindTijd) return "soft";
 
   // Beide hebben tijden en de datetime-ranges overlappen → hard conflict.
   return "hard";
 }
+
 
 // ─── Bulk analyse ─────────────────────────────────────────────────────────────
 
@@ -86,6 +87,13 @@ function buildMessage(level: ConflictLevel, event: PersonalEvent, dienst: Dienst
  * Analyseer alle aankomende events tegen alle diensten.
  * Retourneert een Map van eventId → ergste conflict.
  * Als een event overlap heeft met meerdere diensten, pakt het de zwaarste.
+ *
+ * Contract (audit F13): callers geven hun VOLLEDIGE dienstenlijst door — de
+ * agenda- en roosterpagina gebruiken beide de ongefilterde lijst zodat de
+ * conflict-tellingen overal identiek zijn. VERWIJDERDE diensten worden hier
+ * centraal overgeslagen; past-diensten filteren zichzelf uit omdat alleen
+ * aankomende events geanalyseerd worden en de datetime-ranges dan nooit
+ * overlappen.
  */
 export function analyzeConflicts(
   events:   PersonalEvent[],
@@ -93,10 +101,12 @@ export function analyzeConflicts(
 ): Map<string, ConflictInfo> {
   const result = new Map<string, ConflictInfo>();
   const levelOrder: Record<ConflictLevel, number> = { hard: 2, soft: 1, info: 0 };
+  // VERWIJDERDE diensten mogen nooit een conflict veroorzaken (audit F13).
+  const activeDiensten = diensten.filter((dienst) => dienst.status !== "VERWIJDERD");
 
   for (const event of events) {
     if (event.kalender === "Rooster") continue;
-    for (const dienst of diensten) {
+    for (const dienst of activeDiensten) {
       const level = detectConflict(event, dienst);
       if (!level) continue;
 

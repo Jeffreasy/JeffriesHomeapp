@@ -307,6 +307,53 @@ type EventOptionGroup = {
   events: PersonalEvent[];
 };
 
+// ── Draft persistence (FH9) ──────────────────────────────────────────────────
+// A tab-reload, PWA-kill or Android back press must never destroy a long
+// unsaved note. While dirty, a snapshot of title+content is debounced into
+// localStorage (per note id; "new-note" for a fresh editor) and offered back
+// via an inline restore banner on the next open.
+type NoteDraft = {
+  titel: string;
+  inhoud: string;
+  savedAt: number;
+  // Uitgebreid (low): ook tags/deadline/kleur overleven een hard kill.
+  tags?: string[];
+  deadline?: string;
+  kleur?: string;
+};
+
+const DRAFT_KEY_PREFIX = "note-editor-draft:";
+
+function draftStorageKey(noteId?: string | null) {
+  return `${DRAFT_KEY_PREFIX}${noteId ?? "new-note"}`;
+}
+
+function readDraft(key: string): NoteDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<NoteDraft>;
+    if (typeof parsed.inhoud !== "string" || typeof parsed.savedAt !== "number") return null;
+    return {
+      titel: typeof parsed.titel === "string" ? parsed.titel : "",
+      inhoud: parsed.inhoud,
+      savedAt: parsed.savedAt,
+      tags: Array.isArray(parsed.tags) ? parsed.tags.filter((t): t is string => typeof t === "string") : undefined,
+      deadline: typeof parsed.deadline === "string" ? parsed.deadline : undefined,
+      kleur: typeof parsed.kleur === "string" ? parsed.kleur : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearStoredDraft(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {}
+}
+
 type EditorPanel = "details" | "style" | "history";
 type PendingEditorAction = "archive" | "complete" | "delete" | "pin" | null;
 type NoteAction = (id: string) => void | Promise<void>;
@@ -399,6 +446,8 @@ export function NoteEditor({
   const [revisionLoading, setRevisionLoading] = useState(false);
   const [revisionError, setRevisionError] = useState("");
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  // M-K: welke revisie volledig uitgeklapt is (inhoud bekijken vóór herstellen).
+  const [expandedRevisionId, setExpandedRevisionId] = useState<string | null>(null);
   const [baseline, setBaseline] = useState<NoteEditorSnapshot>(() => buildInitialSnapshot(note, {
     initialDeadline,
     initialLinkedEventId,
@@ -406,6 +455,20 @@ export function NoteEditor({
     initialTitle,
     initialBusinessContext,
   }));
+
+  // FH9c: draft snapshot in localStorage. On open, offer restore when a draft
+  // exists that is newer than the note's last save and differs from what the
+  // editor already shows.
+  const draftKey = draftStorageKey(note?.id);
+  const [pendingDraft, setPendingDraft] = useState<NoteDraft | null>(() => {
+    const draft = readDraft(draftStorageKey(note?.id));
+    if (!draft) return null;
+    const baseTitel = note?.titel ?? initialTitle ?? "";
+    const baseInhoud = note?.inhoud ?? "";
+    if (draft.titel === baseTitel && draft.inhoud === baseInhoud) return null;
+    if (note?.gewijzigd && draft.savedAt <= new Date(note.gewijzigd).getTime()) return null;
+    return draft;
+  });
 
   const resolvedUserId = userId || note?.user_id;
   const isPinned = Boolean(note?.isPinned || note?.is_pinned);
@@ -710,6 +773,19 @@ export function NoteEditor({
     });
   }, [autoResize, inhoud, linkCursorPos]);
 
+  // R4a: de history-sentinel wordt synchronic geconsumeerd in de sluit-paden
+  // (close/save/delete/archive/complete) VÓÓR unmount — de unmount-cleanup was
+  // te laat wanneer AnimatePresence de instantie nog ~200ms in leven hield en
+  // lekte een verdwaalde entry bij in-app navigatie.
+  const sentinelConsumedRef = useRef(false);
+  const consumeHistorySentinel = useCallback(() => {
+    if (sentinelConsumedRef.current) return;
+    sentinelConsumedRef.current = true;
+    if (typeof window !== "undefined" && window.history.state?.noteEditorGuard) {
+      window.history.back();
+    }
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!canSave || actionBusy) return;
     setSaving(true);
@@ -744,26 +820,144 @@ export function NoteEditor({
         businessContextTitle: enriched.businessContext?.title || (isEditing ? "" : undefined),
       });
       setBaseline(currentSnapshot);
+      // Successful save — the localStorage draft is now stale (FH9c).
+      clearStoredDraft(draftKey);
+      consumeHistorySentinel();
       onClose();
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : "Opslaan mislukt");
     } finally {
       setSaving(false);
     }
-  }, [actionBusy, canSave, currentSnapshot, deadline, effectiveBusinessContext, eventById, inhoud, kleur, linkedEventId, note, onClose, onSave, prioriteit, selectedEvent?.beschrijving, selectedEvent?.titel, selectedEventContextTags, symbol, tags, titel]);
+  }, [actionBusy, canSave, consumeHistorySentinel, currentSnapshot, deadline, draftKey, effectiveBusinessContext, eventById, inhoud, kleur, linkedEventId, note, onClose, onSave, prioriteit, selectedEvent?.beschrijving, selectedEvent?.titel, selectedEventContextTags, symbol, tags, titel]);
 
+  // M-A: reentrancy-guard (HabitForm-patroon) — Escape in de discard-confirm
+  // mag geen tweede confirm openen, en Ctrl+Enter mag niet opslaan terwijl de
+  // confirm openstaat.
+  const confirmingCloseRef = useRef(false);
   const handleCloseAttempt = useCallback(async () => {
+    if (confirmingCloseRef.current) return;
     if (isDirty) {
-      const confirmed = await openConfirm({
-        title: "Wijzigingen sluiten?",
-        message: "Je hebt nog onopgeslagen wijzigingen in deze notitie.",
-        confirmLabel: "Sluiten",
-        variant: "danger",
-      });
-      if (!confirmed) return;
+      confirmingCloseRef.current = true;
+      try {
+        const confirmed = await openConfirm({
+          title: "Wijzigingen sluiten?",
+          message: "Je hebt nog onopgeslagen wijzigingen in deze notitie.",
+          confirmLabel: "Sluiten",
+          variant: "danger",
+        });
+        if (!confirmed) return;
+      } finally {
+        confirmingCloseRef.current = false;
+      }
     }
+    // Explicitly closed (clean, or discard confirmed) — drop the draft so the
+    // restore banner doesn't resurrect content the user chose to throw away.
+    clearStoredDraft(draftKey);
+    consumeHistorySentinel();
     onClose();
-  }, [isDirty, onClose, openConfirm]);
+  }, [consumeHistorySentinel, draftKey, isDirty, onClose, openConfirm]);
+
+  // FH9a: warn before a tab-reload/close while there are unsaved changes.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  // FH9c: while dirty, debounce a title/content snapshot into localStorage so
+  // a hard kill (PWA swipe-away, crash) can still be recovered.
+  useEffect(() => {
+    if (!isDirty) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const draft: NoteDraft = {
+          titel,
+          inhoud,
+          savedAt: Date.now(),
+          tags,
+          deadline: deadline || undefined,
+          kleur: kleur || undefined,
+        };
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {}
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [deadline, draftKey, inhoud, isDirty, kleur, tags, titel]);
+
+  // FH9b: push a history entry when the editor opens and intercept popstate so
+  // the Android/browser back button routes through the dirty-confirm instead of
+  // navigating away and destroying the draft.
+  const handleCloseAttemptRef = useRef(handleCloseAttempt);
+  useEffect(() => {
+    handleCloseAttemptRef.current = handleCloseAttempt;
+  }, [handleCloseAttempt]);
+
+  const mountedAtRef = useRef(Date.now());
+  useEffect(() => {
+    // Preserve Next.js' own history state — only add our sentinel flag.
+    window.history.pushState({ ...window.history.state, noteEditorGuard: true }, "");
+    const onPopState = () => {
+      // Onze eigen compensatie-back (sentinel al geconsumeerd via een van de
+      // sluit-paden) — negeren, anders zou de sentinel opnieuw ge-armd worden.
+      if (sentinelConsumedRef.current) return;
+      // Back consumed the sentinel: re-arm it so the editor stays put.
+      window.history.pushState({ ...window.history.state, noteEditorGuard: true }, "");
+      // R4b: mount-grace — een popstate in de eerste ~300ms is vrijwel zeker
+      // de cleanup-back van een vórige editor-instantie (close→reopen binnen
+      // het AnimatePresence-venster), geen echte Back van de gebruiker. De
+      // sentinel is hierboven al her-armd; niet sluiten.
+      if (Date.now() - mountedAtRef.current < 300) return;
+      void handleCloseAttemptRef.current();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+      if (sentinelConsumedRef.current) return;
+      sentinelConsumedRef.current = true;
+      if (window.history.state?.noteEditorGuard) {
+        // Nog op de sentinel-entry (editor extern gesloten, bv. key-wissel):
+        // consumeren zodat de volgende Back niet twee keer hoeft.
+        window.history.back();
+      } else {
+        // R4c: in-app weggenavigeerd met open editor — de sentinel-entry ligt
+        // onder de nieuwe route en kan niet meer veilig gepopt worden zonder
+        // de navigatie terug te draaien. Best effort: strip alleen de
+        // guard-vlag via replaceState. Bekend residu: één extra Back-druk kan
+        // nodig zijn om voorbij de verweesde entry te komen.
+        try {
+          const state = { ...((window.history.state ?? {}) as Record<string, unknown>) };
+          delete state.noteEditorGuard;
+          window.history.replaceState(state, "");
+        } catch {}
+      }
+    };
+  }, []);
+
+  const restoreDraft = useCallback(() => {
+    if (!pendingDraft) return;
+    setTitel(pendingDraft.titel);
+    setInhoud(pendingDraft.inhoud);
+    // Uitgebreide draft-velden (low): alleen toepassen wanneer aanwezig, oude
+    // drafts zonder deze velden herstellen zoals voorheen.
+    if (pendingDraft.tags) setTags(normalizeTags(pendingDraft.tags));
+    if (pendingDraft.deadline !== undefined) setDeadline(pendingDraft.deadline);
+    if (pendingDraft.kleur !== undefined) setKleur(pendingDraft.kleur);
+    setPendingDraft(null);
+    requestAnimationFrame(() => {
+      textRef.current?.focus();
+      autoResize();
+    });
+  }, [autoResize, pendingDraft]);
+
+  const discardDraft = useCallback(() => {
+    clearStoredDraft(draftKey);
+    setPendingDraft(null);
+  }, [draftKey]);
 
   const handleDeleteClick = useCallback(async () => {
     if (!onDelete || !note || actionBusy) return;
@@ -778,12 +972,14 @@ export function NoteEditor({
     setSaveError("");
     try {
       await onDelete(note.id);
+      clearStoredDraft(draftKey);
+      consumeHistorySentinel();
       onClose();
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : "Verwijderen mislukt");
       setPendingAction(null);
     }
-  }, [actionBusy, note, onClose, onDelete, openConfirm]);
+  }, [actionBusy, consumeHistorySentinel, draftKey, note, onClose, onDelete, openConfirm]);
 
   const handleArchiveClick = useCallback(async () => {
     if (!onArchive || !note || actionBusy) return;
@@ -791,12 +987,13 @@ export function NoteEditor({
     setSaveError("");
     try {
       await onArchive(note.id);
+      consumeHistorySentinel();
       onClose();
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : "Archiveren mislukt");
       setPendingAction(null);
     }
-  }, [actionBusy, note, onArchive, onClose]);
+  }, [actionBusy, consumeHistorySentinel, note, onArchive, onClose]);
 
   const handleCompleteClick = useCallback(async () => {
     if (!onToggleComplete || !note || actionBusy || isDirty) return;
@@ -804,12 +1001,13 @@ export function NoteEditor({
     setSaveError("");
     try {
       await onToggleComplete(note.id);
+      consumeHistorySentinel();
       onClose();
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : "Afronden mislukt");
       setPendingAction(null);
     }
-  }, [actionBusy, isDirty, note, onClose, onToggleComplete]);
+  }, [actionBusy, consumeHistorySentinel, isDirty, note, onClose, onToggleComplete]);
 
   const handlePinClick = useCallback(async () => {
     if (onTogglePin && note && !actionBusy) {
@@ -887,6 +1085,12 @@ export function NoteEditor({
     const previousFocus = document.activeElement as HTMLElement | null;
 
     const handler = (event: KeyboardEvent) => {
+      // M-A: terwijl de discard-confirm openstaat hoort géén editor-shortcut te
+      // vuren — Escape zou de confirm opnieuw openen (loop) en Ctrl+Enter zou
+      // onder de confirm door opslaan. De focus-trap laat de confirm ook met
+      // rust.
+      if (confirmingCloseRef.current) return;
+
       if (event.key === "Tab") {
         const modal = modalRef.current;
         if (!modal) return;
@@ -991,11 +1195,10 @@ export function NoteEditor({
     setTags(tags.filter((item) => item !== tag));
   };
 
+  // Amsterdam-gepind (low): "Vandaag 17:00" moet 17:00 Amsterdamse tijd zijn,
+  // ook wanneer het device in een andere tijdzone staat.
   const setQuickDeadline = (days: number, hour = 9) => {
-    const date = new Date();
-    date.setDate(date.getDate() + days);
-    date.setHours(hour, 0, 0, 0);
-    setDeadline(date.toISOString());
+    setDeadline(amsterdamQuickDeadlineIso(days, hour));
   };
 
   const handleEventChange = (nextEventId: string) => {
@@ -1091,6 +1294,7 @@ export function NoteEditor({
                 } disabled:cursor-not-allowed disabled:opacity-45`}
                 title={isPinned ? "Ontpinnen" : "Pinnen"}
                 aria-label={isPinned ? "Ontpinnen" : "Pinnen"}
+                aria-pressed={isPinned}
               >
                 <Pin size={18} className={isPinned ? "fill-amber-300" : ""} />
               </button>
@@ -1109,6 +1313,29 @@ export function NoteEditor({
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
           <div className="grid min-h-full gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
             <section className="min-w-0 space-y-3">
+              {pendingDraft && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2">
+                  <p className="min-w-0 flex-1 text-xs font-medium text-amber-200">
+                    Onopgeslagen concept gevonden ({formatDutchDateTime(new Date(pendingDraft.savedAt).toISOString())})
+                  </p>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={restoreDraft}
+                      className="inline-flex h-8 items-center rounded-lg border border-amber-500/30 bg-amber-500/15 px-2.5 text-xs font-bold text-amber-200 transition-colors hover:bg-amber-500/25"
+                    >
+                      Herstellen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={discardDraft}
+                      className="inline-flex h-8 items-center rounded-lg border border-[var(--color-border)] px-2.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+                    >
+                      Verwijderen
+                    </button>
+                  </div>
+                </div>
+              )}
               <input
                 type="text"
                 placeholder="Titel"
@@ -1275,7 +1502,9 @@ export function NoteEditor({
                 <PanelButton icon={History} label="Historie" active={activePanel === "history"} onClick={() => setActivePanel("history")} />
               </div>
 
-              <AnimatePresence mode="wait">
+              {/* popLayout i.p.v. wait (K4): geen lege-aside-flits terwijl het
+                  vorige paneel eerst uit-animeert. */}
+              <AnimatePresence mode="popLayout">
                 {activePanel === "details" && (
                   <motion.div
                     key="details"
@@ -1509,35 +1738,59 @@ export function NoteEditor({
                         </p>
                       ) : (
                         <div className="space-y-2">
-                          {revisions.map((revision) => (
-                            <div
-                              key={revision.id}
-                              className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-[var(--color-text)]">
-                                    {revision.titel || firstContentLine(revision.inhoud) || "Naamloze versie"}
-                                  </p>
-                                  <p className="mt-0.5 text-xs text-[var(--color-text-subtle)]">
-                                    {formatDutchDateTime(revision.aangemaakt)}
-                                  </p>
+                          {revisions.map((revision) => {
+                            const expanded = expandedRevisionId === revision.id;
+                            return (
+                              <div
+                                key={revision.id}
+                                className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-[var(--color-text)]">
+                                      {revision.titel || firstContentLine(revision.inhoud) || "Naamloze versie"}
+                                    </p>
+                                    <p className="mt-0.5 text-xs text-[var(--color-text-subtle)]">
+                                      {formatDutchDateTime(revision.aangemaakt)}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleRestoreRevision(revision)}
+                                    disabled={!onRestoreRevision || actionBusy}
+                                    className="flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-2.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:opacity-50"
+                                  >
+                                    <RotateCcw size={13} />
+                                    {restoringId === revision.id ? "..." : "Herstel"}
+                                  </button>
                                 </div>
+                                {/* M-K: volledige inhoud inzien vóór herstellen */}
+                                {expanded ? (
+                                  <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--color-border)] bg-black/15 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                                    {revision.inhoud || "Geen inhoud"}
+                                  </pre>
+                                ) : (
+                                  <p className="mt-2 line-clamp-2 break-words text-xs leading-relaxed text-[var(--color-text-muted)]">
+                                    {revision.inhoud || "Geen inhoud"}
+                                  </p>
+                                )}
                                 <button
                                   type="button"
-                                  onClick={() => void handleRestoreRevision(revision)}
-                                  disabled={!onRestoreRevision || actionBusy}
-                                  className="flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-2.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:opacity-50"
+                                  onClick={() =>
+                                    setExpandedRevisionId(expanded ? null : revision.id)
+                                  }
+                                  aria-expanded={expanded}
+                                  className="mt-1.5 flex min-h-[34px] items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
                                 >
-                                  <RotateCcw size={13} />
-                                  {restoringId === revision.id ? "..." : "Herstel"}
+                                  <ChevronDown
+                                    size={13}
+                                    className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+                                  />
+                                  {expanded ? "Inhoud verbergen" : "Volledige inhoud bekijken"}
                                 </button>
                               </div>
-                              <p className="mt-2 line-clamp-2 break-words text-xs leading-relaxed text-[var(--color-text-muted)]">
-                                {revision.inhoud || "Geen inhoud"}
-                              </p>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </PanelSection>
@@ -2112,6 +2365,29 @@ function formatDeadlineForInput(value?: string | null): string {
 function localDateTimeToIso(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+/**
+ * ISO-instant voor "vandaag + N dagen om HH:00" op de Europe/Amsterdam-kalender,
+ * onafhankelijk van de device-tijdzone (deadline quick-buttons, low).
+ */
+function amsterdamQuickDeadlineIso(daysFromToday: number, hour: number): string {
+  const todayAms = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });
+  const base = new Date(`${todayAms}T12:00:00Z`);
+  base.setUTCDate(base.getUTCDate() + daysFromToday);
+  const dateIso = base.toISOString().slice(0, 10);
+  // Start met een UTC-gok en corrigeer op het uur dat Amsterdam werkelijk toont
+  // (dekking voor CET/CEST; kantoor-uren 9/17 wrappen nooit over middernacht).
+  const guess = new Date(`${dateIso}T${String(hour).padStart(2, "0")}:00:00Z`);
+  const amsHour = Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Amsterdam",
+      hour: "2-digit",
+      hour12: false,
+    }).format(guess),
+  );
+  guess.setUTCHours(guess.getUTCHours() + (hour - amsHour));
+  return guess.toISOString();
 }
 
 function normalizeDeadlineForSave(value: string): string {

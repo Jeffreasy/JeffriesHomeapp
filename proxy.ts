@@ -12,6 +12,16 @@ export default clerkMiddleware(async (auth, req) => {
   if (!isPublicRoute(req)) {
     const { userId } = await auth();
     if (!userId) {
+      // For API requests, return a 401 response instead of a redirect —
+      // a redirect makes fetch() land on the sign-in HTML with status 200,
+      // which the client would then fail to parse as JSON (FH4). The `detail`
+      // key matches what apiFetchWithStatus reads for error messages.
+      if (req.nextUrl.pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { detail: "Niet ingelogd.", code: "UNAUTHORIZED" },
+          { status: 401 }
+        );
+      }
       // Redirect to custom sign-in page
       const signInUrl = new URL("/sign-in", req.url);
       signInUrl.searchParams.set("redirect_url", req.url);
@@ -19,6 +29,7 @@ export default clerkMiddleware(async (auth, req) => {
     }
   }
 });
+
 
 export const config = {
   matcher: [

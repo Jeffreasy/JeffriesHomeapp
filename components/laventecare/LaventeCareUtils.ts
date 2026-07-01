@@ -100,3 +100,99 @@ export function fitTone(score?: number): Tone {
   if (score >= 55) return "amber";
   return "rose";
 }
+
+// ─── Vervaldatum/overdue-helpers (N9) ────────────────────────────────────────
+
+/** Vandaag als "YYYY-MM-DD" in Europe/Amsterdam — de kalenderdag die op
+ *  facturen/offertes van toepassing is, ongeacht de device-timezone. */
+export function amsterdamToday(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/** Aantal hele dagen dat `date` (ISO-datum of timestamp) vóór vandaag
+ *  (Amsterdam) ligt; 0 als niet verstreken of ongeldig. */
+export function daysPastDue(date?: string | null): number {
+  if (!date) return 0;
+  const day = date.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return 0;
+  const today = amsterdamToday();
+  if (day >= today) return 0;
+  const diffMs = Date.parse(`${today}T12:00:00Z`) - Date.parse(`${day}T12:00:00Z`);
+  return Math.max(1, Math.round(diffMs / 86_400_000));
+}
+
+/** True zodra `date` vóór vandaag (Amsterdam) ligt. */
+export function isPastDate(date?: string | null): boolean {
+  return daysPastDue(date) > 0;
+}
+
+// ─── Dossierdocument-koppeling (M-K) ─────────────────────────────────────────
+// Eén gedeelde implementatie voor CustomerDossier en CustomersView: de kopieën
+// waren gevorkt en weken al af (de name-match-fallback zonder id-guard kon een
+// document van een andere klant in dit dossier trekken).
+
+type DossierDocumentLike = {
+  company_id?: string | null;
+  context_id?: string | null;
+  context_type: string;
+  context_title?: string | null;
+  lead_id?: string | null;
+  project_id?: string | null;
+  workstream_id?: string | null;
+};
+
+export function isDossierDocumentForCompany(
+  doc: DossierDocumentLike,
+  companyId: string,
+  companyName: string,
+  leadIds: Set<string>,
+  projectIds: Set<string>,
+  workstreamIds: Set<string>,
+) {
+  if (!companyId) return false;
+  if (doc.company_id === companyId) return true;
+  if (doc.context_id === companyId && ["company", "klant", "klantdossier", "laventecare_company"].includes(doc.context_type)) return true;
+  if (doc.lead_id && leadIds.has(doc.lead_id)) return true;
+  if (doc.project_id && projectIds.has(doc.project_id)) return true;
+  if (doc.workstream_id && workstreamIds.has(doc.workstream_id)) return true;
+  // Name-match fallback only for documents with NO id-based context at all. A
+  // document already tied to another entity by id must not also be pulled into
+  // this dossier by a coincidental or same-name title (cross-customer misfile).
+  const hasIdContext = Boolean(doc.company_id || doc.context_id || doc.lead_id || doc.project_id || doc.workstream_id);
+  if (hasIdContext) return false;
+  return Boolean(doc.context_title && normalizeDossierText(doc.context_title) === normalizeDossierText(companyName));
+}
+
+function normalizeDossierText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+// ─── Dossierdocument-viewerlink met context (L2) ─────────────────────────────
+// De "Recent vastgelegd"/"Recent in dossiers"-lijsten openden de viewer ZONDER
+// de gelogde dossiercontext, waardoor een generiek document verscheen i.p.v.
+// het gepersonaliseerde document dat vastgelegd is. De context-queryparams
+// zitten al in de opgeslagen pdf_url — die nemen we over in de viewer-URL.
+export function dossierDocumentViewerHref(doc: {
+  document_key: string;
+  theme?: string | null;
+  pdf_url?: string | null;
+}): string {
+  const params = new URLSearchParams({ theme: doc.theme === "print" ? "print" : "screen" });
+  if (doc.pdf_url) {
+    try {
+      const stored = new URL(doc.pdf_url, "https://placeholder.local");
+      stored.searchParams.forEach((value, key) => {
+        if (key === "theme" || key === "delivery") return;
+        params.set(key, value);
+      });
+    } catch {
+      // Ongeldige opgeslagen URL: val terug op de kale viewer-link.
+    }
+  }
+  return `/laventecare/documenten/${encodeURIComponent(doc.document_key)}?${params.toString()}`;
+}

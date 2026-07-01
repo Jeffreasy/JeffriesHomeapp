@@ -31,7 +31,7 @@ export default function SignUpPage() {
             </svg>
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "#f1f5f9" }}>Homeapp</h1>
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: "#f1f5f9" }}>Jeffries Dashboard</h1>
             <p className="text-sm mt-1" style={{ color: "#64748b" }}>Account aanmaken</p>
           </div>
         </div>

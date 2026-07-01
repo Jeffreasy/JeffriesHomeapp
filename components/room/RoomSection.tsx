@@ -19,7 +19,9 @@ interface RoomSectionProps {
 }
 
 export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
-  const { mutate: sendCommand } = useLampCommand();
+  // sendBatch: optimistic cache-patch per lamp (zelfde simulatie als SceneBar,
+  // via lib/deviceCommands) + één invalidate aan het eind i.p.v. N refetches.
+  const { sendBatch } = useLampCommand();
   const { success } = useToast();
   const [showScenes, setShowScenes] = useState(false);
 
@@ -37,11 +39,11 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
       : 0;
 
   const toggleAll = () => {
-    onlineDevices.forEach((device) => sendCommand({ id: device.id, cmd: { on: !allOn } }));
+    sendBatch(onlineDevices, { on: !allOn });
   };
 
   const applyScene = (scene: ScenePreset) => {
-    onlineDevices.forEach((device) => sendCommand({ id: device.id, cmd: scene.command }));
+    sendBatch(onlineDevices, scene.command);
     success(`${scene.label} toegepast in ${room.name}`);
     setShowScenes(false);
   };

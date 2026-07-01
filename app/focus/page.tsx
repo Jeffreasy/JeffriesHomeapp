@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppIcon } from "@/components/ui/AppIcon";
@@ -13,6 +13,7 @@ import {
   useFocusData,
 } from "@/hooks/useFocusData";
 import type { Device, DeviceCommand, FocusAttention, FocusBusinessStatus, FocusSyncSummary } from "@/lib/api";
+import { applyCommandToDevice } from "@/lib/deviceCommands";
 import { CUSTOM_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +55,8 @@ function formatGeneratedAt(value?: string) {
 }
 
 function formatEuroCents(value?: number) {
-  if (!value) return "€0";
+  // Unknown (nog niet geladen / fout) is niet hetzelfde als nul (F3).
+  if (value === undefined || value === null) return "—";
   return new Intl.NumberFormat("nl-NL", {
     style: "currency",
     currency: "EUR",
@@ -68,22 +70,46 @@ function Header({
   generatedAt,
   attentionCount,
   bridgeOnline,
+  summaryError,
+  stale,
+  jitter,
 }: {
   time?: string;
   today?: string;
   generatedAt?: string;
   attentionCount: number;
   bridgeOnline: boolean;
+  summaryError?: boolean;
+  stale?: boolean;
+  /** M-G: subtiele 1-2px verschuiving van de grote klok tegen OLED burn-in. */
+  jitter?: { x: number; y: number };
 }) {
+  // F4: op een wandkiosk moet een hangende refresh zichtbaar zijn — rose bij
+  // een echte fout, amber wanneer de data ouder is dan ~2 refresh-intervallen.
+  const timestampClass = summaryError
+    ? "text-rose-300"
+    : stale
+      ? "text-amber-300"
+      : "text-slate-500";
   return (
     <header className="flex shrink-0 flex-col gap-3 border-b border-white/8 bg-black/20 px-3 py-3 backdrop-blur-xl sm:px-5 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 items-end gap-4">
-        <div className="font-mono text-5xl font-semibold leading-none text-white sm:text-6xl">
+        <div
+          className="font-mono text-5xl font-semibold leading-none text-white sm:text-6xl"
+          style={{
+            // Alleen transform (geen reflow); verschuift elke paar minuten 1-2px.
+            transform: `translate(${jitter?.x ?? 0}px, ${jitter?.y ?? 0}px)`,
+            transition: "transform 1.5s ease",
+          }}
+        >
           {time ?? "--:--"}
         </div>
         <div className="min-w-0 pb-1">
           <p className="truncate text-sm font-semibold text-slate-200 sm:text-base">{today ?? "Focus laden"}</p>
-          <p className="mt-1 text-xs text-slate-500">Laatst bijgewerkt {formatGeneratedAt(generatedAt)}</p>
+          <p className={`mt-1 text-xs ${timestampClass}`}>
+            Laatst bijgewerkt {formatGeneratedAt(generatedAt)}
+            {summaryError ? " · verversen mislukt" : stale ? " · verouderd" : ""}
+          </p>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
@@ -114,7 +140,21 @@ function StatusPill({ icon, label, active }: { icon: "radar" | "wifi" | "wifiOff
   );
 }
 
-function NowPanel({ item, todayIso }: { item: FocusTimelineItem | null; todayIso?: string }) {
+// M9: while data is loading the kiosk must show placeholders — a confident
+// "Geen blokkades / Geen habits gepland" on a cold start is indistinguishable
+// from a genuinely empty day.
+function SkeletonLines({ rows = 3 }: { rows?: number }) {
+  return (
+    <div role="status" aria-live="polite" className="space-y-2">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="h-12 animate-pulse rounded-lg border border-white/8 bg-white/[0.03]" />
+      ))}
+      <span className="sr-only">Laden…</span>
+    </div>
+  );
+}
+
+function NowPanel({ item, todayIso, isLoading }: { item: FocusTimelineItem | null; todayIso?: string; isLoading?: boolean }) {
   return (
     <section className={`${PANEL} flex h-full min-h-[260px] flex-col p-4 sm:p-5 xl:min-h-0`}>
       <div className="flex items-center justify-between gap-3">
@@ -138,6 +178,11 @@ function NowPanel({ item, todayIso }: { item: FocusTimelineItem | null; todayIso
             <p className="mt-3 line-clamp-2 text-base leading-6 text-slate-300">{item.subtitle}</p>
             <p className="mt-5 text-sm font-semibold text-slate-400">{formatTimelineMeta(item, todayIso)}</p>
           </Link>
+        ) : isLoading ? (
+          <div role="status" aria-live="polite" className="animate-pulse rounded-lg border border-white/10 bg-white/[0.03] p-5 text-center">
+            <p className="text-lg font-semibold text-slate-400">Laden…</p>
+            <p className="mt-2 text-sm text-slate-600">Rooster en agenda worden opgehaald.</p>
+          </div>
         ) : (
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-5 text-center">
             <p className="text-lg font-semibold text-white">Geen directe planning</p>
@@ -149,13 +194,15 @@ function NowPanel({ item, todayIso }: { item: FocusTimelineItem | null; todayIso
   );
 }
 
-function TimelinePanel({ items, todayIso }: { items: FocusTimelineItem[]; todayIso?: string }) {
+function TimelinePanel({ items, todayIso, isLoading }: { items: FocusTimelineItem[]; todayIso?: string; isLoading?: boolean }) {
   const visible = items.slice(0, 9);
   return (
     <section className={`${PANEL} flex h-full min-h-[240px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
-      <PanelHeader icon="calendarDays" label="Vandaag en straks" value={`${visible.length} items`} />
+      <PanelHeader icon="calendarDays" label="Vandaag en straks" value={isLoading && visible.length === 0 ? "Laden" : `${visible.length} items`} />
       <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {visible.length > 0 ? (
+        {isLoading && visible.length === 0 ? (
+          <SkeletonLines rows={4} />
+        ) : visible.length > 0 ? (
           visible.map((item) => (
             <Link
               key={item.id}
@@ -180,12 +227,14 @@ function TimelinePanel({ items, todayIso }: { items: FocusTimelineItem[]; todayI
   );
 }
 
-function AttentionPanel({ items }: { items: FocusAttention[] }) {
+function AttentionPanel({ items, isLoading }: { items: FocusAttention[]; isLoading?: boolean }) {
   return (
     <section className={`${PANEL} flex h-full min-h-[240px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
-      <PanelHeader icon="warning" label="Aandacht nodig" value={items.length === 0 ? "Rustig" : `${items.length}`} />
+      <PanelHeader icon="warning" label="Aandacht nodig" value={isLoading && items.length === 0 ? "Laden" : items.length === 0 ? "Rustig" : `${items.length}`} />
       <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-        {items.length > 0 ? (
+        {isLoading && items.length === 0 ? (
+          <SkeletonLines rows={3} />
+        ) : items.length > 0 ? (
           items.map((item) => {
             const content = (
               <div className={`rounded-lg border px-3 py-3 ${severityClasses(item.severity)}`}>
@@ -222,7 +271,7 @@ function SystemPanel({
   nextAppointment,
 }: {
   devices: { total: number; online: number; on: number; bridgeOnline: boolean };
-  finance: { value: string; hidden: boolean; meta: string };
+  finance: { value: string; hidden: boolean; meta: string; togglePrivacy: () => void };
   sync?: FocusSyncSummary;
   summaryError?: boolean;
   nextAppointment: string;
@@ -239,7 +288,30 @@ function SystemPanel({
       </div>
       <FocusLightControls />
       <div className="mt-3 space-y-2">
-        <InfoRow label="Netto" value={finance.value} meta={finance.hidden ? "Privacy actief" : finance.meta} />
+        <InfoRow
+          label="Netto"
+          value={finance.value}
+          meta={finance.hidden ? "Privacy actief" : finance.meta}
+          action={
+            // F5: dezelfde "finance"-privacyscope als de eye-toggles op de
+            // andere pagina's — maskeren/tonen kan nu ook vanaf de kiosk.
+            <button
+              type="button"
+              onClick={finance.togglePrivacy}
+              aria-pressed={finance.hidden}
+              aria-label={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
+              title={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                finance.hidden
+                  ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
+                  : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200",
+              )}
+            >
+              <AppIcon name={finance.hidden ? "hide" : "show"} size="xs" />
+            </button>
+          }
+        />
         <InfoRow label="Afspraak" value={nextAppointment} />
         <InfoRow label="Sync" value={syncValue} tone={summaryError ? "rose" : undefined} />
       </div>
@@ -248,27 +320,6 @@ function SystemPanel({
 }
 
 const FOCUS_LIGHT_SCENE_IDS = ["focus", "avond", "nacht", "ochtend"] as const;
-
-function applyCommandToDevice(device: Device, cmd: DeviceCommand): Device {
-  const next = {
-    ...(device.current_state ?? { on: false, brightness: 100, color_temp: 4000, r: 0, g: 0, b: 0 }),
-  };
-
-  if (cmd.on !== undefined) next.on = cmd.on;
-  if (cmd.brightness !== undefined) next.brightness = cmd.brightness;
-  if (cmd.color_temp_mireds !== undefined) {
-    next.color_temp = Math.round(1_000_000 / cmd.color_temp_mireds);
-    next.r = 0;
-    next.g = 0;
-    next.b = 0;
-  }
-  if (cmd.r !== undefined) next.r = cmd.r;
-  if (cmd.g !== undefined) next.g = cmd.g;
-  if (cmd.b !== undefined) next.b = cmd.b;
-  if (cmd.on === false) next.on = false;
-
-  return { ...device, current_state: next };
-}
 
 function FocusLightControls() {
   const { data: devices = [], isLoading } = useDevices();
@@ -363,18 +414,22 @@ function HabitNotePanel({
   habits,
   habitProgress,
   notes,
+  isLoading,
 }: {
   habits: Array<{ id: string; title: string; meta: string; done: boolean }>;
   habitProgress: { due: number; completed: number };
   notes: Array<{ id: string; title: string; meta: string; priority: string; href: string }>;
+  isLoading?: boolean;
 }) {
   return (
     <section className={`${PANEL} flex h-full min-h-[280px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
-      <PanelHeader icon="habit" label="Persoonlijk systeem" value={`${habitProgress.completed}/${habitProgress.due} habits`} />
+      <PanelHeader icon="habit" label="Persoonlijk systeem" value={isLoading && habits.length === 0 ? "Laden" : `${habitProgress.completed}/${habitProgress.due} habits`} />
       <div className="mt-4 grid min-h-0 flex-1 gap-4 sm:grid-cols-2">
         <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
           <p className="text-xs font-semibold uppercase text-slate-500">Habits vandaag</p>
-          {habits.length > 0 ? (
+          {isLoading && habits.length === 0 ? (
+            <SkeletonLines rows={3} />
+          ) : habits.length > 0 ? (
             habits.map((habit) => (
               <div key={habit.id} className="flex min-h-12 items-center gap-3 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
                 <AppIcon name={habit.done ? "statusOk" : "statusActive"} size="sm" iconClassName={habit.done ? "text-emerald-300" : "text-slate-500"} />
@@ -390,7 +445,9 @@ function HabitNotePanel({
         </div>
         <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
           <p className="text-xs font-semibold uppercase text-slate-500">Notitie focus</p>
-          {notes.length > 0 ? (
+          {isLoading && notes.length === 0 ? (
+            <SkeletonLines rows={3} />
+          ) : notes.length > 0 ? (
             notes.map((note) => (
               <Link key={note.id} href={note.href} className="block min-h-12 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 transition-colors hover:bg-white/[0.06]">
                 <p className="truncate text-sm font-semibold text-white">{note.title}</p>
@@ -452,12 +509,15 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "a
   );
 }
 
-function InfoRow({ label, value, meta, tone }: { label: string; value: string; meta?: string; tone?: "rose" }) {
+function InfoRow({ label, value, meta, tone, action }: { label: string; value: string; meta?: string; tone?: "rose"; action?: ReactNode }) {
   return (
     <div className="rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <p className="shrink-0 text-xs text-slate-500">{label}</p>
-        <p className={`min-w-0 truncate text-sm font-semibold sm:text-right ${tone === "rose" ? "text-rose-300" : "text-white"}`}>{value}</p>
+        <div className="flex min-w-0 items-center gap-2 sm:justify-end">
+          <p className={`min-w-0 truncate text-sm font-semibold sm:text-right ${tone === "rose" ? "text-rose-300" : "text-white"}`}>{value}</p>
+          {action}
+        </div>
       </div>
       {meta && <p className="mt-1 truncate text-xs text-slate-600 sm:text-right">{meta}</p>}
     </div>
@@ -475,9 +535,10 @@ function EmptyLine({ title, detail }: { title: string; detail: string }) {
 
 function formatRelativeCompact(date: string, todayIso?: string) {
   if (!todayIso) return date.slice(5);
-  if (date === todayIso) return "vandaag";
-  if (date === addDaysIso(todayIso, 1)) return "morgen";
-  if (date === addDaysIso(todayIso, 2)) return "overmorgen";
+  // Zelfde register als dashboard/habits: met hoofdletter (low).
+  if (date === todayIso) return "Vandaag";
+  if (date === addDaysIso(todayIso, 1)) return "Morgen";
+  if (date === addDaysIso(todayIso, 2)) return "Overmorgen";
   return date.slice(5).split("-").reverse().join("-");
 }
 
@@ -488,31 +549,62 @@ function addDaysIso(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+// De focus-summary refresht elke 30s; ~2 gemiste intervallen betekent dat de
+// kiosk verouderde data toont (F4).
+const GENERATED_AT_STALE_MS = 90_000;
+
 export default function FocusPage() {
   const focus = useFocusData();
   const todayIso = focus.dateInfo?.todayIso;
+  // Pure staleness check: vergelijk tegen de minuut-klok in state i.p.v.
+  // Date.now() tijdens render (react-hooks/purity); de klok tikt elke minuut,
+  // ruim vaak genoeg voor een 90s-drempel.
+  const generatedStale = Boolean(
+    focus.generatedAt &&
+      focus.clock &&
+      focus.clock.epochMs - new Date(focus.generatedAt).getTime() > GENERATED_AT_STALE_MS,
+  );
+
+  // M-G: nachtdimmen 23:00–07:00 (Amsterdam, via de bestaande minuutklok) +
+  // deterministische 1-2px klok-jitter per ~3 minuten tegen burn-in.
+  const clockHour = focus.clock ? Number(focus.clock.time.slice(0, 2)) : null;
+  const nightDim = clockHour !== null && Number.isFinite(clockHour) && (clockHour >= 23 || clockHour < 7);
+  const jitterBucket = focus.clock ? Math.floor(focus.clock.epochMs / 180_000) : 0;
+  const clockJitter = {
+    x: (jitterBucket % 3) - 1,
+    y: (Math.floor(jitterBucket / 3) % 3) - 1,
+  };
 
   return (
-    <div className="min-h-dvh overflow-y-auto bg-[#07090f] text-slate-100 xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden">
+    <div
+      className="min-h-dvh overflow-y-auto bg-[#07090f] text-slate-100 xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden"
+      style={{
+        filter: nightDim ? "brightness(0.6)" : "none",
+        transition: "filter 2s ease",
+      }}
+    >
       <Header
         time={focus.clock?.time ?? focus.summary?.time}
         today={focus.dateInfo?.todayLabel}
         generatedAt={focus.generatedAt}
         attentionCount={focus.attention.length}
         bridgeOnline={focus.devices.bridgeOnline}
+        summaryError={focus.summaryError}
+        stale={generatedStale}
+        jitter={clockJitter}
       />
 
       <main className="grid gap-3 p-3 sm:p-4 lg:grid-cols-2 xl:min-h-0 xl:flex-1 xl:overflow-hidden xl:grid-cols-[minmax(280px,0.9fr)_minmax(400px,1.28fr)_minmax(280px,0.92fr)] xl:grid-rows-[minmax(210px,0.9fr)_minmax(160px,0.72fr)_minmax(200px,0.58fr)]">
         <div className="order-1 xl:col-start-1 xl:row-start-1 xl:min-h-0">
-          <NowPanel item={focus.nextItem} todayIso={todayIso} />
+          <NowPanel item={focus.nextItem} todayIso={todayIso} isLoading={focus.isLoading} />
         </div>
 
         <div className="order-2 xl:col-start-3 xl:row-span-2 xl:row-start-1 xl:min-h-0">
-          <AttentionPanel items={focus.attention} />
+          <AttentionPanel items={focus.attention} isLoading={focus.isLoading} />
         </div>
 
         <div className="order-3 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:min-h-0">
-          <TimelinePanel items={focus.timeline} todayIso={todayIso} />
+          <TimelinePanel items={focus.timeline} todayIso={todayIso} isLoading={focus.isLoading} />
         </div>
 
         <div className="order-4 xl:col-start-1 xl:row-span-2 xl:row-start-2 xl:min-h-0">
@@ -530,6 +622,7 @@ export default function FocusPage() {
             habits={focus.habitItems}
             habitProgress={{ due: focus.habits.due, completed: focus.habits.completed }}
             notes={focus.focusNotes}
+            isLoading={focus.isLoading}
           />
         </div>
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, X, Plus } from "lucide-react";
+import { Check, X, Plus, Loader2 } from "lucide-react";
 import {
   type Automation,
   type AutomationAction,
@@ -14,15 +14,20 @@ import {
   SCENE_DEFINITIONS,
   type ShiftType,
 } from "@/lib/automations";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 
 interface AutomationFormProps {
   initialData?: Automation;
+  /** Bestaande automations — voor de niet-blokkerende overlap-waarschuwing (M3). */
+  existing?: Automation[];
   onClose: () => void;
-  onSave: (a: Omit<Automation, "id" | "createdAt" | "lastFiredAt">) => void;
+  /** Moet een promise teruggeven: de modal sluit pas bij succes (M2). */
+  onSave: (a: Omit<Automation, "id" | "createdAt" | "lastFiredAt">) => void | Promise<void>;
 }
 
-export function AutomationForm({ initialData, onClose, onSave }: AutomationFormProps) {
+export function AutomationForm({ initialData, existing = [], onClose, onSave }: AutomationFormProps) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [time, setTime] = useState(initialData?.trigger.time ?? "07:00");
   const [triggerType, setTriggerType] = useState<"time" | "schedule">(
@@ -33,7 +38,7 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
     initialData?.trigger.shiftType ?? "Vroeg"
   );
   const [actionType, setActionType] = useState<ActionType>(initialData?.action.type ?? "scene");
-  
+
   const [sceneId, setSceneId] = useState(initialData?.action.sceneId ?? "helder");
   const [brightness, setBrightness] = useState(initialData?.action.brightness ?? 80);
   const [colorHex, setColorHex] = useState(initialData?.action.colorHex ?? "#ff8800");
@@ -41,6 +46,53 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
 
   // Smart Exclusions
   const [excludedShifts, setExcludedShifts] = useState<ShiftType[]>(initialData?.trigger.excludedShifts ?? []);
+
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(true, dialogRef);
+  const { openConfirm } = useConfirm();
+  const confirmingRef = useRef(false);
+
+  // Dirty-check: vergelijk de huidige invoer met de beginsituatie.
+  const snapshot = useMemo(
+    () =>
+      JSON.stringify({
+        name, time, triggerType, days, shiftType, actionType,
+        sceneId, brightness, colorHex, colorTempMireds, excludedShifts,
+      }),
+    [name, time, triggerType, days, shiftType, actionType, sceneId, brightness, colorHex, colorTempMireds, excludedShifts]
+  );
+  const initialSnapshot = useRef(snapshot);
+  const isDirty = snapshot !== initialSnapshot.current;
+
+  // Sluiten via backdrop/Escape/X: bij ongesavede wijzigingen eerst bevestigen.
+  const requestClose = async () => {
+    if (saving || confirmingRef.current) return;
+    if (isDirty) {
+      confirmingRef.current = true;
+      const discard = await openConfirm({
+        title: "Wijzigingen verwerpen?",
+        message: "Je hebt niet-opgeslagen wijzigingen in dit formulier.",
+        confirmLabel: "Verwerpen",
+        variant: "danger",
+      });
+      confirmingRef.current = false;
+      if (!discard) return;
+    }
+    onClose();
+  };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || confirmingRef.current) return;
+      void requestClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // requestClose verandert elke render; de listener leest altijd de laatste via closure-vernieuwing.
+  });
 
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
@@ -51,9 +103,29 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
     );
   };
 
-  const handleSave = () => {
-    if (!name) return;
-    if (triggerType === "time" && days.length === 0) return;
+  // M3: niet-blokkerende overlap-check — zelfde tijd + minstens één gedeelde
+  // dag met een andere íngeschakelde automation. Rooster-getriggerde regels
+  // kunnen op elke dag vuren en tellen dus op alle dagen mee.
+  const overlapping = useMemo(() => {
+    const myDays = triggerType === "time" ? days : ALL_DAYS;
+    return existing.filter((other) => {
+      if (!other.enabled || other.id === initialData?.id) return false;
+      if (other.trigger.time !== time) return false;
+      const otherDays =
+        other.trigger.triggerType === "schedule" ? ALL_DAYS : other.trigger.days ?? [];
+      return myDays.some((d) => otherDays.includes(d));
+    });
+  }, [existing, initialData?.id, time, triggerType, days]);
+
+  // Waarom de opslaan-knop disabled is — als inline uitleg getoond.
+  const validationHint = !name
+    ? "Geef een naam op"
+    : triggerType === "time" && days.length === 0
+      ? "Kies minstens één dag"
+      : null;
+
+  const handleSave = async () => {
+    if (validationHint || saving) return;
 
     const action: AutomationAction = { type: actionType };
     if (actionType === "scene")      action.sceneId = sceneId as keyof typeof SCENE_DEFINITIONS;
@@ -71,14 +143,22 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
       excludedShifts: cleanExcluded.length > 0 ? cleanExcluded : undefined,
     };
 
-    onSave({ 
-      name, 
-      enabled: initialData?.enabled ?? true, 
-      trigger,
-      action,
-      group: initialData?.group
-    });
-    onClose();
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await onSave({
+        name,
+        enabled: initialData?.enabled ?? true,
+        trigger,
+        action,
+        group: initialData?.group
+      });
+      onClose(); // alléén sluiten bij succes — invoer blijft anders bewaard
+    } catch {
+      setSaveError("Opslaan is mislukt. Je invoer is bewaard — probeer het opnieuw.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const actionLabels: Record<ActionType, string> = {
@@ -97,11 +177,16 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={() => void requestClose()}
         aria-hidden="true"
       />
-      
+
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={initialData ? "Automatisering bewerken" : "Nieuwe automatisering"}
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -114,7 +199,7 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
           {initialData ? "Automatisering bewerken" : "Nieuwe automatisering"}
         </h3>
         <button
-          onClick={onClose}
+          onClick={() => void requestClose()}
           aria-label="Formulier sluiten"
           className="text-slate-500 hover:text-slate-300"
         >
@@ -123,18 +208,20 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
       </div>
 
       <div>
-        <label htmlFor="auto-name" className="sr-only">Naam</label>
+        <label htmlFor="auto-name" className="mb-1 block text-xs font-semibold text-slate-300">
+          Naam <span className="text-amber-400" aria-hidden="true">*</span>
+        </label>
         <input
           id="auto-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Naam *"
+          placeholder="Bijv. Ochtendlicht woonkamer"
           className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
         />
       </div>
 
       <div>
-        <label htmlFor="auto-time" className="sr-only">Tijdstip</label>
+        <label htmlFor="auto-time" className="mb-1 block text-xs font-semibold text-slate-300">Tijdstip</label>
         <input
           id="auto-time"
           type="time"
@@ -142,6 +229,7 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
           onChange={(e) => setTime(e.target.value)}
           className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50 [color-scheme:dark]"
         />
+        <p className="mt-1 text-[10px] text-slate-500">Tijden in Nederlandse tijd (Europe/Amsterdam)</p>
       </div>
 
       <fieldset>
@@ -237,6 +325,20 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
             ))}
           </div>
         </fieldset>
+      )}
+
+      {/* M3: niet-blokkerende waarschuwing bij overlappende automations */}
+      {overlapping.length > 0 && (
+        <p
+          role="status"
+          className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
+        >
+          Let op: &lsquo;{overlapping[0].name}&rsquo;
+          {overlapping.length > 1
+            ? ` en ${overlapping.length - 1} andere draaien`
+            : " draait"}{" "}
+          ook om {time} op deze dagen.
+        </p>
       )}
 
       <fieldset>
@@ -356,15 +458,26 @@ export function AutomationForm({ initialData, onClose, onSave }: AutomationFormP
         </div>
       </fieldset>
 
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={!name || (triggerType === "time" && days.length === 0)}
-        className="w-full py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 disabled:opacity-40 flex items-center justify-center gap-2"
-      >
-        <Check size={13} />
-        Opslaan
-      </button>
+      {saveError && (
+        <p role="alert" className="rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+          {saveError}
+        </p>
+      )}
+
+      <div>
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={!!validationHint || saving}
+          className="w-full py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 disabled:opacity-40 flex items-center justify-center gap-2"
+        >
+          {saving ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Check size={13} aria-hidden="true" />}
+          {saving ? "Bezig met opslaan…" : "Opslaan"}
+        </button>
+        {validationHint && (
+          <p className="mt-1.5 text-center text-[11px] text-slate-500">{validationHint}</p>
+        )}
+      </div>
       </motion.div>
     </div>
   );

@@ -243,7 +243,7 @@ export function useNotes() {
   const queryKey = getGetNotesQueryKey({ userId });
   const tagsQueryKey = getGetNotesTagsQueryKey({ userId });
 
-  const { data: notesRaw, isLoading: loadingNotes, isError: notesError } = useGetNotes({ userId }, { query: { enabled: !!userId } });
+  const { data: notesRaw, isLoading: loadingNotes, isError: notesError, refetch: refetchNotes } = useGetNotes({ userId }, { query: { enabled: !!userId } });
   const { data: tagsRaw, isLoading: loadingTags } = useGetNotesTags({ userId }, { query: { enabled: !!userId } });
 
   const raw = useMemo<NoteRecord[]>(() => {
@@ -331,18 +331,41 @@ export function useNotes() {
         await queryClient.cancelQueries({ queryKey });
         const previousNotes = queryClient.getQueryData<NotesCache>(queryKey);
 
+        // R3: fabriceer GEEN client-side `gewijzigd` — dat ging als
+        // concurrency-token mee in de volgende PATCH en veroorzaakte onterechte
+        // 409's bij twee snelle wijzigingen. De vorige serverwaarde blijft in
+        // de cache tot onSuccess de echte response-note terugschrijft. Het
+        // request-only veld expectedGewijzigd hoort ook niet in de cache.
         const patch = toModelPatch(variables.data as Partial<NoteUpdateData>);
+        delete (patch as Record<string, unknown>).expectedGewijzigd;
         queryClient.setQueryData<NotesCache>(queryKey, (old) => {
           if (!old?.data) return old;
           return {
             ...old,
             data: old.data.map((note: ModelNote) =>
-              note.id === variables.id ? { ...note, ...patch, gewijzigd: new Date().toISOString() } : note
+              note.id === variables.id ? { ...note, ...patch } : note
             ),
           };
         });
 
         return { previousNotes };
+      },
+      onSuccess: (result, variables) => {
+        // R3: schrijf de PATCH-response (met server-`gewijzigd`) in de cache
+        // zodat het concurrency-token direct weer klopt — óók vóór de
+        // invalidation-refetch landt.
+        const updated = result?.data;
+        if (updated && typeof updated === "object" && (updated as ModelNote).id) {
+          queryClient.setQueryData<NotesCache>(queryKey, (old) => {
+            if (!old?.data) return old;
+            return {
+              ...old,
+              data: old.data.map((note: ModelNote) =>
+                note.id === variables.id ? (updated as ModelNote) : note
+              ),
+            };
+          });
+        }
       },
       onError: (err, variables, context) => {
         toastError("Kon wijzigingen niet opslaan.");
@@ -396,6 +419,8 @@ export function useNotes() {
     allTags,
     isLoading: loadingNotes || loadingTags,
     isError: notesError,
+    /** Handmatige retry voor de fout-state van de lijst (N8). */
+    refetch: refetchNotes,
     count: active.length,
 
     create: async (data: NoteCreateData) => {

@@ -59,10 +59,10 @@ export default function SignInPage() {
               className="text-2xl font-bold tracking-tight"
               style={{ color: "#f1f5f9" }}
             >
-              Homeapp
+              Jeffries Dashboard
             </h1>
             <p className="text-sm mt-1" style={{ color: "#64748b" }}>
-              Smart Home Control · Jouw persoonlijke dashboard
+              Jouw persoonlijke dashboard
             </p>
           </div>
         </div>

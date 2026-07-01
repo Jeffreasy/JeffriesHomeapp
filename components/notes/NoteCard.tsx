@@ -21,7 +21,8 @@ interface NoteCardProps {
   onToggleComplete?: (id: string) => void | Promise<void>;
   onArchive:   (id: string) => void | Promise<void>;
   onDelete:    (id: string) => void | Promise<void>;
-  onUpdateContent?: (id: string, inhoud: string) => void | Promise<void>;
+  onUpdateContent?: (id: string, inhoud: string, expectedGewijzigd?: string) => void | Promise<void>;
+
   onNavigateToNote?: (title: string) => void;
   linkedEventLabel?: string;
   backlinks?: NoteBacklink[];
@@ -89,7 +90,8 @@ export function NoteCard({
     } else {
       return;
     }
-    await runAction("check", () => onUpdateContent(note.id, lines.join("\n")));
+    await runAction("check", () => onUpdateContent(note.id, lines.join("\n"), note.gewijzigd));
+
   };
 
   return (
@@ -97,15 +99,7 @@ export function NoteCard({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      role="button"
-      tabIndex={pendingAction ? -1 : 0}
-      aria-label={masked ? "Notitie openen" : `Notitie openen: ${displayTitle}`}
-      onKeyDown={(e) => {
-        if (e.key !== "Enter" && e.key !== " ") return;
-        e.preventDefault();
-        if (!pendingAction) onEdit(note);
-      }}
-      className={`glass group relative rounded-xl border border-[var(--color-border)] outline-none transition-all focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
+      className={`glass group relative rounded-xl border border-[var(--color-border)] outline-none transition-all ${
         pendingAction
           ? "cursor-progress opacity-80"
           : "cursor-pointer hover:border-[var(--color-border-hover)]"
@@ -143,10 +137,23 @@ export function NoteCard({
               title={`Prioriteit: ${prio.label}`}
             />
           )}
-          {/* The whole card is the (keyboard-accessible) open target, so the
-              title is plain text — no second tab stop. */}
+          {/* N2: the card root is a plain div (role="button" + interactive
+              children was invalid ARIA nesting). The TITLE is the real,
+              keyboard-focusable open-control; the card-wide onClick stays as a
+              pointer convenience. */}
           <h3 className={`min-w-0 flex-1 truncate text-sm font-semibold ${isCompleted ? "text-slate-400 line-through decoration-emerald-400/50" : "text-slate-200"}`}>
-            {masked ? "••••••" : displayTitle}
+            <button
+              type="button"
+              disabled={Boolean(pendingAction)}
+              aria-label={masked ? "Notitie openen" : `Notitie openen: ${displayTitle}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!pendingAction) onEdit(note);
+              }}
+              className="block w-full truncate rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 disabled:cursor-progress"
+            >
+              {masked ? "••••••" : displayTitle}
+            </button>
           </h3>
         </div>
 
@@ -278,9 +285,10 @@ export function NoteCard({
           </div>
         </div>
 
-        {/* Backlinks (Zettelkasten) */}
+        {/* Backlinks (Zettelkasten) — geen extra px: de kaart-container levert
+            de horizontale padding al (N7, dubbele inspringing weg). */}
         {!masked && backlinks && backlinks.length > 0 && (
-          <div className={`-mt-1 flex flex-wrap items-center gap-1.5 pb-2 ${compact ? "px-3" : "px-4"}`}>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <Link2 size={10} className="text-amber-400/60 shrink-0" />
             {backlinks.slice(0, 3).map((bl) => (
               <button

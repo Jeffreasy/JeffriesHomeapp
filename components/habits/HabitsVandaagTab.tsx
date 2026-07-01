@@ -32,6 +32,8 @@ export function HabitsVandaagTab({
   toggle,
   increment,
   incident,
+  removeIncident,
+  incidentAllowed = true,
   pause,
   archive,
   setConfirmDelete,
@@ -39,7 +41,7 @@ export function HabitsVandaagTab({
   dayHealth,
   stats,
   habits,
-  pendingHabitId,
+  pendingHabitIds,
 }: {
   todayHabits: HabitWithLog[];
   isLoading: boolean;
@@ -49,6 +51,8 @@ export function HabitsVandaagTab({
   toggle: (id: string) => void;
   increment: (id: string, step: number) => void;
   incident: (id: string, trigger?: string, note?: string) => void;
+  removeIncident?: (id: string) => void;
+  incidentAllowed?: boolean;
   pause: (id: string) => void;
   archive: (id: string) => void;
   setConfirmDelete: (id: string) => void;
@@ -56,7 +60,7 @@ export function HabitsVandaagTab({
   dayHealth: DayHealth;
   stats?: HabitStatsRecord;
   habits: HabitRecord[];
-  pendingHabitId: string | null;
+  pendingHabitIds: ReadonlySet<string>;
 }) {
   const activeCount = habits.filter((h) => h.isActief && !h.isPauze).length;
   const emptyTitle = isToday
@@ -94,12 +98,16 @@ export function HabitsVandaagTab({
                 key={habit._id}
                 habit={habit}
                 masked={privacyOn}
-                pending={pendingHabitId === habit._id}
+                pending={pendingHabitIds.has(habit._id)}
                 onToggle={() => toggle(habit._id!)}
                 onIncrement={(stap) => increment(habit._id!, stap)}
                 onIncident={(trigger, notitie) =>
                   incident(habit._id!, trigger, notitie)
                 }
+                onRemoveIncident={
+                  removeIncident ? () => removeIncident(habit._id!) : undefined
+                }
+                incidentDisabled={!incidentAllowed}
                 onPause={() => pause(habit._id!)}
                 onArchive={() => archive(habit._id!)}
                 onRemove={() => setConfirmDelete(habit._id!)}

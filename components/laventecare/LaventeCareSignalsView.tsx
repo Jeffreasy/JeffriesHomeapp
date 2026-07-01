@@ -1,8 +1,32 @@
 "use client";
 
+import { useState } from "react";
 import { Clock3, Sparkles } from "lucide-react";
 import type { BusinessSignal, ActionItem, FollowUpSignal } from "./LaventeCareTypes";
 import { ActionItemCard, EmptyState, FollowUpCard, SignalCard } from "./LaventeCareCards";
+
+function ShowAllToggle({
+  total,
+  noun,
+  expanded,
+  onToggle,
+}: {
+  total: number;
+  noun: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+    >
+      {expanded ? "Toon minder" : `Toon alle ${total} ${noun}`}
+    </button>
+  );
+}
 
 export function LaventeCareSignalsView({
   businessSignals,
@@ -25,6 +49,10 @@ export function LaventeCareSignalsView({
 }) {
   const signalKey = (kind: "action" | "lead", signal: BusinessSignal) => `${kind}:${signal.source}:${signal.id}`;
   const triageTotal = businessSignals.length + actionItems.length + followUps.length;
+  // Verborgen afkapping opgeheven: standaard 6/5/3 items, met "Toon alle N".
+  const [showAllSignals, setShowAllSignals] = useState(false);
+  const [showAllActions, setShowAllActions] = useState(false);
+  const [showAllFollowUps, setShowAllFollowUps] = useState(false);
 
   return (
     <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.3fr_0.7fr]">
@@ -54,7 +82,7 @@ export function LaventeCareSignalsView({
               />
             </div>
           ) : (
-            businessSignals.slice(0, 6).map((signal) => (
+            (showAllSignals ? businessSignals : businessSignals.slice(0, 6)).map((signal) => (
               <SignalCard
                 key={`${signal.source}-${signal.id}`}
                 signal={signal}
@@ -66,6 +94,14 @@ export function LaventeCareSignalsView({
             ))
           )}
         </div>
+        {businessSignals.length > 6 ? (
+          <ShowAllToggle
+            total={businessSignals.length}
+            noun="signalen"
+            expanded={showAllSignals}
+            onToggle={() => setShowAllSignals((value) => !value)}
+          />
+        ) : null}
       </div>
 
       <div className="glass min-w-0 p-5">
@@ -80,7 +116,7 @@ export function LaventeCareSignalsView({
           {actionItems.length === 0 ? (
             <EmptyState title="Geen open acties" body="Maak vanuit zakelijke signalen een actie, dan neemt Brain dit mee in Telegram." />
           ) : (
-            actionItems.slice(0, 5).map((action) => (
+            (showAllActions ? actionItems : actionItems.slice(0, 5)).map((action) => (
               <ActionItemCard
                 key={action._id}
                 action={action}
@@ -90,14 +126,30 @@ export function LaventeCareSignalsView({
             ))
           )}
         </div>
+        {actionItems.length > 5 ? (
+          <ShowAllToggle
+            total={actionItems.length}
+            noun="acties"
+            expanded={showAllActions}
+            onToggle={() => setShowAllActions((value) => !value)}
+          />
+        ) : null}
         {followUps.length > 0 && (
           <div className="mt-5 border-t border-[var(--color-border)] pt-4">
             <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Follow-ups uit funnel</p>
             <div className="mt-3 space-y-3">
-              {followUps.slice(0, 3).map((followUp) => (
+              {(showAllFollowUps ? followUps : followUps.slice(0, 3)).map((followUp) => (
                 <FollowUpCard key={`${followUp.source}-${followUp.id}`} followUp={followUp} />
               ))}
             </div>
+            {followUps.length > 3 ? (
+              <ShowAllToggle
+                total={followUps.length}
+                noun="follow-ups"
+                expanded={showAllFollowUps}
+                onToggle={() => setShowAllFollowUps((value) => !value)}
+              />
+            ) : null}
           </div>
         )}
       </div>

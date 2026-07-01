@@ -1,4 +1,7 @@
+import { del } from "idb-keyval";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+
 
 export interface Room {
   id: string;
@@ -46,6 +49,21 @@ export class ApiError extends Error {
   }
 }
 
+// ─── Query-client registry ────────────────────────────────────────────────────
+// providers.tsx registers its QueryClient here so the 401 path below can wipe
+// the in-memory react-query cache before redirecting to sign-in (L5), without
+// importing @tanstack/react-query (or providers.tsx) into this module — that
+// would create a circular import.
+interface ClearableCache {
+  clear: () => void;
+}
+
+let registeredQueryClient: ClearableCache | null = null;
+
+export function registerQueryClient(client: ClearableCache) {
+  registeredQueryClient = client;
+}
+
 // apiFetchWithStatus returns the parsed body AND the real HTTP status so callers
 // (e.g. the orval mutator) can discriminate responses instead of assuming 200.
 export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): Promise<{ data: T; status: number }> {
@@ -58,11 +76,50 @@ export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): P
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      // Session expired mid-use (FH4): purge cached user data in every case —
+      // the session is gone, so nothing user-scoped may survive in IndexedDB
+      // or the service-worker caches.
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (typeof window !== "undefined") {
+        del("REACT_QUERY_OFFLINE_CACHE").catch(() => {});
+        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: "CLEAR_ALL_CACHES" });
+        }
+        if (method === "GET") {
+          // Reads: also drop the in-memory react-query cache (L5) and send the
+          // user to sign-in, preserving the current location for the round-trip.
+          registeredQueryClient?.clear();
+          window.location.href = `/sign-in?redirect_url=${encodeURIComponent(
+            window.location.pathname + window.location.search
+          )}`;
+        }
+      }
+      if (method !== "GET") {
+        // Mutations: do NOT redirect — that would unmount the open form and
+        // destroy everything the user typed (M4). Let the error bubble to the
+        // caller's normal toast path; the form and its input survive.
+        throw new ApiError("Je sessie is verlopen — log opnieuw in om verder te gaan.", 401);
+      }
+      throw new ApiError("Niet ingelogd. Je wordt doorgestuurd naar de inlogpagina.", 401);
+    }
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new ApiError(error.detail ?? `API error ${res.status}`, res.status);
   }
 
+
   if (res.status === 204) return { data: undefined as T, status: res.status };
+
+  // Guard against non-JSON 200s (e.g. an HTML page served after a silent
+  // redirect) so callers get a readable Dutch error instead of a raw
+  // "SyntaxError: Unexpected token '<'" (FH4).
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("json")) {
+    throw new ApiError(
+      "Onverwacht antwoord van de server (geen JSON). Herlaad de pagina of log opnieuw in.",
+      res.status
+    );
+  }
   return { data: await res.json(), status: res.status };
 }
 
@@ -176,10 +233,20 @@ export const transactionsApi = {
     if (filter.offset != null)   params.set("offset", String(filter.offset));
     return apiFetch<TransactionListResponse>(`/transactions?${params}`);
   },
-  stats: (userId: string, ibanFilter?: string, jaarFilter?: string) => {
+  stats: (
+    userId: string,
+    ibanFilter?: string,
+    jaarFilter?: string,
+    // Optioneel periodebereik: het stats-endpoint beperkt alle aggregaties tot
+    // datumVan/datumTot zodra ze meegegeven worden (F1).
+    datumVan?: string,
+    datumTot?: string,
+  ) => {
     const params = new URLSearchParams({ userId });
     if (ibanFilter) params.set("ibanFilter", ibanFilter);
     if (jaarFilter) params.set("jaarFilter", jaarFilter);
+    if (datumVan) params.set("datumVan", datumVan);
+    if (datumTot) params.set("datumTot", datumTot);
     return apiFetch<TransactionFullStats>(`/transactions/stats?${params}`);
   },
   import: (data: { userId: string; transactions: TransactionImportRow[] }) =>
@@ -228,6 +295,26 @@ export interface TransactionImportRow {
 }
 
 
+// ─── Habits (incidenten) ─────────────────────────────────────────────────────
+// The generated orval client covers the habits CRUD + POST incident; the DELETE
+// incident endpoint is newer and lives here. Mirrors the generated path
+// conventions (/habits/{id}/incident?userId=…).
+
+export const habitsApi = {
+  /**
+   * Removes the incident log for a habit on the given day.
+   * `datum` is "YYYY-MM-DD" (Amsterdam); omitted = today. Backend returns 204,
+   * or 404 when there is no incident on that day.
+   */
+  deleteIncident: (habitId: string, userId: string, datum?: string) => {
+    const params = new URLSearchParams({ userId });
+    if (datum) params.set("datum", datum);
+    return apiFetch<void>(`/habits/${encodeURIComponent(habitId)}/incident?${params}`, {
+      method: "DELETE",
+    });
+  },
+};
+
 // ─── Loonstroken ──────────────────────────────────────────────────────────────
 
 export const loonstrokenApi = {
@@ -266,6 +353,14 @@ export interface LoonstrookRow {
   componenten: string;
   geimporteerd_op: string;
 }
+
+// ─── Schedule (manual aanvulling op de generated hooks) ──────────────────────
+
+export const scheduleApi = {
+  /** Wist alle diensten van de gebruiker — DELETE /schedule?userId=… → 204. */
+  clear: (userId: string) =>
+    apiFetch<void>(`/schedule?userId=${encodeURIComponent(userId)}`, { method: "DELETE" }),
+};
 
 // ─── Personal Events ──────────────────────────────────────────────────────────
 
@@ -1087,6 +1182,8 @@ export interface LCMailbox {
   templates: LCMailTemplate[];
   outbox: LCMailOutboxItem[];
   inbox: LCMailInboxItem[];
+  /** Optionele fout van de laatste inbox-sync (bijv. ontbrekende Graph-machtiging). */
+  inboxError?: string | null;
 }
 
 export interface LCMailAISource {
@@ -1175,6 +1272,10 @@ export const laventecareApi = {
     to_name?: string;
     cc?: string[];
     bcc?: string[];
+    /** Optionele onderwerp-override (bijv. "Re: <origineel>" bij een reply). */
+    subject?: string;
+    /** Conversation-id van de thread waarop dit een antwoord is. */
+    conversation_id?: string;
     variables?: Record<string, string>;
     send?: boolean;
     attachments?: Array<{
@@ -1303,6 +1404,15 @@ export const laventecareApi = {
     status?: string;
   }) =>
     apiFetch<LCTimeEntry>("/laventecare/time-entries", { method: "POST", body: JSON.stringify(data) }),
+  // N10: urenregels zijn bewerkbaar/verwijderbaar zolang ze niet op een
+  // factuur staan (backend antwoordt 409 zodra invoice_id gezet is).
+  updateTimeEntry: (id: string, data: { omschrijving?: string; minuten?: number; status?: "open" | "afgeschreven" }) =>
+    apiFetch<LCTimeEntry>(`/laventecare/time-entries/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  deleteTimeEntry: (id: string) =>
+    apiFetch<void>(`/laventecare/time-entries/${encodeURIComponent(id)}`, { method: "DELETE" }),
   createInvoice: (data: {
     company_id?: string;
     project_id?: string;
@@ -1709,6 +1819,7 @@ export interface NoteRow {
   kleur: string | null;
   is_pinned: boolean;
   is_archived: boolean;
+  is_completed?: boolean;
   deadline: string | null;
   linked_event_id: string | null;
   prioriteit: string | null;
@@ -1724,6 +1835,15 @@ export interface NoteRow {
 export const notesApi = {
   list: (userId: string) =>
     apiFetch<NoteRow[]>(`/notes?userId=${userId}`),
+  /**
+   * Lichtgewicht lijst voor de focus-kiosk: `fields=summary` laat de backend
+   * de volledige inhoud weg en `limit` begrenst het aantal rijen, zodat de
+   * 2-minuten-poll niet telkens het hele notitiecorpus hertrekt (M-G).
+   */
+  listSummary: (userId: string, limit = 100) =>
+    apiFetch<NoteRow[]>(
+      `/notes?userId=${encodeURIComponent(userId)}&limit=${limit}&fields=summary`,
+    ),
   search: (userId: string, query: string) =>
     apiFetch<NoteRow[]>(`/notes/search?userId=${userId}&q=${encodeURIComponent(query)}`),
   tags: (userId: string) =>

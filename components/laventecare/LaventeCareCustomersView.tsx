@@ -1,8 +1,9 @@
 "use client";
 
-import { Building2, CalendarClock, FileText, FolderOpen, Mail, Pencil, Phone, Plus, UserRound, Workflow } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Building2, CalendarClock, FileText, FolderOpen, Mail, Pencil, Phone, Plus, Search, UserRound, Workflow } from "lucide-react";
 import type { CompanyItem, ContactItem, DossierDocumentItem, LeadItem, ProjectItem, WorkstreamItem } from "./LaventeCareTypes";
-import { formatDate, label } from "./LaventeCareUtils";
+import { formatDate, isDossierDocumentForCompany, label } from "./LaventeCareUtils";
 
 export function LaventeCareCustomersView({
   companies,
@@ -36,6 +37,15 @@ export function LaventeCareCustomersView({
     ...activeWorkstreams.map((item) => item.company_id).filter(Boolean),
     ...activeProjects.map((item) => item.company_id).filter(Boolean),
   ]);
+  // Simpele client-side zoekfilter op naam (en sector) voor de klantenlijst.
+  const [query, setQuery] = useState("");
+  const filteredCompanies = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return companies;
+    return companies.filter((company) =>
+      `${company.naam} ${company.sector ?? ""}`.toLowerCase().includes(needle)
+    );
+  }, [companies, query]);
 
   if (companies.length === 0) {
     return (
@@ -68,8 +78,25 @@ export function LaventeCareCustomersView({
         <Metric label="Actief" value={activeCompanyIds.size} sub="met open werk" />
       </div>
 
+      <div className="relative">
+        <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Zoek klant op naam of sector..."
+          aria-label="Zoek klant"
+          className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/50"
+        />
+      </div>
+
+      {filteredCompanies.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-slate-500">
+          Geen klanten gevonden voor &ldquo;{query}&rdquo;.
+        </p>
+      ) : null}
+
       <div className="grid gap-3 lg:grid-cols-2">
-        {companies.map((company) => {
+        {filteredCompanies.map((company) => {
           const id = company._id ?? company.id;
           const companyContacts = contacts.filter((contact) => contact.company_id === id);
           const leadIds = new Set(activeLeads.filter((lead) => lead.company_id === id).map((lead) => lead._id ?? lead.id));
@@ -223,22 +250,8 @@ function toExternalHref(url: string) {
   return /^https?:\/\//i.test(url) ? url : `https://${url}`;
 }
 
-function isDossierDocumentForCompany(
-  doc: DossierDocumentItem,
-  companyId: string,
-  companyName: string,
-  leadIds: Set<string>,
-  projectIds: Set<string>,
-  workstreamIds: Set<string>
-) {
-  if (!companyId) return false;
-  if (doc.company_id === companyId) return true;
-  if (doc.context_id === companyId && ["company", "klant", "klantdossier", "laventecare_company"].includes(doc.context_type)) return true;
-  if (doc.lead_id && leadIds.has(doc.lead_id)) return true;
-  if (doc.project_id && projectIds.has(doc.project_id)) return true;
-  if (doc.workstream_id && workstreamIds.has(doc.workstream_id)) return true;
-  return Boolean(doc.context_title && doc.context_title.trim().toLowerCase() === companyName.trim().toLowerCase());
-}
+// M-K: isDossierDocumentForCompany is gehoist naar LaventeCareUtils — deze
+// kopie liep al achter (miste de hasIdContext-guard op de name-match).
 
 function Metric({ label, value, sub }: { label: string; value: number; sub: string }) {
   return (

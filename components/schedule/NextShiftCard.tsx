@@ -1,8 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
-import { type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { type DienstRow, getEndKey, getStartKey, shiftTypeColor } from "@/lib/schedule";
+import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type ConflictInfo } from "@/lib/conflictDetection";
 import { cn } from "@/lib/utils";
 import { AppIcon, type SymbolTone } from "@/components/ui/AppIcon";
@@ -37,13 +37,27 @@ function capitalize(value: string): string {
 interface NextShiftCardProps {
   dienst:     DienstRow | null;
   compact?:   boolean;
+  /** Cold-load flag — toont een skeleton i.p.v. "Geen aankomende diensten" (audit K3). */
+  loading?:   boolean;
   onImport?:  () => void;
   afspraken?: PersonalEvent[];
   conflictMap?: Map<string, ConflictInfo>;
   todayIso?: string | null;
 }
 
-export function NextShiftCard({ dienst, compact, onImport, afspraken = [], conflictMap, todayIso }: NextShiftCardProps) {
+export function NextShiftCard({ dienst, compact, loading = false, onImport, afspraken = [], conflictMap, todayIso }: NextShiftCardProps) {
+  if (!dienst && loading) {
+    return (
+      <div
+        aria-hidden="true"
+        className={cn(
+          "glass min-w-0 animate-pulse rounded-xl border border-[var(--color-border)]",
+          compact ? "h-[76px]" : "h-[120px]",
+        )}
+      />
+    );
+  }
+
   if (!dienst) {
     return (
       <div className={cn(
@@ -80,9 +94,18 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
   const resolveConflict = (evt: PersonalEvent) => {
     const ci = conflictMap?.get(evt.eventId);
     const isHeledag = evt.heledag || !evt.startTijd;
+    // Fallback vergelijkt volledige datum+tijd-sleutels (zoals lib/conflictDetection),
+    // zodat nachtdiensten over de dagnachtgrens correct matchen (audit K9) —
+    // kale HH:MM-strings faalden daar.
+    const overlapsShift = () => {
+      if (isHeledag || !evt.eindTijd) return false;
+      const evStart = `${evt.startDatum} ${evt.startTijd}`;
+      const evEnd = `${getDisplayEndDate(evt)} ${evt.eindTijd}`;
+      return evStart < getEndKey(dienst) && getStartKey(dienst) < evEnd;
+    };
     const level = ci?.level
       ?? (isHeledag ? "soft"
-        : (evt.startTijd && evt.eindTijd && evt.startTijd < dienst.eindTijd && evt.eindTijd > dienst.startTijd) ? "hard"
+        : overlapsShift() ? "hard"
         : "info");
     return {
       textClass: level === "hard" ? "text-red-400" : level === "soft" ? "text-amber-400" : "text-blue-400",

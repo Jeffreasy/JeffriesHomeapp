@@ -1,4 +1,4 @@
-import { type DienstRow } from "./schedule";
+import { getIsoWeek, type DienstRow } from "./schedule";
 import { type PersonalEvent } from "@/hooks/usePersonalEvents";
 
 /**
@@ -20,25 +20,10 @@ export interface UnifiedWeek {
  * ─── Helpers ──────────────────────────────────────────────────────────────────
  */
 
-/** Normalise weeknr string "YYYY-WW" derived from date. */
-function getIsoWeek(dateStr: string): string {
-  try {
-    const d = new Date(dateStr + "T12:00:00"); // veilige parse
-    if (isNaN(d.getTime())) return "Onbekend";
-    
-    // ISO week calculation
-    const jan4 = new Date(d.getFullYear(), 0, 4);
-    const monday = new Date(jan4);
-    monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
-    const weekNum = Math.floor((d.getTime() - monday.getTime()) / (7 * 86_400_000)) + 1;
-    
-    return `${d.getFullYear()}-${String(weekNum).padStart(2, "0")}`;
-  } catch {
-    return "Onbekend";
-  }
-}
+// ISO-week key komt uit de gedeelde helper in lib/schedule.ts (audit F5) —
+// de lokale kopie is verwijderd zodat er één weekberekening bestaat.
 
-/** 
+/**
  * Geeft een "YYYY-MM-DD HH:MM" string puur voor sorteer-doeleinden.
  * "24:00" = push to bottom of the day
  */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,7 @@ export function CollapsibleSection({
   keepMounted = false,
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const contentId = useId();
   const currentTheme = themeClasses[theme];
 
   return (
@@ -80,6 +81,8 @@ export function CollapsibleSection({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        aria-controls={contentId}
         className={cn(
           "flex w-full items-center justify-between gap-3 border p-4 text-left transition-all duration-300 sm:px-6",
           isOpen ? "bg-white/[0.02] border-transparent" : currentTheme.header
@@ -114,6 +117,7 @@ export function CollapsibleSection({
 
       {keepMounted ? (
         <motion.div
+          id={contentId}
           initial={false}
           animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
@@ -127,6 +131,7 @@ export function CollapsibleSection({
         <AnimatePresence initial={false}>
           {isOpen && (
             <motion.div
+              id={contentId}
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}

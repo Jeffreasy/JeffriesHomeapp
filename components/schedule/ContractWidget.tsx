@@ -6,13 +6,14 @@ import { useSchedule } from "@/hooks/useSchedule";
 import { analyzeContract, getCurrentWeekBalance } from "@/lib/schedule";
 import { Target, TrendingDown, TrendingUp, CheckCircle2 } from "lucide-react";
 import { hoursValue } from "./RoosterUtils";
+import { formatWeekLabel } from "./scheduleUtils";
 
-export function ContractWidget() {
+export function ContractWidget({ contractUren = 16 }: { contractUren?: number } = {}) {
   const { diensten } = useSchedule();
-  
+
   const stats = useMemo(() => {
-    return analyzeContract(diensten, 16);
-  }, [diensten]);
+    return analyzeContract(diensten, contractUren);
+  }, [diensten, contractUren]);
 
   const currentOrNextWeek = useMemo(() => {
     return getCurrentWeekBalance(stats);
@@ -50,7 +51,8 @@ export function ContractWidget() {
           <div className="flex items-center gap-2 mb-2 opacity-80">
             <Target size={14} className="text-slate-400" />
             <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400">
-              Contracturen · week {currentOrNextWeek.weeknr}
+              {/* Gedeelde weeklabel-formatter (audit L8) — geen rauwe "2026-27". */}
+              Contracturen · {formatWeekLabel(currentOrNextWeek.weeknr)}
             </span>
           </div>
           
@@ -87,7 +89,8 @@ export function ContractWidget() {
           <div className="space-y-1.5">
             <div className="flex justify-between text-[10px] font-bold tracking-widest text-slate-500">
               <span>0u</span>
-              <span>16u doel</span>
+              {/* Doel volgt de contracturen-prop i.p.v. hardcoded "16u" (audit L8). */}
+              <span>{hoursValue(stats.contractUrenPerWeek)}u doel</span>
             </div>
             
             <div className="flex h-3 gap-0.5 w-full">
@@ -113,9 +116,10 @@ export function ContractWidget() {
             </div>
           </div>
 
-                    {/* Global Balance */}
+                    {/* Global Balance — toekomstige (geplande) weken tellen
+                        hier niet in mee (audit F6). */}
           <div className="flex justify-between items-center rounded-lg bg-black/40 border border-slate-800 p-3">
-            <span className="text-xs uppercase tracking-widest font-semibold text-slate-400">Totaalbalans</span>
+            <span className="text-xs uppercase tracking-widest font-semibold text-slate-400">Totaalbalans <span className="normal-case tracking-normal text-slate-500">(t/m deze week)</span></span>
             <span 
               className="text-xl font-black tabular-nums"
               style={{ color: stats.totalDelta > 0 ? "#f97316" : stats.totalDelta < 0 ? "#ef4444" : "#10b981" }}
@@ -131,12 +135,16 @@ export function ContractWidget() {
               {stats.weeklyBalances.slice(-15).map((w) => {
                 const h = Math.max(2, Math.min(32, Math.abs(w.delta) * 2));
                 const isOver = w.delta > 0;
-                const color = isOver ? "#f97316" : w.delta < 0 ? "#ef4444" : "#10b981";
+                // Toekomstige weken zijn "gepland": gedimd en neutraal gekleurd,
+                // zodat lege geplande weken niet als rood tekort ogen (audit F6).
+                const color = w.future
+                  ? "#64748b"
+                  : isOver ? "#f97316" : w.delta < 0 ? "#ef4444" : "#10b981";
                 return (
                   <div
                     key={w.weeknr}
-                    title={"Week " + w.weeknr + ": " + w.delta + "h"}
-                    className="flex-1 rounded-t-sm transition-all duration-300 hover:opacity-100 opacity-60"
+                    title={`${formatWeekLabel(w.weeknr)}: ${w.delta > 0 ? "+" : ""}${hoursValue(w.delta)}u${w.future ? " (gepland)" : ""}`}
+                    className={`flex-1 rounded-t-sm transition-all duration-300 hover:opacity-100 ${w.future ? "opacity-30" : "opacity-60"}`}
                     style={{
                       height: h + "px",
                       backgroundColor: color,
@@ -145,7 +153,7 @@ export function ContractWidget() {
                 );
               })}
             </div>
-            <div className="flex justify-between mt-1 text-[8px] uppercase tracking-widest text-slate-500 font-bold">
+            <div className="flex justify-between mt-1 text-[10px] uppercase tracking-widest text-slate-400 font-bold">
               <span>Trend 15 weken</span>
               <span>{stats.weeklyBalances.length} weken</span>
             </div>

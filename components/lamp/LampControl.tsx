@@ -1,12 +1,13 @@
 "use client";
 
 import { HexColorPicker } from "react-colorful";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import { Thermometer, Sun, Palette, RefreshCw } from "lucide-react";
-import { type Device } from "@/lib/api";
+import { type Device, type DeviceCommand } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
-import { hexToRgb, rgbToHex } from "@/lib/utils";
+import { useToast } from "@/components/ui/Toast";
+import { cn, hexToRgb, rgbToHex } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { devicesApi } from "@/lib/api";
 
@@ -30,8 +31,54 @@ const COLOR_PRESETS = [
 export function LampControl({ device }: LampControlProps) {
   const { mutate: sendCommand } = useLampCommand();
   const queryClient = useQueryClient();
+  const { error: toastError } = useToast();
   const [refreshing, setRefreshing] = useState(false);
   const state = device.current_state;
+
+  // Anti-snap-back: sla de server→lokaal-sync over zolang de gebruiker sleept
+  // of er nog een (gedebouncet) commando onderweg is, anders springt de slider
+  // terug naar de oude serverwaarde midden in een drag.
+  const activePointersRef = useRef(0);
+  const inFlightSendsRef = useRef(0);
+  // Grace-window dat het gat dekt tussen de laatste lokale edit en het moment
+  // dat de gedebouncete send daadwerkelijk vertrekt (max 200ms debounce).
+  const localEditUntilRef = useRef(0);
+
+  // R12: increment op het element, maar decrement op window-niveau — een
+  // pointerup die buiten het element landt (of verloren gaat door alt-tab)
+  // mag de server-sync niet permanent blokkeren tot remount.
+  const interactionProps = {
+    onPointerDown: () => { activePointersRef.current += 1; },
+  };
+
+  useEffect(() => {
+    const releasePointer = () => {
+      activePointersRef.current = Math.max(0, activePointersRef.current - 1);
+    };
+    // Tab-switch mid-drag: er komt nooit meer een pointerup — teller resetten.
+    const resetPointers = () => { activePointersRef.current = 0; };
+    window.addEventListener("pointerup", releasePointer);
+    window.addEventListener("pointercancel", releasePointer);
+    document.addEventListener("visibilitychange", resetPointers);
+    return () => {
+      window.removeEventListener("pointerup", releasePointer);
+      window.removeEventListener("pointercancel", releasePointer);
+      document.removeEventListener("visibilitychange", resetPointers);
+    };
+  }, []);
+
+  const isOn = state?.on ?? false;
+
+  const trackedSend = (cmd: DeviceCommand) => {
+    // M7: bediening op een uitgeschakelde lamp zet hem ook aan — de backend
+    // impliceert geen on:true bij brightness/kleur (zie lib/deviceCommands).
+    const effective: DeviceCommand = !isOn && cmd.on === undefined ? { ...cmd, on: true } : cmd;
+    inFlightSendsRef.current += 1;
+    sendCommand(
+      { id: device.id, cmd: effective },
+      { onSettled: () => { inFlightSendsRef.current = Math.max(0, inFlightSendsRef.current - 1); } }
+    );
+  };
 
   const refresh = async () => {
     setRefreshing(true);
@@ -40,6 +87,8 @@ export function LampControl({ device }: LampControlProps) {
       queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
         old?.map((d) => (d.id === device.id ? fresh : d))
       );
+    } catch {
+      toastError("Staat verversen mislukt — lamp niet bereikbaar");
     } finally {
       setRefreshing(false);
     }
@@ -60,6 +109,16 @@ export function LampControl({ device }: LampControlProps) {
 
   // Sync local state when device state changes from outside (e.g. another user)
   useEffect(() => {
+    // Niet syncen terwijl de gebruiker sleept of een send onderweg is — anders
+    // springt de slider terug naar de (nog niet bijgewerkte) serverwaarde.
+    if (
+      activePointersRef.current > 0 ||
+      inFlightSendsRef.current > 0 ||
+      Date.now() < localEditUntilRef.current
+    ) {
+      return;
+    }
+
     setLocalBrightness(state?.brightness ?? 100);
     setLocalMireds(Math.round(1_000_000 / (state?.color_temp ?? 2700)));
 
@@ -78,40 +137,82 @@ export function LampControl({ device }: LampControlProps) {
   // ─── Debounced API callers (200ms) ─────────────────────────────────────────
 
   const sendBrightness = useDebouncedCallback((v: number) => {
-    sendCommand({ id: device.id, cmd: { brightness: v } });
+    trackedSend({ brightness: v });
   }, 200);
 
   const sendColorTemp = useDebouncedCallback((mireds: number) => {
-    sendCommand({ id: device.id, cmd: { color_temp_mireds: mireds } });
+    trackedSend({ color_temp_mireds: mireds });
   }, 200);
 
   const sendColor = useDebouncedCallback((hex: string) => {
     const { r, g, b } = hexToRgb(hex);
-    sendCommand({ id: device.id, cmd: { r, g, b } });
+    trackedSend({ r, g, b });
   }, 120);
 
   // ─── Handlers (local state + debounced API) ────────────────────────────────
 
   const handleBrightness = (v: number) => {
+    localEditUntilRef.current = Date.now() + 400;
     setLocalBrightness(v);
     sendBrightness(v);
   };
 
   const handleColorTemp = (mireds: number) => {
+    localEditUntilRef.current = Date.now() + 400;
     setLocalMireds(mireds);
     sendColorTemp(mireds);
   };
 
   const handleColor = (hex: string) => {
     // Only update local — does NOT call setQueryData on every move
+    localEditUntilRef.current = Date.now() + 400;
     setLocalHex(hex);
     sendColor(hex);
+  };
+
+  // L7: een moduswissel stuurt ook echt een commando, zodat de lamp de UI
+  // volgt. Alleen als de lamp aan is — een tabwissel op een uitgeschakelde
+  // lamp mag hem niet onverwacht aanzetten.
+  const handleModeSwitch = (m: Mode) => {
+    if (m === mode) return;
+    setMode(m);
+    if (!isOn) return;
+    localEditUntilRef.current = Date.now() + 400;
+    if (m === "white") {
+      trackedSend({ color_temp_mireds: localMireds });
+    } else {
+      const { r, g, b } = hexToRgb(localHex);
+      trackedSend({ r, g, b });
+    }
+  };
+
+  // L5: los hex-invoerveld naast de picker (valideert #rrggbb).
+  const hexInputId = useId();
+  const hexInputRef = useRef<HTMLInputElement>(null);
+  const [hexDraft, setHexDraft] = useState(localHex);
+  useEffect(() => {
+    // Niet klobberen terwijl de gebruiker in het veld typt.
+    if (document.activeElement !== hexInputRef.current) setHexDraft(localHex);
+  }, [localHex]);
+  const normalizeHex = (raw: string) => (raw.startsWith("#") ? raw : `#${raw}`);
+  const hexDraftValid = /^#[0-9a-fA-F]{6}$/.test(normalizeHex(hexDraft.trim()));
+  const handleHexInput = (raw: string) => {
+    setHexDraft(raw);
+    const normalized = normalizeHex(raw.trim());
+    if (/^#[0-9a-fA-F]{6}$/.test(normalized)) handleColor(normalized.toLowerCase());
   };
 
   const kelvin = localMireds > 0 ? Math.round(1_000_000 / localMireds) : 2700;
 
   return (
     <div className="p-4 space-y-5" onClick={(e) => e.stopPropagation()}>
+      {/* M7: eerlijk zijn over de uit-staat — bediening zet de lamp aan */}
+      {!isOn && (
+        <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-300/90">
+          Lamp staat uit — bediening zet hem aan
+        </p>
+      )}
+      <div className={cn("space-y-5 transition-opacity", !isOn && "opacity-50")}>
       {/* Helderheid + Refresh */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -124,10 +225,11 @@ export function LampControl({ device }: LampControlProps) {
             <button
               onClick={refresh}
               disabled={refreshing}
-              className="text-slate-600 hover:text-slate-400 transition-colors"
+              aria-label="Staat verversen"
               title="Staat verversen van lamp"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white/5 hover:text-slate-400"
             >
-              <RefreshCw size={11} className={refreshing ? "animate-spin" : ""} />
+              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -137,6 +239,8 @@ export function LampControl({ device }: LampControlProps) {
           max={100}
           value={localBrightness}
           onChange={(e) => handleBrightness(+e.target.value)}
+          aria-label="Helderheid"
+          {...interactionProps}
           style={{
             background: `linear-gradient(to right, #f59e0b ${localBrightness}%, rgba(255,255,255,0.1) ${localBrightness}%)`,
           }}
@@ -148,7 +252,8 @@ export function LampControl({ device }: LampControlProps) {
         {(["white", "color"] as Mode[]).map((m) => (
           <button
             key={m}
-            onClick={() => setMode(m)}
+            onClick={() => handleModeSwitch(m)}
+            aria-pressed={mode === m}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg transition-all ${
               mode === m
                 ? "bg-[rgba(255,255,255,0.1)] text-white font-medium"
@@ -177,6 +282,8 @@ export function LampControl({ device }: LampControlProps) {
             max={455}
             value={localMireds}
             onChange={(e) => handleColorTemp(+e.target.value)}
+            aria-label="Kleurtemperatuur"
+            {...interactionProps}
             style={{
               // Mireds schaal: laag = koel (6500K), hoog = warm (2200K)
               // Slider gaat links (koel/blauw) → rechts (warm/oranje)
@@ -211,18 +318,45 @@ export function LampControl({ device }: LampControlProps) {
           </div>
 
           {/* Full color picker */}
-          <HexColorPicker
-            color={localHex}
-            onChange={handleColor}
-            style={{ width: "100%", height: 130 }}
-          />
-          <div
-            className="w-full h-7 rounded-xl border border-[var(--color-border)]"
-            style={{ background: localHex, transition: "background 0.1s" }}
-          />
-          <p className="text-center text-xs font-mono text-slate-500">{localHex.toUpperCase()}</p>
+          <div {...interactionProps}>
+            <HexColorPicker
+              color={localHex}
+              onChange={handleColor}
+              style={{ width: "100%", height: 130 }}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div
+              className="h-7 min-w-0 flex-1 rounded-xl border border-[var(--color-border)]"
+              style={{ background: localHex, transition: "background 0.1s" }}
+            />
+            <label htmlFor={hexInputId} className="sr-only">
+              Hexkleur (#rrggbb)
+            </label>
+            <input
+              id={hexInputId}
+              ref={hexInputRef}
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              maxLength={7}
+              placeholder="#ff8800"
+              value={hexDraft}
+              onChange={(e) => handleHexInput(e.target.value)}
+              onBlur={() => setHexDraft(localHex)}
+              aria-invalid={!hexDraftValid}
+              className={cn(
+                "w-24 shrink-0 rounded-lg border bg-[var(--color-surface)] px-2 py-1.5 text-center font-mono text-xs text-slate-300 outline-none transition-colors",
+                hexDraftValid
+                  ? "border-[var(--color-border)] focus:border-amber-500/50"
+                  : "border-rose-500/50 text-rose-300"
+              )}
+            />
+          </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

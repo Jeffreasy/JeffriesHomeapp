@@ -17,27 +17,26 @@ import { cn } from "@/lib/utils";
 type ManagedShiftType = Exclude<ShiftType, "any">;
 
 export default function AutomationsPage() {
-  const { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, isLoading, isError, refetch, lastCheck } =
+  const { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, isLoading, isError, refetch } =
     useAutomations();
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [busyWekkerType, setBusyWekkerType] = useState<ManagedShiftType | null>(null);
+  const [togglingIds, setTogglingIds] = useState<string[]>([]);
   const { openConfirm } = useConfirm();
   const { success, error } = useToast();
 
+  // Het formulier awaicht deze promise: pas sluiten bij succes. Een fout
+  // bubbelt naar AutomationForm, dat open blijft en zelf een inline
+  // foutmelding toont — géén page-level toast erbovenop (dubbele feedback).
   const handleSave = async (data: Parameters<typeof add>[0]) => {
     const isNew = editingId === "new";
     const target = editingId;
-    setEditingId(null);
-    try {
-      if (isNew) {
-        await add(data);
-        success(`Automatisering '${data.name}' aangemaakt`);
-      } else if (target) {
-        await update(target, data);
-        success(`Automatisering '${data.name}' bijgewerkt`);
-      }
-    } catch {
-      error(`Opslaan van '${data.name}' mislukt`);
+    if (isNew) {
+      await add(data);
+      success(`Automatisering '${data.name}' aangemaakt`);
+    } else if (target) {
+      await update(target, data);
+      success(`Automatisering '${data.name}' bijgewerkt`);
     }
   };
 
@@ -58,10 +57,13 @@ export default function AutomationsPage() {
   };
 
   const handleToggle = async (a: Automation) => {
+    setTogglingIds((ids) => [...ids, a.id]);
     try {
       await toggle(a.id);
     } catch {
       error(`Schakelen van '${a.name}' mislukt`);
+    } finally {
+      setTogglingIds((ids) => ids.filter((id) => id !== a.id));
     }
   };
 
@@ -70,6 +72,8 @@ export default function AutomationsPage() {
     try {
       const count = await addDienstWekkerPack(shiftType, times);
       success(`${shiftType}-wekker opgeslagen met ${count} stappen`);
+    } catch (err) {
+      error(err instanceof Error ? err.message : `${shiftType}-wekker opslaan mislukt`);
     } finally {
       setBusyWekkerType(null);
     }
@@ -88,10 +92,13 @@ export default function AutomationsPage() {
     try {
       await removeDienstWekkerPack(shiftType);
       success(`${shiftType}-wekker verwijderd`);
+    } catch (err) {
+      error(err instanceof Error ? err.message : `${shiftType}-wekker verwijderen mislukt`);
     } finally {
       setBusyWekkerType(null);
     }
   };
+
 
   const enabled = automations.filter((a) => a.enabled);
   const disabled = automations.filter((a) => !a.enabled);
@@ -111,8 +118,7 @@ export default function AutomationsPage() {
                 </p>
                 <h1 className="mt-1 truncate text-2xl font-bold text-white">Automatisering</h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  {enabled.length} actief · Engine elke 15s
-                  {lastCheck && <span className="ml-1 text-slate-600">· {lastCheck}</span>}
+                  {enabled.length} actief · Engine elke 30s
                 </p>
               </div>
             </div>
@@ -147,24 +153,42 @@ export default function AutomationsPage() {
           />
         </ErrorBoundary>
 
-          {/* Engine status */}
-          <div className="glass rounded-xl p-4 flex items-center gap-3 border border-green-500/15">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true" />
-            <div className="flex-1">
-              <p className="text-xs font-medium text-green-400">Automation Engine actief (Go)</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">
-                Draait 24/7 op je lokale server · ook zonder open browser
-              </p>
+          {/* Engine status — weerspiegelt de echte querystatus (M10) */}
+          {isError ? (
+            <div className="glass rounded-xl p-4 flex items-center gap-3 border border-rose-500/20">
+              <div className="w-2 h-2 rounded-full bg-rose-400" aria-hidden="true" />
+              <div className="flex-1">
+                <p className="text-xs font-medium text-rose-300">
+                  Engine niet bereikbaar — status onbekend
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  De automatiseringen konden niet worden opgehaald · wekkers gaan mogelijk niet af
+                </p>
+              </div>
+              <Activity size={15} className="text-rose-400 opacity-60" aria-hidden="true" />
             </div>
-            <Activity size={15} className="text-green-400 opacity-60" aria-hidden="true" />
-          </div>
+          ) : (
+            <div className="glass rounded-xl p-4 flex items-center gap-3 border border-green-500/15">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true" />
+              <div className="flex-1">
+                {/* L2: eerlijk claimen wat we écht weten — de API antwoordt;
+                    of de engine-loop zelf draait, weten we hier niet. */}
+                <p className="text-xs font-medium text-green-400">Automations-API bereikbaar</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Engine draait 24/7 in de cloud (Render) · ook zonder open browser
+                </p>
+              </div>
+              <Activity size={15} className="text-green-400 opacity-60" aria-hidden="true" />
+            </div>
+          )}
 
           <AnimatePresence>
             {editingId && (
-              <AutomationForm 
-                initialData={editingId !== "new" ? automations.find(a => a.id === editingId) : undefined} 
-                onClose={() => setEditingId(null)} 
-                onSave={handleSave} 
+              <AutomationForm
+                initialData={editingId !== "new" ? automations.find(a => a.id === editingId) : undefined}
+                existing={automations}
+                onClose={() => setEditingId(null)}
+                onSave={handleSave}
               />
             )}
           </AnimatePresence>
@@ -180,6 +204,7 @@ export default function AutomationsPage() {
                     <AutomationCard
                       key={a.id}
                       automation={a}
+                      togglePending={togglingIds.includes(a.id)}
                       onToggle={() => handleToggle(a)}
                       onEdit={() => setEditingId(a.id)}
                       onDelete={() => handleDelete(a)}
@@ -201,6 +226,7 @@ export default function AutomationsPage() {
                     <AutomationCard
                       key={a.id}
                       automation={a}
+                      togglePending={togglingIds.includes(a.id)}
                       onToggle={() => handleToggle(a)}
                       onEdit={() => setEditingId(a.id)}
                       onDelete={() => handleDelete(a)}

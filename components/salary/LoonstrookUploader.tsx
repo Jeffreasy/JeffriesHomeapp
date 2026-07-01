@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import { Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { parseLoonstrookPDFs, type ParseResult } from "@/lib/loonstrook-pdf";
-import { usePostLoonstrokenImport } from "@/lib/api/generated/loonstroken/loonstroken";
+import { getGetLoonstrokenQueryKey, usePostLoonstrokenImport } from "@/lib/api/generated/loonstroken/loonstroken";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
@@ -95,8 +95,8 @@ export function LoonstrookUploader() {
       const apiRes = response.data as unknown as { inserted: number; total: number };
       const res = { toegevoegd: apiRes.inserted, bijgewerkt: apiRes.total - apiRes.inserted };
       
-      await queryClient.invalidateQueries({ queryKey: ["getLoonstroken"] });
-      
+      await queryClient.invalidateQueries({ queryKey: getGetLoonstrokenQueryKey() });
+
       setImportResult(res);
       setState("done");
     } catch (err) {
@@ -133,7 +133,14 @@ export function LoonstrookUploader() {
             </p>
             <label className="btn btn--primary" htmlFor="pdf-input">Kies bestanden</label>
             <input id="pdf-input" type="file" accept=".pdf" multiple className="visually-hidden"
-              onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+              onChange={(e) => {
+                // Kopieer eerst: de FileList kan leeggemaakt worden door de reset.
+                const files = Array.from(e.target.files ?? []);
+                if (files.length) handleFiles(files);
+                // L10: reset zodat dezelfde PDF opnieuw kiezen wél een
+                // change-event geeft (zelfde patroon als de rooster-CSV-input).
+                e.target.value = "";
+              }} />
             {state === "error" && errorMsg && (
               <div className="dropzone__error"><AlertCircle size={15} /><span>{errorMsg}</span></div>
             )}

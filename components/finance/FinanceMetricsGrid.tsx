@@ -73,9 +73,9 @@ export function FinanceMetricsGrid({
         tone={stats.nettoStroom >= 0 ? "green" : "rose"}
       />
       <MetricCard
-        label="Categorieen"
+        label="Categorieën"
         value={`${stats.aantalCategorieen}`}
-        meta={topCategory ? `${topCategory.categorie} is grootste uitgavenpost` : "Nog geen categorieen"}
+        meta={topCategory ? `${topCategory.categorie} is grootste uitgavenpost` : "Nog geen categorieën"}
         icon={Hash}
         tone="indigo"
       />
@@ -90,7 +90,13 @@ export function FinanceMetricsGrid({
         <MetricCard
           label="Netto salaris"
           value={formatPrivateEuro(salarisStat.latest.netto)}
-          meta={salarisStat.delta !== 0 ? `${formatPrivateSignedEuro(salarisStat.delta)} versus vorige loonstrook` : `${formatPrivateEuro(salarisStat.gemNetto)} gemiddeld`}
+          // De loonstrookperiode hoort in de meta: zonder die context is een
+          // verouderde (stale) loonstrook onzichtbaar.
+          meta={`${salarisStat.latest.periodeLabel ? `${formatMonth(salarisStat.latest.periodeLabel)} · ` : ""}${
+            salarisStat.delta !== 0
+              ? `${formatPrivateSignedEuro(salarisStat.delta)} versus vorige loonstrook`
+              : `${formatPrivateEuro(salarisStat.gemNetto)} gemiddeld`
+          }`}
           icon={Wallet}
           tone="amber"
         />

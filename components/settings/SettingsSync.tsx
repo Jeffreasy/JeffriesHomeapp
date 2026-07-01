@@ -53,7 +53,12 @@ function SyncStatusRow({ label, status }: { label: string; status?: SyncStatusVi
           <p className="truncate text-sm font-semibold text-slate-200">{label}</p>
           <span className={cn("text-xs font-bold", classes.text)}>{value}</span>
         </div>
-        <p className="mt-1 truncate text-xs text-slate-500">{status?.lastError ?? syncTimestamp(status)}</p>
+        {/* lastError is sticky on the backend status object — only show it while
+            the sync is actually in "failed" state (L10), otherwise a long-fixed
+            error keeps scaring the user next to a green "Succes" badge. */}
+        <p className="mt-1 truncate text-xs text-slate-500">
+          {status?.status === "failed" && status.lastError ? status.lastError : syncTimestamp(status)}
+        </p>
       </div>
     </div>
   );

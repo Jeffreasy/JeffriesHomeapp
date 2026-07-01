@@ -44,19 +44,37 @@ const closedLcStatuses = new Set([
 export function useLaventeCare() {
   const queryClient = useQueryClient();
 
-  const { data: cockpit, isLoading: cockpitLoading, isError: cockpitError } = useQuery({
+  const {
+    data: cockpit,
+    isLoading: cockpitLoading,
+    isError: cockpitError,
+    refetch: refetchCockpit,
+  } = useQuery({
     queryKey: ["laventecare", "cockpit"],
     queryFn: () => laventecareApi.cockpit(),
     staleTime: 15_000,
   });
 
-  const { data: billing, isLoading: billingLoading } = useQuery({
+  // limit 250 (was 80): the billing view now exposes the FULL quote/invoice
+  // lists (FH7) instead of only the 5 most recent, so older open invoices
+  // must actually be in the payload to stay actionable.
+  const {
+    data: billing,
+    isLoading: billingLoading,
+    isError: billingError,
+    refetch: refetchBilling,
+  } = useQuery({
     queryKey: ["laventecare", "billing"],
-    queryFn: () => laventecareApi.billing({ limit: 80 }),
+    queryFn: () => laventecareApi.billing({ limit: 250 }),
     staleTime: 15_000,
   });
 
-  const { data: mailbox, isLoading: mailboxLoading } = useQuery({
+  const {
+    data: mailbox,
+    isLoading: mailboxLoading,
+    isError: mailboxError,
+    refetch: refetchMailbox,
+  } = useQuery({
     queryKey: ["laventecare", "mailbox"],
     queryFn: () => laventecareApi.mailbox({ limit: 50 }),
     staleTime: 15_000,
@@ -259,6 +277,17 @@ export function useLaventeCare() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
   });
 
+  const updateTimeEntryMut = useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Parameters<typeof laventecareApi.updateTimeEntry>[1]) =>
+      laventecareApi.updateTimeEntry(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
+  const deleteTimeEntryMut = useMutation({
+    mutationFn: (id: string) => laventecareApi.deleteTimeEntry(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
+  });
+
   const createInvoiceMut = useMutation({
     mutationFn: (data: Parameters<typeof laventecareApi.createInvoice>[0]) => laventecareApi.createInvoice(data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["laventecare"] }),
@@ -368,12 +397,12 @@ export function useLaventeCare() {
   const timeEntries = useMemo(() => (billing?.timeEntries ?? []) as TimeEntryItem[], [billing]);
   const invoices = useMemo(() => (billing?.invoices ?? []) as InvoiceItem[], [billing]);
   const invoiceLines = useMemo(() => (billing?.invoiceLines ?? []) as InvoiceLineItem[], [billing]);
-  const activeLeads = useMemo(
+  // Full, unfiltered lists (M-J): the customer-dossier timeline needs closed/
+  // won/lost leads en afgeronde projecten om klantgeschiedenis compleet te
+  // tonen. De views die alleen actief werk tonen filteren hieronder verder.
+  const leads = useMemo(
     () =>
-      (allLeadsData
-        ? allLeadsData.filter((lead) => !closedLcStatuses.has(lead.status))
-        : cockpit?.activeLeads ?? []
-      ).map((l) => ({
+      (allLeadsData ?? cockpit?.activeLeads ?? []).map((l) => ({
         ...l,
         _id: l.id,
         fitScore: l.fit_score ?? undefined,
@@ -382,17 +411,22 @@ export function useLaventeCare() {
       })) as LeadItem[],
     [allLeadsData, cockpit]
   );
-  const activeProjects = useMemo(
+  const activeLeads = useMemo(
+    () => leads.filter((lead) => !closedLcStatuses.has(lead.status)),
+    [leads]
+  );
+  const projects = useMemo(
     () =>
-      (allProjectsData
-        ? allProjectsData.filter((project) => !closedLcStatuses.has(project.status))
-        : cockpit?.activeProjects ?? []
-      ).map((p) => ({
+      (allProjectsData ?? cockpit?.activeProjects ?? []).map((p) => ({
         ...p,
         _id: p.id,
         waardeIndicatie: p.waarde_indicatie ?? undefined,
       })) as ProjectItem[],
     [allProjectsData, cockpit]
+  );
+  const activeProjects = useMemo(
+    () => projects.filter((project) => !closedLcStatuses.has(project.status)),
+    [projects]
   );
   const workstreams = useMemo(
     () =>
@@ -498,18 +532,28 @@ export function useLaventeCare() {
   return {
     cockpitLoading,
     cockpitError,
+    refetchCockpit,
     billingLoading,
+    billingError,
+    refetchBilling,
     mailboxLoading,
+    mailboxError,
+    refetchMailbox,
     dossierAdviceLoading,
     dossierAdviceError,
     refetchDossierAdvice,
+    // Raw cockpit-payload: aanwezig zodra er (gecachte) data is, ook als een
+    // latere background-refetch faalde (R7).
+    cockpit,
     companies,
     contacts,
     accessCredentials,
     documents,
+    leads,
     activeLeads,
     workstreams,
     activeWorkstreams,
+    projects,
     activeProjects,
     businessSignals,
     actionItems,
@@ -564,6 +608,8 @@ export function useLaventeCare() {
     createQuoteMut,
     updateQuoteStatusMut,
     createTimeEntryMut,
+    updateTimeEntryMut,
+    deleteTimeEntryMut,
     createInvoiceMut,
     createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,

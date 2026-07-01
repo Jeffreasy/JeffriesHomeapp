@@ -1,12 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Clock, Play, PauseCircle, Trash2 } from "lucide-react";
+import { AlarmClock, Clock, Loader2, Play, PauseCircle, Trash2 } from "lucide-react";
 import {
   type Automation,
   type AutomationAction,
   SCENE_DEFINITIONS,
   DAY_LABELS,
+  isDienstWekkerAutomation,
+  nextRunLabel,
 } from "@/lib/automations";
 import { cn } from "@/lib/utils";
 import { Pencil } from "lucide-react";
@@ -33,18 +35,27 @@ function daysLabel(days?: number[]): string {
 
 interface AutomationCardProps {
   automation: Automation;
+  /** True zolang de enable/disable-call in flight is — knop is dan geblokkeerd. */
+  togglePending?: boolean;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-export function AutomationCard({ automation, onToggle, onEdit, onDelete }: AutomationCardProps) {
+export function AutomationCard({ automation, togglePending = false, onToggle, onEdit, onDelete }: AutomationCardProps) {
+  // L3: dag+maand+tijd — een kale tijd zegt niet of dat vandaag of vorige week was.
   const lastFired = automation.lastFiredAt
-    ? new Date(automation.lastFiredAt).toLocaleTimeString("nl", {
+    ? new Date(automation.lastFiredAt).toLocaleString("nl-NL", {
+        day: "2-digit",
+        month: "short",
         hour: "2-digit",
         minute: "2-digit",
       })
     : null;
+
+  // M4: client-side "volgende run" voor vaste-dagen-triggers (Amsterdam).
+  const nextRun = automation.enabled ? nextRunLabel(automation.trigger) : null;
+  const isWekkerStep = isDienstWekkerAutomation(automation);
 
   return (
     <motion.div
@@ -70,7 +81,19 @@ export function AutomationCard({ automation, onToggle, onEdit, onDelete }: Autom
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-slate-200">{automation.name}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-slate-200">{automation.name}</p>
+          {isWekkerStep && (
+            <a
+              href="#dienst-wekker-cockpit"
+              title="Beheer deze stap via de dienstwekker-cockpit bovenaan de pagina"
+              className="inline-flex items-center gap-1 rounded-md border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300 transition-colors hover:bg-sky-500/20"
+            >
+              <AlarmClock size={10} aria-hidden="true" />
+              Onderdeel van dienst-wekker
+            </a>
+          )}
+        </div>
         <p className="text-xs text-slate-400 mt-0.5">
           {automation.trigger.triggerType === "schedule" ? (
             <span className="text-orange-400/80">
@@ -88,6 +111,14 @@ export function AutomationCard({ automation, onToggle, onEdit, onDelete }: Autom
             Behalve bij: {automation.trigger.excludedShifts.join(", ")} dienst
           </p>
         )}
+        {nextRun && (
+          <p className="text-[10px] text-slate-500 mt-1">Volgende run: {nextRun}</p>
+        )}
+        {automation.enabled && automation.trigger.triggerType === "schedule" && (
+          <p className="text-[10px] text-slate-600 mt-1">
+            Vuurt alleen op dagen met een passende dienst in het rooster
+          </p>
+        )}
         {lastFired && (
           <p className="text-[10px] text-slate-600 mt-1">Laatste uitvoering: {lastFired}</p>
         )}
@@ -96,15 +127,26 @@ export function AutomationCard({ automation, onToggle, onEdit, onDelete }: Autom
       <div className="flex gap-2 flex-shrink-0">
         <button
           onClick={onToggle}
+          disabled={togglePending}
+          role="switch"
+          aria-checked={automation.enabled}
           aria-label={automation.enabled ? "Automatisering pauzeren" : "Automatisering starten"}
           className={cn(
             "h-10 w-10 sm:h-8 sm:w-8 rounded-lg border flex items-center justify-center transition-all",
             automation.enabled
               ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
-              : "bg-[var(--color-surface)] border-[var(--color-border)] text-slate-500 hover:bg-[var(--color-surface-hover)]"
+              : "bg-[var(--color-surface)] border-[var(--color-border)] text-slate-500 hover:bg-[var(--color-surface-hover)]",
+            togglePending && "opacity-60 cursor-wait"
           )}
         >
-          {automation.enabled ? <Play size={12} /> : <PauseCircle size={12} />}
+          {/* Icoon toont de ACTIE: pauzeren als hij aan staat, starten als hij uit staat */}
+          {togglePending ? (
+            <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+          ) : automation.enabled ? (
+            <PauseCircle size={12} aria-hidden="true" />
+          ) : (
+            <Play size={12} aria-hidden="true" />
+          )}
         </button>
         <button
           onClick={onEdit}

@@ -159,9 +159,11 @@ export const DIENST_WEKKER_PACKS: Record<ShiftType, DienstWekkerTemplate[]> = {
 /** Create a full set of automation objects for a shift type */
 export function createDienstWekkerPack(shiftType: ShiftType, times: Partial<DienstWekkerTimes> = {}): Automation[] {
   const templates = DIENST_WEKKER_PACKS[shiftType] ?? [];
+  // M5: géén tijd in de naam bakken — de weergavetijd komt uit trigger.time,
+  // zodat naam en werkelijke triggertijd nooit uit elkaar kunnen lopen.
   return templates.map((t) =>
     createAutomation({
-      name: `${t.name} (${times[t.id] ?? t.time})`,
+      name: t.name,
       enabled: true,
       group: `dienst-wekker-${shiftType.toLowerCase()}`,
       trigger: {
@@ -176,6 +178,56 @@ export function createDienstWekkerPack(shiftType: ShiftType, times: Partial<Dien
 
 export function getDienstWekkerDefaultTimes(shiftType: ShiftType): DienstWekkerTimes {
   return Object.fromEntries((DIENST_WEKKER_PACKS[shiftType] ?? []).map((template) => [template.id, template.time]));
+}
+
+/** True als deze automation onderdeel is van een dienst-wekker-pack (M5). */
+export function isDienstWekkerAutomation(automation: Pick<Automation, "group">): boolean {
+  return (automation.group ?? "").startsWith("dienst-wekker");
+}
+
+// ─── Next-run preview (M4) ───────────────────────────────────────────────────
+
+/** Huidige weekdag-index (0=Ma…6=Zo) + minuten sinds middernacht in Amsterdam. */
+function amsterdamNow(now: Date): { dayIdx: number; minutes: number } {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Amsterdam",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  const weekdayMap: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+  const dayIdx = weekdayMap[get("weekday")] ?? 0;
+  // "24" kan voorkomen bij middernacht in sommige runtimes — normaliseer naar 0.
+  const hour = Number(get("hour")) % 24;
+  const minutes = hour * 60 + Number(get("minute"));
+  return { dayIdx, minutes };
+}
+
+/**
+ * "Volgende run"-label voor vaste-dagen-automations, berekend in Amsterdam-tijd.
+ * Retourneert bv. "vandaag 07:00", "morgen 07:00" of "Za 07:00".
+ * Voor rooster-getriggerde automations (dienst-wekker) is de volgende run
+ * afhankelijk van het rooster en niet client-side te bepalen → null.
+ */
+export function nextRunLabel(trigger: AutomationTrigger, now: Date = new Date()): string | null {
+  if (trigger.triggerType === "schedule") return null;
+  const days = trigger.days;
+  if (!days || days.length === 0) return null;
+  const [hh, mm] = trigger.time.split(":").map(Number);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  const triggerMinutes = hh * 60 + mm;
+
+  const { dayIdx, minutes } = amsterdamNow(now);
+  for (let offset = 0; offset <= 7; offset++) {
+    const candidate = (dayIdx + offset) % 7;
+    if (!days.includes(candidate)) continue;
+    if (offset === 0 && triggerMinutes <= minutes) continue; // vandaag al geweest
+    const dayLabel = offset === 0 ? "vandaag" : offset === 1 ? "morgen" : DAY_LABELS[candidate];
+    return `${dayLabel} ${trigger.time}`;
+  }
+  return null;
 }
 
 export function actionLabel(action: AutomationAction): string {

@@ -27,7 +27,7 @@ import { NotesHeader, type NotesTab } from "@/components/notes/NotesHeader";
 import { NotesFilters } from "@/components/notes/NotesFilters";
 import { NotesList } from "@/components/notes/NotesList";
 import { NotesMetricsRow } from "@/components/notes/NotesMetrics";
-import { WeekJournal, getMonday } from "@/components/notes/WeekJournal";
+import { WeekJournal, getMonday, amsterdamToday } from "@/components/notes/WeekJournal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
@@ -52,27 +52,37 @@ export default function NotitiesPage() {
     remove,
     revisions,
     restoreRevision,
+    refetch,
   } = useNotes();
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("notes");
-  const { error: toastError } = useToast();
   const { diensten } = useSchedule();
   const { events: agendaEvents, upcoming: upcomingAgendaEvents } = usePersonalEvents({ diensten });
   const { openConfirm } = useConfirm();
+  const { success: toastSuccess, error: toastError } = useToast();
   const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
 
   // ── Tab state ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<NotesTab>("collection");
 
   // ── Week Journal state ─────────────────────────────────────
-  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
+  // Amsterdam-gepind "vandaag" zodat de startweek klopt in elke device-TZ.
+  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(amsterdamToday()));
 
   // ── Collection state ───────────────────────────────────────
   const [viewMode, setViewMode] = useState<ViewMode>("active");
   const [boardMode, setBoardMode] = useState<BoardMode>("board");
   const [noteScope, setNoteScope] = useState<NoteScope>("all");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
+  // K7: the input updates instantly (searchInput); filtering runs on the
+  // ~250ms-debounced `search` so large lists don't re-filter per keystroke.
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(searchInput), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   // ── Editor state ───────────────────────────────────────────
   const [editorOpen, setEditorOpen] = useState(false);
@@ -89,6 +99,12 @@ export default function NotitiesPage() {
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
 
       if ((event.key === "n" || event.key === "N") && activeTab === "collection") {
+        // N6: nooit een editor-remount triggeren vanaf knoppen/contentEditable
+        // of terwijl de editor dan wel een dialog openstaat — een "n" met focus
+        // op een toolbar-knop vernietigde anders de in-memory draft.
+        if (editorOpen) return;
+        if (target.tagName === "BUTTON" || target.isContentEditable) return;
+        if (document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
         event.preventDefault();
         setEditNote(null);
         setEditorOpen(true);
@@ -104,7 +120,7 @@ export default function NotitiesPage() {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activeTab]);
+  }, [activeTab, editorOpen]);
 
   // ── Collection: filtered & sorted notes ────────────────────
   // A non-empty search retrieves across ALL buckets (active+completed+archived)
@@ -216,7 +232,7 @@ export default function NotitiesPage() {
   }, [active]);
 
   const activeFilters = [
-    search.trim(),
+    searchInput.trim(),
     tagFilter,
     viewMode !== "active",
     noteScope !== "all",
@@ -275,7 +291,9 @@ export default function NotitiesPage() {
       });
       setQuickText("");
     } catch {
-      toastError("Notitie opslaan is mislukt — probeer opnieuw");
+      // N3: useNotes' create-mutatie toast de fout al ("Kon notitie niet
+      // opslaan.") — de catch blijft alleen om een unhandled rejection te
+      // voorkomen, zonder tweede toast.
     } finally {
       setQuickSaving(false);
     }
@@ -302,9 +320,10 @@ export default function NotitiesPage() {
     if (confirmed) await remove(id);
   };
 
-  const handleUpdateContent = async (id: string, inhoud: string) => {
-    await update(id, { inhoud });
+  const handleUpdateContent = async (id: string, inhoud: string, expectedGewijzigd?: string) => {
+    await update(id, { inhoud, expectedGewijzigd });
   };
+
 
   const handleNavigateToNote = (title: string) => {
     // Open the linked note directly, wherever it lives (active/completed/archived)
@@ -322,11 +341,93 @@ export default function NotitiesPage() {
     setViewMode("active");
     setNoteScope("all");
     setTagFilter(null);
+    // Direct (zonder debounce) zetten zodat de navigatie meteen resultaat toont.
+    setSearchInput(title);
     setSearch(title);
     searchRef.current?.focus();
   };
 
+  // ── M-J: pragmatisch tagbeheer ─────────────────────────────
+  // Client-side loop over alle geladen notities met de tag; sequentieel via de
+  // bestaande update-mutatie (met concurrency-token). Notities die falen worden
+  // overgeslagen en meegeteld in de eindmelding.
+  const runTagOperation = async (
+    tag: string,
+    transform: (tags: string[]) => string[],
+    onProgress?: (index: number, total: number) => void,
+  ) => {
+    const targets = [...active, ...completed, ...archived].filter((note) =>
+      (note.tags ?? []).includes(tag),
+    );
+    let done = 0;
+    let failed = 0;
+    for (const note of targets) {
+      onProgress?.(done + failed + 1, targets.length);
+      try {
+        await update(note.id, {
+          tags: transform(note.tags ?? []),
+          expectedGewijzigd: note.gewijzigd,
+        });
+        done += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    return { done, failed, total: targets.length };
+  };
+
+  const handleRenameTag = async (
+    tag: string,
+    next: string,
+    onProgress?: (index: number, total: number) => void,
+  ) => {
+    const clean = next.trim().replace(/^#+/, "").replace(/\s+/g, "-").toLowerCase();
+    if (!clean || clean === tag) return false;
+    const confirmed = await openConfirm({
+      title: `Tag hernoemen?`,
+      message: `Alle geladen notities met #${tag} krijgen #${clean}.`,
+      confirmLabel: "Hernoemen",
+    });
+    if (!confirmed) return false;
+    const result = await runTagOperation(
+      tag,
+      (tags) => Array.from(new Set(tags.map((t) => (t === tag ? clean : t)))),
+      onProgress,
+    );
+    if (result.failed > 0) {
+      toastError(`Tag hernoemd in ${result.done} van ${result.total} notities — ${result.failed} overgeslagen.`);
+    } else {
+      toastSuccess(`Tag #${tag} hernoemd naar #${clean} in ${result.done} notitie${result.done === 1 ? "" : "s"}.`);
+    }
+    return true;
+  };
+
+  const handleDeleteTag = async (
+    tag: string,
+    onProgress?: (index: number, total: number) => void,
+  ) => {
+    const confirmed = await openConfirm({
+      title: "Tag verwijderen?",
+      message: `#${tag} wordt uit alle geladen notities verwijderd. De notities zelf blijven bestaan.`,
+      confirmLabel: "Verwijderen",
+      variant: "danger",
+    });
+    if (!confirmed) return false;
+    const result = await runTagOperation(
+      tag,
+      (tags) => tags.filter((t) => t !== tag),
+      onProgress,
+    );
+    if (result.failed > 0) {
+      toastError(`Tag verwijderd uit ${result.done} van ${result.total} notities — ${result.failed} overgeslagen.`);
+    } else {
+      toastSuccess(`Tag #${tag} verwijderd uit ${result.done} notitie${result.done === 1 ? "" : "s"}.`);
+    }
+    return true;
+  };
+
   const clearFilters = () => {
+    setSearchInput("");
     setSearch("");
     setTagFilter(null);
     setNoteScope("all");
@@ -361,6 +462,8 @@ export default function NotitiesPage() {
             onEdit={handleEdit}
             onCreate={create}
             onToggleComplete={toggleComplete}
+            isLoading={isLoading}
+            isError={isError}
           />
         )}
 
@@ -394,8 +497,8 @@ export default function NotitiesPage() {
 
             <NotesFilters
               activeFilters={activeFilters}
-              search={search}
-              setSearch={setSearch}
+              search={searchInput}
+              setSearch={setSearchInput}
               searchRef={searchRef}
               clearFilters={clearFilters}
               viewMode={viewMode}
@@ -415,12 +518,15 @@ export default function NotitiesPage() {
               tagFilter={tagFilter}
               setTagFilter={setTagFilter}
               privacyOn={privacyOn}
+              onRenameTag={handleRenameTag}
+              onDeleteTag={handleDeleteTag}
             />
 
             <NotesList
               displayed={displayed}
               isLoading={isLoading}
               isError={isError}
+              onRetry={() => void refetch()}
               viewMode={viewMode}
               boardMode={boardMode}
               sortMode={sortMode}

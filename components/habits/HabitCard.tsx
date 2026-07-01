@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Check,
@@ -12,6 +18,7 @@ import {
   Edit3,
   Plus,
   Minus,
+  RotateCcw,
   ChevronDown,
   Trophy,
   Calendar,
@@ -27,7 +34,8 @@ import {
 } from "@/lib/habit-constants";
 import { getLevel } from "@/lib/habit-constants";
 import { DEFAULT_STAP, INCIDENT_TRIGGERS } from "@/lib/habit-constants";
-import type { HabitWithLog } from "@/hooks/useHabits";
+import { isPeriodHabit, isPeriodSatisfied, type HabitWithLog } from "@/hooks/useHabits";
+import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { AppIcon } from "@/components/ui/AppIcon";
 
 /**
@@ -49,6 +57,10 @@ interface HabitCardProps {
   onToggle: () => void;
   onIncrement: (stap: number) => void;
   onIncident: (trigger?: string, notitie?: string) => void;
+  /** Removes the incident registration for the shown day (confirm handled by caller). */
+  onRemoveIncident?: () => void;
+  /** True when incidents can't be logged for the shown date (e.g. >30 dagen terug). */
+  incidentDisabled?: boolean;
   onPause: () => void;
   onArchive: () => void;
   onRemove: () => void;
@@ -56,6 +68,12 @@ interface HabitCardProps {
   masked?: boolean;
   pending?: boolean;
   paused?: boolean;
+  /**
+   * True when this habit has no log slot for today (Overzicht-tab, M-C):
+   * the toggle is disabled with "Vandaag niet gepland" — behalve voor
+   * weekly/monthly habits, die op elke dag afvinkbaar zijn.
+   */
+  notDueToday?: boolean;
 }
 
 export function HabitCard({
@@ -63,6 +81,8 @@ export function HabitCard({
   onToggle,
   onIncrement,
   onIncident,
+  onRemoveIncident,
+  incidentDisabled = false,
   onPause,
   onArchive,
   onRemove,
@@ -70,6 +90,7 @@ export function HabitCard({
   masked = false,
   pending = false,
   paused = false,
+  notDueToday = false,
 }: HabitCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showDetail, setShowDetail] = useState(false);
@@ -113,12 +134,82 @@ export function HabitCard({
   const hasIncident = habit.log?.isIncident === true;
   const isQuantitative = habit.isKwantitatief && habit.doelWaarde;
   const color = habit.kleur ?? "#f97316";
-  const isSuccess = isNegative ? !hasIncident : isCompleted;
+  // N5: weekly/monthly habits count per periode — target gehaald = voldaan,
+  // ook als er vandaag geen vinkje staat.
+  const periodHabit = isPeriodHabit(habit);
+  const periodTarget = habit.doelAantal ?? 0;
+  const periodCount = habit.periodVoltooidCount ?? 0;
+  const periodSatisfied = isPeriodSatisfied(habit);
+  const isSuccess = isNegative ? !hasIncident : isCompleted || periodSatisfied;
+  // M-C: niet-due habits (Overzicht) zijn niet toggle-baar — behalve
+  // period-habits, die tellen op elke dag mee voor hun week/maand-doel.
+  const toggleBlocked = notDueToday && !periodHabit;
 
   const stap = DEFAULT_STAP[habit.eenheid ?? "x"] ?? 1;
   const currentWaarde = habit.log?.waarde ?? 0;
+
+  // ── M-F: instant stepper ────────────────────────────────────────────────────
+  // Taps accumuleren lokaal (draftWaarde) en worden ~400ms na de laatste tap in
+  // één request gecommit (LampControl-patroon). De knoppen blijven bruikbaar
+  // tijdens debounce én tijdens een lopende request; een commit die binnenkomt
+  // terwijl er al een request loopt wordt na afloop alsnog verstuurd.
+  const [draftWaarde, setDraftWaarde] = useState<number | null>(null);
+  const [waardeInput, setWaardeInput] = useState<string | null>(null);
+  const pendingRef = useRef(pending);
+  const pendingCommitRef = useRef<number | null>(null);
+  const serverWaardeRef = useRef(currentWaarde);
+  useEffect(() => {
+    serverWaardeRef.current = currentWaarde;
+  }, [currentWaarde]);
+
+  const commitWaarde = useCallback(
+    (target: number) => {
+      if (pendingRef.current) {
+        pendingCommitRef.current = target;
+        return;
+      }
+      const delta = target - serverWaardeRef.current;
+      setDraftWaarde(null);
+      if (delta !== 0) onIncrement(delta);
+    },
+    [onIncrement],
+  );
+  const debouncedCommit = useDebouncedCallback(commitWaarde, 400);
+
+  useEffect(() => {
+    pendingRef.current = pending;
+    if (!pending && pendingCommitRef.current != null) {
+      const target = pendingCommitRef.current;
+      pendingCommitRef.current = null;
+      commitWaarde(target);
+    }
+  }, [pending, commitWaarde]);
+
+  const displayedWaarde = draftWaarde ?? currentWaarde;
+  const doelWaarde = habit.doelWaarde ?? 0;
+  const displayedCompleted = isQuantitative
+    ? displayedWaarde >= doelWaarde
+    : isCompleted;
+
+  const stepBy = (delta: number) => {
+    const next = Math.max(0, displayedWaarde + delta);
+    setDraftWaarde(next);
+    setWaardeInput(null);
+    debouncedCommit(next);
+  };
+
+  const commitWaardeInput = () => {
+    if (waardeInput == null) return;
+    const parsed = Number(waardeInput.replace(",", "."));
+    setWaardeInput(null);
+    if (!Number.isFinite(parsed)) return;
+    const next = Math.max(0, parsed);
+    setDraftWaarde(next);
+    debouncedCommit(next);
+  };
+
   const progress = isQuantitative
-    ? Math.min(1, currentWaarde / habit.doelWaarde!)
+    ? Math.min(1, displayedWaarde / habit.doelWaarde!)
     : 0;
   const displayName = masked ? "Verborgen habit" : habit.naam;
   const displayEmoji = masked ? "•" : habit.emoji;
@@ -126,6 +217,25 @@ export function HabitCard({
   const frequencyLabel = masked
     ? "Schema"
     : (FREQUENTIE_LABELS[habit.frequentie] ?? habit.frequentie);
+
+  // Pijltjesnavigatie in het actiemenu (low): één menu, roving focus.
+  const handleMenuKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const keys = ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp", "Home", "End"];
+    if (!keys.includes(e.key)) return;
+    const items = Array.from(
+      e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+    );
+    if (items.length === 0) return;
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    let next = 0;
+    if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = items.length - 1;
+    else if (e.key === "ArrowRight" || e.key === "ArrowDown")
+      next = current < 0 ? 0 : (current + 1) % items.length;
+    else next = current < 0 ? items.length - 1 : (current - 1 + items.length) % items.length;
+    e.preventDefault();
+    items[next].focus();
+  };
 
   const handleIncidentSubmit = () => {
     onIncident(selectedTrigger, triggerNotitie || undefined);
@@ -193,14 +303,22 @@ export function HabitCard({
           <button
             type="button"
             onClick={onToggle}
-            disabled={pending || paused}
+            disabled={pending || paused || toggleBlocked}
             aria-busy={pending}
             aria-label={
-              isCompleted
-                ? `${displayName} heropenen`
-                : `${displayName} voltooien`
+              toggleBlocked
+                ? `${displayName}: vandaag niet gepland`
+                : isCompleted
+                  ? `${displayName} heropenen`
+                  : `${displayName} voltooien`
             }
-            title={isCompleted ? "Heropenen" : "Voltooien"}
+            title={
+              toggleBlocked
+                ? "Vandaag niet gepland"
+                : isCompleted
+                  ? "Heropenen"
+                  : "Voltooien"
+            }
             className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer disabled:cursor-default"
             style={{
               background: isCompleted ? color : "rgba(255,255,255,0.03)",
@@ -253,6 +371,18 @@ export function HabitCard({
           </div>
 
           <div className="flex items-center gap-2 mt-1">
+            {/* N5: week/maand-voortgang voor x_per_week / x_per_maand habits */}
+            {periodHabit && periodTarget > 0 && !masked && (
+              <span
+                className={`text-[10px] font-semibold ${
+                  periodSatisfied ? "text-green-400/90" : "text-sky-400/80"
+                }`}
+              >
+                {periodCount}/{periodTarget}{" "}
+                {habit.frequentie === "x_per_week" ? "deze week" : "deze maand"}
+                {periodSatisfied ? " ✓" : ""}
+              </span>
+            )}
             {habit.huidigeStreak > 0 && (
               <span className="text-[10px] text-orange-400/80 font-medium">
                 {formatStreak(habit.huidigeStreak)}
@@ -282,13 +412,38 @@ export function HabitCard({
           <button
             type="button"
             onClick={() => setShowTriggerModal(true)}
-            disabled={pending || paused}
+            disabled={pending || paused || incidentDisabled}
             aria-busy={pending}
-            aria-label={`Incident loggen voor ${displayName}`}
+            aria-label={
+              incidentDisabled
+                ? `Incident loggen kan alleen tot 30 dagen terug`
+                : `Incident loggen voor ${displayName}`
+            }
             className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-500/12 bg-red-500/8 transition-transform active:scale-90 disabled:cursor-default disabled:opacity-40"
-            title="Incident loggen"
+            title={
+              incidentDisabled
+                ? "Incident loggen kan alleen tot 30 dagen terug"
+                : "Incident loggen"
+            }
           >
             <AlertTriangle size={16} className="text-red-400/70" />
+          </button>
+        )}
+
+        {/* Incident verwijderen (H5) — geen doodlopende indicator meer: een
+            misklik kan de registratie voor deze dag weer weghalen. */}
+        {isNegative && hasIncident && onRemoveIncident && (
+          <button
+            type="button"
+            onClick={onRemoveIncident}
+            disabled={pending || paused}
+            aria-busy={pending}
+            aria-label={`Incident verwijderen voor ${displayName}`}
+            className="flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-red-500/15 bg-red-500/8 px-2.5 text-[10px] font-semibold text-red-300/90 transition-transform active:scale-90 disabled:cursor-default disabled:opacity-40"
+            title="Incident verwijderen"
+          >
+            <RotateCcw size={14} className="text-red-400/80" />
+            <span className="hidden sm:inline">Incident verwijderen</span>
           </button>
         )}
 
@@ -321,12 +476,12 @@ export function HabitCard({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Minus button */}
+            {/* Minus button — niet uitgeschakeld tijdens debounce/verzenden
+                (M-F): taps accumuleren lokaal en gaan in één request. */}
             <button
               type="button"
-              onClick={() => onIncrement(-stap)}
-              disabled={currentWaarde <= 0 || pending || paused}
-              aria-busy={pending}
+              onClick={() => stepBy(-stap)}
+              disabled={displayedWaarde <= 0 || paused}
               aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verminderen`}
               className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-20"
               style={{
@@ -337,32 +492,44 @@ export function HabitCard({
               <Minus size={16} className="text-slate-400" />
             </button>
 
-            {/* Current value — tap to jump straight to the goal (or reset). */}
-            <button
-              type="button"
-              onClick={() => onIncrement((isCompleted ? 0 : habit.doelWaarde ?? currentWaarde) - currentWaarde)}
-              disabled={pending || paused}
-              aria-label={isCompleted ? `${displayName} terugzetten naar 0` : `${displayName} direct op ${habit.doelWaarde} ${habit.eenheid ?? ""} zetten`}
-              className="flex-1 rounded-lg py-1 text-center transition-colors hover:bg-white/[0.04] disabled:cursor-default disabled:hover:bg-transparent"
-            >
-              <span
-                className="text-sm font-bold"
-                style={{ color: isCompleted ? color : "rgba(255,255,255,0.8)" }}
-              >
-                {masked ? "••" : currentWaarde}
-              </span>
-              <span className="text-[10px] text-[var(--color-text-muted)]">
-                {" "}
-                / {masked ? "••" : `${habit.doelWaarde} ${habit.eenheid ?? ""}`}
-              </span>
-            </button>
+            {/* Huidige waarde — direct bewerkbaar; Enter of blur commit (M-F). */}
+            <div className="flex flex-1 items-center justify-center gap-1">
+              {masked ? (
+                <span className="text-sm font-bold text-[rgba(255,255,255,0.8)]">
+                  •• <span className="text-[10px] text-[var(--color-text-muted)]">/ ••</span>
+                </span>
+              ) : (
+                <>
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="decimal"
+                    value={waardeInput ?? String(displayedWaarde)}
+                    onChange={(e) => setWaardeInput(e.target.value)}
+                    onBlur={commitWaardeInput}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    disabled={paused}
+                    aria-label={`${displayName} waarde (${habit.eenheid ?? "aantal"})`}
+                    className="w-16 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-2 py-1.5 text-center text-sm font-bold outline-none [appearance:textfield] focus:border-sky-500/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    style={{ color: displayedCompleted ? color : "rgba(255,255,255,0.8)" }}
+                  />
+                  <span className="text-[10px] text-[var(--color-text-muted)]">
+                    / {habit.doelWaarde} {habit.eenheid ?? ""}
+                  </span>
+                </>
+              )}
+            </div>
 
             {/* Plus button */}
             <button
               type="button"
-              onClick={() => onIncrement(stap)}
-              disabled={isCompleted || pending || paused}
-              aria-busy={pending}
+              onClick={() => stepBy(stap)}
+              disabled={displayedCompleted || paused}
               aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verhogen`}
               className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-30"
               style={{
@@ -598,6 +765,7 @@ export function HabitCard({
             role="menu"
             aria-label={`Acties voor ${displayName}`}
             className="p-2.5 flex gap-2"
+            onKeyDown={handleMenuKeyDown}
           >
             <MenuBtn
               icon={<Edit3 size={15} />}

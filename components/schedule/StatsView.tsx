@@ -44,13 +44,17 @@ function MonthStreamItem({
   const empty = stats.count === 0;
 
   return (
+    // Lege maanden zijn echt disabled — geen hover-feedback of klikbare no-op (audit N11).
     <motion.button
       onClick={onClick}
+      disabled={empty}
       whileHover={!empty ? { x: 4 } : {}}
       className={`group relative flex w-full min-w-0 items-center justify-between border-b text-left transition-colors ${
-        active 
-          ? "border-white bg-white/5" 
-          : "border-white/10 hover:bg-white/5"
+        active
+          ? "border-white bg-white/5"
+          : empty
+            ? "border-white/10 cursor-default"
+            : "border-white/10 hover:bg-white/5"
       }`}
     >
       <div className="min-w-0 flex-1 py-3 pl-2 pr-3 sm:py-4 sm:pr-4">
@@ -82,7 +86,7 @@ function MonthStreamItem({
           
           {!empty && (
             <div className="shrink-0 text-right">
-              <p className="text-[10px] uppercase text-slate-500 font-bold tracking-widest">
+              <p className="text-[10px] uppercase text-slate-400 font-bold tracking-widest">
                 {stats.count} diensten
               </p>
             </div>
@@ -110,7 +114,7 @@ function MonthDetailStream({ stats }: { stats: MonthStats }) {
     >
       <div className="mb-6 border-b border-white/10 pb-4 sm:mb-8">
         <h3 className="mb-2 text-xl font-bold tracking-tight text-white sm:text-2xl">{stats.label}</h3>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
           <span>Totaal: {hoursValue(stats.totalHours)}u</span>
           <span>Diensten: {stats.count}</span>
           <span>Gem: {hoursValue(stats.avgDuur)}u</span>
@@ -151,19 +155,19 @@ function DienstregelItem({ dienst }: { dienst: DienstRow }) {
     <div className="group flex items-center justify-between py-2 border-b border-white/5 hover:border-white/20 transition-colors">
       <div className="flex items-center gap-4">
         <p className="text-xs font-bold text-slate-400 w-6">{dienst.startDatum.slice(8)}</p>
-        <span 
-          className="text-[9px] font-bold px-2 py-0.5"
+        <span
+          className="text-[10px] font-bold px-2 py-0.5"
           style={{ color: color, backgroundColor: color + "10", border: `1px solid ${color}30` }}
         >
           {dienst.shiftType}
         </span>
       </div>
-      
+
       <div className="flex items-center gap-3">
         <p className="text-xs font-mono text-slate-300">
-          {dienst.startTijd}<span className="text-slate-600 px-1">-</span>{dienst.eindTijd}
+          {dienst.startTijd}<span className="text-slate-500 px-1">–</span>{dienst.eindTijd}
         </p>
-        <p className="w-8 text-right text-[10px] font-bold text-slate-500">{hoursValue(dienst.duur)}u</p>
+        <p className="w-8 text-right text-[10px] font-bold text-slate-400">{hoursValue(dienst.duur)}u</p>
       </div>
     </div>
   );

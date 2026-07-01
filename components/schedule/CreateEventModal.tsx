@@ -2,12 +2,14 @@
 
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
-import { type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { applyEventRowToCache, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
 import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
@@ -66,7 +68,9 @@ interface CreateEventModalProps {
 
 export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialDate, initialTime }: CreateEventModalProps) {
   const { user }  = useUser();
-  const { success, toast } = useToast();
+  const queryClient = useQueryClient();
+  const { success, toast, error: toastError } = useToast();
+  const { openConfirm } = useConfirm();
 
   const today = getAmsterdamTodayIso();
   const defaultDate = initialDate || today;
@@ -183,17 +187,75 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
 
   const handleClose = useCallback(() => { reset(); onClose(); }, [reset, onClose]);
 
+  // ── Dirty-check vóór sluiten (audit K6) ──────────────────────────────────
+  // Alleen de door de gebruiker bewerkbare velden tellen mee; automatische
+  // context-verrijking (tags/categorie/symbool) maakt het formulier niet dirty.
+  const pristine = useMemo(() => (
+    editEvent
+      ? {
+          titel: editEvent.titel,
+          startDatum: editEvent.startDatum,
+          eindDatum: editEvent.eindDatum,
+          heledag: editEvent.heledag,
+          startTijd: editEvent.startTijd ?? "09:00",
+          eindTijd: editEvent.eindTijd ?? "10:00",
+          locatie: editEvent.locatie ?? "",
+          beschrijving: stripEventMetadata(editEvent.beschrijving ?? ""),
+        }
+      : {
+          titel: "",
+          startDatum: defaultDate,
+          eindDatum: defaultDate,
+          heledag: false,
+          startTijd: defaultStartTime,
+          eindTijd: defaultEndTime,
+          locatie: "",
+          beschrijving: "",
+        }
+  ), [defaultDate, defaultEndTime, defaultStartTime, editEvent]);
+
+  const isDirty =
+    titel !== pristine.titel ||
+    startDatum !== pristine.startDatum ||
+    eindDatum !== pristine.eindDatum ||
+    heledag !== pristine.heledag ||
+    (!heledag && (startTijd !== pristine.startTijd || eindTijd !== pristine.eindTijd)) ||
+    locatie !== pristine.locatie ||
+    beschrijving !== pristine.beschrijving;
+
+  // Guard zodat Escape in de bevestigingsdialoog niet nogmaals hier afvangt.
+  const confirmingRef = useRef(false);
+  const handleCloseAttempt = useCallback(async () => {
+    if (confirmingRef.current) return;
+    if (!isDirty) {
+      handleClose();
+      return;
+    }
+    confirmingRef.current = true;
+    try {
+      const discard = await openConfirm({
+        title: "Wijzigingen verwerpen?",
+        message: "Je hebt niet-opgeslagen wijzigingen in deze afspraak.",
+        confirmLabel: "Verwerpen",
+        variant: "danger",
+      });
+      if (discard) handleClose();
+    } finally {
+      confirmingRef.current = false;
+    }
+  }, [handleClose, isDirty, openConfirm]);
+
   // Accessibility: trap focus in the dialog, restore focus on close, close on Escape.
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(open, dialogRef);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") void handleCloseAttempt();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, handleClose]);
+  }, [open, handleCloseAttempt]);
 
   const handleCategoryChange = (nextCategory: CategoryId) => {
     setCategoryTouched(true);
@@ -214,8 +276,12 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
       return;
     }
 
+    // Pending-state dekt alleen de korte synchrone validatie/verrijking; de
+    // (tot ~20s trage) Google-push blokkeert de modal niet meer (audit F8).
     setLoading(true);
     setError("");
+    let row: PersonalEventRow | null = null;
+    let rollback: () => void = () => {};
     try {
       const rawDesc = beschrijving.trim();
       const enriched = enrichEventDraft({
@@ -236,7 +302,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
         tags: enriched.tags,
       });
 
-      const row: PersonalEventRow = {
+      row = {
         user_id:      user.id,
         event_id:     editEvent?.eventId ?? crypto.randomUUID(),
         titel:        titel.trim(),
@@ -256,27 +322,48 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
         kalender:     editEvent?.kalender ?? "Main",
       };
 
-      const result = await personalEventsApi.upsert(row);
-      if (result.instantSync) {
-        success(editEvent ? "Afspraak direct bijgewerkt in Google Calendar" : "Afspraak direct gesynchroniseerd met Google Calendar");
-      } else if (result.permanent) {
-        toast(
-          "Afspraak lokaal opgeslagen, maar kan niet naar Google gesynchroniseerd worden (vermoedelijk een automatisch Google-event, zoals een verjaardag). Pas dit aan in Google Agenda/Contacten zelf.",
-          "error"
-        );
-      } else {
-        toast(result.syncError
-          ? "Afspraak opgeslagen; Google sync blijft in de wachtrij."
-          : "Afspraak opgeslagen en staat in de Google Calendar wachtrij.",
-        "info");
-      }
-      await onSuccess?.();
-      handleClose();
+      // Optimistic: laat de afspraak direct in de lijst/kalender verschijnen;
+      // bij een fout wordt de cache-snapshot teruggezet (audit M16).
+      rollback = applyEventRowToCache(queryClient, user.id, row);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Opslaan mislukt");
-    } finally {
       setLoading(false);
+      return;
     }
+    setLoading(false);
+    if (!row) return;
+    const pendingRow = row;
+    const wasEdit = Boolean(editEvent);
+
+    // Modal direct sluiten (audit F8): de rij staat al optimistisch in de
+    // cache. De upsert wordt op de achtergrond afgerond met toast-feedback en
+    // rollback bij falen — zelfde patroon als het delete-pad.
+    handleClose();
+
+    void (async () => {
+      try {
+        const result = await personalEventsApi.upsert(pendingRow);
+        if (result.instantSync) {
+          success(wasEdit ? "Afspraak direct bijgewerkt in Google Calendar" : "Afspraak direct gesynchroniseerd met Google Calendar");
+        } else if (result.permanent) {
+          toast(
+            "Afspraak lokaal opgeslagen, maar kan niet naar Google gesynchroniseerd worden (vermoedelijk een automatisch Google-event, zoals een verjaardag). Pas dit aan in Google Agenda/Contacten zelf.",
+            "error"
+          );
+        } else {
+          toast(result.syncError
+            ? "Afspraak opgeslagen; Google sync blijft in de wachtrij."
+            : "Afspraak opgeslagen en staat in de Google Calendar wachtrij.",
+          "info");
+        }
+        await onSuccess?.();
+      } catch (err) {
+        // Optimistic rij terugdraaien; de modal is al dicht, dus een toast
+        // i.p.v. de inline foutmelding.
+        rollback();
+        toastError(`Opslaan mislukt: ${err instanceof Error ? err.message : "onbekende fout"} — wijziging teruggedraaid.`);
+      }
+    })();
   };
 
   return (
@@ -288,7 +375,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             data-app-modal="agenda-event"
             className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
-            onClick={handleClose}
+            onClick={() => void handleCloseAttempt()}
           />
 
           {/* Modal */}
@@ -318,7 +405,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 <button
                   type="button"
                   aria-label="Afspraakmodal sluiten"
-                  onClick={handleClose}
+                  onClick={() => void handleCloseAttempt()}
                   className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
                   <AppIcon name="close" tone="slate" size="sm" />
                 </button>
@@ -497,15 +584,15 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 {/* Info */}
                 <p className="text-[10px] text-slate-600">
                   {editEvent
-                    ? "Wijzigingen worden direct naar Google Calendar gepusht. Als Google niet reageert, blijft de actie in de Render-wachtrij."
-                    : "Afspraak wordt direct naar Google Calendar gepusht. Als Google niet reageert, blijft de actie in de Render-wachtrij."
+                    ? "Wijzigingen worden direct naar Google Calendar gepusht. Als Google niet reageert, blijft de wijziging in de wachtrij (nog niet in Google)."
+                    : "Afspraak wordt direct naar Google Calendar gepusht. Als Google niet reageert, blijft de afspraak in de wachtrij (nog niet in Google)."
                   }
                 </p>
                 </div>
 
                 {/* Actions */}
                 <div className="flex shrink-0 gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))]">
-                  <button type="button" onClick={handleClose}
+                  <button type="button" onClick={() => void handleCloseAttempt()}
                     className="min-h-[44px] flex-1 rounded-xl border border-[var(--color-border)] text-sm font-semibold text-slate-500 transition-all hover:bg-[var(--color-surface-hover)] hover:text-slate-300 cursor-pointer">
                     Annuleren
                   </button>

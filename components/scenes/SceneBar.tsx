@@ -9,7 +9,6 @@ import {
 import { HexColorPicker } from "react-colorful";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
 import { useToast } from "@/components/ui/Toast";
-import { useQueryClient } from "@tanstack/react-query";
 import { CUSTOM_SCENES, WIZ_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
 import { cn, hexToRgb } from "@/lib/utils";
 import { type Device } from "@/lib/api";
@@ -25,46 +24,19 @@ const SCENE_ICONS: Record<string, React.ElementType> = {
   ochtend: Coffee,
 };
 
-// ─── Optimistic state helper ──────────────────────────────────────────────────
-
-function applyCommandToDevice(device: Device, cmd: ScenePreset["command"]): Device {
-  const prev = device.current_state ?? { on: false, brightness: 100, color_temp: 4000, r: 0, g: 0, b: 0 };
-  const next = { ...prev };
-
-  if (cmd.on !== undefined)        next.on         = cmd.on;
-  if (cmd.brightness !== undefined) next.brightness = cmd.brightness;
-
-  if (cmd.color_temp_mireds !== undefined) {
-    next.color_temp = Math.round(1_000_000 / cmd.color_temp_mireds);
-    next.r = 0; next.g = 0; next.b = 0; // white mode clears RGB
-  }
-  if (cmd.r !== undefined) next.r = cmd.r;
-  if (cmd.g !== undefined) next.g = cmd.g;
-  if (cmd.b !== undefined) next.b = cmd.b;
-  if (cmd.on === false)    next.on = false;
-
-  return { ...device, current_state: next };
-}
-
 // ─── Inline color picker pill (replaces GlobalColorPicker in header) ──────────
 
 function ColorPill({ devices }: { devices: Device[] }) {
   const [open, setOpen] = useState(false);
   const [hex, setHex]   = useState("#ff8800");
-  const { mutate: sendCommand } = useLampCommand();
-  const queryClient = useQueryClient();
+  // sendBatch patcht de cache optimistic per lamp (applyCommandToDevice in
+  // lib/deviceCommands) en invalideert één keer aan het eind.
+  const { sendBatch } = useLampCommand();
   const { success } = useToast();
 
   const apply = () => {
     const { r, g, b } = hexToRgb(hex);
-    const cmd = { r, g, b, on: true };
-
-    // Optimistic update
-    queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
-      old?.map((d) => (d.status === "online" ? applyCommandToDevice(d, cmd) : d))
-    );
-
-    devices.forEach((d) => sendCommand({ id: d.id, cmd }));
+    sendBatch(devices, { r, g, b, on: true });
     success("Kleur toegepast op alle lampen");
     setOpen(false);
   };
@@ -135,8 +107,7 @@ function ColorPill({ devices }: { devices: Device[] }) {
 
 export function SceneBar() {
   const { data: devices = [] } = useDevices();
-  const { mutate: sendCommand } = useLampCommand();
-  const queryClient = useQueryClient();
+  const { sendBatch } = useLampCommand();
   const { success } = useToast();
   const [showWiz, setShowWiz] = useState(false);
 
@@ -144,13 +115,9 @@ export function SceneBar() {
   const activeScene = detectActiveScene(devices);
 
   const applyScene = (scene: ScenePreset) => {
-    // 1. Optimistic update — instant visual feedback
-    queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
-      old?.map((d) => (d.status === "online" ? applyCommandToDevice(d, scene.command) : d))
-    );
-
-    // 2. Send to all online lamps
-    onlineDevices.forEach((d) => sendCommand({ id: d.id, cmd: scene.command }));
+    // sendBatch doet de optimistic cache-patch per lamp (instant feedback)
+    // en invalideert de devices-query één keer aan het eind.
+    sendBatch(onlineDevices, scene.command);
     success(`Scène "${scene.label}" toegepast`);
     setShowWiz(false);
   };

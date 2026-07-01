@@ -53,6 +53,7 @@ export function LampToolbar({
                 key={item.id}
                 type="button"
                 onClick={() => onFilterChange(item.id)}
+                aria-pressed={filter === item.id}
                 className={`h-8 shrink-0 rounded-lg px-3 text-xs font-semibold transition-colors ${
                   filter === item.id
                     ? "bg-amber-500/15 text-amber-200"

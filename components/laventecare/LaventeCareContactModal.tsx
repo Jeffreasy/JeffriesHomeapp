@@ -1,13 +1,14 @@
 "use client";
 
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { Loader2, Plus, Save, UserRound } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalCancelButton } from "@/components/ui/Modal";
 import type { CompanyItem, ContactForm } from "./LaventeCareTypes";
 
 export function LaventeCareContactModal({
   isOpen,
   onClose,
+  dirty,
   contactForm,
   setContactForm,
   companies,
@@ -17,6 +18,7 @@ export function LaventeCareContactModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
+  dirty?: boolean;
   contactForm: ContactForm;
   setContactForm: Dispatch<SetStateAction<ContactForm>>;
   companies: CompanyItem[];
@@ -24,22 +26,51 @@ export function LaventeCareContactModal({
   editingContact: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const [companyError, setCompanyError] = useState("");
+  const [naamError, setNaamError] = useState("");
+
+  // Inline validatie (M28/L1): markeer en focus het schuldige veld; de
+  // page-level handler houdt de toast en blokkeert de daadwerkelijke submit.
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const missingCompany = !contactForm.companyId;
+    const missingNaam = !contactForm.naam.trim();
+    setCompanyError(missingCompany ? "Koppel de contactpersoon aan een klant" : "");
+    setNaamError(missingNaam ? "Naam is verplicht" : "");
+    if (missingCompany || missingNaam) {
+      window.setTimeout(
+        () => document.getElementById(missingCompany ? "contact-form-company" : "contact-form-naam")?.focus(),
+        0,
+      );
+    }
+    void onSubmit(event);
+  };
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      dirty={dirty}
       title={editingContact ? "Contactpersoon bewerken" : "Contactpersoon toevoegen"}
       icon={<UserRound size={18} className="text-sky-300" />}
       theme="sky"
       maxWidth="2xl"
     >
-      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} noValidate className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Klant</span>
+          <span className="text-xs font-semibold text-slate-400">
+            Klant <span className="text-rose-300">*</span>
+          </span>
           <select
+            id="contact-form-company"
+            required
+            aria-invalid={Boolean(companyError)}
             value={contactForm.companyId}
             onChange={(event) => setContactForm((form) => ({ ...form, companyId: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-sky-500"
+            className={`mt-1 w-full rounded-lg border bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors ${
+              companyError
+                ? "border-rose-400/60 focus:border-rose-400/60"
+                : "border-[var(--color-border)] focus:border-sky-500"
+            }`}
           >
             <option value="">Geen klant gekoppeld</option>
             {companies.map((company) => (
@@ -48,16 +79,35 @@ export function LaventeCareContactModal({
               </option>
             ))}
           </select>
+          {companyError ? (
+            <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+              {companyError}
+            </p>
+          ) : null}
         </label>
 
         <label className="block sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Naam</span>
+          <span className="text-xs font-semibold text-slate-400">
+            Naam <span className="text-rose-300">*</span>
+          </span>
           <input
+            id="contact-form-naam"
+            required
+            aria-invalid={Boolean(naamError)}
             value={contactForm.naam}
             onChange={(event) => setContactForm((form) => ({ ...form, naam: event.target.value }))}
             placeholder="Naam contactpersoon"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-sky-500"
+            className={`mt-1 w-full rounded-lg border bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 ${
+              naamError
+                ? "border-rose-400/60 focus:border-rose-400/60"
+                : "border-[var(--color-border)] focus:border-sky-500"
+            }`}
           />
+          {naamError ? (
+            <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+              {naamError}
+            </p>
+          ) : null}
         </label>
 
         <label className="block">
@@ -139,13 +189,11 @@ export function LaventeCareContactModal({
         </label>
 
         <div className="sticky bottom-0 -mx-5 -mb-5 mt-2 flex flex-col-reverse gap-2 border-t border-white/5 bg-[rgba(15,23,42,0.96)] px-5 py-4 backdrop-blur sm:col-span-2 sm:-mx-6 sm:-mb-6 sm:flex-row sm:justify-end sm:px-6">
-          <button
-            type="button"
-            onClick={onClose}
+          {/* R11: via de guarded close, zodat de dirty-guard ook hier geldt. */}
+          <ModalCancelButton
+            onFallback={onClose}
             className="inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-slate-300 transition-colors hover:text-white"
-          >
-            Annuleren
-          </button>
+          />
           <button
             type="submit"
             disabled={savingContact}
