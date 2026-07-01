@@ -38,9 +38,9 @@ import { AddDeviceForm } from "@/components/settings/AddDeviceForm";
 import { AddRoomForm } from "@/components/settings/AddRoomForm";
 import { RoomRow } from "@/components/settings/RoomRow";
 import { DeviceDiscoveryPanel } from "@/components/settings/DeviceDiscoveryPanel";
-import { type Room, settingsApi, syncApi } from "@/lib/api";
+import { type Room, privacyApi, settingsApi, syncApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   formatDateTime,
@@ -65,6 +65,7 @@ export default function SettingsPage() {
   const { success, error: toastError } = useToast();
   const { user, isLoaded: userLoaded } = useUser();
   const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("account");
+  const queryClient = useQueryClient();
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ["settings-overview"],
@@ -91,18 +92,35 @@ export default function SettingsPage() {
   // today" required an extra click every single visit.
   const {
     data: aiDiagnostics = null,
-    isFetching: aiChecking,
     refetch: refetchAiDiagnostics,
   } = useQuery({
     queryKey: ["ai-diagnostics"],
     queryFn: async () => (await settingsApi.aiDiagnostics()) as unknown as AiDiagnosticsResult,
     refetchInterval: 60000,
   });
+  // Deliberately NOT isFetching from the query above — that flag is also
+  // true during the silent 60s background poll, which would make the "Test
+  // AI" button appear busy/disabled every minute with no user interaction.
+  const [aiChecking, setAiChecking] = useState(false);
 
   const telegramStatusAction = async () => settingsApi.telegramStatus();
-  const updatePrivacySettings = async (_args: Record<string, unknown>) => ({});
+
+  const { data: privacySettings } = useQuery({
+    queryKey: ["privacy-settings", user?.id],
+    queryFn: () => privacyApi.get(user!.id),
+    enabled: Boolean(user?.id),
+  });
+
+  const updatePrivacySettings = async (args: Partial<Record<PrivacyScope, boolean>>) => {
+    if (!user?.id) {
+      throw new Error("Geen ingelogde gebruiker");
+    }
+    const result = await privacyApi.update(user.id, args);
+    await queryClient.invalidateQueries({ queryKey: ["privacy-settings", user.id] });
+    return result;
+  };
+
   const auditLogs: any[] = [];
-  const privacySettings = undefined as any;
 
   const [syncing, setSyncing] = useState<SyncTarget | null>(null);
   const [pendingBusyId, setPendingBusyId] = useState<string | null>(null);
@@ -265,20 +283,37 @@ export default function SettingsPage() {
   };
 
   const handleAICheck = async () => {
-    const result = await refetchAiDiagnostics();
-    if (result.error) {
-      toastError(result.error instanceof Error ? result.error.message : "AI diagnose mislukt");
-      return;
-    }
-    if (result.data) {
-      success(result.data.ok ? "AI diagnose groen" : "AI diagnose heeft aandachtspunten");
+    setAiChecking(true);
+    try {
+      const result = await refetchAiDiagnostics();
+      if (result.error) {
+        toastError(result.error instanceof Error ? result.error.message : "AI diagnose mislukt");
+        return;
+      }
+      if (result.data) {
+        success(result.data.ok ? "AI diagnose groen" : "AI diagnose heeft aandachtspunten");
+      }
+    } finally {
+      setAiChecking(false);
     }
   };
 
   const togglePrivacyScope = async (scope: PrivacyScope) => {
     const current = privacySettings?.[scope] ?? true;
+    // The backend PUT /privacy upserts ALL five columns from the request
+    // body (no partial-patch support) — sending only the changed scope would
+    // silently reset every other scope to false. Always send the full,
+    // merged set of current values with just this one flipped.
+    const merged: Record<PrivacyScope, boolean> = {
+      finance: privacySettings?.finance ?? true,
+      habits: privacySettings?.habits ?? true,
+      notes: privacySettings?.notes ?? true,
+      email: privacySettings?.email ?? true,
+      account: privacySettings?.account ?? true,
+      [scope]: !current,
+    };
     try {
-      await updatePrivacySettings({ [scope]: !current } as Partial<Record<PrivacyScope, boolean>>);
+      await updatePrivacySettings(merged);
       success("Privacy voorkeur bijgewerkt");
     } catch (err) {
       toastError(err instanceof Error ? err.message : "Privacy voorkeur opslaan mislukt");

@@ -5,6 +5,27 @@ import { EmptyState, Panel, SectionHeader, StatusMetric, StatusPill, StatusRow }
 import { formatDateTime } from "./SettingsUtils";
 import type { PendingAIAction } from "@/lib/api";
 
+const SENSITIVE_ARG_KEY_PATTERN = /token|secret|password|apikey|authorization/i;
+
+// action.args is an arbitrary Record<string, unknown> populated from AI
+// tool-call arguments — rendering it verbatim in the UI could leak a secret
+// embedded in some future tool's parameters. Redact any key (at any depth)
+// that looks sensitive before display.
+function redactArgs(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(redactArgs);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, v]) => [
+        key,
+        SENSITIVE_ARG_KEY_PATTERN.test(key) ? "***" : redactArgs(v),
+      ])
+    );
+  }
+  return value;
+}
+
 export function SettingsRuntime({
   overview,
   overviewDevices,
@@ -100,7 +121,7 @@ export function SettingsPendingActions({
                         Toon exacte parameters
                       </summary>
                       <pre className="mt-1 max-h-48 overflow-auto rounded-lg border border-[var(--color-border)] bg-black/20 p-2 text-[11px] text-slate-400">
-                        {JSON.stringify(action.args, null, 2)}
+                        {JSON.stringify(redactArgs(action.args), null, 2)}
                       </pre>
                     </details>
                   )}
