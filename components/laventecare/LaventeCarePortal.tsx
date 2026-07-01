@@ -13,6 +13,7 @@ import {
   FileCheck2,
   FolderKanban,
   Gauge,
+  Handshake,
   LayoutDashboard,
   LifeBuoy,
   ListChecks,
@@ -26,18 +27,16 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StatChip } from "@/components/ui/StatChip";
 
 export type PortalView =
   | "overview"
-  | "customers"
+  | "pipeline"
   | "signals"
-  | "workstreams"
   | "commerce"
   | "mailbox"
-  | "delivery"
   | "operations"
-  | "knowledge"
-  | "gaps";
+  | "knowledge";
 
 export type PortalSection = {
   id: PortalView;
@@ -65,15 +64,12 @@ export type CapabilityRow = {
 
 export const portalIcons = {
   overview: LayoutDashboard,
-  customers: UsersRound,
+  pipeline: Handshake,
   signals: Sparkles,
-  workstreams: Workflow,
   commerce: ReceiptText,
   mailbox: MailCheck,
-  delivery: FolderKanban,
   operations: LifeBuoy,
   knowledge: BookOpenText,
-  gaps: Gauge,
 };
 
 export function LaventeCarePortalHero({
@@ -85,7 +81,7 @@ export function LaventeCarePortalHero({
   projects,
   invoices,
   documents,
-  onOpenGaps,
+  onOpenCapabilities,
 }: {
   capabilityRows: CapabilityRow[];
   companies: number;
@@ -95,7 +91,7 @@ export function LaventeCarePortalHero({
   projects: number;
   invoices: number;
   documents: number;
-  onOpenGaps: () => void;
+  onOpenCapabilities: () => void;
 }) {
   const ready = capabilityRows.filter((row) => row.status === "ready").length;
   const attention = capabilityRows.filter((row) => row.status === "attention").length;
@@ -112,7 +108,7 @@ export function LaventeCarePortalHero({
             </div>
             <button
               type="button"
-              onClick={onOpenGaps}
+              onClick={onOpenCapabilities}
               className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-[11px] font-bold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
             >
               <Gauge size={13} />
@@ -129,15 +125,26 @@ export function LaventeCarePortalHero({
         </div>
       </div>
 
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-        <PortalStat label="Klanten" value={companies} detail={`${contacts} contacten`} icon={UsersRound} />
-        <PortalStat label="Leads" value={leads} detail="sales" icon={Sparkles} />
-        <PortalStat label="Opdrachten" value={workstreams} detail="werkbank" icon={Workflow} />
-        <PortalStat label="Projecten" value={projects} detail="delivery" icon={FolderKanban} />
-        <PortalStat label="Facturen" value={invoices} detail="bunq" icon={Banknote} />
-        <PortalStat label="Docs" value={documents} detail="templates" icon={BookOpenText} />
-        <PortalStat label="Vulling" value={`${ready}/${capabilityRows.length}`} detail={attention || missing ? `${attention + missing} focus` : "op orde"} icon={Gauge} />
-      </div>
+      <details className="mt-3" open>
+        <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-normal text-slate-500 marker:hidden">
+          Kerncijfers
+        </summary>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <StatChip icon={UsersRound} label="Klanten" value={String(companies)} meta={`${contacts} contacten`} tone="amber" />
+          <StatChip icon={Sparkles} label="Leads" value={String(leads)} meta="sales" tone="indigo" />
+          <StatChip icon={Workflow} label="Opdrachten" value={String(workstreams)} meta="werkbank" tone="indigo" />
+          <StatChip icon={FolderKanban} label="Projecten" value={String(projects)} meta="delivery" tone="green" />
+          <StatChip icon={Banknote} label="Facturen" value={String(invoices)} meta="bunq" tone="amber" />
+          <StatChip icon={BookOpenText} label="Docs" value={String(documents)} meta="templates" tone="sky" />
+          <StatChip
+            icon={Gauge}
+            label="Vulling"
+            value={`${ready}/${capabilityRows.length}`}
+            meta={attention || missing ? `${attention + missing} focus` : "op orde"}
+            tone={attention || missing ? "rose" : "green"}
+          />
+        </div>
+      </details>
 
       {(attention > 0 || missing > 0) && (
         <div className="mt-3 hidden gap-2 lg:grid lg:grid-cols-3">
@@ -148,7 +155,7 @@ export function LaventeCarePortalHero({
               <button
                 key={row.label}
                 type="button"
-                onClick={onOpenGaps}
+                onClick={onOpenCapabilities}
                 className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2 text-left transition hover:bg-amber-500/10"
               >
                 <span className="min-w-0">
@@ -164,19 +171,6 @@ export function LaventeCarePortalHero({
   );
 }
 
-function PortalStat({ label, value, detail, icon: Icon }: { label: string; value: number | string; detail: string; icon: LucideIcon }) {
-  return (
-    <div className="min-w-[126px] flex-1 rounded-lg border border-white/10 bg-white/[0.03] p-3 sm:min-w-[142px]">
-      <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-[11px] font-semibold uppercase tracking-normal text-slate-500">{label}</p>
-        <Icon size={14} className="shrink-0 text-slate-500" />
-      </div>
-      <p className="mt-2 truncate text-xl font-bold text-white">{value}</p>
-      <p className="mt-1 truncate text-xs text-slate-500">{detail}</p>
-    </div>
-  );
-}
-
 export function PortalNavigation({
   sections,
   activeView,
@@ -187,7 +181,7 @@ export function PortalNavigation({
   onChange: (view: PortalView) => void;
 }) {
   return (
-    <nav className="z-20 -mx-4 border-y border-white/10 bg-[var(--color-background)]/92 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:sticky lg:top-[76px] lg:-mx-8 lg:px-8">
+    <nav className="relative z-20 -mx-4 border-y border-white/10 bg-[var(--color-background)]/92 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:sticky lg:top-[76px] lg:-mx-8 lg:px-8">
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {sections.map((section) => {
           const Icon = section.icon;
@@ -209,39 +203,14 @@ export function PortalNavigation({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold">{section.label}</span>
-                <span className="mt-0.5 hidden truncate text-[11px] uppercase tracking-normal text-slate-500 sm:block">{section.eyebrow}</span>
               </span>
               <span className="rounded-full border border-white/10 bg-black/20 px-1.5 py-0.5 text-[11px] font-bold text-slate-300 sm:px-2 sm:text-xs">{section.count}</span>
             </button>
           );
         })}
       </div>
+      <div className="pointer-events-none absolute right-0 top-2 bottom-3 w-8 bg-gradient-to-l from-[var(--color-background)] to-transparent sm:right-6 lg:right-8" />
     </nav>
-  );
-}
-
-export function PortalWorkspaceHeader({ section }: { section?: PortalSection }) {
-  if (!section) return null;
-  const Icon = section.icon;
-  return (
-    <div className="glass min-w-0 p-3 sm:p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-200">
-            <Icon size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{section.eyebrow}</p>
-            <h2 className="mt-1 truncate text-xl font-bold text-white">{section.label}</h2>
-            <p className="mt-1 hidden max-w-3xl text-sm leading-6 text-slate-400 sm:block">{section.description}</p>
-          </div>
-        </div>
-        <span className="inline-flex h-9 w-fit items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-xs font-bold text-slate-300">
-          <CircleDashed size={14} />
-          {section.count}
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -305,7 +274,7 @@ export function PortalInsightRail({
         {attentionRows.length > 0 ? (
           <button
             type="button"
-            onClick={() => onChange("gaps")}
+            onClick={() => onChange("overview")}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 transition hover:bg-rose-500/15"
           >
             <AlertTriangle size={14} />
@@ -488,16 +457,6 @@ export function CapabilityMatrix({
           </button>
         ))}
       </div>
-      {!expanded && capabilityRows.length > visibleRows.length ? (
-        <button
-          type="button"
-          onClick={() => onOpenView?.("gaps")}
-          className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-bold text-slate-200 transition hover:bg-white/[0.08]"
-        >
-          <ListChecks size={14} />
-          Volledige dekking bekijken
-        </button>
-      ) : null}
     </section>
   );
 }

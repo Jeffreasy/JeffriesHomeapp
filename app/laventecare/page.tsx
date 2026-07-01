@@ -42,9 +42,7 @@ import { LaventeCareProjectModal } from "@/components/laventecare/LaventeCarePro
 import { LaventeCareWorkstreamModal } from "@/components/laventecare/LaventeCareWorkstreamModal";
 import { LaventeCareCustomerDossier } from "@/components/laventecare/LaventeCareCustomerDossier";
 import { LaventeCareSignalsView } from "@/components/laventecare/LaventeCareSignalsView";
-import { LaventeCareCustomersView } from "@/components/laventecare/LaventeCareCustomersView";
-import { LaventeCareFunnelView } from "@/components/laventecare/LaventeCareFunnelView";
-import { LaventeCareWorkstreamsView } from "@/components/laventecare/LaventeCareWorkstreamsView";
+import { LaventeCarePipelineView } from "@/components/laventecare/LaventeCarePipelineView";
 import { LaventeCareOperationsView } from "@/components/laventecare/LaventeCareOperationsView";
 import { LaventeCareKnowledgeView } from "@/components/laventecare/LaventeCareKnowledgeView";
 import { LaventeCareBillingView } from "@/components/laventecare/LaventeCareBillingView";
@@ -55,7 +53,6 @@ import {
   PortalInsightRail,
   PortalNavigation,
   PortalRoadmapPanel,
-  PortalWorkspaceHeader,
   portalIcons,
   type CapabilityRow,
   type PortalSection,
@@ -253,7 +250,7 @@ export default function LaventeCarePage() {
               ? "attention"
               : "missing",
         owner: "CRM",
-        view: "customers",
+        view: "pipeline",
         score:
           companies.length > 0 && contacts.length > 0
             ? 100
@@ -295,7 +292,7 @@ export default function LaventeCarePage() {
         detail: `${totalWorkstreams} opdrachten, ${activeWorkstreams.length} actief`,
         status: totalWorkstreams > 0 ? "ready" : "attention",
         owner: "Werkbank",
-        view: "workstreams",
+        view: "pipeline",
         score: 100,
         priority: totalWorkstreams > 0 ? "laag" : "middel",
         nextStep:
@@ -311,7 +308,7 @@ export default function LaventeCarePage() {
         detail: `${activeProjects.length} actieve projecten`,
         status: activeProjects.length > 0 ? "ready" : "attention",
         owner: "Delivery",
-        view: "delivery",
+        view: "pipeline",
         score: 100,
         priority: activeProjects.length > 0 ? "laag" : "middel",
         nextStep:
@@ -378,7 +375,7 @@ export default function LaventeCarePage() {
             ? "ready"
             : "attention",
         owner: "Dossier",
-        view: "customers",
+        view: "pipeline",
         score: 100,
         priority:
           dossierDocuments.length > 0 || activityEvents.length > 0
@@ -481,12 +478,12 @@ export default function LaventeCarePage() {
         tone: "sky",
       },
       {
-        id: "customers",
-        label: "Klanten",
-        eyebrow: "CRM basis",
-        description: "Klantdossiers, contactpersonen en relatiecontext.",
-        count: `${companies.length}`,
-        icon: portalIcons.customers,
+        id: "pipeline",
+        label: "Klanten & Delivery",
+        eyebrow: "Pipeline",
+        description: "Klantdossiers, leads, projecten en opdrachten in een werkstroom.",
+        count: `${companies.length + activeLeads.length + totalWorkstreams + activeProjects.length}`,
+        icon: portalIcons.pipeline,
         tone: "amber",
       },
       {
@@ -496,15 +493,6 @@ export default function LaventeCarePage() {
         description: "Nieuwe matches, open acties en follow-ups.",
         count: `${businessSignals.length + actionItems.length + followUps.length}`,
         icon: portalIcons.signals,
-        tone: "violet",
-      },
-      {
-        id: "workstreams",
-        label: "Opdrachten",
-        eyebrow: "Werkbank",
-        description: "Kleine klussen, adviestrajecten en tussenwerk.",
-        count: `${totalWorkstreams}`,
-        icon: portalIcons.workstreams,
         tone: "violet",
       },
       {
@@ -526,15 +514,6 @@ export default function LaventeCarePage() {
         tone: mailbox?.summary.configured ? "emerald" : "amber",
       },
       {
-        id: "delivery",
-        label: "Delivery",
-        eyebrow: "Projecten",
-        description: "Leads naar projecten, fasering en waarde.",
-        count: `${activeLeads.length + activeProjects.length}`,
-        icon: portalIcons.delivery,
-        tone: "emerald",
-      },
-      {
         id: "operations",
         label: "Operations",
         eyebrow: "Governance",
@@ -552,23 +531,12 @@ export default function LaventeCarePage() {
         icon: portalIcons.knowledge,
         tone: "sky",
       },
-      {
-        id: "gaps",
-        label: "Gatenlijst",
-        eyebrow: "Klantdekking",
-        description:
-          "Welke bedrijfsfuncties staan live, half live of missen nog.",
-        count: `${capabilityRows.filter((row) => row.status !== "ready").length}`,
-        icon: portalIcons.gaps,
-        tone: "rose",
-      },
     ],
     [
       actionItems.length,
       activeLeads.length,
       activeProjects.length,
       businessSignals.length,
-      capabilityRows,
       companies.length,
       followUps.length,
       invoices.length,
@@ -584,10 +552,6 @@ export default function LaventeCarePage() {
       totalWorkstreams,
     ],
   );
-
-  const activePortalSection =
-    portalSections.find((section) => section.id === activeView) ??
-    portalSections[0];
 
   const closeCompanyForm = () => {
     setShowCompanyForm(false);
@@ -1599,7 +1563,7 @@ export default function LaventeCarePage() {
           projects={activeProjects.length}
           invoices={invoices.length}
           documents={summary.documents}
-          onOpenGaps={() => setActiveView("gaps")}
+          onOpenCapabilities={() => setActiveView("overview")}
         />
 
         <PortalNavigation
@@ -1623,8 +1587,6 @@ export default function LaventeCarePage() {
           </div>
 
           <section className="order-1 min-w-0 space-y-4">
-            <PortalWorkspaceHeader section={activePortalSection} />
-
             {activeView === "overview" ? (
               <div className="space-y-5">
                 <LaventeCareBusinessCommandCenter
@@ -1641,15 +1603,35 @@ export default function LaventeCarePage() {
                   capabilityRows={capabilityRows}
                   onOpenView={setActiveView}
                 />
+                <details className="glass min-w-0 overflow-hidden">
+                  <summary className="cursor-pointer list-none p-4 text-sm font-bold text-white marker:hidden">
+                    Volledige capability matrix
+                    {capabilityRows.filter((row) => row.status !== "ready").length > 0
+                      ? ` (${capabilityRows.filter((row) => row.status !== "ready").length} focus)`
+                      : ""}
+                  </summary>
+                  <div className="space-y-5 border-t border-white/10 p-4">
+                    <CapabilityMatrix
+                      capabilityRows={capabilityRows}
+                      expanded
+                      onOpenView={setActiveView}
+                    />
+                    <PortalRoadmapPanel
+                      onOpenCommerce={() => setActiveView("commerce")}
+                      onOpenOperations={() => setActiveView("operations")}
+                      onOpenKnowledge={() => setActiveView("knowledge")}
+                    />
+                  </div>
+                </details>
               </div>
             ) : null}
 
-            {activeView === "customers" ? (
-              <LaventeCareCustomersView
+            {activeView === "pipeline" ? (
+              <LaventeCarePipelineView
                 companies={companies}
                 contacts={contacts}
+                workstreams={workstreams}
                 activeLeads={activeLeads}
-                activeWorkstreams={workstreams}
                 activeProjects={activeProjects}
                 dossierDocuments={dossierDocuments}
                 onShowCompanyForm={openNewCompanyForm}
@@ -1660,6 +1642,17 @@ export default function LaventeCarePage() {
                 onOpenDossier={(company) =>
                   setSelectedCompanyId(company._id ?? company.id)
                 }
+                processingLead={processingLead}
+                processingProject={processingProject}
+                handleLeadStatus={handleLeadStatus}
+                handleLeadToProject={handleLeadToProject}
+                handleProjectStatus={handleProjectStatus}
+                onShowProjectForm={() => setShowProjectForm(true)}
+                activeWorkstreamCount={activeWorkstreams.length}
+                processingWorkstream={processingWorkstream}
+                onShowWorkstreamForm={() => setShowWorkstreamForm(true)}
+                handleWorkstreamStatus={handleWorkstreamStatus}
+                handleWorkstreamToProject={handleWorkstreamToProject}
               />
             ) : null}
 
@@ -1673,18 +1666,6 @@ export default function LaventeCarePage() {
                 handleCreateActionFromSignal={handleCreateActionFromSignal}
                 handleConvertSignalToLead={handleConvertSignalToLead}
                 handleCompleteAction={handleCompleteAction}
-              />
-            ) : null}
-
-            {activeView === "workstreams" ? (
-              <LaventeCareWorkstreamsView
-                workstreams={workstreams}
-                projects={activeProjects}
-                activeWorkstreamCount={activeWorkstreams.length}
-                processingWorkstream={processingWorkstream}
-                onShowWorkstreamForm={() => setShowWorkstreamForm(true)}
-                handleWorkstreamStatus={handleWorkstreamStatus}
-                handleWorkstreamToProject={handleWorkstreamToProject}
               />
             ) : null}
 
@@ -1745,19 +1726,6 @@ export default function LaventeCarePage() {
               />
             ) : null}
 
-            {activeView === "delivery" ? (
-              <LaventeCareFunnelView
-                activeLeads={activeLeads}
-                activeProjects={activeProjects}
-                processingLead={processingLead}
-                processingProject={processingProject}
-                handleLeadStatus={handleLeadStatus}
-                handleLeadToProject={handleLeadToProject}
-                handleProjectStatus={handleProjectStatus}
-                onShowProjectForm={() => setShowProjectForm(true)}
-              />
-            ) : null}
-
             {activeView === "operations" ? (
               <LaventeCareOperationsView
                 recentDecisions={recentDecisions}
@@ -1789,21 +1757,6 @@ export default function LaventeCarePage() {
                 dossierAdviceError={dossierAdviceError}
                 onRetryDossierAdvice={() => { void refetchDossierAdvice(); }}
               />
-            ) : null}
-
-            {activeView === "gaps" ? (
-              <div className="space-y-5">
-                <CapabilityMatrix
-                  capabilityRows={capabilityRows}
-                  expanded
-                  onOpenView={setActiveView}
-                />
-                <PortalRoadmapPanel
-                  onOpenCommerce={() => setActiveView("commerce")}
-                  onOpenOperations={() => setActiveView("operations")}
-                  onOpenKnowledge={() => setActiveView("knowledge")}
-                />
-              </div>
             ) : null}
           </section>
         </div>
