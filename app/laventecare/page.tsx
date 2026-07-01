@@ -2,6 +2,8 @@
 
 import { FormEvent, useState, useMemo } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ApiError } from "@/lib/api";
 import {
   LAVENTECARE_DOCUMENT_TOTAL,
   toLaventeCareSeedDocuments,
@@ -136,6 +138,7 @@ export default function LaventeCarePage() {
   } = useLaventeCare();
 
   const { success, error: toastError } = useToast();
+  const { openConfirm } = useConfirm();
   const [showCompanyForm, setShowCompanyForm] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
   const [showLeadForm, setShowLeadForm] = useState(false);
@@ -1000,8 +1003,23 @@ export default function LaventeCarePage() {
     }
   };
 
+  const leadClosingStatuses: Record<string, string> = {
+    verloren: "Lead sluiten als verloren? Dit verwijdert de lead uit de actieve funnel en kan nergens in de UI meer teruggedraaid worden.",
+    gediskwalificeerd: "Lead sluiten als niet-fit? Dit verwijdert de lead uit de actieve funnel en kan nergens in de UI meer teruggedraaid worden.",
+  };
+
   const handleLeadStatus = async (lead: LeadItem, status: string) => {
     if (!lead._id) return;
+    const confirmMessage = leadClosingStatuses[status];
+    if (confirmMessage) {
+      const confirmed = await openConfirm({
+        title: "Lead sluiten",
+        message: confirmMessage,
+        confirmLabel: "Sluiten",
+        variant: "danger",
+      });
+      if (!confirmed) return;
+    }
     setProcessingLead(`${lead._id}:${status}`);
     try {
       await updateLeadMut.mutateAsync({ id: lead._id, status });
@@ -1025,8 +1043,8 @@ export default function LaventeCarePage() {
         samenvatting: lead.pijnpunt ?? undefined,
       });
       success("Lead omgezet naar project");
-    } catch {
-      toastError("Lead converteren is mislukt");
+    } catch (err) {
+      toastError(err instanceof ApiError ? err.message : "Lead converteren is mislukt");
     } finally {
       setProcessingLead(null);
     }
