@@ -32,7 +32,14 @@ import type {
   MailInboxItem,
 } from "@/components/laventecare/LaventeCareTypes";
 
-const closedWorkstreamStatuses = new Set(["afgerond", "done", "gesloten", "gearchiveerd", "omgezet_project"]);
+// Mirrors the backend's shared lead/project/workstream terminal-status vocabulary
+// (isClosedStatus in store/laventecare.go) — used to filter a full, unfiltered
+// fetch down to "active" client-side instead of relying on the cockpit's capped
+// (max 8) pre-filtered arrays.
+const closedLcStatuses = new Set([
+  "afgerond", "done", "gesloten", "gearchiveerd", "omgezet_project",
+  "gewonnen", "verloren", "gediskwalificeerd", "geannuleerd",
+]);
 
 export function useLaventeCare() {
   const queryClient = useQueryClient();
@@ -58,6 +65,18 @@ export function useLaventeCare() {
   const { data: allWorkstreamsData } = useQuery({
     queryKey: ["laventecare", "workstreams", "all"],
     queryFn: () => laventecareApi.listWorkstreams({ includeClosed: true, limit: 100 }),
+    staleTime: 15_000,
+  });
+
+  const { data: allLeadsData } = useQuery({
+    queryKey: ["laventecare", "leads", "all"],
+    queryFn: () => laventecareApi.listLeads({ limit: 100 }),
+    staleTime: 15_000,
+  });
+
+  const { data: allProjectsData } = useQuery({
+    queryKey: ["laventecare", "projects", "all"],
+    queryFn: () => laventecareApi.listProjects({ limit: 100 }),
     staleTime: 15_000,
   });
 
@@ -351,23 +370,29 @@ export function useLaventeCare() {
   const invoiceLines = useMemo(() => (billing?.invoiceLines ?? []) as InvoiceLineItem[], [billing]);
   const activeLeads = useMemo(
     () =>
-      (cockpit?.activeLeads ?? []).map((l) => ({
+      (allLeadsData
+        ? allLeadsData.filter((lead) => !closedLcStatuses.has(lead.status))
+        : cockpit?.activeLeads ?? []
+      ).map((l) => ({
         ...l,
         _id: l.id,
         fitScore: l.fit_score ?? undefined,
         volgendeStap: l.volgende_stap ?? undefined,
         volgendeActieDatum: l.volgende_actie_datum ?? undefined,
       })) as LeadItem[],
-    [cockpit]
+    [allLeadsData, cockpit]
   );
   const activeProjects = useMemo(
     () =>
-      (cockpit?.activeProjects ?? []).map((p) => ({
+      (allProjectsData
+        ? allProjectsData.filter((project) => !closedLcStatuses.has(project.status))
+        : cockpit?.activeProjects ?? []
+      ).map((p) => ({
         ...p,
         _id: p.id,
         waardeIndicatie: p.waarde_indicatie ?? undefined,
       })) as ProjectItem[],
-    [cockpit]
+    [allProjectsData, cockpit]
   );
   const workstreams = useMemo(
     () =>
@@ -383,7 +408,7 @@ export function useLaventeCare() {
     [allWorkstreamsData, cockpit]
   );
   const activeWorkstreams = useMemo(
-    () => workstreams.filter((workstream) => !closedWorkstreamStatuses.has(workstream.status)),
+    () => workstreams.filter((workstream) => !closedLcStatuses.has(workstream.status)),
     [workstreams]
   );
   const businessSignals = useMemo(

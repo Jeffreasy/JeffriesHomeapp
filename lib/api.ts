@@ -1455,8 +1455,20 @@ export const laventecareApi = {
     apiFetch<{ status: string }>(`/laventecare/leads/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   convertLeadToProject: (id: string, data: { naam: string; fase?: string; status?: string; samenvatting?: string }) =>
     apiFetch<LCProject>(`/laventecare/leads/${id}/convert`, { method: "POST", body: JSON.stringify(data) }),
-  listProjects: () =>
-    apiFetch<LCProject[]>("/laventecare/projects"),
+  listLeads: (params?: { limit?: number; companyId?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.limit) search.set("limit", String(params.limit));
+    if (params?.companyId) search.set("companyId", params.companyId);
+    const query = search.toString();
+    return apiFetch<LCLead[]>(`/laventecare/leads${query ? `?${query}` : ""}`);
+  },
+  listProjects: (params?: { limit?: number; companyId?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.limit) search.set("limit", String(params.limit));
+    if (params?.companyId) search.set("companyId", params.companyId);
+    const query = search.toString();
+    return apiFetch<LCProject[]>(`/laventecare/projects${query ? `?${query}` : ""}`);
+  },
   createProject: (data: Partial<LCProject> & { company_name?: string; website?: string }) =>
     apiFetch<LCProject>("/laventecare/projects", { method: "POST", body: JSON.stringify(data) }),
   updateProject: (id: string, data: Partial<LCProject>) =>
