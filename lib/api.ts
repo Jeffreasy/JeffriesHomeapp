@@ -295,6 +295,8 @@ export interface PersonalEventMutationResult {
   pendingProcessed?: number;
   syncError?: string;
   syncMessage?: string;
+  /** True when syncError can never succeed on retry (e.g. editing a Google-generated birthday event). */
+  permanent?: boolean;
 }
 
 export interface PersonalEventRow {

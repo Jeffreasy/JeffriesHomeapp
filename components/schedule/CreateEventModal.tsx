@@ -259,6 +259,11 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
       const result = await personalEventsApi.upsert(row);
       if (result.instantSync) {
         success(editEvent ? "Afspraak direct bijgewerkt in Google Calendar" : "Afspraak direct gesynchroniseerd met Google Calendar");
+      } else if (result.permanent) {
+        toast(
+          "Afspraak lokaal opgeslagen, maar kan niet naar Google gesynchroniseerd worden (vermoedelijk een automatisch Google-event, zoals een verjaardag). Pas dit aan in Google Agenda/Contacten zelf.",
+          "error"
+        );
       } else {
         toast(result.syncError
           ? "Afspraak opgeslagen; Google sync blijft in de wachtrij."

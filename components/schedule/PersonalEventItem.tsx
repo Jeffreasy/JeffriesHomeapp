@@ -62,6 +62,8 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
       const result = await personalEventsApi.updateStatus(event.userId, event.eventId, nextStatus);
       if (result.instantSync || nextStatus === "VERWIJDERD") {
         success(nextStatus === "PendingDelete" ? "Afspraak direct verwijderd uit Google Calendar" : "Afspraak verwijderd");
+      } else if (result.permanent) {
+        error("Kan niet worden verwijderd via Google (vermoedelijk een automatisch Google-event, zoals een verjaardag). Pas dit aan in Google Agenda/Contacten zelf.");
       } else {
         toast(result.syncError
           ? "Afspraak gemarkeerd; verwijderen blijft in de wachtrij."
