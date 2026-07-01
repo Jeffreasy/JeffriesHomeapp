@@ -418,7 +418,7 @@ export function NoteEditor({
     () => buildEventOptionGroups(eventOptions, linkedEventId),
     [eventOptions, linkedEventId],
   );
-  const laventeCareContextOptions = useLaventeCareBusinessContextOptions();
+  const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
   const eventById = useMemo(() => {
     const map = new Map<string, PersonalEvent>();
     for (const event of eventOptions) {

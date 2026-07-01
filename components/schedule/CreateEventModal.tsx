@@ -90,7 +90,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   const [symbolTouched,   setSymbolTouched]   = useState(false);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
-  const laventeCareContextOptions = useLaventeCareBusinessContextOptions();
+  const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
 
   const reset = useCallback(() => {
     setTitel(""); setStartDatum(defaultDate); setEindDatum(defaultDate);

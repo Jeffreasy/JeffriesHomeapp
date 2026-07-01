@@ -19,7 +19,7 @@ export function BusinessContextPicker({
   label = "Business context",
   compact = false,
 }: BusinessContextPickerProps) {
-  const options = useLaventeCareBusinessContextOptions();
+  const { options, isError } = useLaventeCareBusinessContextOptions();
   const normalized = normalizeBusinessContext(value);
 
   const selectedKey = getBusinessContextOptionKey(normalized);
@@ -77,6 +77,11 @@ export function BusinessContextPicker({
             </optgroup>
           )}
         </select>
+        {isError && (
+          <p className="mt-1.5 text-[11px] text-amber-500">
+            Klantdossiers konden niet geladen worden — lijst kan onvolledig zijn.
+          </p>
+        )}
       </div>
     </div>
   );

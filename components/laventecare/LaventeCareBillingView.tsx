@@ -251,7 +251,7 @@ export function LaventeCareBillingView({
       setTimeForm(emptyBillingTimeForm);
       success("Urenregel vastgelegd");
     } catch {
-      return;
+      toastError("Urenregel vastleggen is mislukt");
     }
   };
 
@@ -290,7 +290,7 @@ export function LaventeCareBillingView({
       setQuoteForm(emptyBillingQuoteForm);
       success("Offerteconcept aangemaakt");
     } catch {
-      return;
+      toastError("Offerte aanmaken is mislukt");
     }
   };
 
@@ -340,7 +340,7 @@ export function LaventeCareBillingView({
         "Factuurconcept aangemaakt. Maak daarna het Bunq betaalverzoek en koppel de factuur in Mailbox.",
       );
     } catch {
-      return;
+      toastError("Factuur aanmaken is mislukt");
     }
   };
 

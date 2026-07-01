@@ -37,7 +37,7 @@ const closedWorkstreamStatuses = new Set(["afgerond", "done", "gesloten", "gearc
 export function useLaventeCare() {
   const queryClient = useQueryClient();
 
-  const { data: cockpit, isLoading: cockpitLoading } = useQuery({
+  const { data: cockpit, isLoading: cockpitLoading, isError: cockpitError } = useQuery({
     queryKey: ["laventecare", "cockpit"],
     queryFn: () => laventecareApi.cockpit(),
     staleTime: 15_000,
@@ -472,6 +472,7 @@ export function useLaventeCare() {
 
   return {
     cockpitLoading,
+    cockpitError,
     billingLoading,
     mailboxLoading,
     dossierAdviceLoading,

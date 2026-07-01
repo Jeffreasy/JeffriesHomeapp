@@ -13,7 +13,7 @@ import { businessContextLabel, enrichNoteDraft, getPrimaryWorkspaceContext, pars
 
 export function QuickNote() {
   const { notes, create, isLoading } = useNotes();
-  const laventeCareContextOptions = useLaventeCareBusinessContextOptions();
+  const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
 

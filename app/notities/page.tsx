@@ -58,7 +58,7 @@ export default function NotitiesPage() {
   const { diensten } = useSchedule();
   const { events: agendaEvents, upcoming: upcomingAgendaEvents } = usePersonalEvents({ diensten });
   const { openConfirm } = useConfirm();
-  const laventeCareContextOptions = useLaventeCareBusinessContextOptions();
+  const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
 
   // ── Tab state ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<NotesTab>("collection");
