@@ -12,7 +12,7 @@ import { usePrivacy } from "@/hooks/usePrivacy";
 import { useSalary } from "@/hooks/useSalary";
 import { useSchedule } from "@/hooks/useSchedule";
 import { type FocusAttention, focusApi } from "@/lib/api";
-import { type DienstRow } from "@/lib/schedule";
+import { normalizeTime, type DienstRow } from "@/lib/schedule";
 import { calculateScheduleSalaryForecast } from "@/lib/salaryForecast";
 import {
   formatCurrency,
@@ -73,8 +73,14 @@ function addDaysIso(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+// normalizeTime pads single-digit hours (e.g. a "9:00" from an unpadded CSV
+// import) before the key is used in string comparisons below — without it, a
+// 09:00 shift stored as "9:00" would sort AFTER "09:00" lexicographically
+// (since '9' > '0'), letting a currently-active shift fail the "now" check or
+// vanish from the 3-day timeline window entirely. Reuses the same helper the
+// rooster page already relies on for this exact reason (lib/schedule.ts).
 function timelineKey(date: string, time = "00:00") {
-  return `${date} ${time || "00:00"}`;
+  return `${date} ${normalizeTime(time, "00:00")}`;
 }
 
 function normalizeEndKey(date: string, startTime: string, endDate?: string, endTime?: string) {
@@ -197,7 +203,13 @@ function makeHabitItems(todayHabits: ReturnType<typeof useHabits>["todayHabits"]
   });
 }
 
-function localAttention(conflictCount: number, eventsPending: number): FocusAttention[] {
+// Conflicts have no backend equivalent, so stay local. A "pending sync" item is
+// deliberately NOT generated here — the backend's buildFocusAttention already
+// emits one ("personal-pending") from the identical personal_events pending-
+// status count, and since uniqueAttention() only dedups by exact id, a second,
+// differently-worded local item for the same condition used to double up as
+// two attention cards for one real fact.
+function localAttention(conflictCount: number): FocusAttention[] {
   const items: FocusAttention[] = [];
   if (conflictCount > 0) {
     items.push({
@@ -206,16 +218,6 @@ function localAttention(conflictCount: number, eventsPending: number): FocusAtte
       severity: "high",
       title: "Agenda conflicten",
       detail: `${conflictCount} afspraak/afspraken vragen aandacht`,
-      href: "/agenda",
-    });
-  }
-  if (eventsPending > 0) {
-    items.push({
-      id: "local-agenda-pending",
-      domain: "agenda",
-      severity: "medium",
-      title: "Lokale agenda wachtrij",
-      detail: `${eventsPending} afspraak/afspraken staan lokaal in de wachtrij`,
       href: "/agenda",
     });
   }
@@ -314,10 +316,10 @@ export function useFocusData() {
   const attention = useMemo(
     () =>
       uniqueAttention([
-        ...localAttention(personal.withConflicts.length, personal.pending.length),
+        ...localAttention(personal.withConflicts.length),
         ...(summaryQuery.data?.attention ?? []),
       ]),
-    [personal.pending.length, personal.withConflicts.length, summaryQuery.data?.attention],
+    [personal.withConflicts.length, summaryQuery.data?.attention],
   );
 
   const onlineDevices = devices.filter((device) => device.status === "online").length;
@@ -338,7 +340,13 @@ export function useFocusData() {
       total: summaryQuery.data?.health.devicesTotal ?? devices.length,
       online: summaryQuery.data?.health.devicesOnline ?? onlineDevices,
       on: summaryQuery.data?.health.devicesOn ?? onDevices,
-      bridgeOnline: summaryQuery.data?.health.bridgeOnline ?? onlineDevices > 0,
+      // The backend deliberately derives bridge liveness from a dedicated
+      // heartbeat, NOT per-device status (which only updates via sporadic UDP
+      // posts and stays stale while the bridge is actively polling — see the
+      // comment on FocusHandler.focusHealth). Falling back to "any device
+      // reports online" here would reintroduce that exact stale signal, so
+      // default to false (not live) rather than guess while data is loading.
+      bridgeOnline: summaryQuery.data?.health.bridgeOnline ?? false,
     },
     schedule: {
       nextDienst: schedule.nextDienst,
@@ -371,6 +379,10 @@ export function useFocusData() {
     business: summaryQuery.data?.business,
     generatedAt: summaryQuery.data?.generatedAt,
     sync: summaryQuery.data?.sync,
+    // On an unattended 24/7 kiosk, a sustained backend outage must look
+    // different from an ordinary loading flicker - surface this so panels can
+    // show a distinct error state instead of being stuck on "Laden" forever.
+    summaryError: summaryQuery.isError,
     isLoading:
       !dateInfo ||
       summaryQuery.isLoading ||

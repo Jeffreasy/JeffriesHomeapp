@@ -208,7 +208,7 @@ function addDaysIso(iso: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function normalizeTime(time: string | undefined, fallback: string): string {
+export function normalizeTime(time: string | undefined, fallback: string): string {
   if (!time) return fallback;
   const match = time.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return fallback;

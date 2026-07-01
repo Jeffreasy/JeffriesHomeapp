@@ -218,14 +218,17 @@ function SystemPanel({
   devices,
   finance,
   sync,
+  summaryError,
   nextAppointment,
 }: {
   devices: { total: number; online: number; on: number; bridgeOnline: boolean };
   finance: { value: string; hidden: boolean; meta: string };
   sync?: FocusSyncSummary;
+  summaryError?: boolean;
   nextAppointment: string;
 }) {
-  const syncValue = [sync?.schedule.status ?? "laden", sync?.gmail.status ?? "laden"].join(" / ");
+  const syncFallback = summaryError ? "fout" : "laden";
+  const syncValue = [sync?.schedule.status ?? syncFallback, sync?.gmail.status ?? syncFallback].join(" / ");
   return (
     <section className={`${PANEL} h-full min-h-[250px] p-4 xl:min-h-0`}>
       <PanelHeader icon="shield" label="Systeemlijn" value={devices.bridgeOnline ? "Live" : "Aandacht"} />
@@ -238,7 +241,7 @@ function SystemPanel({
       <div className="mt-3 space-y-2">
         <InfoRow label="Netto" value={finance.value} meta={finance.hidden ? "Privacy actief" : finance.meta} />
         <InfoRow label="Afspraak" value={nextAppointment} />
-        <InfoRow label="Sync" value={syncValue} />
+        <InfoRow label="Sync" value={syncValue} tone={summaryError ? "rose" : undefined} />
       </div>
     </section>
   );
@@ -403,10 +406,11 @@ function HabitNotePanel({
   );
 }
 
-function BusinessPanel({ business }: { business?: FocusBusinessStatus }) {
+function BusinessPanel({ business, summaryError }: { business?: FocusBusinessStatus; summaryError?: boolean }) {
+  const headerValue = business ? `${business.activeProjects} projecten` : summaryError ? "Fout" : "Laden";
   return (
     <section className={`${PANEL} h-full min-h-[230px] p-4 xl:min-h-0 xl:p-3.5`}>
-      <PanelHeader icon="business" label="LaventeCare" value={business ? `${business.activeProjects} projecten` : "Laden"} />
+      <PanelHeader icon="business" label="LaventeCare" value={headerValue} />
       <div className="mt-4 grid grid-cols-2 gap-2 xl:mt-3 xl:grid-cols-4 xl:gap-1.5">
         <Metric label="Opdrachten" value={`${business?.activeWorkstreams ?? 0}`} tone="blue" />
         <Metric label="Acties" value={`${business?.openActions ?? 0}`} tone={(business?.overdueActions ?? 0) > 0 ? "rose" : "green"} />
@@ -448,12 +452,12 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "a
   );
 }
 
-function InfoRow({ label, value, meta }: { label: string; value: string; meta?: string }) {
+function InfoRow({ label, value, meta, tone }: { label: string; value: string; meta?: string; tone?: "rose" }) {
   return (
     <div className="rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <p className="shrink-0 text-xs text-slate-500">{label}</p>
-        <p className="min-w-0 truncate text-sm font-semibold text-white sm:text-right">{value}</p>
+        <p className={`min-w-0 truncate text-sm font-semibold sm:text-right ${tone === "rose" ? "text-rose-300" : "text-white"}`}>{value}</p>
       </div>
       {meta && <p className="mt-1 truncate text-xs text-slate-600 sm:text-right">{meta}</p>}
     </div>
@@ -516,6 +520,7 @@ export default function FocusPage() {
             devices={focus.devices}
             finance={focus.finance}
             sync={focus.sync}
+            summaryError={focus.summaryError}
             nextAppointment={formatNextAppointmentMeta(focus.personal.nextAppointment, todayIso)}
           />
         </div>
@@ -529,7 +534,7 @@ export default function FocusPage() {
         </div>
 
         <div className="order-6 xl:col-start-3 xl:row-start-3 xl:min-h-0">
-          <BusinessPanel business={focus.business} />
+          <BusinessPanel business={focus.business} summaryError={focus.summaryError} />
         </div>
       </main>
     </div>
