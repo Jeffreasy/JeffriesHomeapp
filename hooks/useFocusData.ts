@@ -46,6 +46,13 @@ export type FocusNoteItem = {
   href: string;
 };
 
+export type FocusAttentionNote = {
+  id: string;
+  title: string;
+  kind: "verlopen" | "vandaag" | "triage";
+  deadline: string | null;
+};
+
 export type FocusHabitItem = {
   id: string;
   title: string;
@@ -374,6 +381,22 @@ export function useFocusData() {
   const focusNotes = useMemo(() => makeFocusNotes(activeNotes, dateInfo?.todayIso), [dateInfo?.todayIso, activeNotes]);
   const habitItems = useMemo(() => makeHabitItems(habits.todayHabits), [habits.todayHabits]);
 
+  // Voeding voor de in-place "Notities met aandacht"-modal: dezelfde drie
+  // categorieën die het backend-attention-item telt (verlopen/vandaag/triage).
+  const attentionNotes = useMemo<FocusAttentionNote[]>(() => {
+    const todayKey = dateInfo?.todayIso;
+    if (!todayKey) return [];
+    const rank = { verlopen: 0, vandaag: 1, triage: 2 } as const;
+    const out: FocusAttentionNote[] = [];
+    for (const note of activeNotes) {
+      const deadline = note.deadline ? note.deadline.slice(0, 10) : null;
+      const triage = Boolean((note as NoteRecord & { triage_flag?: boolean }).triage_flag);
+      const kind = deadline && deadline < todayKey ? "verlopen" : deadline === todayKey ? "vandaag" : triage ? "triage" : null;
+      if (kind) out.push({ id: note.id, title: titleFromNote(note), kind, deadline });
+    }
+    return out.sort((a, b) => rank[a.kind] - rank[b.kind] || (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"));
+  }, [activeNotes, dateInfo?.todayIso]);
+
   const salaryForecast = useMemo(
     () =>
       calculateScheduleSalaryForecast(schedule.diensten, dateInfo?.period, {
@@ -461,6 +484,11 @@ export function useFocusData() {
     rawEvents: personal.upcoming,
     rawDiensten: schedule.upcoming,
     refetchPersonal: personal.refetch,
+    // In-place aandacht-modals (R4): conflicterende afspraken + hun meldingen,
+    // en de notities die het "Notities met aandacht"-item telt.
+    conflictEvents: personal.withConflicts,
+    conflictMap: personal.conflictMap,
+    attentionNotes,
     habitActions: {
       toggle: habits.toggle,
       pendingIds: habits.pendingHabitIds,

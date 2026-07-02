@@ -3,21 +3,31 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
+import { DailyChecklist } from "@/components/habits/DailyChecklist";
 import { useDevices, useLampCommand } from "@/hooks/useDevices";
-import type { PersonalEvent } from "@/hooks/usePersonalEvents";
+import { getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import {
   formatNextAppointmentMeta,
   formatTimelineMeta,
+  type FocusAttentionNote,
   type FocusHabitItem,
   type FocusTimelineItem,
   useFocusData,
 } from "@/hooks/useFocusData";
-import { notesApi, type DeviceCommand, type FocusAttention, type FocusBusinessStatus, type FocusSyncSummary } from "@/lib/api";
+import {
+  laventecareApi,
+  notesApi,
+  type DeviceCommand,
+  type FocusAttention,
+  type FocusBusinessStatus,
+  type FocusSyncSummary,
+  type LCActionItem,
+} from "@/lib/api";
 import type { DienstRow } from "@/lib/schedule";
 import { CUSTOM_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
 import { cn } from "@/lib/utils";
@@ -406,7 +416,18 @@ function TimelinePanel({
 
 /* ─── Aandacht ───────────────────────────────────────────────────────────── */
 
-function AttentionPanel({ items, isLoading }: { items: FocusAttention[]; isLoading?: boolean }) {
+function AttentionPanel({
+  items,
+  isLoading,
+  inPlaceIds,
+  onOpen,
+}: {
+  items: FocusAttention[];
+  isLoading?: boolean;
+  /** Kaarten met een in-place modal (geen paginanavigatie, geen pijl). */
+  inPlaceIds: ReadonlySet<string>;
+  onOpen: (item: FocusAttention) => void;
+}) {
   return (
     <section className={`${PANEL} flex min-h-[220px] flex-1 flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
       <PanelHeader
@@ -419,6 +440,7 @@ function AttentionPanel({ items, isLoading }: { items: FocusAttention[]; isLoadi
           <SkeletonLines rows={3} />
         ) : items.length > 0 ? (
           items.map((item) => {
+            const inPlace = inPlaceIds.has(item.id);
             const content = (
               <div className={`rounded-xl border px-3.5 py-3 ${severityClasses(item.severity)}`}>
                 <div className="flex items-start gap-3">
@@ -431,16 +453,21 @@ function AttentionPanel({ items, isLoading }: { items: FocusAttention[]; isLoadi
                     <p className="text-sm font-bold text-white">{item.title}</p>
                     <p className="mt-1 text-xs leading-5 text-slate-300">{item.detail}</p>
                   </div>
-                  {/* Aandacht = "ga het afhandelen": deze kaarten verlaten bewust
-                      de kiosk — maak dat zichtbaar met een pijl. */}
-                  {item.href && (
-                    <span aria-hidden className="mt-0.5 shrink-0 text-sm font-semibold text-slate-500">
-                      →
-                    </span>
-                  )}
+                  {/* In-place kaarten openen een modal op de kiosk; de rest
+                      verlaat bewust de pagina — de pijl markeert dat verschil. */}
+                  <span aria-hidden className="mt-0.5 shrink-0 text-sm font-semibold text-slate-500">
+                    {inPlace ? "▸" : item.href ? "→" : ""}
+                  </span>
                 </div>
               </div>
             );
+            if (inPlace) {
+              return (
+                <button key={item.id} type="button" onClick={() => onOpen(item)} className="block w-full text-left transition-opacity hover:opacity-85">
+                  {content}
+                </button>
+              );
+            }
             return item.href ? (
               <Link key={item.id} href={item.href} className="block transition-opacity hover:opacity-85">
                 {content}
@@ -960,6 +987,212 @@ function NoteViewModal({ noteId, onClose }: { noteId: string | null; onClose: ()
   );
 }
 
+/* ─── Aandacht-modals: de tellers uitklappen zonder de kiosk te verlaten ─── */
+
+/** Agenda-conflicten: de conflicterende afspraken mét melding; een tik opent
+ *  direct de afspraak-modal (verplaatsen = de echte oplossing). */
+function ConflictListModal({
+  open,
+  events,
+  conflictMap,
+  onClose,
+  onOpenEvent,
+}: {
+  open: boolean;
+  events: PersonalEvent[];
+  conflictMap: Map<string, { level: string; message: string }>;
+  onClose: () => void;
+  onOpenEvent: (event: PersonalEvent) => void;
+}) {
+  return (
+    <Modal isOpen={open} onClose={onClose} title="Agenda conflicten" icon={<AppIcon name="warning" size="sm" />} maxWidth="lg" theme="rose">
+      <div className="space-y-1.5">
+        {events.length === 0 ? (
+          <EmptyLine title="Geen conflicten meer" detail="Alle afspraken passen naast je diensten." />
+        ) : (
+          events.map((event) => {
+            const conflict = conflictMap.get(event.eventId);
+            return (
+              <button
+                key={event.eventId}
+                type="button"
+                onClick={() => onOpenEvent(event)}
+                className="w-full rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-white/[0.055]"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 truncate text-sm font-bold text-white">{event.titel}</p>
+                  <span className="shrink-0 font-mono text-xs font-semibold text-slate-400">{getTimeLabel(event)}</span>
+                </div>
+                {conflict && <p className="mt-1 text-xs leading-5 text-rose-200">{conflict.message}</p>}
+                <p className="mt-1 text-[11px] text-slate-500">Tik om te verplaatsen of aan te passen</p>
+              </button>
+            );
+          })
+        )}
+      </div>
+      <ModalFooter href="/agenda" hrefLabel="Open agenda" onClose={onClose} />
+    </Modal>
+  );
+}
+
+const NOTE_KIND_CHIP: Record<FocusAttentionNote["kind"], string> = {
+  verlopen: "border-rose-400/30 bg-rose-500/10 text-rose-200",
+  vandaag: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+  triage: "border-sky-400/25 bg-sky-400/10 text-sky-200",
+};
+
+/** Notities met aandacht: verlopen/vandaag/triage; een tik opent de viewer. */
+function NotesAttentionModal({
+  open,
+  notes,
+  onClose,
+  onOpenNote,
+}: {
+  open: boolean;
+  notes: FocusAttentionNote[];
+  onClose: () => void;
+  onOpenNote: (id: string) => void;
+}) {
+  return (
+    <Modal isOpen={open} onClose={onClose} title="Notities met aandacht" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" theme="amber">
+      <div className="space-y-1.5">
+        {notes.length === 0 ? (
+          <EmptyLine title="Niets dat aandacht vraagt" detail="Geen verlopen, vandaag- of triage-notities." />
+        ) : (
+          notes.map((note) => (
+            <button
+              key={note.id}
+              type="button"
+              onClick={() => onOpenNote(note.id)}
+              className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-white/[0.055]"
+            >
+              <span className={cn("shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold capitalize", NOTE_KIND_CHIP[note.kind])}>
+                {note.kind}
+              </span>
+              <p className="min-w-0 truncate text-sm font-semibold text-white">{note.title}</p>
+            </button>
+          ))
+        )}
+      </div>
+      <ModalFooter href="/notities" hrefLabel="Open notities" onClose={onClose} />
+    </Modal>
+  );
+}
+
+/** Habits vandaag: de complete home-checklist (incl. stepper voor kwantitatieve
+ *  habits) hergebruikt in een kiosk-modal — afvinken zonder paginawissel. */
+function HabitsTodayModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Modal isOpen={open} onClose={onClose} title="Habits vandaag" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" theme="emerald">
+      <DailyChecklist />
+      <ModalFooter href="/habits" hrefLabel="Open habits" onClose={onClose} />
+    </Modal>
+  );
+}
+
+const LC_ACTION_DONE_STATUSES = new Set(["afgerond", "vervallen", "done", "closed"]);
+
+/** LaventeCare-acties (vandaag of verlopen): direct afvinkbaar, zelfde
+ *  status-mutatie als de LaventeCare-pagina ("afgerond"). */
+function LcActionsModal({ open, todayIso, onClose }: { open: boolean; todayIso?: string; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const { success, error } = useToast();
+  const [pendingId, setPendingId] = useState<string | null>(null);
+
+  const actionsQuery = useQuery({
+    queryKey: ["focus-lc-actions"],
+    queryFn: () => laventecareApi.listActions(),
+    enabled: open,
+    staleTime: 30_000,
+  });
+  const complete = useMutation({
+    mutationFn: (id: string) => laventecareApi.updateActionStatus(id, "afgerond"),
+    onSuccess: () => {
+      success("Actie afgerond");
+      void queryClient.invalidateQueries({ queryKey: ["focus-lc-actions"] });
+      void queryClient.invalidateQueries({ queryKey: ["focus-summary"] });
+    },
+    onError: () => error("Actie afronden is mislukt"),
+    onSettled: () => setPendingId(null),
+  });
+
+  // Zelfde venster als de teller op de kaart: open acties met een due-datum
+  // van vandaag of eerder.
+  const items = useMemo(() => {
+    if (!todayIso) return [];
+    return (actionsQuery.data ?? [])
+      .filter((action) => !LC_ACTION_DONE_STATUSES.has(action.status) && action.due_date && action.due_date.slice(0, 10) <= todayIso)
+      .sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""));
+  }, [actionsQuery.data, todayIso]);
+
+  const dueLabel = (action: LCActionItem) => {
+    const due = action.due_date?.slice(0, 10);
+    if (!due || !todayIso) return "";
+    if (due === todayIso) return "Vandaag";
+    const days = Math.max(1, Math.round((Date.parse(`${todayIso}T12:00:00`) - Date.parse(`${due}T12:00:00`)) / 86_400_000));
+    return `${days} ${days === 1 ? "dag" : "dagen"} te laat`;
+  };
+
+  return (
+    <Modal isOpen={open} onClose={onClose} title="LaventeCare acties" icon={<AppIcon name="business" size="sm" />} maxWidth="lg" theme="rose">
+      {actionsQuery.isLoading ? (
+        <SkeletonLines rows={4} />
+      ) : actionsQuery.isError ? (
+        <div className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-4 py-3">
+          <p className="text-sm font-bold text-white">Acties konden niet worden geladen</p>
+          <p className="mt-1 text-xs text-slate-300">Controleer de verbinding en probeer het opnieuw.</p>
+        </div>
+      ) : (
+        <div className="max-h-[52dvh] space-y-1.5 overflow-y-auto pr-1">
+          {items.length === 0 ? (
+            <EmptyLine title="Geen openstaande acties" detail="Niets is vandaag due of verlopen." />
+          ) : (
+            items.map((action) => {
+              const overdue = action.due_date ? action.due_date.slice(0, 10) < (todayIso ?? "") : false;
+              const pending = pendingId === action.id;
+              return (
+                <div key={action.id} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingId(action.id);
+                      complete.mutate(action.id);
+                    }}
+                    disabled={pending}
+                    aria-label={`${action.title} afronden`}
+                    title="Afronden"
+                    className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                      pending
+                        ? "cursor-wait border-white/10 bg-white/[0.04] text-slate-500"
+                        : "border-emerald-400/25 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20",
+                    )}
+                  >
+                    <AppIcon name="statusOk" size="xs" iconClassName={pending ? "animate-pulse" : undefined} />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-white">{action.title}</p>
+                    {action.summary && <p className="mt-0.5 truncate text-xs text-slate-500">{action.summary}</p>}
+                  </div>
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold",
+                      overdue ? "border-rose-400/30 bg-rose-500/10 text-rose-200" : "border-amber-400/25 bg-amber-400/10 text-amber-200",
+                    )}
+                  >
+                    {dueLabel(action)}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+      <ModalFooter href="/laventecare" hrefLabel="Open LaventeCare" onClose={onClose} />
+    </Modal>
+  );
+}
+
 /* ─── Pagina ─────────────────────────────────────────────────────────────── */
 
 // De focus-summary refresht elke 30s; ~2 gemiste intervallen betekent dat de
@@ -979,6 +1212,26 @@ export default function FocusPage() {
   const [eventModal, setEventModal] = useState<PersonalEvent | null>(null);
   const [dienstModal, setDienstModal] = useState<DienstRow | null>(null);
   const [noteModalId, setNoteModalId] = useState<string | null>(null);
+  const [attentionModal, setAttentionModal] = useState<"conflicts" | "notes" | "habits" | "lc-actions" | null>(null);
+
+  // Aandacht-kaarten met een in-place modal; de rest (bridge/sync/wachtrij/
+  // facturen) blijft bewust navigeren — dat zijn ga-het-regelen-acties elders.
+  const attentionInPlace = useMemo(
+    () =>
+      new Map<string, "conflicts" | "notes" | "habits" | "lc-actions">([
+        ["local-agenda-conflicts", "conflicts"],
+        ["notes-focus", "notes"],
+        ["habits-open", "habits"],
+        ["lc-overdue-actions", "lc-actions"],
+      ]),
+    [],
+  );
+  const attentionInPlaceIds = useMemo(() => new Set(attentionInPlace.keys()), [attentionInPlace]);
+  const openAttentionItem = (item: FocusAttention) => {
+    const modal = attentionInPlace.get(item.id);
+    if (modal) setAttentionModal(modal);
+    else if (item.href) router.push(item.href);
+  };
 
   const openTimelineItem = (item: FocusTimelineItem) => {
     if (item.kind === "afspraak") {
@@ -1069,7 +1322,7 @@ export default function FocusPage() {
         </div>
 
         <div className="order-2 flex min-h-0 flex-col gap-3 xl:order-none">
-          <AttentionPanel items={focus.attention} isLoading={focus.isLoading} />
+          <AttentionPanel items={focus.attention} isLoading={focus.isLoading} inPlaceIds={attentionInPlaceIds} onOpen={openAttentionItem} />
           <BusinessPanel business={focus.business} summaryError={focus.summaryError} />
         </div>
       </main>
@@ -1084,6 +1337,31 @@ export default function FocusPage() {
       />
       <DienstDetailModal dienst={dienstModal} todayIso={todayIso} onClose={() => setDienstModal(null)} />
       <NoteViewModal noteId={noteModalId} onClose={() => setNoteModalId(null)} />
+
+      {/* Aandacht-modals: tellers uitklappen op de kiosk zelf. Doorklikken naar
+          een detail (afspraak/notitie) sluit eerst de lijst-modal — geen
+          gestapelde dialogen met vechtende Escape-handlers. */}
+      <ConflictListModal
+        open={attentionModal === "conflicts"}
+        events={focus.conflictEvents}
+        conflictMap={focus.conflictMap}
+        onClose={() => setAttentionModal(null)}
+        onOpenEvent={(event) => {
+          setAttentionModal(null);
+          setEventModal(event);
+        }}
+      />
+      <NotesAttentionModal
+        open={attentionModal === "notes"}
+        notes={focus.attentionNotes}
+        onClose={() => setAttentionModal(null)}
+        onOpenNote={(id) => {
+          setAttentionModal(null);
+          setNoteModalId(id);
+        }}
+      />
+      <HabitsTodayModal open={attentionModal === "habits"} onClose={() => setAttentionModal(null)} />
+      <LcActionsModal open={attentionModal === "lc-actions"} todayIso={todayIso} onClose={() => setAttentionModal(null)} />
 
       {/* SR-aankondiging van optimistic habit-toggles (zelfde patroon als /habits). */}
       <p aria-live="polite" className="sr-only">
