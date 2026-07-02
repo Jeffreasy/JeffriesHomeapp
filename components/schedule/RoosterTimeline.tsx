@@ -8,11 +8,8 @@ import type { PersonalEvent } from "@/hooks/usePersonalEvents";
 import type { UnifiedWeek } from "@/lib/unified";
 import { cn } from "@/lib/utils";
 import { formatHours, pluralize } from "./RoosterUtils";
-
-function formatWeekNumber(weeknr: string) {
-  const [, week] = weeknr.split("-");
-  return week ? String(Number(week)) : weeknr;
-}
+// Gedeelde week-formatter (audit L8) — één bron voor "W27"/"Week 27".
+import { formatWeekNumber } from "./scheduleUtils";
 
 function formatDateRange(items: UnifiedWeek["items"]) {
   if (items.length === 0) return "";
@@ -27,12 +24,11 @@ function formatDateRange(items: UnifiedWeek["items"]) {
 
   if (!first || !last || first === last) return first ? format(first) : "";
   const sameMonth = first.slice(0, 7) === last.slice(0, 7);
-  return sameMonth ? `${format(first, false)}-${format(last)}` : `${format(first)}-${format(last)}`;
+  return sameMonth ? `${format(first, false)}–${format(last)}` : `${format(first)}–${format(last)}`;
 }
 
 export function WeekBlock({
   week,
-  index,
   open,
   onToggle,
   todayIso,
@@ -41,7 +37,6 @@ export function WeekBlock({
   onEditEvent,
 }: {
   week: UnifiedWeek;
-  index: number;
   open: boolean;
   onToggle: () => void;
   todayIso: string | null;
@@ -64,7 +59,8 @@ export function WeekBlock({
       <button
         type="button"
         onClick={onToggle}
-        aria-label={`Week ${weekNumber} ${open ? "inklappen" : "uitklappen"} (${index + 1})`}
+        aria-expanded={open}
+        aria-label={`Week ${weekNumber} ${open ? "inklappen" : "uitklappen"}`}
         className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus:outline-none focus:ring-2 focus:ring-amber-400/35 sm:px-4 sm:py-4"
       >
         <div className="flex min-w-0 items-start gap-3">

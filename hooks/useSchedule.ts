@@ -8,6 +8,7 @@ import {
   useGetScheduleMeta,
   postScheduleImport,
 } from "@/lib/api/generated/schedule/schedule";
+import { scheduleApi } from "@/lib/api";
 import {
   type DienstRow,
   type ScheduleMeta,
@@ -53,12 +54,24 @@ export function useSchedule() {
   // Force refetch trigger
   const [version, setVersion] = useState(0);
 
-  const { data: scheduleRaw, isLoading: loadingSchedule, refetch: refetchSchedule } = useGetSchedule(
+  const {
+    data: scheduleRaw,
+    isLoading: loadingSchedule,
+    isError: scheduleIsError,
+    error: scheduleError,
+    refetch: refetchSchedule,
+  } = useGetSchedule(
     { userId },
     { query: { enabled: !!userId } }
   );
-  
-  const { data: metaRaw, isLoading: loadingMeta, refetch: refetchMeta } = useGetScheduleMeta(
+
+  const {
+    data: metaRaw,
+    isLoading: loadingMeta,
+    isError: metaIsError,
+    error: metaError,
+    refetch: refetchMeta,
+  } = useGetScheduleMeta(
     { userId },
     { query: { enabled: !!userId } }
   );
@@ -94,6 +107,10 @@ export function useSchedule() {
     : null;
 
   const isLoading = loadingSchedule || loadingMeta;
+  // Failed ≠ empty (audit R2 DEEL 2 #2): expose fetch failures so the pages
+  // can render an error branch instead of the misleading empty-state CTA.
+  const isError = scheduleIsError || metaIsError;
+  const error: unknown = scheduleError ?? metaError ?? null;
 
   const invalidateAll = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/schedule"] });
@@ -106,7 +123,9 @@ export function useSchedule() {
 
   const clear = useCallback(async () => {
     if (!userId) return;
-    await postScheduleImport({ userId, fileName: "", rows: [] } as unknown as Parameters<typeof postScheduleImport>[0]);
+    // Echte wis-actie (audit N2): DELETE /schedule verwijdert alle diensten
+    // (204). De oude POST met lege rows werd door de backend hard geweigerd.
+    await scheduleApi.clear(userId);
     invalidateAll();
     setVersion(v => v + 1);
   }, [userId, invalidateAll]);
@@ -143,13 +162,9 @@ export function useSchedule() {
     }
   }, [userId, invalidateAll]);
 
-  const toggleStatus = async (event_id: string, status: string) => {
-    const dienst = diensten.find((d) => d.eventId === event_id);
-    if (!dienst) return;
-    setVersion((v) => v + 1);
-    await postScheduleImport({ userId, fileName: "status-update", rows: [{ ...dienst, status }] } as unknown as Parameters<typeof postScheduleImport>[0]);
-    invalidateAll();
-  };
+  // toggleStatus verwijderd (audit L dead-code): geen consumenten, en het
+  // her-importeerde één dienst met fileName "status-update" wat de rooster-meta
+  // (fileName/totalRows) zou overschrijven — een meta-clobber-footgun.
 
   const dienstenByDate = useMemo(() => {
     const map: Record<string, DienstRow[]> = {};
@@ -159,17 +174,25 @@ export function useSchedule() {
     return map;
   }, [diensten]);
 
+  // Afgeleiden memoizen (audit DEEL 2 #14): inline getNextDienst/getThisWeek/
+  // getUpcoming in de return gaven bij elke render verse array/object-identiteiten,
+  // wat downstream memo's en effecten onnodig hertriggerde.
+  const nextDienst = useMemo(() => getNextDienst(diensten), [diensten]);
+  const thisWeek   = useMemo(() => getThisWeek(diensten), [diensten]);
+  const upcoming   = useMemo(() => getUpcoming(diensten, 30), [diensten]);
+
   return {
     diensten,
     meta,
     dienstenByDate,
-    nextDienst: getNextDienst(diensten),
-    thisWeek:   getThisWeek(diensten),
-    upcoming:   getUpcoming(diensten, 30),
+    nextDienst,
+    thisWeek,
+    upcoming,
     isLoading,
+    isError,
+    error,
     importCsv,
     clear,
-    toggleStatus,
     refetch,
     version,
   };

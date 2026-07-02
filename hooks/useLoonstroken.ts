@@ -71,7 +71,7 @@ export function useLoonstroken() {
   const { user } = useUser();
   const userId = user?.id ?? "";
 
-  const { data: queryData, isLoading } = useGetLoonstroken(
+  const { data: queryData, isLoading, isError, error, refetch } = useGetLoonstroken(
     { userId },
     { query: { enabled: !!userId } }
   );
@@ -113,6 +113,11 @@ export function useLoonstroken() {
     totaalNetto,
     totaalBruto,
     isLoading,
+    // Failed ≠ empty: home/salaris consumers render an error branch instead of
+    // an empty state when the loonstroken-load fails (R2 DEEL 2 #1).
+    isError,
+    error,
+    refetch,
     count: records.length,
   };
 }

@@ -31,6 +31,17 @@ const SALARY_CONFIG = {
 
 type OrtKey = keyof typeof SALARY_CONFIG.ort;
 
+/**
+ * Publieke, read-only weergave van de forecast-aannames (S2): de PrognoseCard
+ * toont deze zodat de gebruiker weet waarop een prognose gebaseerd is.
+ */
+export const FORECAST_ASSUMPTIONS = {
+  contractUrenPerWeek: SALARY_CONFIG.contractUrenPerWeek,
+  deeltijdFactor: SALARY_CONFIG.deeltijdFactor,
+  reisafstandKmEnkel: SALARY_CONFIG.reisafstandKmEnkel,
+  fallbackLoonheffingPct: SALARY_CONFIG.fallbackLoonheffingPct,
+} as const;
+
 export type ScheduleSalaryForecast = {
   periode: string;
   nettoPrognose: number;
@@ -61,10 +72,13 @@ function getTarief(jaar: number, maand: number) {
   const peilDatum = new Date(jaar, maand - 1, 1);
   let actief = SALARY_CONFIG.tarieven[0];
   for (const entry of SALARY_CONFIG.tarieven) {
-    if (peilDatum >= new Date(entry.vanaf)) actief = entry;
+    const parts = entry.vanaf.split("-");
+    const vanafDatum = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    if (peilDatum >= vanafDatum) actief = entry;
   }
   return actief;
 }
+
 
 function parseDateTime(date: string, time: string) {
   const dateMatch = date?.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -248,6 +262,7 @@ function getCalibration(jaar: number, maand: number, calibration: SalaryCalibrat
     basisLoon: roundMoney(basisLoon),
     uurloonORT: roundMoney(uurloonORT),
     reiskostenKm: tarief.reiskostenKm,
+    tariefVanaf: tarief.vanaf,
     taxPct: effectiveTaxPct(exactLoonstrook ?? latestLoonstrook),
     calibrationLabel: exactLoonstrook
       ? "loonstrook dezelfde maand"
@@ -361,6 +376,8 @@ export function calculateScheduleSalaryRecord(
     ortUren: roundHours(ortUren),
     ortUrenDetail: JSON.stringify(ortUrenDetail),
     salarisCalibratie: calibration.calibrationLabel,
+    loonheffingPct: calibration.taxPct,
+    tariefVanaf: calibration.tariefVanaf,
   };
 }
 

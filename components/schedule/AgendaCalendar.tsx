@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   CalendarRange,
@@ -26,11 +27,14 @@ import { AppIcon } from "@/components/ui/AppIcon";
 import { resolveAppIconName } from "@/lib/symbols";
 import { getDisplayTitle } from "@/components/notes/NotesUtils";
 import { getLinkedEventId } from "@/components/notes/NoteAgendaUtils";
+import { compareAllDayFirst } from "@/components/schedule/scheduleUtils";
 
 type CalendarMode = "month" | "week";
 
 type AgendaCalendarProps = {
   events: PersonalEvent[];
+  /** Cold-load flag — shows placeholders instead of "geen items" (audit K3). */
+  isLoading?: boolean;
   notesByDate: Map<string, NoteRecord[]>;
   notesByEventId: Map<string, NoteRecord[]>;
   conflictMap: Map<string, ConflictInfo>;
@@ -68,6 +72,7 @@ const CALENDAR_LEGEND = [
 
 export function AgendaCalendar({
   events,
+  isLoading = false,
   notesByDate,
   notesByEventId,
   conflictMap,
@@ -84,13 +89,22 @@ export function AgendaCalendar({
   onEditEvent,
   onEditNote,
 }: AgendaCalendarProps) {
+  const router = useRouter();
   const days = useMemo(
     () => buildCalendarDays(cursorDate, selectedDate, todayIso, mode, events, notesByDate),
     [cursorDate, events, mode, notesByDate, selectedDate, todayIso],
   );
   const selectedDay = days.find((day) => day.date === selectedDate) ?? buildSingleDay(selectedDate, selectedDate, todayIso, events, notesByDate);
   const title = mode === "month" ? formatMonthTitle(cursorDate) : formatWeekTitle(days);
-  const activeEventCount = days.reduce((sum, day) => sum + day.events.length, 0);
+  // Unieke items tellen (audit L14): een meerdaagse afspraak staat in elke
+  // dagcel, maar is voor de gebruiker één "zichtbaar item".
+  const activeEventCount = useMemo(() => {
+    const ids = new Set<string>();
+    for (const day of days) {
+      for (const event of day.events) ids.add(`${event.kalender}:${event.eventId}`);
+    }
+    return ids.size;
+  }, [days]);
   const activeNoteCount = days.reduce((sum, day) => sum + day.notes.length, 0);
   const selectedLinkedNotes = new Set<string>();
   for (const event of selectedDay.events) {
@@ -106,6 +120,39 @@ export function AgendaCalendar({
     () => buildAgendaList(cursorDate, selectedDate, todayIso, events, notesByDate),
     [cursorDate, selectedDate, todayIso, events, notesByDate],
   );
+
+  // Maand→Agenda-tap: na het wisselen van weergave naar de getapte dag
+  // scrollen zodat de tap zichtbaar landt (audit M17). Ref i.p.v. state zodat
+  // het effect geen cascade-render veroorzaakt; het draait na elke commit en
+  // scrollt zodra de dagsectie gerenderd is.
+  // Initieel op vandaag geankerd (audit F7): de mobiele agendalijst begint
+  // anders op dag 1 van de maand. De geselecteerde dag (= vandaag) krijgt
+  // altijd een sectie, dus het anker bestaat vanaf de eerste render; op
+  // desktop is de lijst display:none en is scrollIntoView een no-op.
+  const pendingScrollDateRef = useRef<string | null>(todayIso);
+  useEffect(() => {
+    const target = pendingScrollDateRef.current;
+    if (mobileView !== "agenda" || !target) return;
+    document.getElementById(`day-${target}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    pendingScrollDateRef.current = null;
+  });
+
+  // Roving tabindex voor het desktop-grid (audit K4): één cel is tabbable,
+  // pijltjestoetsen verplaatsen de focus per dag/week.
+  const [focusedDate, setFocusedDate] = useState<string | null>(null);
+  const gridDates = useMemo(() => days.map((day) => day.date), [days]);
+  const rovingDate = focusedDate && gridDates.includes(focusedDate)
+    ? focusedDate
+    : gridDates.includes(selectedDate)
+      ? selectedDate
+      : gridDates[0];
+  const gridWeeks = useMemo(() => {
+    const weeks: CalendarDay[][] = [];
+    for (let index = 0; index < days.length; index += 7) {
+      weeks.push(days.slice(index, index + 7));
+    }
+    return weeks;
+  }, [days]);
 
   const goPrevious = () => {
     onCursorDateChange(mode === "month" ? addMonthsIso(cursorDate, -1) : addDaysIso(cursorDate, -7));
@@ -132,6 +179,39 @@ export function AgendaCalendar({
     onCursorDateChange(selectedDate);
   };
 
+  const handleGridKeyDown = (event: React.KeyboardEvent<HTMLDivElement>, date: string) => {
+    // Alleen toetsen afhandelen die op de gridcel zélf landen (audit R9):
+    // Enter/Space op een binnenliggende knop moet die knop activeren, niet de
+    // dagselectie kapen.
+    if (event.target !== event.currentTarget) return;
+    let target: string | null = null;
+    if (event.key === "ArrowRight") target = addDaysIso(date, 1);
+    else if (event.key === "ArrowLeft") target = addDaysIso(date, -1);
+    else if (event.key === "ArrowDown") target = addDaysIso(date, 7);
+    else if (event.key === "ArrowUp") target = addDaysIso(date, -7);
+    else if (event.key === "Home") target = gridDates[0];
+    else if (event.key === "End") target = gridDates[gridDates.length - 1];
+    else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectDate(date);
+      return;
+    }
+    if (!target) return;
+    event.preventDefault();
+    // Pijltoetsen over de maand-/weekgrens laten de kalender mee-navigeren i.p.v.
+    // dood te lopen op de rand (audit L a11y): valt het doel buiten het huidige
+    // grid, verschuif dan de cursor zodat de doeldatum in beeld komt.
+    if (!gridDates.includes(target)) {
+      onCursorDateChange(target);
+    }
+    setFocusedDate(target);
+    // Na een cursorwissel bestaat de cel pas na de volgende render — focus in een
+    // microtask zodat de nieuwe grid-cel er is.
+    requestAnimationFrame(() => {
+      document.getElementById(`agenda-cal-cell-${target}`)?.focus();
+    });
+  };
+
   return (
     <section className="rounded-xl border border-[var(--color-border)] bg-white/[0.025] shadow-[0_18px_60px_rgba(0,0,0,0.18)]">
       <div className="border-b border-[var(--color-border)] px-3 py-3 sm:px-4">
@@ -145,7 +225,7 @@ export function AgendaCalendar({
                 <h2 className="truncate text-sm font-semibold text-white">Kalender</h2>
                 {/* Hidden on phone — the count duplicates the page summary chips. */}
                 <p className="mt-0.5 hidden truncate text-xs text-slate-500 sm:block">
-                  {title} · {activeEventCount} zichtbare items · {activeNoteCount} notities
+                  {isLoading ? `${title} · laden…` : `${title} · ${activeEventCount} zichtbare items · ${activeNoteCount} notities`}
                 </p>
               </div>
             </div>
@@ -245,6 +325,12 @@ export function AgendaCalendar({
               </button>
             </div>
 
+            {/* Maand-/weekwissel hoorbaar aankondigen voor screenreaders — de
+                zichtbare titel is puur visueel (audit L a11y). */}
+            <span className="sr-only" role="status" aria-live="polite">
+              {title}
+            </span>
+
             <button
               type="button"
               onClick={() => onCreateEvent(selectedDate)}
@@ -265,15 +351,25 @@ export function AgendaCalendar({
             <div className="divide-y divide-[var(--color-border)]">
               {agendaSections.map((section) => {
                 const standaloneNotes = section.notes.filter((note) => !getLinkedEventId(note));
+                // Stabiel anker per dag (id) zodat een Maand→Agenda-tap hierheen kan scrollen (audit M17).
                 return (
-                  <div key={section.date}>
+                  <div key={section.date} id={`day-${section.date}`}>
                     <div
                       className={cn(
                         "flex items-center justify-between px-3 py-2",
-                        section.isToday ? "border-l-2 border-emerald-400/50 bg-emerald-500/[0.04]" : "bg-white/[0.015]",
+                        section.isToday
+                          ? "border-l-2 border-emerald-400/50 bg-emerald-500/[0.04]"
+                          : section.isSelected
+                            ? "border-l-2 border-sky-400/50 bg-sky-500/[0.05]"
+                            : "bg-white/[0.015]",
                       )}
                     >
-                      <span className={cn("text-xs font-semibold", section.isToday ? "text-emerald-200" : "text-white")}>
+                      <span
+                        className={cn(
+                          "text-xs font-semibold",
+                          section.isToday ? "text-emerald-200" : section.isSelected ? "text-sky-200" : "text-white",
+                        )}
+                      >
                         {formatListHeader(section.date)}{section.isToday ? " · vandaag" : ""}
                       </span>
                       <span className="text-[11px] text-slate-500">{formatDaySummary(section)}</span>
@@ -286,9 +382,10 @@ export function AgendaCalendar({
                           conflict={conflictMap.get(event.eventId)}
                           noteCount={notesByEventId.get(event.eventId)?.length ?? 0}
                           onClick={() => {
-                            // Diensten worden via het rooster beheerd, niet via de
-                            // afspraak-editor — alleen afspraken openen de modal.
-                            if (event.kalender !== "Rooster") onEditEvent(event);
+                            // Diensten worden via het rooster beheerd — een tap
+                            // navigeert daarheen (audit N3); afspraken openen de modal.
+                            if (event.kalender === "Rooster") router.push("/rooster");
+                            else onEditEvent(event);
                           }}
                         />
                       ))}
@@ -324,6 +421,12 @@ export function AgendaCalendar({
                 );
               })}
             </div>
+          ) : isLoading ? (
+            <div className="space-y-2 px-3 py-4" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-12 animate-pulse rounded-lg bg-white/[0.03]" />
+              ))}
+            </div>
           ) : (
             <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
               <CalendarRange size={26} className="text-slate-600" />
@@ -355,6 +458,8 @@ export function AgendaCalendar({
                   onSelect={() => {
                     selectDate(day.date);
                     setMobileView("agenda");
+                    // Na de weergavewissel naar deze dag scrollen (audit M17).
+                    pendingScrollDateRef.current = day.date;
                   }}
                 />
               ))}
@@ -373,32 +478,46 @@ export function AgendaCalendar({
 
       {/* ── Desktop (sm+): month grid + selected-day panel ───────────────── */}
       <div className="hidden grid-cols-1 sm:grid xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="min-w-0 border-b border-[var(--color-border)] xl:border-b-0 xl:border-r">
-          <div className="grid grid-cols-7 border-b border-[var(--color-border)] bg-black/10">
+        <div
+          role="grid"
+          aria-label={`Kalender, ${title}`}
+          className="min-w-0 border-b border-[var(--color-border)] xl:border-b-0 xl:border-r"
+        >
+          <div role="row" className="grid grid-cols-7 border-b border-[var(--color-border)] bg-black/10">
             {WEEKDAYS.map((day) => (
-              <div key={day} className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+              <div key={day} role="columnheader" className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider text-slate-600">
                 {day}
               </div>
             ))}
           </div>
 
-          <div className={cn("grid grid-cols-7", mode === "month" ? "auto-rows-[minmax(96px,1fr)] lg:auto-rows-[minmax(108px,1fr)]" : "auto-rows-[minmax(130px,1fr)]")}>
-            {days.map((day) => (
-              <CalendarDayCell
-                key={day.date}
-                day={day}
-                mode={mode}
-                conflictMap={conflictMap}
-                notesByEventId={notesByEventId}
-                onSelect={() => selectDate(day.date)}
-                onEditEvent={onEditEvent}
-              />
-            ))}
-          </div>
+          {gridWeeks.map((week) => (
+            <div
+              key={week[0]?.date}
+              role="row"
+              className={cn("grid grid-cols-7", mode === "month" ? "auto-rows-[minmax(96px,1fr)] lg:auto-rows-[minmax(108px,1fr)]" : "auto-rows-[minmax(130px,1fr)]")}
+            >
+              {week.map((day) => (
+                <CalendarDayCell
+                  key={day.date}
+                  day={day}
+                  mode={mode}
+                  conflictMap={conflictMap}
+                  notesByEventId={notesByEventId}
+                  isFocusTarget={day.date === rovingDate}
+                  onFocusCell={() => setFocusedDate(day.date)}
+                  onKeyDownCell={(event) => handleGridKeyDown(event, day.date)}
+                  onSelect={() => selectDate(day.date)}
+                  onEditEvent={onEditEvent}
+                />
+              ))}
+            </div>
+          ))}
         </div>
 
         <SelectedDayPanel
           day={selectedDay}
+          isLoading={isLoading}
           notes={dayNotes}
           notesByEventId={notesByEventId}
           conflictMap={conflictMap}
@@ -418,6 +537,9 @@ function CalendarDayCell({
   mode,
   conflictMap,
   notesByEventId,
+  isFocusTarget,
+  onFocusCell,
+  onKeyDownCell,
   onSelect,
   onEditEvent,
 }: {
@@ -425,6 +547,9 @@ function CalendarDayCell({
   mode: CalendarMode;
   conflictMap: Map<string, ConflictInfo>;
   notesByEventId: Map<string, NoteRecord[]>;
+  isFocusTarget: boolean;
+  onFocusCell: () => void;
+  onKeyDownCell: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onSelect: () => void;
   onEditEvent: (event: PersonalEvent) => void;
 }) {
@@ -432,9 +557,19 @@ function CalendarDayCell({
   const hiddenCount = Math.max(0, day.events.length - maxVisible);
 
   return (
+    // De hele cel is klikbaar om de dag te selecteren (audit K16); event-balkjes
+    // stoppen propagatie. Gridcell + roving tabindex voor toetsenbord (audit K4).
     <div
+      role="gridcell"
+      id={`agenda-cal-cell-${day.date}`}
+      aria-selected={day.isSelected}
+      aria-label={`${formatCompactDate(day.date)} — ${day.events.length} items`}
+      tabIndex={isFocusTarget ? 0 : -1}
+      onFocus={onFocusCell}
+      onKeyDown={onKeyDownCell}
+      onClick={onSelect}
       className={cn(
-        "group/day min-w-0 border-b border-r border-[var(--color-border)] p-1 transition-colors last:border-r-0 sm:p-2",
+        "group/day min-w-0 cursor-pointer touch-manipulation border-b border-r border-[var(--color-border)] p-1 transition-colors last:border-r-0 sm:p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400/50",
         day.isSelected ? "bg-sky-500/[0.055]" : "bg-white/[0.012] hover:bg-white/[0.025]",
         !day.inMonth && mode === "month" && "bg-black/10 opacity-55",
       )}
@@ -442,9 +577,10 @@ function CalendarDayCell({
       <div className="mb-1 flex items-center justify-between gap-1">
         <button
           type="button"
-          onClick={onSelect}
+          tabIndex={-1}
+          onClick={(event) => { event.stopPropagation(); onSelect(); }}
           className={cn(
-            "flex h-7 min-w-7 items-center justify-center rounded-lg px-1 text-xs font-semibold tabular-nums transition-colors sm:h-8 sm:min-w-8",
+            "flex h-7 min-w-7 touch-manipulation items-center justify-center rounded-lg px-1 text-xs font-semibold tabular-nums transition-colors sm:h-8 sm:min-w-8",
             day.isToday
               ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/20"
               : day.isSelected
@@ -495,7 +631,8 @@ function CalendarDayCell({
         {hiddenCount > 0 && (
           <button
             type="button"
-            onClick={onSelect}
+            tabIndex={-1}
+            onClick={(event) => { event.stopPropagation(); onSelect(); }}
             className="w-full truncate rounded-md px-1.5 py-1 text-left text-[10px] font-semibold text-slate-500 transition-colors hover:bg-white/[0.04] hover:text-slate-300"
           >
             +{hiddenCount} meer
@@ -524,6 +661,8 @@ function CalendarEventBar({
   const tone = getEventTone(event, hasConflict);
   const isRoster = event.kalender === "Rooster";
   const label = `${isRoster ? "Dienst" : "Afspraak"}: ${event.titel}, ${getTimeLabel(event)}, ${formatCompactDate(event.startDatum)}`;
+  // Klik-affordance in de tooltip (audit L5) — een balkje oogt als passieve tekst.
+  const titleHint = `${label} · klik om te bewerken`;
   const displayTitle = isRoster && event.shiftType ? event.shiftType : event.titel;
   const isCompactMonth = compact && mode === "month";
 
@@ -531,13 +670,16 @@ function CalendarEventBar({
     return (
       <button
         type="button"
-        onClick={onClick}
+        // Niet in de tab-volgorde (audit R9): de roving gridcel is de tab-stop;
+        // events zijn per toetsenbord bereikbaar via het geselecteerde-dag-paneel.
+        tabIndex={-1}
+        onClick={(event) => { event.stopPropagation(); onClick(); }}
         aria-label={label}
         className={cn(
-          "relative flex min-h-9 w-full min-w-0 flex-col items-start justify-center rounded-md border px-1 py-1 text-left transition-colors",
+          "relative flex min-h-9 w-full min-w-0 touch-manipulation flex-col items-start justify-center rounded-md border px-1 py-1 text-left transition-colors",
           tone.cell,
         )}
-        title={label}
+        title={titleHint}
       >
         {!event.heledag && event.startTijd && (
           <span className="w-full truncate text-[9px] font-bold leading-none tabular-nums">
@@ -545,7 +687,7 @@ function CalendarEventBar({
           </span>
         )}
         <span className="w-full truncate text-[9px] font-semibold leading-tight">
-          {event.heledag ? displayTitle : displayTitle}
+          {displayTitle}
         </span>
         {noteCount > 0 && <StickyNote size={8} className="absolute right-0.5 top-0.5 opacity-70" />}
       </button>
@@ -555,14 +697,16 @@ function CalendarEventBar({
   return (
     <button
       type="button"
-      onClick={onClick}
+      // Zie hierboven (audit R9): roving cel is de tab-stop in het grid.
+      tabIndex={-1}
+      onClick={(event) => { event.stopPropagation(); onClick(); }}
       aria-label={label}
       className={cn(
-        "flex w-full min-w-0 items-center rounded-md border text-left text-[11px] font-semibold transition-colors",
+        "flex w-full min-w-0 touch-manipulation items-center rounded-md border text-left text-[11px] font-semibold transition-colors",
         compact ? "min-h-7 gap-1 px-1" : "min-h-[26px] gap-1.5 px-1.5",
         tone.cell,
       )}
-      title={label}
+      title={titleHint}
     >
       <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)} />
       <span className="min-w-0 flex-1 truncate">
@@ -576,6 +720,7 @@ function CalendarEventBar({
 
 function SelectedDayPanel({
   day,
+  isLoading = false,
   notes,
   notesByEventId,
   conflictMap,
@@ -586,6 +731,7 @@ function SelectedDayPanel({
   onEditNote,
 }: {
   day: CalendarDay;
+  isLoading?: boolean;
   notes: NoteRecord[];
   notesByEventId: Map<string, NoteRecord[]>;
   conflictMap: Map<string, ConflictInfo>;
@@ -625,7 +771,13 @@ function SelectedDayPanel({
         </div>
       </div>
 
-      {day.events.length > 0 ? (
+      {isLoading && day.events.length === 0 ? (
+        <div className="space-y-2" aria-hidden="true">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-14 animate-pulse rounded-lg bg-white/[0.03]" />
+          ))}
+        </div>
+      ) : day.events.length > 0 ? (
         <div className="space-y-2">
           {day.events.map((event) => (
             <SelectedDayEvent
@@ -799,7 +951,7 @@ function AgendaListRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex min-h-14 w-full items-stretch gap-3 rounded-lg border border-l-[3px] px-3 py-2.5 text-left transition-colors",
+        "flex min-h-14 w-full touch-manipulation items-stretch gap-3 rounded-lg border border-l-[3px] px-3 py-2.5 text-left transition-colors",
         tone.panel,
         accent,
       )}
@@ -828,7 +980,8 @@ function AgendaListRow({
               <span className="truncate">{event.locatie}</span>
             </span>
           )}
-          {isMultiDay(event) && <span>· t/m {formatDateRange(event)}</span>}
+          {/* Alleen de einddatum — "t/m 2 jul – 5 jul" dupliceerde de range (audit L7). */}
+          {isMultiDay(event) && <span>· t/m {formatEndDateShort(event)}</span>}
         </span>
         {conflict && (
           <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-amber-300">
@@ -844,8 +997,8 @@ function AgendaListRow({
             {noteCount}
           </span>
         )}
-        {/* Diensten komen uit je rooster en zijn hier niet bewerkbaar — geen edit-chevron. */}
-        {!isRoster && <ChevronRight size={15} className="text-slate-600" />}
+        {/* Afspraken openen de editor; diensten navigeren naar /rooster (audit N3). */}
+        <ChevronRight size={15} className="text-slate-600" />
       </span>
     </button>
   );
@@ -873,7 +1026,7 @@ function MobileMonthDotsCell({
       aria-label={`${formatCompactDate(day.date)} — ${day.events.length} items`}
       aria-current={day.isToday ? "date" : undefined}
       className={cn(
-        "flex min-h-12 flex-col items-center gap-1 border-b border-r border-[var(--color-border)] py-1.5 transition-colors last:border-r-0",
+        "flex min-h-12 touch-manipulation flex-col items-center gap-1 border-b border-r border-[var(--color-border)] py-1.5 transition-colors last:border-r-0",
         day.isSelected ? "bg-sky-500/[0.06]" : "hover:bg-white/[0.03]",
         !day.inMonth && "opacity-40",
       )}
@@ -917,7 +1070,9 @@ function buildAgendaList(
   for (let index = 0; index < dayCount; index++) {
     const date = addDaysIso(monthStart, index);
     const day = buildSingleDay(date, selectedDate, todayIso, events, notesByDate, true);
-    if (day.events.length > 0 || day.notes.length > 0) sections.push(day);
+    // De geselecteerde dag krijgt óók een (lege) sectie met "+ Afspraak"-CTA,
+    // zodat een Maand→Agenda-tap op een lege dag zichtbaar landt (audit M17).
+    if (day.events.length > 0 || day.notes.length > 0 || day.isSelected) sections.push(day);
   }
   return sections;
 }
@@ -967,15 +1122,10 @@ function buildSingleDay(
     inMonth,
     isToday: date === todayIso,
     isSelected: date === selectedDate,
-    events: events.filter((event) => eventCoversDate(event, date)).sort(compareCalendarEvents),
+    // Gedeelde comparator met de tijdlijn (audit L6): hele-dag eerst, dan tijd.
+    events: events.filter((event) => eventCoversDate(event, date)).sort(compareAllDayFirst),
     notes: notesByDate.get(date) ?? [],
   };
-}
-
-function compareCalendarEvents(a: PersonalEvent, b: PersonalEvent) {
-  const allDayDelta = Number(Boolean(b.heledag)) - Number(Boolean(a.heledag));
-  if (allDayDelta !== 0) return allDayDelta;
-  return `${a.startTijd || "00:00"}-${a.titel}`.localeCompare(`${b.startTijd || "00:00"}-${b.titel}`, "nl");
 }
 
 function linkedNoteCount(events: PersonalEvent[], notesByEventId: Map<string, NoteRecord[]>) {
@@ -1084,7 +1234,15 @@ function formatWeekTitle(days: CalendarDay[]) {
   if (!first || !last) return "Week";
   const start = new Date(`${first}T12:00:00`).toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
   const end = new Date(`${last}T12:00:00`).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" });
-  return `${start} - ${end}`;
+  return `${start} – ${end}`;
+}
+
+/** "5 jul" — alleen de einddatum van een meerdaags event (audit L7). */
+function formatEndDateShort(event: PersonalEvent) {
+  const iso = getDisplayEndDate(event);
+  const date = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString("nl-NL", { day: "numeric", month: "short" });
 }
 
 function formatCompactDate(dateIso: string) {

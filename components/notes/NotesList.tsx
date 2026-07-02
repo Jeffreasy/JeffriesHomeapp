@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, Archive, CalendarClock, CheckCircle2, Inbox, Link2, NotebookPen, Pin, Plus, RotateCcw, Sparkles } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { NoteCard, type NoteBacklink } from "./NoteCard";
@@ -13,6 +14,7 @@ export function NotesList({
   displayed,
   isLoading,
   isError,
+  onRetry,
   viewMode,
   boardMode,
   sortMode,
@@ -35,6 +37,7 @@ export function NotesList({
   displayed: NoteRecord[];
   isLoading: boolean;
   isError?: boolean;
+  onRetry?: () => void;
   viewMode: ViewMode;
   boardMode: BoardMode;
   sortMode: SortMode;
@@ -49,14 +52,28 @@ export function NotesList({
   toggleComplete: (id: string) => void | Promise<void>;
   archive: (id: string) => void | Promise<void>;
   handleDelete: (id: string) => void | Promise<void>;
-  handleUpdateContent: (id: string, inhoud: string) => void | Promise<void>;
+  handleUpdateContent: (id: string, inhoud: string, expectedGewijzigd?: string) => void | Promise<void>;
+
   handleNavigateToNote: (title: string) => void;
   eventLabelById?: Map<string, string>;
   backlinksById?: Map<string, NoteBacklink[]>;
 }) {
+  // Minute-tick (low): deadline-chips ("Vandaag"/"Verlopen") en boardgroepen
+  // zijn dagafhankelijk — één re-render per minuut laat ze om middernacht
+  // doorrollen zonder interactie.
+  const [, setMinuteTick] = useState(0);
+  useEffect(() => {
+    const interval = window.setInterval(() => setMinuteTick((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
   const activeSort = SORT_OPTIONS.find((option) => option.id === sortMode) ?? SORT_OPTIONS[0];
   const boardGroups = buildBoardGroups(displayed, viewMode, noteScope);
   const mobileBoardGroups = boardGroups.filter((group) => group.notes.length > 0);
+  // K7: popLayout exit-animaties worden merkbaar traag op grote lijsten —
+  // boven ~60 zichtbare kaarten renderen we zonder AnimatePresence. (Volledige
+  // lijst-virtualisatie blijft een open punt.)
+  const animateCards = displayed.length <= 60;
 
   return (
     <section className="min-w-0 space-y-4">
@@ -66,7 +83,7 @@ export function NotesList({
           title={viewMode === "active" ? "Notitie-board" : viewMode === "completed" ? "Afgeronde notities" : "Archief"}
           subtitle={
             isLoading
-              ? "Laden..."
+              ? "Laden…"
               : `${displayed.length} zichtbaar · ${boardMode === "board" ? "board · gegroepeerd" : `grid · ${activeSort.label.toLowerCase()}`}`
           }
           action={
@@ -86,7 +103,17 @@ export function NotesList({
         <div role="alert" className="glass flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/[0.04] px-4 py-12 text-center">
           <AlertTriangle size={34} className="text-rose-400/70" />
           <p className="mt-4 font-semibold text-slate-200">Notities konden niet geladen worden</p>
-          <p className="mt-1 max-w-md text-sm text-slate-500">Controleer je verbinding — de lijst probeert automatisch opnieuw te laden.</p>
+          <p className="mt-1 max-w-md text-sm text-slate-500">Controleer je verbinding en probeer het opnieuw.</p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/15"
+            >
+              <RotateCcw size={14} />
+              Opnieuw proberen
+            </button>
+          )}
         </div>
       ) : isLoading ? (
         <div role="status" aria-live="polite" className="glass flex min-h-[260px] items-center justify-center p-4">
@@ -156,7 +183,7 @@ export function NotesList({
               >
                 <BoardGroupHeader group={group} />
                 <div className="mt-3 space-y-2.5">
-                  <AnimatePresence mode="popLayout">
+                  <CardsPresence animate={animateCards}>
                     {group.notes.map((note) => (
                       <NoteCard
                         key={note.id}
@@ -174,7 +201,7 @@ export function NotesList({
                         masked={privacyOn}
                       />
                     ))}
-                  </AnimatePresence>
+                  </CardsPresence>
                 </div>
               </section>
             ))}
@@ -189,7 +216,7 @@ export function NotesList({
                 <BoardGroupHeader group={group} />
 
                 <div className="mt-3 space-y-3">
-                  <AnimatePresence mode="popLayout">
+                  <CardsPresence animate={animateCards}>
                     {group.notes.length > 0 ? (
                       group.notes.map((note) => (
                         <NoteCard
@@ -213,7 +240,7 @@ export function NotesList({
                         Geen notities in deze kolom.
                       </div>
                     )}
-                  </AnimatePresence>
+                  </CardsPresence>
                 </div>
               </section>
             ))}
@@ -221,7 +248,7 @@ export function NotesList({
         </>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <AnimatePresence mode="popLayout">
+          <CardsPresence animate={animateCards}>
             {displayed.map((note) => (
               <NoteCard
                 key={note.id}
@@ -238,11 +265,17 @@ export function NotesList({
                 masked={privacyOn}
               />
             ))}
-          </AnimatePresence>
+          </CardsPresence>
         </div>
       )}
     </section>
   );
+}
+
+// K7: boven ~60 kaarten de popLayout exit-animaties overslaan.
+function CardsPresence({ animate, children }: { animate: boolean; children: ReactNode }) {
+  if (!animate) return <>{children}</>;
+  return <AnimatePresence mode="popLayout">{children}</AnimatePresence>;
 }
 
 function BoardGroupHeader({ group }: { group: BoardGroup }) {

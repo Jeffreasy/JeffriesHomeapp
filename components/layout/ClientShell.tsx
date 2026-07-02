@@ -31,8 +31,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar — hidden on mobile */}
       <Sidebar />
 
-      {/* Main content — min-w-0 prevents flex overflow bug on mobile */}
-      <div className="flex-1 min-w-0 pb-28 md:ml-64 md:pb-0">
+      {/* Main content — min-w-0 prevents flex overflow bug on mobile.
+          id="main" is the skip-link target from app/layout.tsx (M8). */}
+      <div id="main" className="flex-1 min-w-0 pb-28 md:ml-64 md:pb-0">
         {children}
       </div>
 

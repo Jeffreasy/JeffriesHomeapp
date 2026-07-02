@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { automationsApi, type AutomationRow } from "@/lib/api";
 import {
   type Automation,
@@ -31,6 +31,7 @@ function fromRow(row: AutomationRow): Automation {
 export function useAutomations() {
   const { user } = useUser();
   const userId = user?.id ?? "";
+  const queryClient = useQueryClient();
 
   const {
     data: docs = [],
@@ -83,10 +84,21 @@ export function useAutomations() {
 
   const toggle = useCallback(
     async (id: string) => {
-      await automationsApi.toggle(id);
+      // Optimistic: flip `enabled` direct in de cache, rollback bij fout.
+      const key = ["automations", userId];
+      const previous = queryClient.getQueryData<AutomationRow[]>(key);
+      queryClient.setQueryData<AutomationRow[]>(key, (old) =>
+        old?.map((row) => (row.id === id ? { ...row, enabled: !row.enabled } : row))
+      );
+      try {
+        await automationsApi.toggle(id);
+      } catch (err) {
+        if (previous) queryClient.setQueryData(key, previous);
+        throw err;
+      }
       fetchAutomations();
     },
-    [fetchAutomations]
+    [userId, queryClient, fetchAutomations]
   );
 
   const remove = useCallback(
@@ -101,10 +113,17 @@ export function useAutomations() {
     async (shiftType: ShiftType, times?: Partial<DienstWekkerTimes>) => {
       if (!userId) return 0;
       const groupTag = `dienst-wekker-${shiftType.toLowerCase()}`;
-      await automationsApi.deleteByGroup(userId, groupTag);
+      // Create-before-delete: bouw eerst het nieuwe pack op, en verwijder de
+      // oude stappen pas als álles gelukt is (per id, zodat de nieuwe entries
+      // de group-delete overleven). Faalt een create, dan ruimen we de
+      // zojuist aangemaakte entries op en blijft de oude wekker intact —
+      // nooit een half-geïnstalleerd alarm.
+      const oldIds = docs
+        .filter((row) => row.group_name === groupTag)
+        .map((row) => row.id);
       const pack = createDienstWekkerPack(shiftType, times);
-      // allSettled (not all): attempt every create even if one fails, so we don't
-      // abort mid-pack and leave a half-built wekker after the delete-by-group.
+      // allSettled (not all): attempt every create even if one fails, so we
+      // know exactly which entries exist and can roll them back.
       const results = await Promise.allSettled(
         pack.map((a) =>
           automationsApi.create(userId, {
@@ -117,14 +136,35 @@ export function useAutomations() {
           })
         )
       );
-      await fetchAutomations();
       const failed = results.filter((r) => r.status === "rejected").length;
       if (failed > 0) {
-        throw new Error(`${failed} van ${pack.length} wekker-onderdelen konden niet worden opgeslagen`);
+        // Rollback: verwijder de deels aangemaakte nieuwe entries.
+        const createdIds = results
+          .filter((r): r is PromiseFulfilledResult<AutomationRow> => r.status === "fulfilled")
+          .map((r) => r.value.id);
+        const cleanup = await Promise.allSettled(createdIds.map((id) => automationsApi.delete(id)));
+        await fetchAutomations();
+        // L8: alleen "intact gebleven" beloven als de rollback ook écht slaagde —
+        // anders staan er losse nieuwe stappen naast het oude profiel.
+        const cleanupFailed = cleanup.filter((r) => r.status === "rejected").length;
+        throw new Error(
+          cleanupFailed > 0
+            ? `${failed} van ${pack.length} wekker-onderdelen konden niet worden opgeslagen en het terugdraaien lukte ook niet volledig — controleer je wekkers, er kunnen dubbele stappen staan`
+            : `${failed} van ${pack.length} wekker-onderdelen konden niet worden opgeslagen — je oude wekkerprofiel is intact gebleven`
+        );
+      }
+      // Alles aangemaakt — nu pas de oude stappen verwijderen.
+      const deleteResults = await Promise.allSettled(oldIds.map((id) => automationsApi.delete(id)));
+      await fetchAutomations();
+      const deleteFailed = deleteResults.filter((r) => r.status === "rejected").length;
+      if (deleteFailed > 0) {
+        throw new Error(
+          `Nieuwe wekker opgeslagen, maar ${deleteFailed} oude stap(pen) konden niet worden verwijderd — controleer op dubbele wekkers`
+        );
       }
       return pack.length;
     },
-    [userId, fetchAutomations]
+    [userId, docs, fetchAutomations]
   );
 
   const removeDienstWekkerPack = useCallback(
@@ -141,5 +181,5 @@ export function useAutomations() {
   // so derive it from isFetching while the list is still empty).
   const isLoading = isFetching && automations.length === 0 && !isError;
 
-  return { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, isLoading, isError, refetch: fetchAutomations, lastCheck: null };
+  return { automations, add, update, addDienstWekkerPack, removeDienstWekkerPack, toggle, remove, isLoading, isError, refetch: fetchAutomations };
 }

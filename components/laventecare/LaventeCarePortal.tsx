@@ -354,7 +354,7 @@ export function CapabilityMatrix({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Bedrijfsfunctionaliteit</p>
-          <h3 className="mt-1 text-lg font-bold text-white">{expanded ? "Dekking en inrichting" : "Business readiness"}</h3>
+          <h3 className="mt-1 text-lg font-bold text-white">{expanded ? "Dekking en inrichting" : "Bedrijfsgereedheid"}</h3>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
             Per bedrijfsfunctie zie je of de flow klaar is, gevuld moet worden of echt nog niet is ingericht.
           </p>
@@ -388,7 +388,10 @@ export function CapabilityMatrix({
             <div className="h-full rounded-full bg-gradient-to-r from-sky-400 via-emerald-300 to-amber-300" style={{ width: `${Math.max(6, maturity)}%` }} />
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-500">
-            Alle kernflows zijn ingericht; de resterende signalen gaan over het vullen van echte bedrijfsdata en werkdiscipline.
+            {/* R3-11: alleen "alle kernflows zijn ingericht" beweren als dat écht zo is. */}
+            {attention + missing === 0
+              ? "Alle kernflows zijn ingericht; de resterende signalen gaan over het vullen van echte bedrijfsdata en werkdiscipline."
+              : `${attention + missing} bedrijfsfunctie(s) vragen nog aandacht; richt die in en vul echte bedrijfsdata om de volwassenheid te verhogen.`}
           </p>
         </div>
 
@@ -489,7 +492,7 @@ export function PortalRoadmapPanel({
     },
     {
       icon: FileCheck2,
-      title: "Dossier completeness",
+      title: "Dossiervolledigheid",
       body: "Per klant zichtbaar maken welke documenten, contactmomenten, projecten en acties nog ontbreken.",
       action: "Kennisbank",
       onClick: onOpenKnowledge,

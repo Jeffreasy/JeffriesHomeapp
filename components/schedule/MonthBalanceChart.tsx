@@ -31,8 +31,11 @@ export function MonthBalanceChart() {
     // Only fully completed months are meaningful: the running month is only
     // partially scheduled and future months are nearly empty, so comparing them
     // against a full-month norm would show a fake, massive shortfall.
-    const now = new Date();
-    const currentYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    // Amsterdam-gepind zoals elders in de app; device-lokale datum kan op reis
+    // een maand verschuiven rond de maandwissel.
+    const currentYm = new Date()
+      .toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" })
+      .slice(0, 7);
     const completed = months.filter(m => m.month < currentYm);
 
     // Last 6-12 completed months.

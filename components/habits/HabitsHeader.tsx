@@ -47,6 +47,7 @@ export function HabitsHeader({
               onClick={togglePrivacy}
               title={privacyOn ? "Habits tonen" : "Habits verbergen"}
               aria-label={privacyOn ? "Habits tonen" : "Habits verbergen"}
+              aria-pressed={privacyOn}
               className={cn(
                 "inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors",
                 privacyOn

@@ -116,7 +116,9 @@ function WorkstreamCard({
   const typeLabel = LAVENTECARE_WORKSTREAM_TYPES.find((item) => item.value === workstream.type)?.label ?? label(workstream.type);
   const highPriority = workstream.prioriteit === "hoog";
   const priorityTone = highPriority ? toneClasses.rose : toneClasses.violet;
-  const busy = processingWorkstream?.startsWith(`${id}:`);
+  // Per-item busy scoping: alleen de kaart waarvan een actie loopt disabled,
+  // niet alle sibling-opdrachten (mirrors LaventeCareFunnelView).
+  const busy = Boolean(processingWorkstream?.startsWith(`${id}:`));
   const linkedToProject = Boolean(workstream.project_id);
 
   return (
@@ -189,7 +191,7 @@ function WorkstreamCard({
               key={status.value}
               type="button"
               onClick={() => onStatus(workstream, { status: status.value })}
-              disabled={Boolean(processingWorkstream)}
+              disabled={busy}
               className={cn(
                 "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border px-2 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                 status.value === "afgerond"
@@ -206,10 +208,10 @@ function WorkstreamCard({
           <button
             type="button"
             onClick={() => onConvert(workstream)}
-            disabled={Boolean(processingWorkstream)}
+            disabled={busy}
             className="col-span-2 inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {busy && processingWorkstream === `${id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
+            {processingWorkstream === `${id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
             Project maken
           </button>
         ) : null}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Calendar, CalendarClock, CalendarDays, CheckCircle2, ChevronDown, Clock3, FileSpreadsheet, History, List, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -54,19 +55,20 @@ export function OverviewPanel({
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show">
-      <Panel className="overflow-hidden border border-white/10 bg-black/40 p-0">
-        <div className="min-w-0 border-b border-white/5 px-4 py-4 sm:px-6">
+      {/* Zachte huid i.p.v. brutalistische zwarte eilanden (audit F14). */}
+      <Panel className="overflow-hidden p-0">
+        <div className="min-w-0 border-b border-[var(--color-border)] px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <motion.div variants={itemVariants}>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Roosterstatus
               </p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-white sm:text-2xl">Werk, agenda en signalen</h2>
+              <h2 className="mt-1 text-xl font-bold tracking-tight text-white sm:text-2xl">Werk, agenda en signalen</h2>
             </motion.div>
             <motion.div variants={itemVariants}>
               <Link
                 href="/finance"
-                className="inline-flex h-9 items-center gap-2 border border-white/10 bg-black/60 px-4 text-xs font-black uppercase tracking-widest text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-4 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
               >
                 Finance
                 <ArrowRight size={14} />
@@ -86,15 +88,16 @@ export function OverviewPanel({
           <StatusMetric
             icon={Calendar}
             label="Volgende dienst"
-            value={nextDienst ? `${nextDienst.startTijd} - ${nextDienst.eindTijd}` : "Geen dienst"}
+            value={nextDienst ? `${nextDienst.startTijd}–${nextDienst.eindTijd}` : "Geen dienst"}
             sub={nextDienst ? `${nextDienst.dag}, ${new Date(`${nextDienst.startDatum}T12:00:00`).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}` : "Rooster rustig"}
             tone={nextDienst ? "indigo" : "slate"}
           />
+          {/* Stabiele betekenis: waarde = komende afspraken; vandaag in de sub (audit N6). */}
           <StatusMetric
             icon={CalendarDays}
             label="Agenda"
-            value={todayEventCount > 0 ? `${todayEventCount} vandaag` : `${eventCount} aankomend`}
-            sub="persoonlijke afspraken"
+            value={`${eventCount} komend`}
+            sub={`${todayEventCount} vandaag · persoonlijk`}
             tone={todayEventCount > 0 ? "green" : "blue"}
           />
           <StatusMetric
@@ -107,7 +110,7 @@ export function OverviewPanel({
         </motion.div>
 
         <motion.div variants={itemVariants} className="hidden px-5 py-4 sm:grid sm:grid-cols-3 sm:px-6 gap-0">
-          <MiniBreakdown label="Shifts" value={`V ${shifts["Vroeg"] ?? 0} / L ${shifts["Laat"] ?? 0}`} sub={`${shifts["Dienst"] ?? 0} dagdienst`} />
+          <MiniBreakdown label="Diensten" value={`V ${shifts["Vroeg"] ?? 0} / L ${shifts["Laat"] ?? 0}`} sub={`${shifts["Dienst"] ?? 0} dagdienst`} />
           <MiniBreakdown label="Team R." value={String(teams["R."] ?? 0)} sub="komende diensten" />
           <MiniBreakdown label="Team A." value={String(teams["A."] ?? 0)} sub="komende diensten" />
         </motion.div>
@@ -156,6 +159,14 @@ export function OverviewTab({
   metaSyncedAt?: string;
   thisMonthEvents: number;
 }) {
+  // "Toon alle N"-toggle voor de historie i.p.v. een stille slice(0,8) (audit N8).
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const visibleHistory = showAllHistory ? history : history.slice(0, 8);
+  const hiddenHistoryCount = history.length - visibleHistory.length;
+  // Op mobiel is de aside (afspraken/datakwaliteit/historie) inklapbaar onder de
+  // tijdlijn i.p.v. volledig verborgen (audit DEEL 2 #13).
+  const [showMobileAside, setShowMobileAside] = useState(false);
+
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
@@ -196,7 +207,6 @@ export function OverviewTab({
               <WeekBlock
                 key={week.weeknr}
                 week={week}
-                index={index}
                 open={isWeekOpen(week.weeknr, index)}
                 onToggle={() => toggleWeek(week.weeknr, index)}
                 todayIso={todayIso}
@@ -217,7 +227,26 @@ export function OverviewTab({
         )}
       </div>
 
-      <aside className="hidden space-y-5 md:block xl:sticky xl:top-32 xl:self-start">
+      {/* Mobiele toegang tot de aside — op md+ verborgen; de aside toont daar zelf. */}
+      <button
+        type="button"
+        onClick={() => setShowMobileAside((current) => !current)}
+        aria-expanded={showMobileAside}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] md:hidden"
+      >
+        <span className="flex items-center gap-2">
+          <CalendarDays size={15} className="text-slate-400" />
+          Afspraken, datakwaliteit &amp; historie
+        </span>
+        <ChevronDown size={16} className={cn("shrink-0 text-slate-500 transition-transform", showMobileAside && "rotate-180")} />
+      </button>
+
+      <aside
+        className={cn(
+          "space-y-5 md:block xl:sticky xl:top-32 xl:self-start",
+          showMobileAside ? "block" : "hidden",
+        )}
+      >
         <Panel>
           <SectionTitle
             icon={CalendarDays}
@@ -264,7 +293,7 @@ export function OverviewTab({
             <StatusRow
               icon={Zap}
               label="Wachtrij"
-              value={pendingEvents.length > 0 ? `${pendingEvents.length} pending` : "Geen pending acties"}
+              value={pendingEvents.length > 0 ? `${pendingEvents.length} in wachtrij` : "Geen wachtrij-acties"}
               tone={pendingEvents.length > 0 ? "indigo" : "green"}
             />
             <StatusRow icon={CalendarClock} label="Deze maand" value={pluralize(thisMonthEvents, "afspraak", "afspraken")} tone="slate" />
@@ -276,6 +305,7 @@ export function OverviewTab({
             <button
               type="button"
               onClick={() => setShowHistory((current) => !current)}
+              aria-expanded={showHistory}
               className="flex w-full items-center justify-between gap-3 text-left"
             >
               <SectionTitle
@@ -298,10 +328,25 @@ export function OverviewTab({
                   transition={{ duration: 0.2 }}
                   className="overflow-hidden"
                 >
-                  <div className="mt-4 space-y-2 opacity-70">
-                    {history.slice(0, 8).map((dienst) => (
+                  {/* Geen opacity-dimming op de hele lijst — expliciete tekstkleuren
+                      in DienstItem blijven AA-leesbaar (audit K15). */}
+                  <div className="mt-4 space-y-2">
+                    {visibleHistory.map((dienst) => (
                       <DienstItem key={dienst.eventId} dienst={dienst as never} afspraken={eventsByDate[dienst.startDatum]} />
                     ))}
+                    {history.length > 8 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllHistory((current) => !current)}
+                        aria-expanded={showAllHistory}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.05] hover:text-slate-200"
+                      >
+                        {showAllHistory ? "Toon minder" : `Toon alle ${history.length}`}
+                        {!showAllHistory && hiddenHistoryCount > 0 && (
+                          <span className="text-slate-600">(+{hiddenHistoryCount})</span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               )}

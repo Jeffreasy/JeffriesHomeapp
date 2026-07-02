@@ -37,6 +37,10 @@ export interface SalarisRecord {
   ortUren?: number;
   ortUrenDetail?: string;
   salarisCalibratie?: string;
+  /** Effectieve loonheffings-% waarmee de prognose gerekend is (S2). */
+  loonheffingPct?: number;
+  /** Ingangsdatum van het cao-tarief dat voor deze maand actief was (S2). */
+  tariefVanaf?: string;
 }
 
 function fromRow(r: ModelSalary): SalarisRecord {
@@ -69,7 +73,13 @@ export function useSalary() {
   const { user } = useUser();
   const userId = user?.id ?? "";
 
-  const { data: salaryRaw, isLoading } = useGetSalary({ userId }, { query: { enabled: !!userId } });
+  const {
+    data: salaryRaw,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useGetSalary({ userId }, { query: { enabled: !!userId } });
 
   const raw = useMemo(() => {
     return Array.isArray(salaryRaw?.data) ? salaryRaw.data : undefined;
@@ -101,6 +111,11 @@ export function useSalary() {
     totaalBruto,
     totaalNetto,
     isLoading,
+    // Failed ≠ empty: consumers must be able to tell "load failed" apart from
+    // "no salary records" (home dashboard error branches, R2 DEEL 2 #1).
+    isError,
+    error,
+    refetch,
     berekendOp: records[0]?.berekendOp ?? null,
     isNative: true,
   };

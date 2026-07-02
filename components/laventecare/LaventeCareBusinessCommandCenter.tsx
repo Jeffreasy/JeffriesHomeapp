@@ -16,7 +16,7 @@ import {
   LAVENTECARE_PROFILE,
 } from "@/lib/laventecare";
 import type { CompanyItem, DossierDocumentItem, LeadItem, ProjectItem, WorkstreamItem } from "./LaventeCareTypes";
-import { formatDate, formatMoney, label, projectFaseLabel, projectStatusLabel } from "./LaventeCareUtils";
+import { dossierDocumentViewerHref, formatDate, formatMoney, label, projectFaseLabel, projectStatusLabel } from "./LaventeCareUtils";
 
 const priorityDocuments = [
   "introductie",
@@ -160,22 +160,33 @@ export function LaventeCareBusinessCommandCenter({
   onLogDossierDocument: (payload: LaventeCareDossierDocumentLogPayload) => Promise<void>;
 }) {
   const [selectedContextKey, setSelectedContextKey] = useState<string | null>(null);
+  const [contextQuery, setContextQuery] = useState("");
   const documents = priorityDocuments
     .map((key) => LAVENTECARE_PDF_REGISTRY.find((document) => document.key === key))
     .filter(Boolean);
+  // M21: ALLE klanten/opdrachten/projecten/leads zijn kiesbaar (geen cap op 5)
+  // en er is niets voorgeselecteerd — dossier-loggen vereist een expliciete
+  // keuze zodat een haastklik geen document onder de verkeerde klant hangt.
   const contextOptions = useMemo(
     () => [
-      ...companies.slice(0, 5).map(buildCompanyContextOption),
-      ...activeWorkstreams.slice(0, 4).map(buildWorkstreamContextOption),
-      ...activeProjects.slice(0, 3).map(buildProjectContextOption),
-      ...activeLeads.slice(0, 3).map(buildLeadContextOption),
+      ...companies.map(buildCompanyContextOption),
+      ...activeWorkstreams.map(buildWorkstreamContextOption),
+      ...activeProjects.map(buildProjectContextOption),
+      ...activeLeads.map(buildLeadContextOption),
     ],
     [activeLeads, activeProjects, activeWorkstreams, companies]
   );
+  const filteredContextOptions = useMemo(() => {
+    const needle = contextQuery.trim().toLowerCase();
+    if (!needle) return contextOptions;
+    return contextOptions.filter((option) =>
+      `${option.label} ${option.subtext}`.toLowerCase().includes(needle)
+    );
+  }, [contextOptions, contextQuery]);
   const selectedContextOption =
-    selectedContextKey === "none"
-      ? null
-      : contextOptions.find((option) => option.key === selectedContextKey) ?? contextOptions[0] ?? null;
+    selectedContextKey && selectedContextKey !== "none"
+      ? contextOptions.find((option) => option.key === selectedContextKey) ?? null
+      : null;
   const selectedContext = selectedContextOption?.context ?? null;
 
   return (
@@ -264,38 +275,56 @@ export function LaventeCareBusinessCommandCenter({
               </div>
 
               {contextOptions.length > 0 ? (
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                  {contextOptions.map((option) => {
-                    const isSelected = selectedContextOption?.key === option.key;
+                <div className="mt-3 space-y-2">
+                  <input
+                    value={contextQuery}
+                    onChange={(event) => setContextQuery(event.target.value)}
+                    placeholder={`Zoek in ${contextOptions.length} klanten, opdrachten, projecten en leads...`}
+                    aria-label="Zoek dossiercontext"
+                    className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-400/50"
+                  />
+                  <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedContextKey("none")}
+                      aria-pressed={!selectedContextOption}
+                      className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                        !selectedContextOption
+                          ? "border-slate-400/30 bg-white/[0.07] text-white"
+                          : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
+                      }`}
+                    >
+                      <span className="block truncate text-xs font-bold">Geen context</span>
+                      <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                        Generieke PDF — niet vast te leggen in een dossier
+                      </span>
+                    </button>
+                    {filteredContextOptions.map((option) => {
+                      const isSelected = selectedContextOption?.key === option.key;
 
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => setSelectedContextKey(option.key)}
-                        className={`min-w-[190px] rounded-lg border px-3 py-2 text-left transition ${
-                          isSelected
-                            ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
-                            : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
-                        }`}
-                      >
-                        <span className="block truncate text-xs font-bold">{option.label}</span>
-                        <span className="mt-0.5 block truncate text-[11px] text-slate-500">{option.subtext}</span>
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedContextKey("none")}
-                    className={`min-w-[150px] rounded-lg border px-3 py-2 text-left transition ${
-                      selectedContextKey === "none"
-                        ? "border-slate-400/30 bg-white/[0.07] text-white"
-                        : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
-                    }`}
-                  >
-                    <span className="block truncate text-xs font-bold">Geen context</span>
-                    <span className="mt-0.5 block truncate text-[11px] text-slate-500">Generieke PDF</span>
-                  </button>
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setSelectedContextKey(option.key)}
+                          aria-pressed={isSelected}
+                          className={`w-full rounded-lg border px-3 py-2 text-left transition ${
+                            isSelected
+                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
+                              : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                          }`}
+                        >
+                          <span className="block truncate text-xs font-bold">{option.label}</span>
+                          <span className="mt-0.5 block truncate text-[11px] text-slate-500">{option.subtext}</span>
+                        </button>
+                      );
+                    })}
+                    {filteredContextOptions.length === 0 ? (
+                      <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-slate-500">
+                        Geen context gevonden voor &ldquo;{contextQuery}&rdquo;.
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               ) : (
                 <p className="mt-3 text-xs leading-5 text-slate-500">
@@ -396,9 +425,13 @@ export function LaventeCareBusinessCommandCenter({
               <div className="mt-3 space-y-2">
                 {dossierDocuments.slice(0, 4).map((item) => {
                   const theme = isLaventeCarePdfTheme(item.theme) ? item.theme : "screen";
-                  const href = getLaventeCarePdfViewerUrl({
-                    documentKey: item.document_key,
+                  // L2: viewer-URL MET de gelogde contextparams (uit de
+                  // opgeslagen pdf_url), zodat het gepersonaliseerde document
+                  // opent en niet de generieke template.
+                  const href = dossierDocumentViewerHref({
+                    document_key: item.document_key,
                     theme,
+                    pdf_url: item.pdf_url,
                   });
 
                   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useQueryClient } from "@tanstack/react-query";
 import { getLevel } from "@/lib/habit-constants";
@@ -11,6 +11,7 @@ import {
   useGetHabitsForDate,
   useGetHabitsStats,
   useGetHabitsBadges,
+  getGetHabitsForDateQueryKey,
   postHabits,
   patchHabitsId,
   postHabitsIdToggle,
@@ -20,8 +21,11 @@ import {
   postHabitsIdArchive,
   deleteHabitsId,
 } from "@/lib/api/generated/habits/habits";
+import { ApiError, habitsApi } from "@/lib/api";
 
 import type { ModelHabit, ModelHabitBadge } from "@/lib/api/model";
+import { todayStr } from "@/components/habits/HabitsUtils";
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,8 +90,27 @@ export interface HabitLogEntry {
 
 export interface HabitWithLogRecord extends HabitRecord {
   log: HabitLogEntry | null;
+  /**
+   * Completions in the current ISO week / calendar month (Amsterdam) — only
+   * present for x_per_week / x_per_maand habits (N5, for-date payload).
+   */
+  periodVoltooidCount?: number;
 }
 export type HabitWithLog = HabitWithLogRecord;
+
+/** Weekly/monthly habits are period-based: toggleable any day, satisfied per period. */
+export function isPeriodHabit(habit: Pick<HabitRecord, "frequentie">): boolean {
+  return habit.frequentie === "x_per_week" || habit.frequentie === "x_per_maand";
+}
+
+/** True when a weekly/monthly habit already met its period target (N5). */
+export function isPeriodSatisfied(
+  habit: Pick<HabitWithLogRecord, "frequentie" | "doelAantal" | "doel_aantal" | "periodVoltooidCount">,
+): boolean {
+  if (!isPeriodHabit(habit)) return false;
+  const target = habit.doelAantal ?? habit.doel_aantal ?? 0;
+  return target > 0 && (habit.periodVoltooidCount ?? 0) >= target;
+}
 
 export interface HabitStatsRecord {
   totaal_xp?: number;
@@ -195,6 +218,8 @@ type HabitLogApiRow = {
 
 type HabitWithLogApiRow = ModelHabit & {
   log?: HabitLogApiRow | null;
+  /** Completions this ISO week / month for x_per_week / x_per_maand habits (N5). */
+  period_voltooid_count?: number;
 };
 
 function toLogEntry(log: HabitLogApiRow): HabitLogEntry {
@@ -213,6 +238,10 @@ function toWithLog(wl: HabitWithLogApiRow): HabitWithLogRecord {
   return {
     ...toRecord(wl as ModelHabit),
     log: wl.log ? toLogEntry(wl.log) : null,
+    periodVoltooidCount:
+      typeof wl.period_voltooid_count === "number"
+        ? wl.period_voltooid_count
+        : undefined,
   };
 }
 
@@ -228,6 +257,32 @@ function toBadge(row: ModelHabitBadge): HabitBadgeRecord {
     xpBonus: row.xp_bonus || 0,
     behaaldOp: row.behaald_op || new Date().toISOString(),
   };
+}
+
+/**
+ * Newly-earned badges the backend attaches to a toggle response. The 200 body
+ * is an open map, so we read defensively across the likely field names and only
+ * keep entries with a display name — absent/empty means "no badge data" and the
+ * caller falls back to the milestone self-toast.
+ */
+type EarnedBadge = { naam: string; emoji?: string };
+
+function newlyEarnedBadges(data: unknown): EarnedBadge[] {
+  if (!data || typeof data !== "object") return [];
+  const row = data as Record<string, unknown>;
+  const raw =
+    row.new_badges ?? row.newBadges ?? row.badges ?? row.earned_badges;
+  if (!Array.isArray(raw)) return [];
+  const out: EarnedBadge[] = [];
+  for (const b of raw) {
+    if (!b || typeof b !== "object") continue;
+    const rec = b as Record<string, unknown>;
+    const naam = rec.naam ?? rec.name;
+    if (typeof naam !== "string" || !naam) continue;
+    const emoji = typeof rec.emoji === "string" ? rec.emoji : undefined;
+    out.push({ naam, emoji });
+  }
+  return out;
 }
 
 function numberFrom(value: unknown): number {
@@ -292,29 +347,73 @@ function toHabitPayload(data: Partial<HabitCreateData>): ModelHabit {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
+/** Streak milestones that earn a celebratory toast after a completing toggle. */
+const STREAK_MILESTONES = [7, 30, 100];
+
 export function useHabits(datum?: string) {
   const { user } = useUser();
   const userId = user?.id ?? "";
   const queryClient = useQueryClient();
 
+  // N4: the effective default "vandaag" must roll over at midnight — a frozen
+  // `todayStr()` from mount made DailyChecklist (home), HabitStats and
+  // BadgeShowcase write check-offs to yesterday in a PWA left open overnight.
+  // Reactive: minute tick + visibilitychange, only when no explicit `datum`.
+  const [internalToday, setInternalToday] = useState(() => todayStr());
+  useEffect(() => {
+    if (datum) return;
+    const update = () =>
+      setInternalToday((prev) => {
+        const next = todayStr();
+        return next === prev ? prev : next;
+      });
+    update();
+    const interval = window.setInterval(update, 60_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") update();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [datum]);
+
   const queryParams = useMemo(
-    () => ({ userId, datum: datum ?? new Date().toISOString().slice(0, 10) }),
-    [userId, datum],
+    () => ({ userId, datum: datum ?? internalToday }),
+    [userId, datum, internalToday],
   );
 
-  const { data: allHabitsRaw, isLoading: loadingHabits } = useGetHabits(
+
+  const {
+    data: allHabitsRaw,
+    isLoading: loadingHabits,
+    isError: errorHabits,
+  } = useGetHabits(
     { userId },
     { query: { enabled: !!userId } },
   );
-  const { data: statsRaw, isLoading: loadingStats } = useGetHabitsStats(
+  const {
+    data: statsRaw,
+    isLoading: loadingStats,
+    isError: errorStats,
+  } = useGetHabitsStats(
     { userId },
     { query: { enabled: !!userId } },
   );
-  const { data: badgesRaw, isLoading: loadingBadges } = useGetHabitsBadges(
+  const {
+    data: badgesRaw,
+    isLoading: loadingBadges,
+    isError: errorBadges,
+  } = useGetHabitsBadges(
     { userId },
     { query: { enabled: !!userId } },
   );
-  const { data: forDateRaw, isLoading: loadingForDate } = useGetHabitsForDate(
+  const {
+    data: forDateRaw,
+    isLoading: loadingForDate,
+    isError: errorForDate,
+  } = useGetHabitsForDate(
     queryParams,
     { query: { enabled: !!userId } },
   );
@@ -353,15 +452,28 @@ export function useHabits(datum?: string) {
   }, [stats]);
 
   const todaySummary = useMemo(() => {
-    const due = todayHabits.length;
-    const completed = todayHabits.filter(
+    // N5: a weekly/monthly habit that already met its period target but wasn't
+    // completed today no longer counts as "open vandaag" — it neither presses
+    // the day percentage down nor inflates it.
+    const counted = todayHabits.filter(
+      (h) => !(isPeriodSatisfied(h) && !h.log?.voltooid),
+    );
+    const due = counted.length;
+    const completed = counted.filter(
       (h) => h.log?.voltooid || (h.type === "negatief" && !h.log?.isIncident),
     ).length;
     return { due, completed, rate: due > 0 ? completed / due : 0 };
   }, [todayHabits]);
 
-  const { error: toastError } = useToast();
-  const [pendingHabitId, setPendingHabitId] = useState<string | null>(null);
+  const { error: toastError, success: toastSuccess } = useToast();
+  // Polite live-region text describing the latest optimistic toggle/increment
+  // result — rendered as an sr-only region by consumers (a11y low).
+  const [announcement, setAnnouncement] = useState("");
+  // Per-habit in-flight tracking: a pending action on habit A must never block
+  // (or silently drop) a tap on habit B — cards disable only their own habit.
+  const [pendingHabitIds, setPendingHabitIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
 
   const invalidateAll = () => {
     for (const queryKey of HABIT_QUERY_KEYS) {
@@ -369,22 +481,133 @@ export function useHabits(datum?: string) {
     }
   };
 
-  // Single in-flight guard + error toast for per-habit actions. Prevents the
-  // double/triple-tap duplicate-toggle bug (tap does nothing for 300-800ms) and
-  // surfaces failures instead of silently leaving the tick unchanged.
+  // Per-habit in-flight guard + error toast. Prevents the double/triple-tap
+  // duplicate-toggle bug for the SAME habit while leaving other habits tappable,
+  // and surfaces failures instead of silently leaving the tick unchanged.
+  // Returns true on success so callers (e.g. incident-undo) can react.
   const runHabitAction = async (
     habitId: string,
     action: () => Promise<void>,
     errorMessage: string,
-  ) => {
-    if (pendingHabitId) return;
-    setPendingHabitId(habitId);
+  ): Promise<boolean> => {
+    if (pendingHabitIds.has(habitId)) return false;
+    setPendingHabitIds((prev) => new Set(prev).add(habitId));
     try {
       await action();
-    } catch {
-      toastError(errorMessage);
+      return true;
+    } catch (err) {
+      // 409's dragen een betekenisvolle Nederlandse melding uit de backend
+      // ("Er is al een incident gelogd op deze dag.", gearchiveerd/gepauzeerd).
+      toastError(
+        err instanceof ApiError && err.status === 409 && err.message
+          ? err.message
+          : errorMessage,
+      );
+      return false;
     } finally {
-      setPendingHabitId(null);
+      setPendingHabitIds((prev) => {
+        const next = new Set(prev);
+        next.delete(habitId);
+        return next;
+      });
+    }
+  };
+
+  // ── Optimistic cache patching (M4) ─────────────────────────────────────────
+  // Check-off should feel instant: patch the /habits/for-date cache before the
+  // POST, roll back to the snapshot on error, and reconcile via invalidation
+  // afterwards (same pattern as the notes mutation layer in hooks/useNotes.ts).
+  type ForDateCache = {
+    data?: { habits?: HabitWithLogApiRow[] };
+    status?: number;
+  };
+  const forDateQueryKey = getGetHabitsForDateQueryKey(queryParams);
+
+  const patchForDateLog = (
+    habitId: string,
+    patch: (log: HabitLogApiRow | null, habit: HabitWithLogApiRow) => HabitLogApiRow,
+  ) => {
+    queryClient.setQueryData<ForDateCache>(forDateQueryKey, (old) => {
+      if (!old?.data?.habits) return old;
+      return {
+        ...old,
+        data: {
+          ...old.data,
+          habits: old.data.habits.map((habit) =>
+            habit.id === habitId
+              ? { ...habit, log: patch(habit.log ?? null, habit) }
+              : habit,
+          ),
+        },
+      };
+    });
+  };
+
+  const runOptimisticHabitAction = async (
+    habitId: string,
+    applyOptimistic: () => void,
+    action: () => Promise<void>,
+    errorMessage: string,
+  ): Promise<boolean> => {
+    if (pendingHabitIds.has(habitId)) return false;
+    setPendingHabitIds((prev) => new Set(prev).add(habitId));
+    await queryClient.cancelQueries({ queryKey: forDateQueryKey });
+    const snapshot = queryClient.getQueryData<ForDateCache>(forDateQueryKey);
+    applyOptimistic();
+    try {
+      await action();
+      return true;
+    } catch (err) {
+      if (snapshot !== undefined) {
+        queryClient.setQueryData(forDateQueryKey, snapshot);
+      }
+      // A11y (R3): the optimistic path already announced success; on rollback
+      // that announcement is now a lie. Correct it so screenreaders hear the
+      // action was reverted instead of a stale "voltooid".
+      setAnnouncement("Niet gewijzigd — bijwerken is mislukt");
+      toastError(
+        err instanceof ApiError && err.status === 409 && err.message
+          ? err.message
+          : errorMessage,
+      );
+      return false;
+    } finally {
+      setPendingHabitIds((prev) => {
+        const next = new Set(prev);
+        next.delete(habitId);
+        return next;
+      });
+      // onSettled: reconcile streaks/XP/stats with the server truth.
+      invalidateAll();
+    }
+  };
+
+  // Streak-milestone feedback (low): a completing toggle for TODAY that pushes
+  // the streak exactly onto 7/30/100 earns a celebratory toast. Derived from
+  // the pre-toggle streak (+1) — deterministic for a same-day completion.
+  // Gamification (R3): prefer the server truth. When the toggle-response carries
+  // newly-earned badges, show ONE toast per badge (covers 3/14/60/365 and the
+  // total_*/first_habit awards the old hardcoded 7/30/100 self-toast ignored,
+  // and avoids the double-toast when a badge coincides with a milestone). Only
+  // when the response carries NO badge data do we fall back to the milestone
+  // self-toast, and never for period habits (the +1 math is unsound there).
+  const celebrate = (
+    habit: HabitWithLogRecord | undefined,
+    becameVoltooid: boolean,
+    earned: EarnedBadge[],
+  ) => {
+    if (earned.length > 0) {
+      for (const badge of earned) {
+        toastSuccess(`${badge.emoji ? `${badge.emoji} ` : ""}Badge behaald: ${badge.naam}`);
+      }
+      return;
+    }
+    if (!becameVoltooid || !habit) return;
+    if (queryParams.datum !== todayStr()) return;
+    if (isPeriodHabit(habit)) return;
+    const reached = (habit.huidigeStreak ?? 0) + 1;
+    if (STREAK_MILESTONES.includes(reached)) {
+      toastSuccess(`🔥 ${reached} dagen streak!`);
     }
   };
 
@@ -397,7 +620,13 @@ export function useHabits(datum?: string) {
     level,
     todaySummary,
     isLoading: loadingHabits || loadingStats || loadingBadges || loadingForDate,
-    pendingHabitId,
+    /** Combined error flag across the habits queries (home-dashboard consumes this). */
+    isError: errorHabits || errorStats || errorBadges || errorForDate,
+    pendingHabitIds,
+    /** Latest optimistic toggle result, for a polite aria-live region. */
+    announcement,
+    /** The Amsterdam "YYYY-MM-DD" this hook instance reads/writes logs for. */
+    datum: queryParams.datum,
 
     create: async (data: HabitCreateData) => {
       await postHabits(toHabitPayload(data), { userId });
@@ -407,48 +636,108 @@ export function useHabits(datum?: string) {
       await patchHabitsId(id, toHabitPayload(data) as Record<string, unknown>);
       invalidateAll();
     },
-    toggle: (habitId: string, waarde?: number, notitie?: string) =>
-      runHabitAction(
+    toggle: async (habitId: string, waarde?: number, notitie?: string) => {
+      const habit = todayHabits.find((h) => h.id === habitId);
+      // R1: send the intended state explicitly — the backend now accepts
+      // `voltooid: false` to un-complete, so "Heropenen" is a real flip and the
+      // optimistic patch below is honest instead of a snap-back lie.
+      const nextVoltooid = !(habit?.log?.voltooid ?? false);
+      const naam = habit?.naam ?? "Habit";
+      let earned: EarnedBadge[] = [];
+      const ok = await runOptimisticHabitAction(
         habitId,
+        () => {
+          patchForDateLog(habitId, (log) => ({
+            ...(log ?? {}),
+            voltooid: nextVoltooid,
+            waarde: waarde ?? log?.waarde,
+          }));
+          setAnnouncement(`${naam} ${nextVoltooid ? "voltooid" : "heropend"}`);
+        },
         async () => {
-          await postHabitsIdToggle(
+          const res = await postHabitsIdToggle(
             habitId,
-            toApiPayload({ datum: queryParams.datum, waarde, notitie }),
+            toApiPayload({
+              datum: queryParams.datum,
+              voltooid: nextVoltooid,
+              waarde,
+              notitie,
+            }),
             { userId },
           );
-          invalidateAll();
+          earned = newlyEarnedBadges(res?.data);
         },
         "Habit bijwerken is mislukt",
-      ),
-    increment: (habitId: string, stap: number) =>
-      runHabitAction(
+      );
+      if (ok) celebrate(habit, nextVoltooid, earned);
+      return ok;
+    },
+    increment: async (habitId: string, stap: number) => {
+      const habit = todayHabits.find((h) => h.id === habitId);
+      const doel = habit?.doelWaarde ?? null;
+      const currentVal = habit?.log?.waarde ?? 0;
+      // R5: clamp in the REQUEST too — the optimistic patch already clamped on
+      // 0, but the unclamped value went to the server ("-2/8" after refetch).
+      const nextWaarde = Math.max(0, currentVal + stap);
+      const wasVoltooid = habit?.log?.voltooid ?? false;
+      const nextVoltooid = doel != null ? nextWaarde >= doel : wasVoltooid;
+      const naam = habit?.naam ?? "Habit";
+      let earned: EarnedBadge[] = [];
+      const ok = await runOptimisticHabitAction(
         habitId,
-        async () => {
-          const habit = todayHabits.find(
-            (h: HabitWithLogRecord) => h.id === habitId,
+        () => {
+          patchForDateLog(habitId, (log) => ({
+            ...(log ?? {}),
+            waarde: nextWaarde,
+            voltooid: nextVoltooid,
+          }));
+          setAnnouncement(
+            doel != null
+              ? `${naam}: ${nextWaarde} van ${doel}${nextVoltooid ? " — doel behaald" : ""}`
+              : `${naam}: ${nextWaarde}`,
           );
-          const currentVal = habit?.log?.waarde ?? 0;
-          await postHabitsIdToggle(
+        },
+        async () => {
+          const res = await postHabitsIdToggle(
             habitId,
-            toApiPayload({ datum: queryParams.datum, waarde: currentVal + stap }),
+            toApiPayload({
+              datum: queryParams.datum,
+              waarde: nextWaarde,
+              voltooid: nextVoltooid,
+            }),
             { userId },
           );
-          invalidateAll();
+          earned = newlyEarnedBadges(res?.data);
         },
         "Habit bijwerken is mislukt",
-      ),
+      );
+      if (ok) celebrate(habit, nextVoltooid && !wasVoltooid, earned);
+      return ok;
+    },
     incident: (habitId: string, trigger?: string, notitie?: string) =>
       runHabitAction(
         habitId,
         async () => {
+          // Send the SELECTED date — logging an incident while viewing
+          // yesterday must not silently write to today (M5/H4). Backend
+          // accepts an optional `datum` (Amsterdam, max 30 days back).
           await postHabitsIdIncident(
             habitId,
-            toApiPayload({ trigger, notitie }),
+            toApiPayload({ datum: queryParams.datum, trigger, notitie }),
             { userId },
           );
           invalidateAll();
         },
         "Incident registreren is mislukt",
+      ),
+    removeIncident: (habitId: string, datum?: string) =>
+      runHabitAction(
+        habitId,
+        async () => {
+          await habitsApi.deleteIncident(habitId, userId, datum ?? queryParams.datum);
+          invalidateAll();
+        },
+        "Incident verwijderen is mislukt",
       ),
     reorder: async (items: Array<{ id: string; volgorde: number }>) => {
       await postHabitsReorder({ items });

@@ -75,7 +75,17 @@ export function NotesMetricsRow({
       <StatChip icon={StickyNote} label="Totaal" value={`${totalCount}`} meta={`${activeCount} actief · ${completedCount} afgerond · ${archivedCount} archief`} tone="amber" {...scopeOf("all")} />
       <StatChip icon={AlertTriangle} label="Aandacht" value={`${attentionCount}`} meta={attentionCount > 0 ? "Hoog, vandaag of verlopen" : "Geen urgente notities"} tone={attentionCount > 0 ? "rose" : "green"} {...scopeOf("attention")} />
       <StatChip icon={ListChecks} label="Checklists" value={`${checklistDone}/${checklistTotal}`} meta={checklistTotal > 0 ? "Afgevinkte / totaal checklist-items" : "Geen checklist-items"} tone={checklistTotal > 0 && checklistDone === checklistTotal ? "green" : "sky"} {...scopeOf("checklists")} />
-      <StatChip icon={CalendarClock} label="Deadlines" value={`${deadlineSoon}`} meta={deadlineNext ? `Volgende: ${formatDate(deadlineNext.deadline ?? undefined)}` : "Geen aankomende deadlines"} tone={deadlineOverdue > 0 ? "rose" : deadlineSoon > 0 ? "amber" : "slate"} {...scopeOf("deadlines")} />
+      <StatChip
+        icon={CalendarClock}
+        label="Deadlines"
+        value={`${deadlineSoon}`}
+        // N4: de eerstvolgende deadline zichtbaar in de chip zelf — title-only
+        // meta is onbereikbaar op touch.
+        inlineMeta={deadlineNext ? `Volgende: ${formatDate(deadlineNext.deadline ?? undefined)}` : undefined}
+        meta={deadlineNext ? `Volgende: ${formatDate(deadlineNext.deadline ?? undefined)}` : "Geen aankomende deadlines"}
+        tone={deadlineOverdue > 0 ? "rose" : deadlineSoon > 0 ? "amber" : "slate"}
+        {...scopeOf("deadlines")}
+      />
       <StatChip icon={Link2} label="Agenda" value={`${linkedCount}`} meta={tagsCount > 0 ? `${linkedCount} gekoppeld · ${tagsCount} tags` : "Geen agenda-koppelingen"} tone="indigo" {...scopeOf("linked")} />
     </section>
   );

@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type QueryClient } from "@tanstack/react-query";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { type DienstRow } from "@/lib/schedule";
 import { analyzeConflicts, type ConflictInfo } from "@/lib/conflictDetection";
@@ -35,6 +35,53 @@ export interface PersonalEvent {
 
 const PENDING_STATUSES = new Set(["PendingCreate", "PendingUpdate", "PendingDelete"]);
 const DELETED_STATUSES = new Set(["VERWIJDERD", "cancelled"]);
+
+/** Query key for the raw personal-events rows of a user (react-query cache). */
+export function personalEventsQueryKey(userId: string) {
+  return ["/personal-events", userId] as const;
+}
+
+/**
+ * Optimistically upsert a row into the personal-events cache.
+ * Returns a rollback function that restores the previous cache snapshot.
+ */
+export function applyEventRowToCache(
+  queryClient: QueryClient,
+  userId: string,
+  row: PersonalEventRow,
+): () => void {
+  const key = personalEventsQueryKey(userId);
+  const previous = queryClient.getQueryData<PersonalEventRow[]>(key);
+  queryClient.setQueryData<PersonalEventRow[]>(key, (rows = []) => {
+    const index = rows.findIndex((r) => r.event_id === row.event_id);
+    if (index >= 0) {
+      const next = [...rows];
+      next[index] = { ...next[index], ...row };
+      return next;
+    }
+    return [...rows, row];
+  });
+  return () => queryClient.setQueryData(key, previous);
+}
+
+/**
+ * Optimistically flip the status of a cached personal-event row (e.g. to
+ * PendingDelete/VERWIJDERD so a deleted row disappears instantly).
+ * Returns a rollback function that restores the previous cache snapshot.
+ */
+export function applyEventStatusToCache(
+  queryClient: QueryClient,
+  userId: string,
+  eventId: string,
+  status: string,
+): () => void {
+  const key = personalEventsQueryKey(userId);
+  const previous = queryClient.getQueryData<PersonalEventRow[]>(key);
+  queryClient.setQueryData<PersonalEventRow[]>(key, (rows = []) =>
+    rows.map((r) => (r.event_id === eventId ? { ...r, status } : r)),
+  );
+  return () => queryClient.setQueryData(key, previous);
+}
 
 type AmsterdamNow = {
   date: string;
@@ -116,10 +163,27 @@ function isRosterShadowTitle(title: string): boolean {
   return /^[ar]\s+(vroeg|laat|dienst)$/.test(normalizeText(title));
 }
 
+/**
+ * Heuristic that hides Google-synced "shadow" copies of roster shifts so the
+ * same dienst doesn't show up twice (once from the rooster, once from Google).
+ *
+ * Tightened (audit K1): an event is only treated as a shift shadow when it
+ * (a) is a Google-synced row — locally created pending events are never
+ *     deduplicated, so a user's own appointment can't silently disappear —
+ * (b) has a shift-like title, AND
+ * (c) exactly matches a dienst's start date + start/end time slot.
+ *
+ * Residual risk: a *synced* personal appointment whose title happens to look
+ * like a shift ("R. Vroeg") AND that exactly matches a dienst slot is still
+ * hidden. A watertight fix needs a backend eventId-link between the schedule
+ * sync and the personal-events sync; until then this slot+title+source match
+ * is the narrowest safe heuristic.
+ */
 function isScheduleDuplicateEvent(event: PersonalEvent, diensten: DienstRow[]): boolean {
-  if (isRosterShadowTitle(event.titel)) return true;
+  // Locally created/edited events (pending queue) are user-authored, never shadows.
+  if (isPending(event)) return false;
   if (event.heledag || !event.startTijd || !event.eindTijd) return false;
-  if (!isShiftLikeTitle(event.titel)) return false;
+  if (!isShiftLikeTitle(event.titel) && !isRosterShadowTitle(event.titel)) return false;
   const title = normalizeText(event.titel);
   return diensten.some((dienst) => {
     const sameSlot =
@@ -127,6 +191,8 @@ function isScheduleDuplicateEvent(event: PersonalEvent, diensten: DienstRow[]): 
       dienst.startTijd === event.startTijd &&
       dienst.eindTijd === event.eindTijd;
     if (!sameSlot) return false;
+    // "R Vroeg" / "A Laat" style titles are the classic roster-shadow format.
+    if (isRosterShadowTitle(event.titel)) return true;
     const shift = normalizeText(dienst.shiftType);
     const team = normalizeText(dienst.team);
     const teamShift = normalizeText(`${dienst.team} ${dienst.shiftType}`);

@@ -41,6 +41,12 @@
 
 /* ─── Reset ────────────────────────────────────────────────────────────────── */
 
+:root {
+  /* Native controls, scrollbars and form widgets follow the dark theme
+     instead of rendering light-on-#0a0a0f. */
+  color-scheme: dark;
+}
+
 *,
 *::before,
 *::after {
@@ -104,17 +110,39 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--color-primary);
   cursor: pointer;
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
   transition: transform 0.15s;
+  /* Vergroot het effectieve touch-target zonder de visuele thumb te vergroten. */
+  border: 4px solid transparent;
+  background-clip: padding-box;
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.2);
+}
+
+/* Firefox-tegenhanger — zonder deze regels toont Firefox de kale UA-slider. */
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+  border: 4px solid transparent;
+  background-clip: padding-box;
+  transition: transform 0.15s;
 }
 
 /* ─── Scrollbar ────────────────────────────────────────────────────────────── */

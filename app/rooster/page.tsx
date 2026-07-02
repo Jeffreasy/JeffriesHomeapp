@@ -14,71 +14,18 @@ import { SalarisView } from "@/components/salary/SalarisView";
 import { AfsprakenView } from "@/components/schedule/AfsprakenView";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { calcTotalHours, getEndKey, getHistory, getUpcoming, shiftBreakdown, teamBreakdown } from "@/lib/schedule";
+import { calcTotalHours, getHistory, getUpcoming, shiftBreakdown, teamBreakdown } from "@/lib/schedule";
 import { generateUnifiedTimeline } from "@/lib/unified";
-import { cn } from "@/lib/utils";
 
 import { getAmsterdamTodayIso, formatHours, formatMetaDate, pluralize, type Tab, TABS } from "@/components/schedule/RoosterUtils";
+import { shortSyncError, getShiftAppointments } from "@/components/schedule/scheduleUtils";
 import { EmptyRoster } from "@/components/schedule/RoosterCards";
 import { OverviewPanel, OverviewTab } from "@/components/schedule/RoosterOverview";
+import { TabBar, tabBarPanelId, tabBarTabId } from "@/components/schedule/TabBar";
 import { StatChip } from "@/components/ui/StatChip";
 
-const tabId = (id: Tab) => `rooster-tab-${id}`;
-const tabPanelId = (id: Tab) => `rooster-panel-${id}`;
-
-function TabBar({ active, onChange }: { active: Tab; onChange: (tab: Tab) => void }) {
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    const currentIndex = TABS.findIndex((t) => t.id === active);
-    if (currentIndex < 0) return;
-
-    let nextIndex: number | null = null;
-    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = (currentIndex + 1) % TABS.length;
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = (currentIndex - 1 + TABS.length) % TABS.length;
-    } else if (event.key === "Home") {
-      nextIndex = 0;
-    } else if (event.key === "End") {
-      nextIndex = TABS.length - 1;
-    }
-
-    if (nextIndex === null) return;
-    event.preventDefault();
-    const nextTab = TABS[nextIndex];
-    onChange(nextTab.id);
-    document.getElementById(tabId(nextTab.id))?.focus();
-  };
-
-  return (
-    <div role="tablist" aria-label="Rooster onderdelen" className="flex gap-1 overflow-x-auto scrollbar-none">
-      {TABS.map(({ id, label, icon: Icon }) => {
-        const selected = active === id;
-        return (
-          <button
-            key={id}
-            id={tabId(id)}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            aria-controls={tabPanelId(id)}
-            tabIndex={selected ? 0 : -1}
-            onClick={() => onChange(id)}
-            onKeyDown={handleKeyDown}
-            className={cn(
-              "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40",
-              selected
-                ? "border-amber-500/30 bg-amber-500/12 text-amber-200"
-                : "border-transparent text-slate-500 hover:bg-white/[0.05] hover:text-slate-300"
-            )}
-          >
-            <Icon size={14} />
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
+const tabId = (id: Tab) => tabBarTabId("rooster", id);
+const tabPanelId = (id: Tab) => tabBarPanelId("rooster", id);
 
 function MobileRosterSnapshot({
   upcomingHours,
@@ -97,13 +44,32 @@ function MobileRosterSnapshot({
 }) {
   return (
     <section className="flex flex-wrap items-center gap-1.5 md:hidden" aria-label="Rooster samenvatting">
-      <StatChip icon={Clock3} label="Uren" value={formatHours(upcomingHours)} meta={`${pluralize(upcomingCount, "dienst", "diensten")} · komende 30 dagen`} tone="amber" />
-      <StatChip icon={Briefcase} label="Diensten" value={String(upcomingCount)} meta="komende 30 dagen" tone="sky" />
+      {/* inlineMeta i.p.v. alleen een title-tooltip — tooltips zijn op touch
+          onbereikbaar (audit L2). */}
+      <StatChip
+        icon={Clock3}
+        label="Uren"
+        value={formatHours(upcomingHours)}
+        meta={`${pluralize(upcomingCount, "dienst", "diensten")} · komende 30 dagen`}
+        inlineMeta="30 dgn"
+        tone="amber"
+      />
+      <StatChip
+        icon={Briefcase}
+        label="Diensten"
+        value={String(upcomingCount)}
+        meta="komende 30 dagen"
+        inlineMeta="30 dgn"
+        tone="sky"
+      />
+      {/* Stable metric — the value no longer silently switches meaning between
+          "vandaag" and "aankomend" depending on the day (audit N6). */}
       <StatChip
         icon={CalendarClock}
         label="Afspraken"
-        value={todayEventCount > 0 ? String(todayEventCount) : String(eventCount)}
-        meta={todayEventCount > 0 ? `${todayEventCount} vandaag` : `${eventCount} aankomend`}
+        value={String(eventCount)}
+        meta={`${todayEventCount} vandaag · ${eventCount} komend`}
+        inlineMeta={`${todayEventCount} vandaag`}
         tone="indigo"
       />
       <StatChip
@@ -111,6 +77,7 @@ function MobileRosterSnapshot({
         label="Conflicten"
         value={hardConflicts > 0 ? String(hardConflicts) : String(conflicts)}
         meta={hardConflicts > 0 ? "direct nalopen" : conflicts > 0 ? "aandacht" : "rustig"}
+        inlineMeta={hardConflicts > 0 ? "direct nalopen" : conflicts > 0 ? "aandacht" : "rustig"}
         tone={hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "green"}
       />
     </section>
@@ -124,6 +91,8 @@ export default function RoosterPage() {
     upcoming,
     meta,
     isLoading,
+    isError: scheduleIsError,
+    error: scheduleError,
     importCsv,
     clear,
     refetch,
@@ -141,9 +110,23 @@ export default function RoosterPage() {
   const [weekOverrides, setWeekOverrides] = useState<Record<string, boolean>>({});
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
+  // Eén gedeelde sync-vlag (audit F9): header-Sync én "Verwerk nu" op de
+  // Beheer-tab lezen/schrijven deze — geen dubbele gelijktijdige sync meer.
   const [calSyncing, setCalSyncing] = useState(false);
+  // Laatste wachtrij-fout, persistent zoals op /agenda (audit F10).
+  const [pendingSyncError, setPendingSyncError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [compactTimeline, setCompactTimeline] = useState(false);
+  // Timeout van de "Wissen?"-bevestiging, zodat die geannuleerd kan worden bij
+  // bevestigen/annuleren/unmount (audit L13).
+  const confirmClearTimeoutRef = useRef<number | null>(null);
+  const cancelConfirmClearTimeout = () => {
+    if (confirmClearTimeoutRef.current !== null) {
+      window.clearTimeout(confirmClearTimeoutRef.current);
+      confirmClearTimeoutRef.current = null;
+    }
+  };
+  useEffect(() => cancelConfirmClearTimeout, []);
 
   useEffect(() => {
     const updateToday = () => setTodayIso(getAmsterdamTodayIso());
@@ -173,13 +156,24 @@ export default function RoosterPage() {
     conflictMap,
     withConflicts,
     pending: pendingEvents,
+    error: eventsError,
     refetch: refetchEvents,
-  } = usePersonalEvents({ diensten: timelineDiensten });
+  } = usePersonalEvents({
+    // Volledige dienstenlijst (audit F13): agenda én rooster geven de
+    // ongefilterde lijst door zodat de conflict-tellingen overal identiek zijn;
+    // analyzeConflicts slaat VERWIJDERDE diensten zelf over en past-diensten
+    // kunnen per definitie niet met aankomende events overlappen.
+    diensten,
+  });
 
-  const upcomingHours = calcTotalHours(upcoming);
-  const shifts = shiftBreakdown(upcoming);
-  const teams = teamBreakdown(upcoming);
-  const history = getHistory(diensten);
+  // Pagina-aggregaties memoizen (audit DEEL 2 #14) zodat ze niet elke render
+  // opnieuw over de dienstenlijst rekenen en verse identiteiten produceren.
+  const upcomingHours = useMemo(() => calcTotalHours(upcoming), [upcoming]);
+  const shifts = useMemo(() => shiftBreakdown(upcoming), [upcoming]);
+  const teams = useMemo(() => teamBreakdown(upcoming), [upcoming]);
+  // Expliciet hoge limiet (audit L1): "Toon alle N" in de historie-sidebar
+  // liep anders stilzwijgend tegen de default-cap van 20 aan.
+  const history = useMemo(() => getHistory(diensten, 500), [diensten]);
   const unifiedWeeks = useMemo(
     () => generateUnifiedTimeline(timelineDiensten, upcomingEvents),
     [timelineDiensten, upcomingEvents]
@@ -190,29 +184,13 @@ export default function RoosterPage() {
   const thisMonthEvents = currentMonth
     ? upcomingEvents.filter((event) => event.startDatum.slice(0, 7) === currentMonth)
     : [];
-  const nextShiftEvents = useMemo(() => {
-    if (!nextDienst) return [];
-    // A night shift (e.g. 22:00–07:00) rolls past midnight, so getEndKey()
-    // returns a later calendar day than startDatum. Collect conflicting events
-    // across every day the shift spans — otherwise an early-morning appointment
-    // on the following day (which conflictMap *does* flag as a hard conflict) is
-    // silently dropped from this card.
-    const endDay = getEndKey(nextDienst).slice(0, 10);
-    const result: PersonalEvent[] = [];
-    const seen = new Set<string>();
-    let day = nextDienst.startDatum;
-    let guard = 0;
-    while (day <= endDay && guard++ < 32) {
-      for (const event of eventsByDate[day] ?? []) {
-        if (seen.has(event.eventId)) continue;
-        if (!conflictMap.has(event.eventId)) continue;
-        seen.add(event.eventId);
-        result.push(event);
-      }
-      day = addDaysIso(day, 1);
-    }
-    return result;
-  }, [nextDienst, eventsByDate, conflictMap]);
+  // Eén gedeelde "afspraken bij dienst"-helper (audit DEEL 2 NextShiftCard):
+  // conflicterende events over álle dagen die de (mogelijk nachtelijke) dienst
+  // beslaat — zelfde contract als /agenda en de home-dashboardkaart.
+  const nextShiftEvents = useMemo(
+    () => getShiftAppointments(nextDienst, eventsByDate, conflictMap),
+    [nextDienst, eventsByDate, conflictMap],
+  );
   const hasScheduleData = meta || nextDienst || diensten.length > 0;
 
   const openNewEvent = () => {
@@ -226,6 +204,7 @@ export default function RoosterPage() {
   };
 
   const handleCalendarSync = async () => {
+    if (calSyncing) return;
     if (!user?.id) {
       toastError("Niet ingelogd");
       return;
@@ -235,9 +214,17 @@ export default function RoosterPage() {
     try {
       const result = await syncApi.calendar(user.id);
       await Promise.all([refetch(), refetchEvents()]);
-      if (result.pendingError) {
+      if (result.scheduleWriteError) {
+        // De kalender is opgehaald maar het rooster kon niet worden weggeschreven
+        // — nooit een schone "gesynchroniseerd" claimen (audit DEEL 2 #7).
+        setPendingSyncError(`Rooster opslaan mislukt: ${result.scheduleWriteError}`);
+        toastError(`Rooster opslaan mislukt: ${shortSyncError(result.scheduleWriteError)}`);
+      } else if (result.pendingError) {
+        // Persistent bewaren naast de toast (audit F10).
+        setPendingSyncError(result.pendingError);
         toast(`Rooster en agenda opgehaald; wachtrij faalde: ${shortSyncError(result.pendingError)}`, "info");
       } else {
+        setPendingSyncError(null);
         success("Rooster en persoonlijke agenda gesynchroniseerd.");
       }
     } catch (err) {
@@ -250,6 +237,9 @@ export default function RoosterPage() {
 
   const handleClearSchedule = async () => {
     if (clearing) return;
+    // Bevestiging is gegeven — de 3,5s-auto-reset mag de knoppen niet meer
+    // onder de cursor vandaan trekken (audit L13).
+    cancelConfirmClearTimeout();
     setClearing(true);
     try {
       await clear();
@@ -270,7 +260,7 @@ export default function RoosterPage() {
     setImporting(true);
     try {
       const res = await importCsv(file);
-      if (res.ok) success(`${res.count} diensten geimporteerd`);
+      if (res.ok) success(`${res.count} diensten geïmporteerd`);
       else toastError(`Import mislukt: ${res.error}`);
     } finally {
       setImporting(false);
@@ -314,7 +304,13 @@ export default function RoosterPage() {
             <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
               {meta && (
                 confirmClear ? (
-                  <div className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 sm:col-span-1">
+                  // Zodra een toetsenbordgebruiker Ja/Nee focust vervalt de 3,5s
+                  // auto-reset — anders verdwijnen de knoppen onder de focus
+                  // vandaan (audit L13 a11y).
+                  <div
+                    onFocusCapture={cancelConfirmClearTimeout}
+                    className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 sm:col-span-1"
+                  >
                     <span className="text-xs font-semibold text-rose-300">{clearing ? "Wissen..." : "Wissen?"}</span>
                     <button
                       type="button"
@@ -327,7 +323,10 @@ export default function RoosterPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setConfirmClear(false)}
+                      onClick={() => {
+                        cancelConfirmClearTimeout();
+                        setConfirmClear(false);
+                      }}
                       disabled={clearing}
                       className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-400 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -339,8 +338,14 @@ export default function RoosterPage() {
                     type="button"
                     aria-label="Rooster wissen"
                     onClick={() => {
+                      // Timeout-id bewaren zodat bevestigen/annuleren/unmount
+                      // hem kan annuleren (audit L13).
+                      cancelConfirmClearTimeout();
                       setConfirmClear(true);
-                      window.setTimeout(() => setConfirmClear(false), 3500);
+                      confirmClearTimeoutRef.current = window.setTimeout(() => {
+                        confirmClearTimeoutRef.current = null;
+                        setConfirmClear(false);
+                      }, 3500);
                     }}
                     className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-400 transition-colors hover:border-rose-500/25 hover:bg-rose-500/10 hover:text-rose-300"
                   >
@@ -366,10 +371,11 @@ export default function RoosterPage() {
                 type="button"
                 onClick={handleCalendarSync}
                 disabled={calSyncing}
+                aria-busy={calSyncing}
                 className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw size={16} className={calSyncing ? "animate-spin" : ""} />
-                <span>{calSyncing ? "Syncing" : "Sync"}</span>
+                <span>{calSyncing ? "Synchroniseren…" : "Sync"}</span>
               </button>
 
               <button
@@ -385,19 +391,125 @@ export default function RoosterPage() {
             </div>
           </div>
 
-          <TabBar active={tab} onChange={setTab} />
+          <TabBar tabs={TABS} active={tab} onChange={setTab} idPrefix="rooster" ariaLabel="Rooster onderdelen" tone="amber" />
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
-        {isLoading && (
+      {/* Bottom padding komt van ClientShell (pb-28 op mobiel) — hier niet dupliceren. */}
+      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        {isLoading && hasScheduleData && (
           <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-500">
             <Clock3 size={13} className="text-sky-300" />
             Roostergegevens worden bijgewerkt
           </div>
         )}
 
-        {!hasScheduleData && (
+        {/* Failed ≠ empty (audit DEEL 2 #2): een mislukte refresh mét gecachte
+            data toont een persistente amber banner i.p.v. stil verouderde data. */}
+        {scheduleIsError && hasScheduleData && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+            <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+            <span className="min-w-0 flex-1">
+              Rooster verversen mislukt — je ziet mogelijk verouderde gegevens.
+            </span>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+            >
+              Opnieuw proberen
+            </button>
+          </div>
+        )}
+
+        {/* Afspraken-fetch faalde (audit DEEL 2 #2): voorheen negeerde /rooster
+            een 500 volledig — een vrolijk-groene "rustig"-conflictchip naast een
+            lege tijdlijn. Nu een expliciete banner met retry. */}
+        {eventsError && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+            <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+            <span className="min-w-0 flex-1">
+              Afspraken en conflicten konden niet worden geladen — de tijdlijn en tellingen kunnen onvolledig zijn.
+            </span>
+            <button
+              type="button"
+              onClick={() => void refetchEvents()}
+              className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+            >
+              Opnieuw proberen
+            </button>
+          </div>
+        )}
+
+        {/* Persistente wachtrij-fout van de laatste sync — pariteit met het
+            sidebar-paneel op /agenda (audit F10). */}
+        {pendingSyncError && (
+          <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">Wachtrij-fout</p>
+            </div>
+            <p className="mt-1 text-[11px] leading-relaxed text-amber-400/80">{shortSyncError(pendingSyncError)}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCalendarSync}
+                disabled={calSyncing}
+                className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50 cursor-pointer"
+              >
+                Opnieuw syncen
+              </button>
+              <button
+                type="button"
+                onClick={() => setPendingSyncError(null)}
+                className="rounded-md px-2 py-1 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-300 cursor-pointer"
+              >
+                Verbergen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* First-run: de skeleton/empty/error-states horen alleen bij de
+            Overzicht-tab. Statistieken/Salaris/Beheer hebben eigen lege staten
+            en moeten ook zónder rooster bereikbaar zijn — anders zijn het dode
+            knoppen voor een nieuwe gebruiker (audit DEEL 2 #5). */}
+
+        {/* Tijdens de koude load géén "Rooster ophalen"-CTA flashen (audit M18):
+            eerst een lichte skeleton, pas bij een écht lege dataset de empty state. */}
+        {tab === "overzicht" && !hasScheduleData && isLoading && (
+          <div className="space-y-4" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="h-4 w-40 animate-pulse rounded bg-white/5" />
+                <div className="h-12 animate-pulse rounded-lg bg-white/[0.03]" />
+                <div className="h-12 animate-pulse rounded-lg bg-white/[0.03]" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Failed ≠ empty (audit DEEL 2 #2): een 500 zonder data toont een
+            foutpaneel met retry, niet de uitnodigende "Rooster ophalen"-CTA. */}
+        {tab === "overzicht" && !hasScheduleData && !isLoading && scheduleIsError && (
+          <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] px-6 py-12 text-center">
+            <AlertTriangle size={28} className="text-amber-400" />
+            <h3 className="mt-4 text-lg font-semibold text-amber-100">Rooster kon niet worden geladen</h3>
+            <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
+              {scheduleErrorMessage(scheduleError)}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+            >
+              <RefreshCw size={15} />
+              Opnieuw proberen
+            </button>
+          </div>
+        )}
+
+        {tab === "overzicht" && !hasScheduleData && !isLoading && !scheduleIsError && (
           <EmptyRoster
             syncing={calSyncing}
             onSync={handleCalendarSync}
@@ -405,12 +517,15 @@ export default function RoosterPage() {
           />
         )}
 
-        {hasScheduleData && (
+        {/* Overzicht toont zijn hero/tijdlijn alleen mét data; de overige tabs
+            renderen altijd (eigen lege staten) zodat ze op first-run bereikbaar
+            zijn (audit DEEL 2 #5). */}
+        {(hasScheduleData || tab !== "overzicht") && (
           <>
             {/* The next-shift hero + snapshot only belong on the Overzicht tab —
                 they're irrelevant on Statistieken/Salaris/Beheer and previously
                 rendered there too, walling off the actual content. */}
-            {tab === "overzicht" && (
+            {tab === "overzicht" && hasScheduleData && (
               <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_420px]">
                 <div className="order-2 hidden md:block xl:order-1">
                   <OverviewPanel
@@ -427,14 +542,27 @@ export default function RoosterPage() {
                 </div>
 
                 <div className="order-1 space-y-3 xl:order-2">
-                  <NextShiftCard
-                    dienst={nextDienst}
-                    compact={compactTimeline}
-                    onImport={handleCalendarSync}
-                    afspraken={nextShiftEvents}
-                    conflictMap={conflictMap}
-                    todayIso={todayIso}
-                  />
+                  {/* Beide varianten renderen en via CSS tonen — voorkomt de
+                      compact↔full flip na hydration met matchMedia (audit N5). */}
+                  <div className="md:hidden">
+                    <NextShiftCard
+                      dienst={nextDienst}
+                      compact
+                      onImport={handleCalendarSync}
+                      afspraken={nextShiftEvents}
+                      conflictMap={conflictMap}
+                      todayIso={todayIso}
+                    />
+                  </div>
+                  <div className="hidden md:block">
+                    <NextShiftCard
+                      dienst={nextDienst}
+                      onImport={handleCalendarSync}
+                      afspraken={nextShiftEvents}
+                      conflictMap={conflictMap}
+                      todayIso={todayIso}
+                    />
+                  </div>
                   <MobileRosterSnapshot
                     upcomingHours={upcomingHours}
                     upcomingCount={upcoming.length}
@@ -447,7 +575,7 @@ export default function RoosterPage() {
               </section>
             )}
 
-            {tab === "overzicht" && (
+            {tab === "overzicht" && hasScheduleData && (
               <div role="tabpanel" id={tabPanelId("overzicht")} aria-labelledby={tabId("overzicht")} tabIndex={0}>
                 <OverviewTab
                   unifiedWeeks={unifiedWeeks}
@@ -508,10 +636,18 @@ export default function RoosterPage() {
                 className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
               >
                 <ErrorBoundary>
+                  {/* Volledige dienstenlijst — zelfde invoer als de pagina zelf
+                      én als /agenda, zodat conflict-tellingen overal identiek
+                      zijn (audit N10/F13). Sync-vlag gedeeld met de header-knop
+                      (audit F9); wachtrij-fouten landen in de pagina-banner
+                      (audit F10). */}
                   <AfsprakenView
-                    diensten={upcoming}
+                    diensten={diensten}
                     onEditEvent={handleEditEvent}
                     onNewEvent={openNewEvent}
+                    syncing={calSyncing}
+                    onSyncingChange={setCalSyncing}
+                    onPendingSyncError={setPendingSyncError}
                   />
                 </ErrorBoundary>
               </div>
@@ -533,14 +669,9 @@ export default function RoosterPage() {
   );
 }
 
-function shortSyncError(error: string) {
-  return error.length > 140 ? `${error.slice(0, 137)}...` : error;
-}
-
-/** Advance an ISO date (YYYY-MM-DD) by `days`, noon-anchored to match eventsByDate keys. */
-function addDaysIso(baseIso: string, days: number): string {
-  const date = new Date(`${baseIso}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return baseIso;
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+/** Leesbare melding uit de (untyped) query-error van useSchedule. */
+function scheduleErrorMessage(error: unknown) {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error instanceof Error && error.message) return error.message;
+  return "De server gaf een fout terug. Controleer je verbinding en probeer het opnieuw.";
 }

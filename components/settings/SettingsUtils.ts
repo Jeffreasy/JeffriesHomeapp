@@ -1,10 +1,12 @@
 import {
+  Briefcase,
   CalendarClock,
   CalendarDays,
   Database,
   Lightbulb,
   StickyNote,
   Target,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -190,9 +192,11 @@ export const toneClasses: Record<Tone, { border: string; surface: string; icon: 
 
 export const routeTiles: Array<{ href: string; label: string; meta: string; icon: LucideIcon; tone: Tone }> = [
   { href: "/lampen", label: "Verlichting", meta: "Lampen bedienen", icon: Lightbulb, tone: "amber" },
+  { href: "/automations", label: "Automations", meta: "Wekkers en schema's", icon: Zap, tone: "amber" },
   { href: "/rooster", label: "Rooster", meta: "Diensten", icon: CalendarClock, tone: "sky" },
   { href: "/agenda", label: "Agenda", meta: "Afspraken en sync", icon: CalendarDays, tone: "indigo" },
   { href: "/finance", label: "Finance", meta: "Transacties", icon: Database, tone: "green" },
+  { href: "/laventecare", label: "LaventeCare", meta: "Klanten en facturatie", icon: Briefcase, tone: "green" },
   { href: "/notities", label: "Notities", meta: "Knowledge base", icon: StickyNote, tone: "indigo" },
   { href: "/habits", label: "Habits", meta: "Privacygevoelig", icon: Target, tone: "rose" },
 ];

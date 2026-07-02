@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import { AlarmClock, BellRing, Briefcase, Clock3, Loader2, Moon, RotateCcw, Save, ShieldCheck, Sunrise, Trash2 } from "lucide-react";
 import {
@@ -18,6 +18,12 @@ type ManagedShiftType = Exclude<ShiftType, "any">;
 interface DienstWekkerSectionProps {
   automations: Automation[];
   busyType?: ManagedShiftType | null;
+  /**
+   * True zodra de automations-lijst betrouwbaar geladen is. Zolang false
+   * (nog laden of fout) blokkeren we opslaan/verwijderen: de pack-ids zijn
+   * dan onbekend en opslaan zou een dubbel pack achterlaten (fix 8a).
+   */
+  listReady?: boolean;
   onSave: (type: ManagedShiftType, times: DienstWekkerTimes) => void | Promise<void>;
   onRemove: (type: ManagedShiftType) => void | Promise<void>;
 }
@@ -124,12 +130,36 @@ function hasChanges(type: ManagedShiftType, draft: DienstWekkerTimes, automation
   return templates.some((template) => draft[template.id] !== reference[template.id]);
 }
 
-export function DienstWekkerSection({ automations, busyType, onSave, onRemove }: DienstWekkerSectionProps) {
+export function DienstWekkerSection({ automations, busyType, listReady = true, onSave, onRemove }: DienstWekkerSectionProps) {
   const [activeType, setActiveType] = useState<ManagedShiftType>("Vroeg");
   const [draftTimes, setDraftTimes] = useState<Record<ManagedShiftType, DienstWekkerTimes>>(() => buildTimesState(automations));
+  // Onthoud de laatst-verwerkte servertijden per profiel, zodat we een
+  // background-refetch alleen ín de draft mergen als díe profieltijden écht
+  // zijn veranderd — en dan nog alleen wanneer de gebruiker die draft niet
+  // handmatig heeft aangepast (fix 8b: geen half-getypte tijden wegvagen).
+  const serverTimesRef = useRef<Record<ManagedShiftType, DienstWekkerTimes>>(buildTimesState(automations));
 
   useEffect(() => {
-    setDraftTimes(buildTimesState(automations));
+    const nextServer = buildTimesState(automations);
+    setDraftTimes((current) => {
+      let changed = false;
+      const merged = { ...current };
+      (Object.keys(nextServer) as ManagedShiftType[]).forEach((type) => {
+        const prevServer = serverTimesRef.current[type];
+        const nowServer = nextServer[type];
+        // Alleen dit profiel aanraken als de servertijden ervan wijzigden.
+        const serverChanged = JSON.stringify(prevServer) !== JSON.stringify(nowServer);
+        if (!serverChanged) return;
+        // Draft dirty t.o.v. de vórige serverstaat? Dan is de gebruiker aan het
+        // typen — die tijden niet overschrijven. Anders volgt de draft de server.
+        const draftDirty = JSON.stringify(current[type]) !== JSON.stringify(prevServer);
+        if (draftDirty) return;
+        merged[type] = nowServer;
+        changed = true;
+      });
+      return changed ? merged : current;
+    });
+    serverTimesRef.current = nextServer;
   }, [automations]);
 
   const activeProfile = SHIFT_PROFILES.find((profile) => profile.type === activeType) ?? SHIFT_PROFILES[0];
@@ -159,7 +189,10 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
   };
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.24)] sm:p-5">
+    <section
+      id="dienst-wekker-cockpit"
+      className="scroll-mt-28 rounded-xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_18px_60px_rgba(0,0,0,0.24)] sm:p-5"
+    >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-500/10 text-amber-200">
@@ -176,7 +209,7 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
         <div className="grid grid-cols-3 gap-2 xl:min-w-[360px]">
           <WekkerMetric label="Profielen" value={`${SHIFT_PROFILES.filter((profile) => getShiftAutomations(automations, profile.type).length > 0).length}/3`} />
           <WekkerMetric label="Actief" value={`${SHIFT_PROFILES.reduce((sum, profile) => sum + getShiftAutomations(automations, profile.type).filter((item) => item.enabled).length, 0)}`} />
-          <WekkerMetric label="Engine" value="Go" />
+          <WekkerMetric label="Draait" value="Server" />
         </div>
       </div>
 
@@ -189,6 +222,7 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
             <button
               key={profile.type}
               type="button"
+              aria-pressed={selected}
               onClick={() => setActiveType(profile.type)}
               className={cn(
                 "rounded-xl border p-3 text-left transition-colors",
@@ -207,7 +241,7 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
                 </div>
                 {items.length > 0 && (
                   <span className={cn("rounded-md px-2 py-1 text-[11px] font-semibold", items.some((item) => item.enabled) ? "bg-emerald-500/10 text-emerald-200" : "bg-slate-500/10 text-slate-400")}>
-                    {items.some((item) => item.enabled) ? "Live" : "Pauze"}
+                    {items.some((item) => item.enabled) ? "Actief" : "Pauze"}
                   </span>
                 )}
               </div>
@@ -228,6 +262,13 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-bold text-white">{activeProfile.label}</h3>
                   <p className="text-xs text-slate-500">{enabledCount}/{activeTemplates.length} stappen actief · laatste run {formatLastRun(activeItems)}</p>
+                  {/* M4: eerlijk over wat "Actief" betekent — of er een passende
+                      dienst aankomt is hier niet te verifiëren zonder rooster. */}
+                  {enabledCount > 0 && (
+                    <p className="mt-1 text-[11px] text-amber-300/80">
+                      Vuurt alleen op dagen met een passende {activeType}-dienst in het rooster.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -245,7 +286,8 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
                 <button
                   type="button"
                   onClick={() => onRemove(activeType)}
-                  disabled={busy}
+                  disabled={busy || !listReady}
+                  title={!listReady ? "Wekkers worden nog geladen — even wachten" : undefined}
                   className="inline-flex h-9 items-center gap-2 rounded-lg border border-rose-400/20 bg-rose-500/10 px-3 text-xs font-semibold text-rose-200 transition-colors hover:bg-rose-500/15 disabled:opacity-50"
                 >
                   {busy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
@@ -255,8 +297,14 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
               <button
                 type="button"
                 onClick={() => onSave(activeType, activeDraft)}
-                disabled={busy || (!dirty && installedCount > 0)}
-                title={!dirty && installedCount > 0 ? "Geen wijzigingen om op te slaan. Pas een tijd aan om opnieuw op te slaan." : undefined}
+                disabled={busy || !listReady || (!dirty && installedCount > 0)}
+                title={
+                  !listReady
+                    ? "Wekkers worden nog geladen — even wachten om dubbele wekkers te voorkomen"
+                    : !dirty && installedCount > 0
+                      ? "Geen wijzigingen om op te slaan. Pas een tijd aan om opnieuw op te slaan."
+                      : undefined
+                }
                 className="inline-flex h-9 items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-500/15 px-3 text-xs font-semibold text-amber-100 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 {busy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
@@ -265,7 +313,9 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
             </div>
           </div>
 
-          <div className="mt-4 space-y-2">
+          <p className="mt-3 text-[10px] text-slate-500">Tijden in Nederlandse tijd (Europe/Amsterdam)</p>
+
+          <div className="mt-2 space-y-2">
             {activeTemplates.map((template, index) => {
               const installed = findTemplateAutomation(activeItems, activeType, template.id, index);
               return (
@@ -307,7 +357,7 @@ export function DienstWekkerSection({ automations, busyType, onSave, onRemove }:
           <div className="mt-4 space-y-3 text-sm leading-6 text-slate-400">
             <InfoLine icon={<Clock3 size={14} />} title="Rooster gestuurd" text={`Alle stappen controleren eerst of je vandaag een ${activeType}-dienst hebt.`} />
             <InfoLine icon={<BellRing size={14} />} title="Server-side" text="De Go engine voert dit uit, ook wanneer je browser of tablet uit staat." />
-            <InfoLine icon={<AlarmClock size={14} />} title="Idempotent" text="Opslaan vervangt het volledige profiel, zodat dubbele wekkers worden voorkomen." />
+            <InfoLine icon={<AlarmClock size={14} />} title="Geen dubbele wekkers" text="Opslaan vervangt het volledige profiel, zodat dubbele wekkers worden voorkomen." />
           </div>
           <div className="mt-4 rounded-lg border border-amber-400/15 bg-amber-500/10 p-3">
             <p className="text-xs font-semibold text-amber-100">Preview</p>

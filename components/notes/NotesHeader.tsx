@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "@/components/ui/AppIcon";
@@ -31,9 +32,32 @@ export function NotesHeader({
   onTabChange: (tab: NotesTab) => void;
 }) {
   const tabs: { id: NotesTab; label: string; icon: AppIconName }[] = [
-    { id: "journal", label: "Week Journal", icon: "book" },
+    { id: "journal", label: "Weekjournaal", icon: "book" },
     { id: "collection", label: "Collectie", icon: "list" },
   ];
+
+  // Roving tabindex + pijltjes/Home/End (low) — zelfde mechanics als de
+  // gedeelde schedule-TabBar, inline gehouden zodat de underline-styling van
+  // deze header intact blijft.
+  const handleTabKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
+    if (currentIndex < 0) return;
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1) % tabs.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = tabs.length - 1;
+    }
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    onTabChange(nextTab.id);
+    document.getElementById(`notes-tab-${nextTab.id}`)?.focus();
+  };
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/95 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
@@ -44,7 +68,7 @@ export function NotesHeader({
             <h1 className="text-lg font-bold text-white">Notities</h1>
             <p className="text-xs text-[var(--color-text-muted)]">
               {isLoading
-                ? "Laden..."
+                ? "Laden…"
                 : `${count} actief · ${completedCount} afgerond · ${archivedCount} archief · ${pinnedCount} vastgezet`}
             </p>
           </div>
@@ -84,10 +108,13 @@ export function NotesHeader({
           {tabs.map(({ id, label, icon }) => (
             <button
               key={id}
+              id={`notes-tab-${id}`}
               role="tab"
               aria-selected={activeTab === id}
               aria-current={activeTab === id ? "page" : undefined}
+              tabIndex={activeTab === id ? 0 : -1}
               onClick={() => onTabChange(id)}
+              onKeyDown={handleTabKeyDown}
               className={cn(
                 "relative flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer",
                 activeTab === id

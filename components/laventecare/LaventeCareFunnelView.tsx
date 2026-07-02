@@ -124,7 +124,9 @@ export function LaventeCareFunnelView({
                         <p className="mt-1 text-xs text-slate-500">{label(lead.status)} - {lead.bron}</p>
                       </div>
                       <span className={cn("rounded-full border px-2.5 py-1 text-xs font-bold", tone.border, tone.surface, tone.text)}>
-                        {lead.fitScore ?? 0}% fit
+                        {typeof lead.fitScore === "number"
+                          ? `${lead.fitScore}% fit`
+                          : "Nog geen fit-score"}
                       </span>
                     </div>
                     {lead.pijnpunt && <p className="mt-3 text-sm leading-6 text-slate-400">{lead.pijnpunt}</p>}
@@ -139,13 +141,20 @@ export function LaventeCareFunnelView({
                         <div className="mt-4 grid gap-2 sm:grid-cols-4">
                           {["intake", "discovery", "voorstel"].map((status) => {
                             const busy = processingLead === `${lead._id}:${status}`;
+                            const isCurrent = lead.status === status;
                             return (
                               <button
                                 key={status}
                                 type="button"
                                 onClick={() => handleLeadStatus(lead, status)}
                                 disabled={leadBusy}
-                                className="btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60"
+                                aria-pressed={isCurrent}
+                                title={isCurrent ? "Huidige status" : undefined}
+                                className={cn(
+                                  "btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60",
+                                  isCurrent &&
+                                    "border-sky-400/50 bg-sky-500/15 text-sky-100 ring-1 ring-inset ring-sky-400/40",
+                                )}
                               >
                                 {busy && <Loader2 size={13} className="animate-spin" />}
                                 {label(status)}

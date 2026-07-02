@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 import {
   Activity,
+  AlertTriangle,
   Lightbulb,
   Power,
+  RefreshCw,
   Settings,
   Sparkles,
   Sun,
@@ -12,7 +14,9 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDevices, useRooms, useLampCommand } from "@/hooks/useHomeapp";
+import { useBridgeStatus } from "@/hooks/useDevices";
 import { RoomSection } from "@/components/room/RoomSection";
 import { LampDetailPanel } from "@/components/lamp/LampDetailPanel";
 import { SceneBar } from "@/components/scenes/SceneBar";
@@ -39,9 +43,11 @@ import { LampToolbar } from "@/components/lamp/LampToolbar";
 import { LampOverviewSidebar } from "@/components/lamp/LampOverviewSidebar";
 
 export default function LampenPage() {
-  const { data: devices = [], isLoading: loadingDevices, error: devicesError } = useDevices();
+  const { data: devices = [], isLoading: loadingDevices, isFetching: fetchingDevices, error: devicesError } = useDevices();
   const { data: rooms = [], isLoading: loadingRooms, error: roomsError } = useRooms();
-  const { mutate: sendCommand } = useLampCommand();
+  const { sendBatch } = useLampCommand();
+  const { bridge, bridgeOffline } = useBridgeStatus();
+  const queryClient = useQueryClient();
 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -82,14 +88,19 @@ export default function LampenPage() {
   const hasNoDevices = !isLoading && devices.length === 0 && !devicesError;
 
   const toggleAll = () => {
-    onlineDevices.forEach((device) => sendCommand({ id: device.id, cmd: { on: !allOnlineOn } }));
+    // Batch: één invalidate aan het eind i.p.v. een refetch-storm per lamp.
+    sendBatch(onlineDevices, { on: !allOnlineOn });
+  };
+
+  const refreshDevices = () => {
+    queryClient.invalidateQueries({ queryKey: ["devices"] });
   };
 
   const handleSelect = (device: Device) => {
     setSelectedDeviceId((previous) => (previous === device.id ? null : device.id));
   };
 
-  useGlobalShortcuts({ devices: onlineDevices, allOn: allOnlineOn, sendCommand });
+  useGlobalShortcuts({ devices: onlineDevices, allOn: allOnlineOn, sendBatch });
 
   return (
     <div className="text-slate-100">
@@ -102,16 +113,27 @@ export default function LampenPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Smart lighting
+                  Slimme verlichting
                 </p>
                 <h1 className="mt-1 truncate text-2xl font-bold text-white">Verlichting</h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  {onlineDevices.length}/{devices.length} online - {onDevices.length} aan
+                  {onlineDevices.length}/{devices.length} online · {onDevices.length} aan
                 </p>
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={refreshDevices}
+                disabled={fetchingDevices}
+                aria-label="Lampstatus verversen"
+                title="Haal de actuele lampstatus op"
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-wait disabled:opacity-60"
+              >
+                <RefreshCw size={16} className={fetchingDevices ? "animate-spin" : ""} aria-hidden="true" />
+                <span className="hidden sm:inline">Verversen</span>
+              </button>
               <Link
                 href="/settings"
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
@@ -134,6 +156,28 @@ export default function LampenPage() {
         </header>
 
         <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
+          {/* N7: in queue-modus bevestigt de backend commando's vóór uitvoering —
+              bij een offline bridge is de getoonde staat dus mogelijk nep. */}
+          {bridgeOffline && (
+            <div
+              role="status"
+              className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4"
+            >
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-amber-200">
+                  Bridge offline — lampcommando&apos;s worden uitgesteld en de getoonde status kan verouderd zijn.
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">
+                  {bridge?.lastSeenAt
+                    ? `Laatste heartbeat: ${new Date(bridge.lastSeenAt).toLocaleString("nl-NL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}.`
+                    : "Nog geen heartbeat ontvangen."}
+                  {(bridge?.commandsPending ?? 0) > 0 && ` ${bridge?.commandsPending} commando('s) in de wachtrij.`}
+                </p>
+              </div>
+            </div>
+          )}
+
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_420px]">
             <LampCommandCenter
               devices={devices.length}
@@ -191,6 +235,26 @@ export default function LampenPage() {
 
               {isLoading ? (
                 <LoadingGrid />
+              ) : devicesError && devices.length === 0 ? (
+                // Failed ≠ empty: bij een device-fetch-fout géén "Filters resetten"
+                // maar een echte foutmelding met retry.
+                <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/5 px-6 py-12 text-center">
+                  <AlertTriangle size={28} className="text-rose-300" aria-hidden="true" />
+                  <h3 className="mt-4 text-base font-semibold text-rose-200">
+                    Lampen konden niet worden geladen
+                  </h3>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+                    De deviceverbinding is mislukt. De lampen zelf werken mogelijk gewoon — alleen de status is niet op te halen.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={refreshDevices}
+                    className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/15"
+                  >
+                    <RefreshCw size={15} className={fetchingDevices ? "animate-spin" : ""} aria-hidden="true" />
+                    Opnieuw proberen
+                  </button>
+                </div>
               ) : hasNoDevices ? (
                 <EmptyDevices />
               ) : hasAnyResults ? (
@@ -233,8 +297,13 @@ export default function LampenPage() {
                   icon={Activity}
                   label="Systeem"
                   title="Live status"
-                  sub={isLoading ? "laden" : "actueel"}
+                  sub={isLoading ? "laden" : "ververst elke 10s"}
                 />
+                {/* N7: eerlijk over de grens van "live" — de fysieke lampstatus
+                    reconvergeert in queue-modus pas bij de bridge-poll. */}
+                <p className="-mt-2 mb-3 text-[11px] leading-4 text-slate-500">
+                  Getoonde status is de laatst bekende — de fysieke lampstatus kan enkele minuten achterlopen.
+                </p>
                 <div className="space-y-3">
                   <StatusRow
                     icon={Wifi}

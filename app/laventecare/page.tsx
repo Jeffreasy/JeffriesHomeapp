@@ -1,8 +1,10 @@
 "use client";
 
-import { FormEvent, useState, useMemo } from "react";
+import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { RotateCcw, TriangleAlert } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
 import { ApiError } from "@/lib/api";
 import {
   LAVENTECARE_DOCUMENT_TOTAL,
@@ -61,9 +63,16 @@ import {
 
 export default function LaventeCarePage() {
   const {
+    cockpit,
     cockpitLoading,
+    cockpitError,
+    refetchCockpit,
     billingLoading,
+    billingError,
+    refetchBilling,
     mailboxLoading,
+    mailboxError,
+    refetchMailbox,
     dossierAdviceLoading,
     dossierAdviceError,
     refetchDossierAdvice,
@@ -71,9 +80,11 @@ export default function LaventeCarePage() {
     contacts,
     accessCredentials,
     documents,
+    leads,
     activeLeads,
     workstreams,
     activeWorkstreams,
+    projects,
     activeProjects,
     businessSignals,
     actionItems,
@@ -101,6 +112,7 @@ export default function LaventeCarePage() {
     createContactMut,
     updateContactMut,
     createAccessCredentialMut,
+    updateAccessCredentialMut,
     createLeadMut,
     updateLeadMut,
     convertLeadMut,
@@ -124,6 +136,8 @@ export default function LaventeCarePage() {
     createQuoteMut,
     updateQuoteStatusMut,
     createTimeEntryMut,
+    updateTimeEntryMut,
+    deleteTimeEntryMut,
     createInvoiceMut,
     createInvoiceFromQuoteMut,
     updateInvoiceStatusMut,
@@ -149,6 +163,18 @@ export default function LaventeCarePage() {
     useState<WorkstreamForm>(emptyWorkstreamForm);
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  // Baselines for the dirty-guard (M3): snapshot of the form as it was when the
+  // modal opened (empty, prefilled or populated-for-edit). A modal is "dirty"
+  // when its current form no longer equals its baseline.
+  const [companyFormBaseline, setCompanyFormBaseline] = useState<string>(
+    JSON.stringify(emptyCompanyForm),
+  );
+  const [contactFormBaseline, setContactFormBaseline] = useState<string>(
+    JSON.stringify(emptyContactForm),
+  );
+  const [workstreamFormBaseline, setWorkstreamFormBaseline] = useState<string>(
+    JSON.stringify(emptyWorkstreamForm),
+  );
   const [savingCompany, setSavingCompany] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
   const [savingAccessCredential, setSavingAccessCredential] = useState(false);
@@ -183,15 +209,55 @@ export default function LaventeCarePage() {
   >(null);
   const [generatingInvoiceDocumentId, setGeneratingInvoiceDocumentId] =
     useState<string | null>(null);
+  // Separate busy flag so the "UBL" button no longer spins while "Document"
+  // is generating (they used to share generatingInvoiceDocumentId).
+  const [downloadingInvoiceUBLId, setDownloadingInvoiceUBLId] = useState<
+    string | null
+  >(null);
+  const [updatingAccessCredentialId, setUpdatingAccessCredentialId] = useState<
+    string | null
+  >(null);
   const [refreshingPaymentInvoiceId, setRefreshingPaymentInvoiceId] = useState<
     string | null
   >(null);
+  // Set once an inbox-sync reports that the Graph app lacks Mail.Read; the
+  // mailbox view then shows a persistent notice instead of only a toast (M15).
+  const [inboundBlocked, setInboundBlocked] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(
     null,
   );
   const [activeView, setActiveView] = useState<PortalView>("overview");
   const [mailboxInvoiceId, setMailboxInvoiceId] = useState("");
+  // R3-maandafsluiting: signaleer de mailbox dat een herinnering bedoeld is,
+  // zodat die de herinneringstemplate voorselecteert.
+  const [mailboxIntent, setMailboxIntent] = useState<"reminder" | null>(null);
+  // R3-H6: per-factuur pending betaalverzoek dat op bevestiging wacht; leeft op
+  // de pagina zodat de instructie persistent en actionabel op de factuurrij staat.
+  const [pendingPaymentActions, setPendingPaymentActions] = useState<
+    Record<string, { message: string; code?: string; pendingActionId?: string }>
+  >({});
+  // R3-maandafsluiting: klant voorgeselecteerd bij het openen van Commercie
+  // vanuit het dossier.
+  const [commercePrefillCompanyId, setCommercePrefillCompanyId] = useState("");
   const [search, setSearch] = useState("");
+  // N10: per-regel busy-vlag voor urenregel-acties.
+  const [processingTimeEntryId, setProcessingTimeEntryId] = useState<
+    string | null
+  >(null);
+  // Diff L-7: het "Verzonden"-signaal leeft hier zodat het de key-remount van
+  // de mailbox-view (na het legen van de invoice-prefill) overleeft.
+  const [mailJustSent, setMailJustSent] = useState(false);
+  const mailJustSentTimer = useRef<number | null>(null);
+  // M-D: dirty-status van de commerce/mailbox-formulieren, gelift via
+  // callbacks zodat een tabwissel eerst om bevestiging kan vragen.
+  const commerceDirtyRef = useRef(false);
+  const mailboxDirtyRef = useRef(false);
+  const handleCommerceDirtyChange = useCallback((dirty: boolean) => {
+    commerceDirtyRef.current = dirty;
+  }, []);
+  const handleMailboxDirtyChange = useCallback((dirty: boolean) => {
+    mailboxDirtyRef.current = dirty;
+  }, []);
 
   const selectedCompany = useMemo(
     () =>
@@ -200,6 +266,20 @@ export default function LaventeCarePage() {
       ) ?? null,
     [companies, selectedCompanyId],
   );
+
+  // Dirty flags (M3): lead/project forms always open empty (they reset on
+  // close), company/contact/workstream forms compare against the snapshot
+  // taken when they were opened (empty, prefilled or loaded-for-edit).
+  const leadFormDirty =
+    JSON.stringify(leadForm) !== JSON.stringify(emptyLeadForm);
+  const projectFormDirty =
+    JSON.stringify(projectForm) !== JSON.stringify(emptyProjectForm);
+  const workstreamFormDirty =
+    JSON.stringify(workstreamForm) !== workstreamFormBaseline;
+  const companyFormDirty =
+    JSON.stringify(companyForm) !== companyFormBaseline;
+  const contactFormDirty =
+    JSON.stringify(contactForm) !== contactFormBaseline;
 
   const filteredDocuments = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -239,7 +319,7 @@ export default function LaventeCarePage() {
     const invoiceCount = billing?.summary.invoices ?? invoices.length;
     const hasCommercialData =
       quoteCount > 0 || timeEntryCount > 0 || invoiceCount > 0;
-    return [
+    const rows: CapabilityRow[] = [
       {
         label: "Klantenbasis",
         detail: `${companies.length} klanten, ${contacts.length} contactpersonen`,
@@ -356,15 +436,15 @@ export default function LaventeCarePage() {
         label: "Bunq betalingen",
         detail: billing?.summary.bunqReady
           ? "API en rekening staan klaar"
-          : "Render env mist nog providerdata",
+          : "Betaalprovider-configuratie op de server ontbreekt nog",
         status: billing?.summary.bunqReady ? "ready" : "missing",
         owner: "Finance",
         view: "commerce",
         score: billing?.summary.bunqReady ? 100 : 20,
         priority: billing?.summary.bunqReady ? "laag" : "hoog",
         nextStep: billing?.summary.bunqReady
-          ? "Koppel het eerste betaalverzoek aan een factuur zodra de commerciele flow gevuld is."
-          : "Vul Render env voor Bunq volledig aan voordat betaalverzoeken live kunnen.",
+          ? "Koppel het eerste betaalverzoek aan een factuur zodra de commerciële flow gevuld is."
+          : "De betaalprovider-configuratie op de server ontbreekt nog; die moet compleet zijn voordat betaalverzoeken live kunnen.",
         actionLabel: "Open betalingen",
       },
       {
@@ -415,7 +495,7 @@ export default function LaventeCarePage() {
       },
       {
         label: "Documentbasis",
-        detail: `${summary.documents}/${LAVENTECARE_DOCUMENT_TOTAL} templates geindexeerd`,
+        detail: `${summary.documents}/${LAVENTECARE_DOCUMENT_TOTAL} templates geïndexeerd`,
         status:
           summary.documents >= LAVENTECARE_DOCUMENT_TOTAL
             ? "ready"
@@ -439,6 +519,16 @@ export default function LaventeCarePage() {
         actionLabel: "Open kennisbank",
       },
     ];
+    // R3-11: koppel de volwassenheidsscore aan de status. Meerdere rijen hadden
+    // hardcoded score 100 terwijl hun status "attention" ("Inrichten") kon zijn
+    // — dat gaf "~84% volwassen" naast zeven "Inrichten"-badges. Een nog niet
+    // ingerichte flow telt niet als 100% volwassen.
+    return rows.map((row) => {
+      if (row.status === "ready") return row;
+      if (row.status === "attention" && row.score > 70) return { ...row, score: 65 };
+      if (row.status === "missing" && row.score > 40) return { ...row, score: 20 };
+      return row;
+    });
   }, [
     activeLeads.length,
     activeProjects.length,
@@ -562,6 +652,7 @@ export default function LaventeCarePage() {
   const openNewCompanyForm = () => {
     setEditingCompanyId(null);
     setCompanyForm(emptyCompanyForm);
+    setCompanyFormBaseline(JSON.stringify(emptyCompanyForm));
     setShowCompanyForm(true);
   };
 
@@ -575,7 +666,7 @@ export default function LaventeCarePage() {
 
   const handleEditCompany = (company: CompanyItem) => {
     setEditingCompanyId(company._id ?? company.id);
-    setCompanyForm({
+    const populated: CompanyForm = {
       naam: company.naam ?? "",
       website: company.website ?? "",
       sector: company.sector ?? "",
@@ -596,7 +687,9 @@ export default function LaventeCarePage() {
       defaultLoginUrl: company.default_login_url ?? "",
       onboardingStatus: company.onboarding_status ?? "niet_gestart",
       dataProcessingStatus: company.data_processing_status ?? "niet_nodig",
-    });
+    };
+    setCompanyForm(populated);
+    setCompanyFormBaseline(JSON.stringify(populated));
     setShowCompanyForm(true);
   };
 
@@ -668,17 +761,19 @@ export default function LaventeCarePage() {
       (contact) => contact.company_id === id,
     );
     setEditingContactId(null);
-    setContactForm({
+    const prefilled = {
       ...emptyContactForm,
       companyId: id,
       isPrimary: companyContacts.length === 0,
-    });
+    };
+    setContactForm(prefilled);
+    setContactFormBaseline(JSON.stringify(prefilled));
     setShowContactForm(true);
   };
 
   const handleEditContact = (contact: ContactItem) => {
     setEditingContactId(contact._id ?? contact.id);
-    setContactForm({
+    const populated: ContactForm = {
       companyId: contact.company_id ?? contact.companyId ?? "",
       naam: contact.naam ?? "",
       email: contact.email ?? "",
@@ -688,7 +783,9 @@ export default function LaventeCarePage() {
       notities: contact.notities ?? "",
       preferredChannel: contact.preferred_channel ?? "",
       decisionRole: contact.decision_role ?? "",
-    });
+    };
+    setContactForm(populated);
+    setContactFormBaseline(JSON.stringify(populated));
     setShowContactForm(true);
   };
 
@@ -764,8 +861,26 @@ export default function LaventeCarePage() {
       success("Toegang vastgelegd in klantdossier");
     } catch {
       toastError("Toegang vastleggen is mislukt. Controleer of de secret key op de backend staat als je een wachtwoord invult.");
+      // M-C: rethrow zodat het formulier zichzelf NIET reset en de invoer
+      // behouden blijft.
+      throw new Error("Toegang vastleggen is mislukt");
     } finally {
       setSavingAccessCredential(false);
+    }
+  };
+
+  const handleUpdateAccessCredential = async (
+    id: string,
+    data: { status?: string; secret_label?: string; secret_hint?: string; notes?: string },
+  ) => {
+    setUpdatingAccessCredentialId(id);
+    try {
+      await updateAccessCredentialMut.mutateAsync({ id, ...data });
+      success("Toegang bijgewerkt");
+    } catch {
+      toastError("Toegang bijwerken is mislukt");
+    } finally {
+      setUpdatingAccessCredentialId(null);
     }
   };
 
@@ -875,6 +990,7 @@ export default function LaventeCarePage() {
         bron: "cockpit",
       });
       setWorkstreamForm(emptyWorkstreamForm);
+      setWorkstreamFormBaseline(JSON.stringify(emptyWorkstreamForm));
       setShowWorkstreamForm(false);
       success("LaventeCare opdracht toegevoegd");
     } catch {
@@ -1075,14 +1191,37 @@ export default function LaventeCarePage() {
 
   const handleStartWorkstreamForCompany = (company: CompanyItem) => {
     const id = company._id ?? company.id;
-    setWorkstreamForm({
+    const prefilled = {
       ...emptyWorkstreamForm,
       companyId: id,
       projectId: "",
       klantNaam: company.naam,
       titel: `${company.naam}: opdracht`,
-    });
+    };
+    setWorkstreamForm(prefilled);
+    // The prefill itself is not "dirty": closing without extra typing may
+    // discard it silently.
+    setWorkstreamFormBaseline(JSON.stringify(prefilled));
     setShowWorkstreamForm(true);
+  };
+
+  // Unified close-reset semantics (M3): closing a create-modal always drops
+  // the draft, so a later open never resurfaces stale input. The dirty-guard
+  // in Modal asks for confirmation first when there is typed input.
+  const closeLeadForm = () => {
+    setShowLeadForm(false);
+    setLeadForm(emptyLeadForm);
+  };
+
+  const closeProjectForm = () => {
+    setShowProjectForm(false);
+    setProjectForm(emptyProjectForm);
+  };
+
+  const closeWorkstreamForm = () => {
+    setShowWorkstreamForm(false);
+    setWorkstreamForm(emptyWorkstreamForm);
+    setWorkstreamFormBaseline(JSON.stringify(emptyWorkstreamForm));
   };
 
   const handleLogDossierDocument = async (
@@ -1160,6 +1299,9 @@ export default function LaventeCarePage() {
     }
   };
 
+  // M-C: deze drie handlers rethrowen bij een fout, zodat de formulieren in
+  // OperationsView alleen na een geslaagde save resetten en mislukte invoer
+  // behouden blijft.
   const handleCreateDecision = async (
     payload: Parameters<typeof createDecisionMut.mutateAsync>[0],
   ) => {
@@ -1168,6 +1310,7 @@ export default function LaventeCarePage() {
       success("Besluit vastgelegd in LaventeCare");
     } catch {
       toastError("Besluit vastleggen is mislukt");
+      throw new Error("Besluit vastleggen is mislukt");
     }
   };
 
@@ -1179,6 +1322,7 @@ export default function LaventeCarePage() {
       success("Change request aangemaakt");
     } catch {
       toastError("Change request aanmaken is mislukt");
+      throw new Error("Change request aanmaken is mislukt");
     }
   };
 
@@ -1190,6 +1334,7 @@ export default function LaventeCarePage() {
       success("SLA-incident geregistreerd");
     } catch {
       toastError("SLA-incident registreren is mislukt");
+      throw new Error("SLA-incident registreren is mislukt");
     }
   };
 
@@ -1254,6 +1399,89 @@ export default function LaventeCarePage() {
     }
   };
 
+  // ── N10: urenregels bewerken, afschrijven, heropenen en verwijderen ──────
+  const timeEntryConflictMessage =
+    "Deze urenregel staat al op een factuur en kan niet meer worden aangepast of verwijderd.";
+
+  const handleUpdateTimeEntry = async (
+    id: string,
+    data: { omschrijving?: string; minuten?: number; status?: "open" | "afgeschreven" },
+    successMessage = "Urenregel bijgewerkt",
+  ) => {
+    setProcessingTimeEntryId(id);
+    try {
+      await updateTimeEntryMut.mutateAsync({ id, ...data });
+      success(successMessage);
+    } catch (err) {
+      toastError(
+        err instanceof ApiError && err.status === 409
+          ? timeEntryConflictMessage
+          : "Urenregel bijwerken is mislukt",
+      );
+      throw err;
+    } finally {
+      setProcessingTimeEntryId(null);
+    }
+  };
+
+  const handleEditTimeEntry = (
+    id: string,
+    data: { omschrijving?: string; minuten?: number },
+  ) => handleUpdateTimeEntry(id, data);
+
+  const handleWriteOffTimeEntry = async (entry: {
+    id: string;
+    description: string;
+    minutes: number;
+  }) => {
+    const confirmed = await openConfirm({
+      title: "Uren afschrijven",
+      message: `"${entry.description}" (${entry.minutes} min) afschrijven? De regel telt dan niet meer mee als niet-gefactureerd en verdwijnt uit de factuurselectie.`,
+      confirmLabel: "Afschrijven",
+    });
+    if (!confirmed) return;
+    try {
+      await handleUpdateTimeEntry(entry.id, { status: "afgeschreven" }, "Urenregel afgeschreven");
+    } catch {
+      // Toast is al getoond.
+    }
+  };
+
+  const handleReopenTimeEntry = async (entry: { id: string }) => {
+    try {
+      await handleUpdateTimeEntry(entry.id, { status: "open" }, "Urenregel heropend");
+    } catch {
+      // Toast is al getoond.
+    }
+  };
+
+  const handleDeleteTimeEntry = async (entry: {
+    id: string;
+    description: string;
+    minutes: number;
+  }) => {
+    const confirmed = await openConfirm({
+      title: "Urenregel verwijderen",
+      message: `"${entry.description}" (${entry.minutes} min) definitief verwijderen? Dit kan niet ongedaan worden gemaakt.`,
+      confirmLabel: "Verwijderen",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+    setProcessingTimeEntryId(entry.id);
+    try {
+      await deleteTimeEntryMut.mutateAsync(entry.id);
+      success("Urenregel verwijderd");
+    } catch (err) {
+      toastError(
+        err instanceof ApiError && err.status === 409
+          ? timeEntryConflictMessage
+          : "Urenregel verwijderen is mislukt",
+      );
+    } finally {
+      setProcessingTimeEntryId(null);
+    }
+  };
+
   const handleCreateInvoice = async (
     payload: Parameters<typeof createInvoiceMut.mutateAsync>[0],
   ) => {
@@ -1278,6 +1506,17 @@ export default function LaventeCarePage() {
   };
 
   const handleUpdateQuoteStatus = async (id: string, status: string) => {
+    // Money-status safety (M20): accepting a quote is a commercial commitment
+    // and unlocks invoicing — confirm before flipping.
+    if (status === "geaccepteerd") {
+      const quote = quotes.find((item) => item.id === id);
+      const confirmed = await openConfirm({
+        title: "Offerte op akkoord zetten",
+        message: `Offerte ${quote?.quote_number ?? ""} als geaccepteerd markeren? Daarna kan er een factuur uit worden gemaakt.`,
+        confirmLabel: "Akkoord",
+      });
+      if (!confirmed) return;
+    }
     setUpdatingQuoteId(id);
     try {
       await updateQuoteStatusMut.mutateAsync({ id, status });
@@ -1290,6 +1529,18 @@ export default function LaventeCarePage() {
   };
 
   const handleUpdateInvoiceStatus = async (id: string, status: string) => {
+    // Money-status safety (M20): "betaald" is effectively irreversible in de
+    // UI — confirm before flipping.
+    if (status === "betaald") {
+      const invoice = invoices.find((item) => item.id === id);
+      const confirmed = await openConfirm({
+        title: "Factuur als betaald markeren",
+        message: `Factuur ${invoice?.invoice_number ?? ""} als betaald markeren? Dit sluit de factuur af en kan in de UI niet worden teruggedraaid.`,
+        confirmLabel: "Betaald",
+        variant: "danger",
+      });
+      if (!confirmed) return;
+    }
     setUpdatingInvoiceId(id);
     try {
       await updateInvoiceStatusMut.mutateAsync({ id, status });
@@ -1306,14 +1557,32 @@ export default function LaventeCarePage() {
     try {
       const result = await createInvoicePaymentRequestMut.mutateAsync(id);
       if (result.confirmationRequired) {
-        success(
-          result.code
-            ? `Betaalverzoek klaar. Bevestig met code ${result.code}`
-            : "Betaalverzoek staat klaar voor bevestiging",
-        );
+        // R3-H6: de backend geeft een expliciete vervolgstap mee ("Bevestig via
+        // Settings of Telegram met /approve X"). Bewaar die persistent op de
+        // factuurrij i.p.v. hem in een wegtikkende toast te laten verdwijnen.
+        setPendingPaymentActions((current) => ({
+          ...current,
+          [id]: {
+            message:
+              result.message ||
+              (result.code
+                ? `Betaalverzoek staat klaar. Bevestig met code ${result.code} via Settings of Telegram (/approve ${result.code}).`
+                : "Betaalverzoek staat klaar voor bevestiging via Settings of Telegram."),
+            code: result.code,
+            pendingActionId: result.pendingActionId,
+          },
+        }));
+        success(result.message || "Betaalverzoek staat klaar voor bevestiging");
       } else if (result.alreadyCreated) {
         success("Deze factuur heeft al een gekoppeld betaalverzoek");
       } else {
+        // Verwerkt zonder bevestiging: een eventuele oude melding kan weg.
+        setPendingPaymentActions((current) => {
+          if (!current[id]) return current;
+          const next = { ...current };
+          delete next[id];
+          return next;
+        });
         success(result.message || "Betaalverzoek verwerkt");
       }
     } catch {
@@ -1323,13 +1592,53 @@ export default function LaventeCarePage() {
     }
   };
 
+  const dismissPendingPaymentAction = useCallback((id: string) => {
+    setPendingPaymentActions((current) => {
+      if (!current[id]) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  // R3-maandafsluiting: dossier→Commercie met de klant voorgeselecteerd.
+  const handleOpenCommerceForCompany = async (company: CompanyItem) => {
+    const switched = await handleChangeView("commerce");
+    if (!switched) return;
+    setCommercePrefillCompanyId(company._id ?? company.id);
+    setSelectedCompanyId(null);
+  };
+
+  // R3-maandafsluiting: prefill een herinneringsmail voor een te-late factuur.
+  const handleSendInvoiceReminder = async (id: string) => {
+    const switched = await handleChangeView("mailbox");
+    if (!switched) return;
+    setMailboxInvoiceId(id);
+    setMailboxIntent("reminder");
+    success("Factuur klaargezet in Mailbox — kies de herinneringstemplate");
+  };
+
   const handleOpenInvoiceDocument = async (id: string) => {
+    // M19: open the tab SYNCHRONOUSLY in the click handler (popup blockers
+    // only allow window.open during a user gesture), show a placeholder, and
+    // navigate/fill it once the document is generated.
+    const preview = window.open("", "_blank");
+    if (!preview) {
+      toastError("Factuurpreview kon niet worden geopend. Sta pop-ups toe voor deze site.");
+      return;
+    }
+    preview.document.open();
+    preview.document.write(
+      "<!doctype html><html lang=\"nl\"><head><meta charset=\"utf-8\"><title>Factuurdocument</title></head>" +
+        "<body style=\"margin:0;display:grid;place-items:center;min-height:100vh;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif\">" +
+        "<p>Factuurdocument genereren…</p></body></html>",
+    );
+    preview.document.close();
     setGeneratingInvoiceDocumentId(id);
     try {
       const result = await generateInvoiceDocumentMut.mutateAsync(id);
-      const preview = window.open("", "_blank", "noopener,noreferrer");
-      if (!preview) {
-        toastError("Factuurpreview kon niet worden geopend");
+      if (preview.closed) {
+        toastError("Factuurpreview is gesloten voordat het document klaar was");
         return;
       }
       preview.document.open();
@@ -1337,6 +1646,7 @@ export default function LaventeCarePage() {
       preview.document.close();
       success("Factuurdocument geopend");
     } catch {
+      if (!preview.closed) preview.close();
       toastError("Factuurdocument genereren is mislukt");
     } finally {
       setGeneratingInvoiceDocumentId(null);
@@ -1344,7 +1654,7 @@ export default function LaventeCarePage() {
   };
 
   const handleDownloadInvoiceUBL = async (id: string) => {
-    setGeneratingInvoiceDocumentId(id);
+    setDownloadingInvoiceUBLId(id);
     try {
       const result = await generateInvoiceDocumentMut.mutateAsync(id);
       const filename = result.download_name.replace(/\.html$/i, ".xml");
@@ -1363,7 +1673,7 @@ export default function LaventeCarePage() {
     } catch {
       toastError("UBL export maken is mislukt");
     } finally {
-      setGeneratingInvoiceDocumentId(null);
+      setDownloadingInvoiceUBLId(null);
     }
   };
 
@@ -1379,12 +1689,17 @@ export default function LaventeCarePage() {
     }
   };
 
-  const handleOpenMailboxForInvoice = (id: string) => {
+  const handleOpenMailboxForInvoice = async (id: string) => {
+    // M-D: dezelfde dirty-guard als een gewone tabwissel.
+    const switched = await handleChangeView("mailbox");
+    if (!switched) return;
     setMailboxInvoiceId(id);
-    setActiveView("mailbox");
+    setMailboxIntent(null);
     success("Factuur klaargezet in Mailbox");
   };
 
+  // Throws on failure so the mailbox composer only resets itself after a
+  // genuinely successful send (M7).
   const handleSendTemplatedMail = async (
     payload: Parameters<typeof sendTemplatedMailMut.mutateAsync>[0],
   ) => {
@@ -1392,17 +1707,33 @@ export default function LaventeCarePage() {
       const result = await sendTemplatedMailMut.mutateAsync(payload);
       if (result.status === "sent") {
         success("LaventeCare mail verzonden en vastgelegd");
+        // Don't keep the invoice prefilled for the next composer visit.
+        setMailboxInvoiceId("");
+        // Diff L-7: het "Verzonden"-signaal leeft op de pagina zodat het de
+        // key-remount van de mailbox-view overleeft.
+        setMailJustSent(true);
+        if (mailJustSentTimer.current !== null) {
+          window.clearTimeout(mailJustSentTimer.current);
+        }
+        mailJustSentTimer.current = window.setTimeout(
+          () => setMailJustSent(false),
+          5000,
+        );
       } else if (result.status === "failed") {
         toastError(result.error_message || "Mail versturen is mislukt");
+        throw new Error("Mail versturen is mislukt");
       } else {
         success("Mailconcept aangemaakt in de outbox");
       }
-    } catch {
-      toastError(
-        payload.send
-          ? "Mail versturen is mislukt"
-          : "Mailconcept aanmaken is mislukt",
-      );
+    } catch (err) {
+      if (!(err instanceof Error && err.message === "Mail versturen is mislukt")) {
+        toastError(
+          payload.send
+            ? "Mail versturen is mislukt"
+            : "Mailconcept aanmaken is mislukt",
+        );
+      }
+      throw err;
     }
   };
 
@@ -1410,13 +1741,47 @@ export default function LaventeCarePage() {
     try {
       const result = await syncInbox();
       if (result.ok) {
+        setInboundBlocked(false);
         success(result.synced > 0 ? `${result.synced} inkomende mail(s) opgehaald` : "Inbox is up-to-date");
       } else {
+        setInboundBlocked(true);
         toastError(result.reason ?? "Inbox-sync is niet beschikbaar");
       }
     } catch {
       toastError("Inbox synchroniseren is mislukt");
     }
+  };
+
+  // Leaving the Mailbox tab drops the invoice prefill so a later visit
+  // doesn't silently re-couple an old invoice to a new mail (M7).
+  // M-D: een tabwissel weg van een half ingevuld commerce-/mailformulier
+  // vraagt eerst om bevestiging — de views unmounten bij het wisselen en de
+  // invoer zou anders stil verdwijnen. Retourneert of de wissel doorging.
+  const handleChangeView = async (view: PortalView): Promise<boolean> => {
+    if (view === activeView) return true;
+    const leavingDirty =
+      (activeView === "commerce" && commerceDirtyRef.current) ||
+      (activeView === "mailbox" && mailboxDirtyRef.current);
+    if (leavingDirty) {
+      const confirmed = await openConfirm({
+        title: "Wijzigingen verwerpen?",
+        message:
+          activeView === "commerce"
+            ? "Het commercie-formulier bevat niet-opgeslagen invoer die bij het wisselen verloren gaat."
+            : "De mail-opsteller bevat niet-verzonden invoer die bij het wisselen verloren gaat.",
+        confirmLabel: "Verwerpen",
+        variant: "danger",
+      });
+      if (!confirmed) return false;
+    }
+    if (activeView === "mailbox" && view !== "mailbox") {
+      setMailboxInvoiceId("");
+      setMailboxIntent(null);
+    }
+    commerceDirtyRef.current = false;
+    mailboxDirtyRef.current = false;
+    setActiveView(view);
+    return true;
   };
 
   const handleSuggestMailContent = async (
@@ -1432,7 +1797,30 @@ export default function LaventeCarePage() {
     }
   };
 
-  if (cockpitLoading) {
+  // FH5: a failed cockpit fetch must never look like an empty CRM. Show a
+  // prominent error with retry instead of "Nog geen klantenbasis" + 0-tellers.
+  // R7: alleen als er ook geen (gecachte) data is — een mislukte background-
+  // refetch mag een werkende CRM niet vervangen door een foutscherm; dan
+  // volstaat de amber banner hieronder.
+  if (cockpitError && !cockpitLoading && !cockpit) {
+    return (
+      <div className="text-slate-100">
+        <main className="mx-auto max-w-[1600px] px-4 py-10 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-xl">
+            <ErrorState
+              title="LaventeCare kon niet laden"
+              text="De cockpitgegevens zijn niet opgehaald. Je klanten, leads en projecten bestaan nog steeds — dit is een verbindings- of serverprobleem, geen lege klantenbasis."
+              onRetry={() => {
+                void refetchCockpit();
+              }}
+            />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (cockpitLoading && !cockpit) {
     // Skeleton mirrors the real layout (full-width hero + max-w-[1600px] main +
     // a tall workspace) so the page doesn't jump when cockpit data resolves.
     return (
@@ -1471,9 +1859,21 @@ export default function LaventeCarePage() {
       />
 
       <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
+        {/* R7: er is gecachte cockpit-data, maar de laatste refresh faalde —
+            toon de data mét een persistente waarschuwing i.p.v. een
+            foutscherm dat de werkende CRM vervangt. */}
+        {cockpitError && cockpit ? (
+          <RefreshFailedBanner
+            text="Vernieuwen is mislukt — je ziet mogelijk verouderde cockpitgegevens."
+            onRetry={() => {
+              void refetchCockpit();
+            }}
+          />
+        ) : null}
         <LaventeCareCompanyModal
           isOpen={showCompanyForm}
           onClose={closeCompanyForm}
+          dirty={companyFormDirty}
           companyForm={companyForm}
           setCompanyForm={setCompanyForm}
           savingCompany={savingCompany}
@@ -1484,6 +1884,7 @@ export default function LaventeCarePage() {
         <LaventeCareContactModal
           isOpen={showContactForm}
           onClose={closeContactForm}
+          dirty={contactFormDirty}
           contactForm={contactForm}
           setContactForm={setContactForm}
           companies={companies}
@@ -1494,7 +1895,8 @@ export default function LaventeCarePage() {
 
         <LaventeCareLeadModal
           isOpen={showLeadForm}
-          onClose={() => setShowLeadForm(false)}
+          onClose={closeLeadForm}
+          dirty={leadFormDirty}
           leadForm={leadForm}
           setLeadForm={setLeadForm}
           companies={companies}
@@ -1505,7 +1907,8 @@ export default function LaventeCarePage() {
 
         <LaventeCareProjectModal
           isOpen={showProjectForm}
-          onClose={() => setShowProjectForm(false)}
+          onClose={closeProjectForm}
+          dirty={projectFormDirty}
           projectForm={projectForm}
           setProjectForm={setProjectForm}
           companies={companies}
@@ -1515,7 +1918,8 @@ export default function LaventeCarePage() {
 
         <LaventeCareWorkstreamModal
           isOpen={showWorkstreamForm}
-          onClose={() => setShowWorkstreamForm(false)}
+          onClose={closeWorkstreamForm}
+          dirty={workstreamFormDirty}
           workstreamForm={workstreamForm}
           setWorkstreamForm={setWorkstreamForm}
           companies={companies}
@@ -1529,12 +1933,16 @@ export default function LaventeCarePage() {
           company={selectedCompany}
           contacts={contacts}
           accessCredentials={accessCredentials}
-          leads={activeLeads}
+          // M-J: het dossier krijgt de VOLLEDIGE lijsten (incl. gesloten/
+          // gewonnen/verloren) — klantgeschiedenis is geen actieve funnel.
+          leads={leads}
           workstreams={workstreams}
-          projects={activeProjects}
+          projects={projects}
           actions={actionItems}
           dossierDocuments={dossierDocuments}
           activityEvents={activityEvents}
+          timeEntries={timeEntries}
+          invoices={invoices}
           savingActivity={createActivityEventMut.isPending}
           savingAccessCredential={savingAccessCredential}
           onClose={() => setSelectedCompanyId(null)}
@@ -1550,8 +1958,13 @@ export default function LaventeCarePage() {
             setSelectedCompanyId(null);
             handleStartWorkstreamForCompany(company);
           }}
+          onOpenCommerce={(company) => {
+            void handleOpenCommerceForCompany(company);
+          }}
           onCreateActivity={handleCreateActivityEvent}
           onCreateAccessCredential={handleCreateAccessCredential}
+          updatingAccessCredentialId={updatingAccessCredentialId}
+          onUpdateAccessCredential={handleUpdateAccessCredential}
         />
 
         <LaventeCarePortalHero
@@ -1563,13 +1976,15 @@ export default function LaventeCarePage() {
           projects={activeProjects.length}
           invoices={invoices.length}
           documents={summary.documents}
-          onOpenCapabilities={() => setActiveView("overview")}
+          onOpenCapabilities={() => {
+            void handleChangeView("overview");
+          }}
         />
 
         <PortalNavigation
           sections={portalSections}
           activeView={activeView}
-          onChange={setActiveView}
+          onChange={handleChangeView}
         />
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -1578,7 +1993,7 @@ export default function LaventeCarePage() {
               capabilityRows={capabilityRows}
               sections={portalSections}
               activeView={activeView}
-              onChange={setActiveView}
+              onChange={handleChangeView}
               signals={businessSignals.length}
               actions={actionItems.length}
               openInvoices={billing?.summary.openInvoices ?? 0}
@@ -1601,7 +2016,9 @@ export default function LaventeCarePage() {
                 />
                 <CapabilityMatrix
                   capabilityRows={capabilityRows}
-                  onOpenView={setActiveView}
+                  onOpenView={(view) => {
+                    void handleChangeView(view);
+                  }}
                 />
                 <details className="glass min-w-0 overflow-hidden">
                   <summary className="cursor-pointer list-none p-4 text-sm font-bold text-white marker:hidden">
@@ -1614,12 +2031,20 @@ export default function LaventeCarePage() {
                     <CapabilityMatrix
                       capabilityRows={capabilityRows}
                       expanded
-                      onOpenView={setActiveView}
+                      onOpenView={(view) => {
+                        void handleChangeView(view);
+                      }}
                     />
                     <PortalRoadmapPanel
-                      onOpenCommerce={() => setActiveView("commerce")}
-                      onOpenOperations={() => setActiveView("operations")}
-                      onOpenKnowledge={() => setActiveView("knowledge")}
+                      onOpenCommerce={() => {
+                        void handleChangeView("commerce");
+                      }}
+                      onOpenOperations={() => {
+                        void handleChangeView("operations");
+                      }}
+                      onOpenKnowledge={() => {
+                        void handleChangeView("knowledge");
+                      }}
                     />
                   </div>
                 </details>
@@ -1669,7 +2094,28 @@ export default function LaventeCarePage() {
               />
             ) : null}
 
-            {activeView === "commerce" ? (
+            {/* R7: foutscherm alleen zonder (gecachte) data; mét data een
+                persistente amber banner boven de gewone view. */}
+            {activeView === "commerce" && billingError && !billing ? (
+              <ErrorState
+                title="Facturatie kon niet laden"
+                text="Offertes, uren en facturen zijn niet opgehaald. Dit is een verbindings- of serverprobleem — er is niets verwijderd."
+                onRetry={() => {
+                  void refetchBilling();
+                }}
+              />
+            ) : null}
+
+            {activeView === "commerce" && billingError && billing ? (
+              <RefreshFailedBanner
+                text="Vernieuwen is mislukt — je ziet mogelijk verouderde facturatiegegevens."
+                onRetry={() => {
+                  void refetchBilling();
+                }}
+              />
+            ) : null}
+
+            {activeView === "commerce" && (!billingError || billing) ? (
               <LaventeCareBillingView
                 billing={billing}
                 billingLoading={billingLoading}
@@ -1687,6 +2133,7 @@ export default function LaventeCarePage() {
                 updatingInvoiceId={updatingInvoiceId}
                 requestingPaymentInvoiceId={requestingPaymentInvoiceId}
                 generatingInvoiceDocumentId={generatingInvoiceDocumentId}
+                downloadingInvoiceUBLId={downloadingInvoiceUBLId}
                 refreshingPaymentInvoiceId={refreshingPaymentInvoiceId}
                 onCreateQuote={handleCreateQuote}
                 onCreateTimeEntry={handleCreateTimeEntry}
@@ -1698,11 +2145,45 @@ export default function LaventeCarePage() {
                 onOpenInvoiceDocument={handleOpenInvoiceDocument}
                 onDownloadInvoiceUBL={handleDownloadInvoiceUBL}
                 onRefreshInvoicePayment={handleRefreshInvoicePayment}
-                onOpenMailboxForInvoice={handleOpenMailboxForInvoice}
+                onOpenMailboxForInvoice={(id) => {
+                  void handleOpenMailboxForInvoice(id);
+                }}
+                onSendInvoiceReminder={(id) => {
+                  void handleSendInvoiceReminder(id);
+                }}
+                pendingPaymentActions={pendingPaymentActions}
+                onDismissPendingPaymentAction={dismissPendingPaymentAction}
+                settingsHref="/settings"
+                prefillCompanyId={commercePrefillCompanyId}
+                updatingTimeEntryId={processingTimeEntryId}
+                onUpdateTimeEntry={handleEditTimeEntry}
+                onWriteOffTimeEntry={handleWriteOffTimeEntry}
+                onReopenTimeEntry={handleReopenTimeEntry}
+                onDeleteTimeEntry={handleDeleteTimeEntry}
+                onDirtyChange={handleCommerceDirtyChange}
               />
             ) : null}
 
-            {activeView === "mailbox" ? (
+            {activeView === "mailbox" && mailboxError && !mailbox ? (
+              <ErrorState
+                title="Mailbox kon niet laden"
+                text="Templates, outbox en inbox zijn niet opgehaald. Dit is een verbindings- of serverprobleem."
+                onRetry={() => {
+                  void refetchMailbox();
+                }}
+              />
+            ) : null}
+
+            {activeView === "mailbox" && mailboxError && mailbox ? (
+              <RefreshFailedBanner
+                text="Vernieuwen is mislukt — je ziet mogelijk een verouderde mailbox."
+                onRetry={() => {
+                  void refetchMailbox();
+                }}
+              />
+            ) : null}
+
+            {activeView === "mailbox" && (!mailboxError || mailbox) ? (
               <LaventeCareMailboxView
                 key={mailboxInvoiceId || "mailbox"}
                 mailbox={mailbox}
@@ -1713,16 +2194,21 @@ export default function LaventeCarePage() {
                 activeWorkstreams={activeWorkstreams}
                 invoices={invoices}
                 prefillInvoiceId={mailboxInvoiceId}
+                prefillIntent={mailboxIntent}
                 templates={mailTemplates}
                 outbox={mailOutbox}
                 inbox={mailInbox}
                 sending={sendTemplatedMailMut.isPending}
                 aiSuggesting={suggestMailContentMut.isPending}
                 syncingInbox={syncingInbox}
+                inboundBlocked={inboundBlocked}
+                inboxError={mailbox?.inboxError}
+                justSent={mailJustSent}
                 onSuggestMailContent={handleSuggestMailContent}
                 onSendTemplatedMail={handleSendTemplatedMail}
                 onSyncInbox={handleSyncInbox}
                 onMarkInboxRead={markInboxRead}
+                onDirtyChange={handleMailboxDirtyChange}
               />
             ) : null}
 
@@ -1761,6 +2247,34 @@ export default function LaventeCarePage() {
           </section>
         </div>
       </main>
+    </div>
+  );
+}
+
+// R7: kleine persistente banner voor "data staat er, maar de laatste refresh
+// faalde" — in plaats van de werkende view te vervangen door een foutscherm.
+function RefreshFailedBanner({
+  text,
+  onRetry,
+}: {
+  text: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.08] px-4 py-3"
+    >
+      <TriangleAlert size={16} className="shrink-0 text-amber-300" />
+      <p className="min-w-0 flex-1 text-sm leading-5 text-amber-100">{text}</p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 text-xs font-bold text-amber-100 transition hover:bg-amber-400/20"
+      >
+        <RotateCcw size={13} />
+        Opnieuw laden
+      </button>
     </div>
   );
 }

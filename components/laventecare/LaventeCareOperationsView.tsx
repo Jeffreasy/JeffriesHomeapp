@@ -86,6 +86,10 @@ export function LaventeCareOperationsView({
   onUpdateIncidentStatus: (id: string, status: string) => Promise<void>;
 }) {
   const [mode, setMode] = useState<OperationMode>("decision");
+  // L6: de kolommen tonen standaard 4 items met een "Toon alle N"-toggle.
+  const [showAllDecisions, setShowAllDecisions] = useState(false);
+  const [showAllChanges, setShowAllChanges] = useState(false);
+  const [showAllIncidents, setShowAllIncidents] = useState(false);
   const [decisionForm, setDecisionForm] = useState({
     projectId: "",
     titel: "",
@@ -123,47 +127,61 @@ export function LaventeCareOperationsView({
     [activeProjects]
   );
 
+  // M-C: de resets draaien alleen na een geslaagde save — de page-handlers
+  // rethrowen bij een fout (met toast), zodat de invoer blijft staan.
   const handleDecisionSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!decisionForm.titel.trim() || !decisionForm.besluit.trim()) return;
-    await onCreateDecision({
-      project_id: emptyToUndefined(decisionForm.projectId),
-      titel: decisionForm.titel.trim(),
-      besluit: decisionForm.besluit.trim(),
-      reden: emptyToUndefined(decisionForm.reden) ?? "Niet gespecificeerd",
-      impact: emptyToUndefined(decisionForm.impact),
-      status: decisionForm.status,
-      datum: emptyToUndefined(decisionForm.datum),
-    });
+    try {
+      await onCreateDecision({
+        project_id: emptyToUndefined(decisionForm.projectId),
+        titel: decisionForm.titel.trim(),
+        besluit: decisionForm.besluit.trim(),
+        reden: emptyToUndefined(decisionForm.reden) ?? "Niet gespecificeerd",
+        impact: emptyToUndefined(decisionForm.impact),
+        status: decisionForm.status,
+        datum: emptyToUndefined(decisionForm.datum),
+      });
+    } catch {
+      return;
+    }
     setDecisionForm({ projectId: "", titel: "", besluit: "", reden: "", impact: "", status: "genomen", datum: "" });
   };
 
   const handleChangeSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!changeForm.titel.trim() || !changeForm.impact.trim()) return;
-    await onCreateChangeRequest({
-      project_id: emptyToUndefined(changeForm.projectId),
-      titel: changeForm.titel.trim(),
-      impact: changeForm.impact.trim(),
-      planning_impact: emptyToUndefined(changeForm.planningImpact),
-      budget_impact: emptyToUndefined(changeForm.budgetImpact),
-      status: changeForm.status,
-    });
+    try {
+      await onCreateChangeRequest({
+        project_id: emptyToUndefined(changeForm.projectId),
+        titel: changeForm.titel.trim(),
+        impact: changeForm.impact.trim(),
+        planning_impact: emptyToUndefined(changeForm.planningImpact),
+        budget_impact: emptyToUndefined(changeForm.budgetImpact),
+        status: changeForm.status,
+      });
+    } catch {
+      return;
+    }
     setChangeForm({ projectId: "", titel: "", impact: "", planningImpact: "", budgetImpact: "", status: "nieuw" });
   };
 
   const handleIncidentSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!incidentForm.titel.trim()) return;
-    await onCreateSlaIncident({
-      project_id: emptyToUndefined(incidentForm.projectId),
-      titel: incidentForm.titel.trim(),
-      prioriteit: incidentForm.prioriteit,
-      status: incidentForm.status,
-      kanaal: incidentForm.kanaal,
-      reactie_deadline: emptyToUndefined(incidentForm.reactieDeadline),
-      samenvatting: emptyToUndefined(incidentForm.samenvatting),
-    });
+    try {
+      await onCreateSlaIncident({
+        project_id: emptyToUndefined(incidentForm.projectId),
+        titel: incidentForm.titel.trim(),
+        prioriteit: incidentForm.prioriteit,
+        status: incidentForm.status,
+        kanaal: incidentForm.kanaal,
+        reactie_deadline: emptyToUndefined(incidentForm.reactieDeadline),
+        samenvatting: emptyToUndefined(incidentForm.samenvatting),
+      });
+    } catch {
+      return;
+    }
     setIncidentForm({
       projectId: "",
       titel: "",
@@ -197,47 +215,63 @@ export function LaventeCareOperationsView({
 
         {mode === "decision" ? (
           <form onSubmit={handleDecisionSubmit} className="mt-4 grid gap-3 lg:grid-cols-2">
-            <ProjectSelect value={decisionForm.projectId} projects={projectOptions} onChange={(value) => setDecisionForm((form) => ({ ...form, projectId: value }))} />
-            <input
-              className={inputClass}
-              value={decisionForm.titel}
-              onChange={(event) => setDecisionForm((form) => ({ ...form, titel: event.target.value }))}
-              placeholder="Besluit titel"
-            />
-            <textarea
-              className={textareaClass}
-              value={decisionForm.besluit}
-              onChange={(event) => setDecisionForm((form) => ({ ...form, besluit: event.target.value }))}
-              placeholder="Wat is besloten?"
-            />
-            <textarea
-              className={textareaClass}
-              value={decisionForm.reden}
-              onChange={(event) => setDecisionForm((form) => ({ ...form, reden: event.target.value }))}
-              placeholder="Waarom?"
-            />
-            <input
-              className={inputClass}
-              value={decisionForm.impact}
-              onChange={(event) => setDecisionForm((form) => ({ ...form, impact: event.target.value }))}
-              placeholder="Impact op klant, planning of scope"
-            />
-            <div className="grid gap-3 sm:grid-cols-2">
+            <LabeledField label="Project">
+              <ProjectSelect value={decisionForm.projectId} projects={projectOptions} onChange={(value) => setDecisionForm((form) => ({ ...form, projectId: value }))} />
+            </LabeledField>
+            <LabeledField label="Titel" required>
               <input
                 className={inputClass}
-                type="date"
-                value={decisionForm.datum}
-                onChange={(event) => setDecisionForm((form) => ({ ...form, datum: event.target.value }))}
+                required
+                value={decisionForm.titel}
+                onChange={(event) => setDecisionForm((form) => ({ ...form, titel: event.target.value }))}
+                placeholder="Besluit titel"
               />
-              <select
+            </LabeledField>
+            <LabeledField label="Besluit" required>
+              <textarea
+                className={textareaClass}
+                required
+                value={decisionForm.besluit}
+                onChange={(event) => setDecisionForm((form) => ({ ...form, besluit: event.target.value }))}
+                placeholder="Wat is besloten?"
+              />
+            </LabeledField>
+            <LabeledField label="Reden">
+              <textarea
+                className={textareaClass}
+                value={decisionForm.reden}
+                onChange={(event) => setDecisionForm((form) => ({ ...form, reden: event.target.value }))}
+                placeholder="Waarom?"
+              />
+            </LabeledField>
+            <LabeledField label="Impact">
+              <input
                 className={inputClass}
-                value={decisionForm.status}
-                onChange={(event) => setDecisionForm((form) => ({ ...form, status: event.target.value }))}
-              >
-                <option value="genomen">Genomen</option>
-                <option value="voorstel">Voorstel</option>
-                <option value="herzien">Herzien</option>
-              </select>
+                value={decisionForm.impact}
+                onChange={(event) => setDecisionForm((form) => ({ ...form, impact: event.target.value }))}
+                placeholder="Impact op klant, planning of scope"
+              />
+            </LabeledField>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <LabeledField label="Besluitdatum">
+                <input
+                  className={inputClass}
+                  type="date"
+                  value={decisionForm.datum}
+                  onChange={(event) => setDecisionForm((form) => ({ ...form, datum: event.target.value }))}
+                />
+              </LabeledField>
+              <LabeledField label="Status">
+                <select
+                  className={inputClass}
+                  value={decisionForm.status}
+                  onChange={(event) => setDecisionForm((form) => ({ ...form, status: event.target.value }))}
+                >
+                  <option value="genomen">Genomen</option>
+                  <option value="voorstel">Voorstel</option>
+                  <option value="herzien">Herzien</option>
+                </select>
+              </LabeledField>
             </div>
             <SubmitButton busy={creatingDecision} disabled={busy || !decisionForm.titel.trim() || !decisionForm.besluit.trim()} label="Besluit vastleggen" />
           </form>
@@ -245,99 +279,128 @@ export function LaventeCareOperationsView({
 
         {mode === "change" ? (
           <form onSubmit={handleChangeSubmit} className="mt-4 grid gap-3 lg:grid-cols-2">
-            <ProjectSelect value={changeForm.projectId} projects={projectOptions} onChange={(value) => setChangeForm((form) => ({ ...form, projectId: value }))} />
-            <input
-              className={inputClass}
-              value={changeForm.titel}
-              onChange={(event) => setChangeForm((form) => ({ ...form, titel: event.target.value }))}
-              placeholder="Change titel"
-            />
-            <textarea
-              className={textareaClass}
-              value={changeForm.impact}
-              onChange={(event) => setChangeForm((form) => ({ ...form, impact: event.target.value }))}
-              placeholder="Scope, risico of klantimpact"
-            />
-            <textarea
-              className={textareaClass}
-              value={changeForm.planningImpact}
-              onChange={(event) => setChangeForm((form) => ({ ...form, planningImpact: event.target.value }))}
-              placeholder="Planning impact"
-            />
-            <input
-              className={inputClass}
-              value={changeForm.budgetImpact}
-              onChange={(event) => setChangeForm((form) => ({ ...form, budgetImpact: event.target.value }))}
-              placeholder="Budget impact"
-            />
-            <select
-              className={inputClass}
-              value={changeForm.status}
-              onChange={(event) => setChangeForm((form) => ({ ...form, status: event.target.value }))}
-            >
-              <option value="nieuw">Nieuw</option>
-              <option value="beoordeeld">Beoordeeld</option>
-              <option value="goedgekeurd">Goedgekeurd</option>
-              <option value="afgewezen">Afgewezen</option>
-            </select>
+            <LabeledField label="Project">
+              <ProjectSelect value={changeForm.projectId} projects={projectOptions} onChange={(value) => setChangeForm((form) => ({ ...form, projectId: value }))} />
+            </LabeledField>
+            <LabeledField label="Titel" required>
+              <input
+                className={inputClass}
+                required
+                value={changeForm.titel}
+                onChange={(event) => setChangeForm((form) => ({ ...form, titel: event.target.value }))}
+                placeholder="Change titel"
+              />
+            </LabeledField>
+            <LabeledField label="Impact" required>
+              <textarea
+                className={textareaClass}
+                required
+                value={changeForm.impact}
+                onChange={(event) => setChangeForm((form) => ({ ...form, impact: event.target.value }))}
+                placeholder="Scope, risico of klantimpact"
+              />
+            </LabeledField>
+            <LabeledField label="Planning impact">
+              <textarea
+                className={textareaClass}
+                value={changeForm.planningImpact}
+                onChange={(event) => setChangeForm((form) => ({ ...form, planningImpact: event.target.value }))}
+                placeholder="Planning impact"
+              />
+            </LabeledField>
+            <LabeledField label="Budget impact">
+              <input
+                className={inputClass}
+                value={changeForm.budgetImpact}
+                onChange={(event) => setChangeForm((form) => ({ ...form, budgetImpact: event.target.value }))}
+                placeholder="Budget impact"
+              />
+            </LabeledField>
+            <LabeledField label="Status">
+              <select
+                className={inputClass}
+                value={changeForm.status}
+                onChange={(event) => setChangeForm((form) => ({ ...form, status: event.target.value }))}
+              >
+                <option value="nieuw">Nieuw</option>
+                <option value="beoordeeld">Beoordeeld</option>
+                <option value="goedgekeurd">Goedgekeurd</option>
+                <option value="afgewezen">Afgewezen</option>
+              </select>
+            </LabeledField>
             <SubmitButton busy={creatingChange} disabled={busy || !changeForm.titel.trim() || !changeForm.impact.trim()} label="Change registreren" />
           </form>
         ) : null}
 
         {mode === "incident" ? (
           <form onSubmit={handleIncidentSubmit} className="mt-4 grid gap-3 lg:grid-cols-2">
-            <ProjectSelect value={incidentForm.projectId} projects={projectOptions} onChange={(value) => setIncidentForm((form) => ({ ...form, projectId: value }))} />
-            <input
-              className={inputClass}
-              value={incidentForm.titel}
-              onChange={(event) => setIncidentForm((form) => ({ ...form, titel: event.target.value }))}
-              placeholder="Incident titel"
-            />
+            <LabeledField label="Project">
+              <ProjectSelect value={incidentForm.projectId} projects={projectOptions} onChange={(value) => setIncidentForm((form) => ({ ...form, projectId: value }))} />
+            </LabeledField>
+            <LabeledField label="Titel" required>
+              <input
+                className={inputClass}
+                required
+                value={incidentForm.titel}
+                onChange={(event) => setIncidentForm((form) => ({ ...form, titel: event.target.value }))}
+                placeholder="Incident titel"
+              />
+            </LabeledField>
             <div className="grid gap-3 sm:grid-cols-3 lg:col-span-2">
-              <select
-                className={inputClass}
-                value={incidentForm.prioriteit}
-                onChange={(event) => setIncidentForm((form) => ({ ...form, prioriteit: event.target.value }))}
-              >
-                <option value="P1">P1 kritiek</option>
-                <option value="P2">P2 hoog</option>
-                <option value="P3">P3 normaal</option>
-                <option value="P4">P4 laag</option>
-              </select>
-              <select
-                className={inputClass}
-                value={incidentForm.status}
-                onChange={(event) => setIncidentForm((form) => ({ ...form, status: event.target.value }))}
-              >
-                <option value="open">Open</option>
-                <option value="in_behandeling">In behandeling</option>
-                <option value="wacht_op_klant">Wacht op klant</option>
-                <option value="gesloten">Gesloten</option>
-              </select>
-              <select
-                className={inputClass}
-                value={incidentForm.kanaal}
-                onChange={(event) => setIncidentForm((form) => ({ ...form, kanaal: event.target.value }))}
-              >
-                <option value="manual">Handmatig</option>
-                <option value="email">Email</option>
-                <option value="telefoon">Telefoon</option>
-                <option value="telegram">Telegram</option>
-                <option value="klant">Klant</option>
-              </select>
+              <LabeledField label="Prioriteit">
+                <select
+                  className={inputClass}
+                  value={incidentForm.prioriteit}
+                  onChange={(event) => setIncidentForm((form) => ({ ...form, prioriteit: event.target.value }))}
+                >
+                  <option value="P1">P1 kritiek</option>
+                  <option value="P2">P2 hoog</option>
+                  <option value="P3">P3 normaal</option>
+                  <option value="P4">P4 laag</option>
+                </select>
+              </LabeledField>
+              <LabeledField label="Status">
+                <select
+                  className={inputClass}
+                  value={incidentForm.status}
+                  onChange={(event) => setIncidentForm((form) => ({ ...form, status: event.target.value }))}
+                >
+                  <option value="open">Open</option>
+                  <option value="in_behandeling">In behandeling</option>
+                  <option value="wacht_op_klant">Wacht op klant</option>
+                  <option value="gesloten">Gesloten</option>
+                </select>
+              </LabeledField>
+              <LabeledField label="Kanaal">
+                <select
+                  className={inputClass}
+                  value={incidentForm.kanaal}
+                  onChange={(event) => setIncidentForm((form) => ({ ...form, kanaal: event.target.value }))}
+                >
+                  <option value="manual">Handmatig</option>
+                  <option value="email">Email</option>
+                  <option value="telefoon">Telefoon</option>
+                  <option value="telegram">Telegram</option>
+                  <option value="klant">Klant</option>
+                </select>
+              </LabeledField>
             </div>
-            <input
-              className={inputClass}
-              type="datetime-local"
-              value={incidentForm.reactieDeadline}
-              onChange={(event) => setIncidentForm((form) => ({ ...form, reactieDeadline: event.target.value }))}
-            />
-            <textarea
-              className={textareaClass}
-              value={incidentForm.samenvatting}
-              onChange={(event) => setIncidentForm((form) => ({ ...form, samenvatting: event.target.value }))}
-              placeholder="Samenvatting, impact en eerste actie"
-            />
+            <LabeledField label="Reactie-deadline">
+              <input
+                className={inputClass}
+                type="datetime-local"
+                value={incidentForm.reactieDeadline}
+                onChange={(event) => setIncidentForm((form) => ({ ...form, reactieDeadline: event.target.value }))}
+              />
+            </LabeledField>
+            <LabeledField label="Samenvatting">
+              <textarea
+                className={textareaClass}
+                value={incidentForm.samenvatting}
+                onChange={(event) => setIncidentForm((form) => ({ ...form, samenvatting: event.target.value }))}
+                placeholder="Samenvatting, impact en eerste actie"
+              />
+            </LabeledField>
             <SubmitButton busy={creatingIncident} disabled={busy || !incidentForm.titel.trim()} label="Incident registreren" />
           </form>
         ) : null}
@@ -362,8 +425,12 @@ export function LaventeCareOperationsView({
             title="Decision log"
             emptyTitle="Geen besluiten"
             emptyBody="Leg keuzes vast zodra scope, aanpak, prijs of planning verandert."
+            total={recentDecisions.length}
+            expanded={showAllDecisions}
+            onToggle={() => setShowAllDecisions((value) => !value)}
+            noun="besluiten"
           >
-            {recentDecisions.slice(0, 4).map((decision) => (
+            {(showAllDecisions ? recentDecisions : recentDecisions.slice(0, 4)).map((decision) => (
               <OperationCard
                 key={decision._id ?? `${decision.titel}-${decision.datum}`}
                 icon={ScrollText}
@@ -394,8 +461,12 @@ export function LaventeCareOperationsView({
             title="Change requests"
             emptyTitle="Geen open changes"
             emptyBody="Scope-, planning- of budgetwijzigingen blijven hier zichtbaar tot ze zijn afgehandeld."
+            total={openChanges.length}
+            expanded={showAllChanges}
+            onToggle={() => setShowAllChanges((value) => !value)}
+            noun="changes"
           >
-            {openChanges.slice(0, 4).map((change) => (
+            {(showAllChanges ? openChanges : openChanges.slice(0, 4)).map((change) => (
               <OperationCard
                 key={change._id ?? change.titel}
                 icon={GitPullRequest}
@@ -428,8 +499,12 @@ export function LaventeCareOperationsView({
             title="SLA incidenten"
             emptyTitle="Geen open incidenten"
             emptyBody="Support- of beheerissues die je vastlegt komen hier met prioriteit en kanaal terug."
+            total={openIncidents.length}
+            expanded={showAllIncidents}
+            onToggle={() => setShowAllIncidents((value) => !value)}
+            noun="incidenten"
           >
-            {openIncidents.slice(0, 4).map((incident) => (
+            {(showAllIncidents ? openIncidents : openIncidents.slice(0, 4)).map((incident) => (
               <OperationCard
                 key={incident._id ?? incident.titel}
                 icon={AlertTriangle}
@@ -457,6 +532,28 @@ export function LaventeCareOperationsView({
         </div>
       </div>
     </section>
+  );
+}
+
+// Proper labels op alle governance-velden (incl. het voorheen naamloze
+// datumveld) i.p.v. placeholder-only inputs.
+function LabeledField({
+  label: fieldLabel,
+  required,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-normal text-slate-500">
+        {fieldLabel}
+        {required ? <span className="text-rose-300"> *</span> : null}
+      </span>
+      {children}
+    </label>
   );
 }
 
@@ -507,6 +604,9 @@ function StatusActions({
   if (!itemId) return null;
   const visibleActions = actions.filter((action) => action.status !== currentStatus);
   if (visibleActions.length === 0) return null;
+  // Per-item busy scoping: alleen de knoppen van het item waarvan een update
+  // loopt disabled, niet alle sibling-kaarten.
+  const itemBusy = Boolean(processingOperation?.startsWith(`${itemType}:${itemId}:`));
   return (
     <>
       {visibleActions.map((action) => {
@@ -518,7 +618,7 @@ function StatusActions({
             key={action.status}
             type="button"
             onClick={() => onUpdate(itemId, action.status)}
-            disabled={Boolean(processingOperation)}
+            disabled={itemBusy}
             className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 text-[11px] font-bold text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-55"
           >
             {busy ? <Loader2 size={13} className="animate-spin" /> : <Icon size={13} />}
@@ -570,6 +670,10 @@ function OperationColumn({
   title,
   emptyTitle,
   emptyBody,
+  total,
+  expanded,
+  onToggle,
+  noun = "items",
   children,
 }: {
   icon: LucideIcon;
@@ -577,6 +681,11 @@ function OperationColumn({
   title: string;
   emptyTitle: string;
   emptyBody: string;
+  /** L6: totaal aantal items; boven de 4 verschijnt een "Toon alle N"-toggle. */
+  total?: number;
+  expanded?: boolean;
+  onToggle?: () => void;
+  noun?: string;
   children: ReactNode;
 }) {
   const color = tone === "sky" ? "text-sky-300" : tone === "amber" ? "text-amber-300" : "text-rose-300";
@@ -588,6 +697,16 @@ function OperationColumn({
         <h3 className="text-sm font-bold text-slate-200">{title}</h3>
       </div>
       <div className="space-y-3">{empty ? <EmptyState title={emptyTitle} body={emptyBody} /> : children}</div>
+      {typeof total === "number" && total > 4 && onToggle ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+        >
+          {expanded ? "Toon minder" : `Toon alle ${total} ${noun}`}
+        </button>
+      ) : null}
     </div>
   );
 }

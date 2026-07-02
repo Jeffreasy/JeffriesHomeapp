@@ -1,6 +1,6 @@
 "use client";
 
-import { Power, Lightbulb, Wifi, WifiOff } from "lucide-react";
+import { Power, Lightbulb, Loader2, Wifi, WifiOff } from "lucide-react";
 import { useState, useEffect } from "react";
 import { type Device } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
@@ -51,8 +51,9 @@ export function LampCard({ device, onSelect }: LampCardProps) {
     sendCommand({ id: device.id, cmd: { on: !isOn } });
   };
 
+  // Ook offline lampen zijn te openen: het paneel toont dan IP/troubleshooting
+  // (de controls zelf blijven daar uitgeschakeld).
   const handleDetailsOpen = () => {
-    if (!isOnline) return;
     if (isMobile) {
       setSheetOpen(true);
     } else {
@@ -81,11 +82,7 @@ export function LampCard({ device, onSelect }: LampCardProps) {
           <button
             type="button"
             onClick={handleDetailsOpen}
-            disabled={!isOnline}
-            className={cn(
-              "group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent",
-              isOnline ? "cursor-pointer" : "cursor-not-allowed"
-            )}
+            className="group flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl text-left outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-amber-400/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
             aria-label={`${device.name} details openen`}
           >
             {/* Lamp icon with glow */}
@@ -116,8 +113,22 @@ export function LampCard({ device, onSelect }: LampCardProps) {
                 ) : (
                   <WifiOff size={11} className="text-red-400" aria-hidden="true" />
                 )}
-                <span className="text-xs text-slate-500">
-                  {isOnline ? (isOn ? `${brightness}% · ${colorTemp}K` : "Uit") : "Offline"}
+                <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                  {/* RGB-modus: toon de kleur i.p.v. een stale kelvin-waarde (L4) */}
+                  {isOnline && isOn && isRgbMode && (
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
+                      style={{ background: glowColor }}
+                      aria-hidden="true"
+                    />
+                  )}
+                  {isOnline
+                    ? isOn
+                      ? isRgbMode
+                        ? `${brightness}% · ${glowColor.toUpperCase()}`
+                        : `${brightness}% · ${colorTemp}K`
+                      : "Uit"
+                    : "Offline"}
                 </span>
               </div>
             </div>
@@ -134,10 +145,15 @@ export function LampCard({ device, onSelect }: LampCardProps) {
               isOn
                 ? "bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30 active:scale-90"
                 : "bg-[rgba(255,255,255,0.05)] text-slate-500 border border-[var(--color-border)] hover:bg-[rgba(255,255,255,0.1)] active:scale-90",
-              !isOnline && "opacity-40 cursor-not-allowed"
+              !isOnline && "opacity-40 cursor-not-allowed",
+              isPending && "opacity-60 cursor-wait"
             )}
           >
-            <Power size={16} aria-hidden="true" />
+            {isPending ? (
+              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Power size={16} aria-hidden="true" />
+            )}
           </button>
         </div>
 
@@ -166,12 +182,64 @@ export function LampCard({ device, onSelect }: LampCardProps) {
           title={device.name}
         >
           {isOnline ? (
-            <LampControl device={device} />
+            <>
+              {/* M7: pariteit met LampDetailPanel — aan/uit-status + power-toggle
+                  ook in de mobiele sheet-header. */}
+              <div
+                className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3"
+                style={{
+                  background: isOn ? `linear-gradient(135deg, ${glowColor}18 0%, transparent 60%)` : undefined,
+                }}
+              >
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <Wifi size={11} className="text-green-400" aria-hidden="true" />
+                  <span className="flex items-center gap-1.5 truncate text-xs text-slate-500">
+                    {isOn && isRgbMode && (
+                      <span
+                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
+                        style={{ background: glowColor }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    {isOn
+                      ? isRgbMode
+                        ? `Aan · ${brightness}% · ${glowColor.toUpperCase()}`
+                        : `Aan · ${brightness}% · ${colorTemp}K`
+                      : "Uit"}
+                  </span>
+                </div>
+                <button
+                  onClick={togglePower}
+                  disabled={isPending}
+                  aria-label={isOn ? `${device.name} uitschakelen` : `${device.name} aanzetten`}
+                  aria-pressed={isOn}
+                  className={cn(
+                    "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl transition-all duration-200",
+                    isOn
+                      ? "border border-amber-500/40 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 active:scale-90"
+                      : "border border-[var(--color-border)] bg-[rgba(255,255,255,0.05)] text-slate-500 hover:bg-[rgba(255,255,255,0.1)] active:scale-90",
+                    isPending && "cursor-wait opacity-60"
+                  )}
+                >
+                  {isPending ? (
+                    <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Power size={14} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+              <LampControl device={device} />
+            </>
           ) : (
             <div className="flex flex-col items-center justify-center px-5 py-12 text-center">
               <WifiOff size={28} className="mb-3 text-slate-600" />
               <p className="text-sm font-medium text-slate-400">Lamp is offline</p>
-              <p className="mt-1 text-xs text-slate-600">Controleer de netwerkverbinding.</p>
+              <p className="mt-1 text-xs font-mono text-slate-500">
+                IP: {device.ip_address ?? "onbekend"}
+              </p>
+              <p className="mt-2 max-w-xs text-xs leading-5 text-slate-600">
+                Controleer of de lamp stroom heeft en met hetzelfde wifi-netwerk is verbonden. Laatste contact: {device.last_seen ? new Date(device.last_seen).toLocaleString("nl-NL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "onbekend"}.
+              </p>
             </div>
           )}
         </BottomSheet>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Power } from "lucide-react";
+import Link from "next/link";
 import { CUSTOM_SCENES, type ScenePreset } from "@/lib/scenes";
 import { Panel } from "./DashboardPrimitives";
 
@@ -35,6 +36,7 @@ export function CommandPanel({
   onlineCount,
   totalCount,
   onCount,
+  loading,
   onToggleAll,
   onApplyScene,
 }: {
@@ -42,6 +44,8 @@ export function CommandPanel({
   onlineCount: number;
   totalCount: number;
   onCount: number;
+  /** H5: laden ≠ leeg — toon "Laden…" i.p.v. "Geen devices gekoppeld". */
+  loading?: boolean;
   onToggleAll: () => void;
   onApplyScene: (scene: ScenePreset) => void;
 }) {
@@ -54,7 +58,11 @@ export function CommandPanel({
           </p>
           <h2 className="mt-1 text-lg font-bold text-white">Licht en sfeer</h2>
           <p className="mt-1 text-sm text-slate-500">
-            {totalCount === 0 ? "Geen devices gekoppeld" : `${onlineCount}/${totalCount} online - ${onCount} aan`}
+            {loading && totalCount === 0
+              ? "Lampen worden geladen…"
+              : totalCount === 0
+                ? "Geen devices gekoppeld"
+                : `${onlineCount}/${totalCount} online - ${onCount} aan`}
           </p>
         </div>
         <button
@@ -78,6 +86,14 @@ export function CommandPanel({
           />
         ))}
       </div>
+
+      {/* H10: het scènegrid toont maar 6 presets — verwijs naar de rest. */}
+      <Link
+        href="/lampen"
+        className="mt-3 flex min-h-10 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] text-xs font-semibold text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
+      >
+        Meer scènes →
+      </Link>
     </Panel>
   );
 }

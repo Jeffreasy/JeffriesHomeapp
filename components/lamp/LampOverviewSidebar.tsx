@@ -45,7 +45,7 @@ function RoomOverviewRow({ group }: { group: RoomGroup }) {
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-slate-200">{group.room.name}</p>
         <p className="mt-0.5 text-xs text-slate-500">
-          {group.onlineCount}/{group.devices.length} online - {group.onCount} aan
+          {group.onlineCount}/{group.devices.length} online · {group.onCount} aan
         </p>
       </div>
       <span

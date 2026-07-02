@@ -4,19 +4,21 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus } from "lucide-react";
 
-import { useHabits, type HabitCreateData } from "@/hooks/useHabits";
+import { isPeriodSatisfied, useHabits, type HabitCreateData } from "@/hooks/useHabits";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 import { HabitForm } from "@/components/habits/HabitForm";
 import { HabitHeatmap } from "@/components/habits/HabitHeatmap";
+import { IncidentUndoSnackbar } from "@/components/habits/IncidentUndoSnackbar";
 import { HabitStats } from "@/components/habits/HabitStats";
 import { BadgeShowcase } from "@/components/habits/BadgeShowcase";
 
@@ -34,16 +36,45 @@ import { cn } from "@/lib/utils";
 
 export default function HabitsPage() {
   const [selectedDate, setSelectedDate] = useState("");
+  const [currentToday, setCurrentToday] = useState("");
   const [activeTab, setActiveTab] = useState<TabId>("vandaag");
   const [showForm, setShowForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState<string | null>(null);
+  const [lastIncident, setLastIncident] = useState<{
+    habitId: string;
+    datum: string;
+    naam: string;
+  } | null>(null);
   const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("habits");
   const { success, error: toastError } = useToast();
   const { openConfirm } = useConfirm();
 
+  // Recompute "today" on a minute interval AND on visibilitychange (M6): a PWA
+  // left open past midnight must not keep writing check-offs to yesterday. When
+  // the user hasn't navigated away from "today", the selected date follows the
+  // rollover too.
+  const lastTodayRef = useRef("");
   useEffect(() => {
-    const timeout = window.setTimeout(() => setSelectedDate(todayStr()), 0);
-    return () => window.clearTimeout(timeout);
+    const update = () => {
+      const next = todayStr();
+      setCurrentToday(next);
+      setSelectedDate((prev) =>
+        prev === "" || prev === lastTodayRef.current ? next : prev,
+      );
+      lastTodayRef.current = next;
+    };
+    // setTimeout(0) keeps the first client-only value out of hydration.
+    const timeout = window.setTimeout(update, 0);
+    const interval = window.setInterval(update, 60_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") update();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const {
@@ -57,21 +88,26 @@ export default function HabitsPage() {
     toggle,
     increment,
     incident,
+    removeIncident,
     pause,
     archive,
     remove,
     isLoading,
-    pendingHabitId,
+    pendingHabitIds,
+    announcement,
   } = useHabits(selectedDate || undefined);
 
-  const currentToday = useMemo(
-    () => (selectedDate ? todayStr() : ""),
-    [selectedDate],
-  );
   const activeDate = selectedDate || currentToday;
   const isToday = !!selectedDate && selectedDate === currentToday;
   const disableNext =
     !!selectedDate && !!currentToday && selectedDate >= currentToday;
+  // Backend accepts incidents max 30 days back (and never in the future) —
+  // disable the button beyond that window instead of letting the call 400.
+  const incidentAllowed =
+    !!activeDate &&
+    !!currentToday &&
+    activeDate <= currentToday &&
+    activeDate >= shiftDate(currentToday, -30);
   const completionPct = Math.round(todaySummary.rate * 100);
 
   const groupedHabits = useMemo(() => {
@@ -86,7 +122,8 @@ export default function HabitsPage() {
       (h) => h.type === "negatief" && !h.log?.isIncident,
     ).length;
     const openPositive = todayHabits.filter(
-      (h) => h.type === "positief" && !h.log?.voltooid,
+      // N5: week/maand-habits met een gehaald periodedoel tellen niet als open.
+      (h) => h.type === "positief" && !h.log?.voltooid && !isPeriodSatisfied(h),
     ).length;
     return { incidents, negativeClear, openPositive };
   }, [todayHabits]);
@@ -140,6 +177,73 @@ export default function HabitsPage() {
     [openConfirm, remove, success, toastError],
   );
 
+  // Incident logging with undo (H5): remember the last logged incident so the
+  // snackbar can DELETE it again (with the exact same datum) in one tap.
+  const handleIncident = useCallback(
+    async (id: string, trigger?: string, notitie?: string) => {
+      const datum = activeDate || todayStr();
+      const ok = await incident(id, trigger, notitie);
+      if (ok) {
+        const habit = habits.find((h) => h._id === id);
+        setLastIncident({ habitId: id, datum, naam: habit?.naam ?? "habit" });
+      }
+    },
+    [activeDate, habits, incident],
+  );
+
+  const handleUndoIncident = useCallback(async () => {
+    if (!lastIncident) return;
+    const ok = await removeIncident(lastIncident.habitId, lastIncident.datum);
+    if (ok) success("Incident verwijderd");
+    setLastIncident(null);
+  }, [lastIncident, removeIncident, success]);
+
+  // Explicit removal from a card that already shows an incident (H5) — the
+  // indicator is no longer a dead end. Uses the selected date, guarded by the
+  // shared ConfirmDialog.
+  const handleRemoveIncident = useCallback(
+    async (id: string) => {
+      const confirmed = await openConfirm({
+        title: "Incident verwijderen?",
+        message:
+          "De incident-registratie voor deze dag wordt verwijderd en je streak wordt opnieuw berekend.",
+        confirmLabel: "Verwijderen",
+        variant: "danger",
+      });
+      if (!confirmed) return;
+      const ok = await removeIncident(id);
+      if (ok) {
+        success("Incident verwijderd");
+        setLastIncident((prev) => (prev?.habitId === id ? null : prev));
+      }
+    },
+    [openConfirm, removeIncident, success],
+  );
+
+  // Pause honesty (R3): pausing does NOT protect the streak — paused days still
+  // count in the streak calculation — so warn before pausing (never on resume).
+  // The backend is improving the semantics; until then this stops the opposite
+  // expectation the bare "Pauzeren" action created.
+  const handlePause = useCallback(
+    async (id: string) => {
+      const habit = habits.find((h) => h._id === id);
+      if (habit?.isPauze) {
+        // Resuming needs no warning.
+        pause(id);
+        return;
+      }
+      const confirmed = await openConfirm({
+        title: "Habit pauzeren?",
+        message:
+          "Let op: gepauzeerde dagen tellen mee voor je streak-berekening.",
+        confirmLabel: "Pauzeren",
+      });
+      if (!confirmed) return;
+      pause(id);
+    },
+    [habits, openConfirm, pause],
+  );
+
   const moveDate = (days: number) => {
     setSelectedDate((date) => shiftDate(date || todayStr(), days));
   };
@@ -171,6 +275,10 @@ export default function HabitsPage() {
 
   return (
     <div className="text-slate-100">
+      {/* Polite live region: optimistische toggle-resultaten voor screenreaders. */}
+      <span aria-live="polite" role="status" className="sr-only">
+        {announcement}
+      </span>
       <HabitsHeader
         level={level}
         stats={stats}
@@ -253,19 +361,22 @@ export default function HabitsPage() {
                 todayHabits={todayHabits}
                 isLoading={isLoading}
                 isToday={isToday}
+                activeDate={activeDate}
                 setShowForm={setShowForm}
                 privacyOn={privacyOn}
                 toggle={toggle}
                 increment={increment}
-                incident={incident}
-                pause={pause}
+                incident={handleIncident}
+                removeIncident={handleRemoveIncident}
+                incidentAllowed={incidentAllowed}
+                pause={handlePause}
                 archive={archive}
                 setConfirmDelete={requestDelete}
                 setEditingHabit={setEditingHabit}
                 dayHealth={dayHealth}
                 stats={stats}
                 habits={habits}
-                pendingHabitId={pendingHabitId}
+                pendingHabitIds={pendingHabitIds}
               />
             </motion.section>
           )}
@@ -285,19 +396,22 @@ export default function HabitsPage() {
               <HabitsOverzichtTab
                 groupedHabits={groupedHabits}
                 isLoading={isLoading}
+                activeDate={activeDate}
                 setShowForm={setShowForm}
                 privacyOn={privacyOn}
                 toggle={toggle}
                 increment={increment}
-                incident={incident}
-                pause={pause}
+                incident={handleIncident}
+                removeIncident={handleRemoveIncident}
+                incidentAllowed={incidentAllowed}
+                pause={handlePause}
                 archive={archive}
                 setConfirmDelete={requestDelete}
                 setEditingHabit={setEditingHabit}
                 dayHealth={dayHealth}
                 habits={habits}
                 todayHabits={todayHabits}
-                pendingHabitId={pendingHabitId}
+                pendingHabitIds={pendingHabitIds}
               />
             </motion.section>
           )}
@@ -338,6 +452,13 @@ export default function HabitsPage() {
       >
         <Plus size={24} />
       </motion.button>
+
+      <IncidentUndoSnackbar
+        incident={lastIncident}
+        masked={privacyOn}
+        onUndo={handleUndoIncident}
+        onDismiss={() => setLastIncident(null)}
+      />
 
       <HabitForm
         open={showForm}

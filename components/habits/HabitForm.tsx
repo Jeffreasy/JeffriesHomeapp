@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -18,9 +18,12 @@ import {
   FREQUENTIE_LABELS,
   MOEILIJKHEID_LABELS,
   DAG_LABELS,
+  DAG_INDEXES_MA_EERST,
 } from "@/lib/habit-constants";
 import type { HabitCreateData } from "@/hooks/useHabits";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 /**
  * HabitForm — Create/edit modal.
@@ -34,6 +37,33 @@ interface HabitFormProps {
   initial?: Partial<HabitCreateData>;
 }
 
+// Mirrors the reset-defaults in the open-effect so the dirty check compares
+// against exactly the state the form (re)opens with.
+function formSnapshot(state: {
+  naam: string;
+  emoji: string;
+  type: string;
+  frequentie: string;
+  aangepasteDagen: number[];
+  moeilijkheid: string;
+  roosterFilter?: string | null;
+  kleur: string;
+  beschrijving: string;
+  isKwantitatief: boolean;
+  doelWaarde?: number;
+  eenheid: string;
+  doelAantal?: number;
+  doelTijd: string;
+}) {
+  return JSON.stringify({
+    ...state,
+    aangepasteDagen: [...state.aangepasteDagen].sort((a, b) => a - b),
+    roosterFilter: state.roosterFilter ?? "alle",
+    doelWaarde: state.doelWaarde ?? null,
+    doelAantal: state.doelAantal ?? null,
+  });
+}
+
 export function HabitForm({
   open,
   onClose,
@@ -41,6 +71,8 @@ export function HabitForm({
   initial,
 }: HabitFormProps) {
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const { openConfirm } = useConfirm();
   const [naam, setNaam] = useState(initial?.naam ?? "");
   const [emoji, setEmoji] = useState(initial?.emoji ?? "🎯");
   const [type, setType] = useState<"positief" | "negatief">(
@@ -75,32 +107,128 @@ export function HabitForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Reset state when form opens or initial values change
+  // Focus trap (M22): keep Tab/Shift+Tab inside the sheet and restore focus on
+  // close — the only modal in the app that rolled its own dialog without one.
+  useFocusTrap(open, sheetRef);
+
+  // R3: freeze `initial` at open-time. The habits query can return a new object
+  // identity while the editor is open (e.g. a Telegram check-off + refocus);
+  // that used to recompute the dirty baseline AND re-run the reset effect,
+  // wiping the user's typed edits. Capturing once on open decouples the form
+  // from live server churn.
+  const frozenInitialRef = useRef<Partial<HabitCreateData> | undefined>(initial);
+  const wasOpenRef = useRef(false);
+  if (open && !wasOpenRef.current) {
+    frozenInitialRef.current = initial;
+    wasOpenRef.current = true;
+  } else if (!open && wasOpenRef.current) {
+    wasOpenRef.current = false;
+  }
+  const frozenInitial = frozenInitialRef.current;
+
+  // Dirty check (H6): compare against the same defaults the open-effect resets to.
+  const initialSnapshot = useMemo(
+    () =>
+      formSnapshot({
+        naam: frozenInitial?.naam ?? "",
+        emoji: frozenInitial?.emoji ?? "🎯",
+        type: frozenInitial?.type ?? "positief",
+        frequentie: frozenInitial?.frequentie ?? "dagelijks",
+        aangepasteDagen: frozenInitial?.aangepasteDagen ?? [],
+        moeilijkheid: frozenInitial?.moeilijkheid ?? "normaal",
+        roosterFilter: frozenInitial?.roosterFilter ?? "alle",
+        kleur: frozenInitial?.kleur ?? HABIT_COLORS[0],
+        beschrijving: frozenInitial?.beschrijving ?? "",
+        isKwantitatief: frozenInitial?.isKwantitatief ?? false,
+        doelWaarde: frozenInitial?.doelWaarde,
+        eenheid: frozenInitial?.eenheid ?? "",
+        doelAantal: frozenInitial?.doelAantal,
+        doelTijd: frozenInitial?.doelTijd ?? "",
+      }),
+    [frozenInitial],
+  );
+  const isDirty =
+    formSnapshot({
+      naam,
+      emoji,
+      type,
+      frequentie,
+      aangepasteDagen,
+      moeilijkheid,
+      roosterFilter,
+      kleur,
+      beschrijving,
+      isKwantitatief,
+      doelWaarde,
+      eenheid,
+      doelAantal,
+      doelTijd,
+    }) !== initialSnapshot;
+
+  // One close path for backdrop, X and Escape: typed input never silently
+  // disappears without an explicit confirm (H6, same gedrag als NoteEditor).
+  const confirmingCloseRef = useRef(false);
+  const handleCloseAttempt = useCallback(async () => {
+    if (confirmingCloseRef.current || isSubmitting) return;
+    if (isDirty) {
+      confirmingCloseRef.current = true;
+      try {
+        const confirmed = await openConfirm({
+          title: "Wijzigingen sluiten?",
+          message: "Je hebt nog niet-opgeslagen invoer in dit formulier.",
+          confirmLabel: "Sluiten",
+          variant: "danger",
+        });
+        if (!confirmed) return;
+      } finally {
+        confirmingCloseRef.current = false;
+      }
+    }
+    onClose();
+  }, [isDirty, isSubmitting, onClose, openConfirm]);
+
+  // Escape-to-close (was missing entirely — M22 noted HabitForm as the only
+  // dialog without it).
   useEffect(() => {
     if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      void handleCloseAttempt();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, handleCloseAttempt]);
+
+  // Reset state ONLY when the form opens (R3): keyed on `[open]`, not `initial`,
+  // so a concurrent server refresh of the habits list can't wipe typed edits.
+  // Reads the frozen snapshot captured at open-time above.
+  useEffect(() => {
+    if (!open) return;
+    const snap = frozenInitialRef.current;
 
     const timeout = window.setTimeout(() => {
-      setNaam(initial?.naam ?? "");
-      setEmoji(initial?.emoji ?? "🎯");
-      setType(initial?.type ?? "positief");
-      setFrequentie(initial?.frequentie ?? "dagelijks");
-      setAangepasteDagen(initial?.aangepasteDagen ?? []);
-      setMoeilijkheid(initial?.moeilijkheid ?? "normaal");
-      setRoosterFilter(initial?.roosterFilter ?? "alle");
-      setKleur(initial?.kleur ?? HABIT_COLORS[0]);
-      setBeschrijving(initial?.beschrijving ?? "");
-      setIsKwantitatief(initial?.isKwantitatief ?? false);
-      setDoelWaarde(initial?.doelWaarde);
-      setEenheid(initial?.eenheid ?? "");
-      setDoelAantal(initial?.doelAantal);
-      setDoelTijd(initial?.doelTijd ?? "");
+      setNaam(snap?.naam ?? "");
+      setEmoji(snap?.emoji ?? "🎯");
+      setType(snap?.type ?? "positief");
+      setFrequentie(snap?.frequentie ?? "dagelijks");
+      setAangepasteDagen(snap?.aangepasteDagen ?? []);
+      setMoeilijkheid(snap?.moeilijkheid ?? "normaal");
+      setRoosterFilter(snap?.roosterFilter ?? "alle");
+      setKleur(snap?.kleur ?? HABIT_COLORS[0]);
+      setBeschrijving(snap?.beschrijving ?? "");
+      setIsKwantitatief(snap?.isKwantitatief ?? false);
+      setDoelWaarde(snap?.doelWaarde);
+      setEenheid(snap?.eenheid ?? "");
+      setDoelAantal(snap?.doelAantal);
+      setDoelTijd(snap?.doelTijd ?? "");
       setShowEmojis(false);
       setIsSubmitting(false);
       setSubmitError(null);
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [open, initial]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -124,8 +252,20 @@ export function HabitForm({
     return () => window.clearTimeout(timeout);
   }, [open]);
 
+  // Inline validatie (lows): aangepast schema vereist ≥1 dag, week/maand-doel
+  // vereist ≥1, en een meetbaar doel mag niet negatief zijn.
+  const validationError =
+    frequentie === "aangepast" && aangepasteDagen.length === 0
+      ? "Kies minimaal één dag voor een aangepast schema."
+      : (frequentie === "x_per_week" || frequentie === "x_per_maand") &&
+          (!doelAantal || doelAantal < 1)
+        ? `Stel in hoe vaak per ${frequentie === "x_per_week" ? "week" : "maand"} (minimaal 1).`
+        : isKwantitatief && doelWaarde != null && doelWaarde < 0
+          ? "Het meetbare doel moet 0 of hoger zijn."
+          : null;
+
   const handleSubmit = async () => {
-    if (!naam.trim() || isSubmitting) return;
+    if (!naam.trim() || isSubmitting || validationError) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
@@ -170,13 +310,15 @@ export function HabitForm({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
+            onClick={() => void handleCloseAttempt()}
             className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm"
           />
 
           {/* Sheet — full-height on mobile, centered modal on desktop */}
           <motion.div
             key="sheet"
+            ref={sheetRef}
+            tabIndex={-1}
             role="dialog"
             aria-modal="true"
             aria-label={initial ? "Habit bewerken" : "Nieuwe habit"}
@@ -202,7 +344,7 @@ export function HabitForm({
               </h2>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => void handleCloseAttempt()}
                 aria-label="Habitformulier sluiten"
                 title="Sluiten"
                 className="w-11 h-11 rounded-full bg-[rgba(255,255,255,0.05)] flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer active:scale-90"
@@ -233,7 +375,7 @@ export function HabitForm({
                   type="text"
                   value={naam}
                   onChange={(e) => setNaam(e.target.value)}
-                  placeholder="Naam van habit..."
+                  placeholder="Naam van habit…"
                   className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 min-h-[56px]"
                 />
               </div>
@@ -277,7 +419,7 @@ export function HabitForm({
                 type="text"
                 value={beschrijving}
                 onChange={(e) => setBeschrijving(e.target.value)}
-                placeholder="Optionele beschrijving..."
+                placeholder="Optionele beschrijving…"
                 className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 mb-4 min-h-[48px]"
               />
 
@@ -356,10 +498,13 @@ export function HabitForm({
                 </div>
               </div>
 
-              {/* Aangepaste dagen */}
+              {/* Aangepaste dagen — weergave maandag-eerst; de waarde blijft de
+                  backend-dagindex (0 = zondag) uit DAG_LABELS. */}
               {frequentie === "aangepast" && (
                 <div className="mb-4 flex gap-1.5">
-                  {DAG_LABELS.map((d, i) => (
+                  {DAG_INDEXES_MA_EERST.map((i) => {
+                    const d = DAG_LABELS[i];
+                    return (
                     <button
                       type="button"
                       key={i}
@@ -387,7 +532,8 @@ export function HabitForm({
                     >
                       {d}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -431,6 +577,21 @@ export function HabitForm({
                     {frequentie === "x_per_week" ? "week" : "maand"}?
                   </label>
                   <div className="flex gap-2">
+                    {/* Vrij getal (min 1); de presets blijven als quick-picks. */}
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={doelAantal ?? ""}
+                      onChange={(e) =>
+                        setDoelAantal(
+                          e.target.value ? Math.floor(Number(e.target.value)) : undefined,
+                        )
+                      }
+                      placeholder="Aantal"
+                      aria-label={`Hoe vaak per ${frequentie === "x_per_week" ? "week" : "maand"}`}
+                      className="w-20 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 min-h-[44px]"
+                    />
                     {(frequentie === "x_per_week"
                       ? [2, 3, 4, 5]
                       : [5, 10, 15, 20]
@@ -639,10 +800,15 @@ export function HabitForm({
                   {submitError}
                 </p>
               )}
+              {validationError && naam.trim() && (
+                <p className="mb-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200">
+                  {validationError}
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!naam.trim() || isSubmitting}
+                disabled={!naam.trim() || isSubmitting || Boolean(validationError)}
                 className="w-full py-4 rounded-2xl text-sm font-bold transition-all min-h-[56px] active:scale-[0.97] disabled:opacity-30 cursor-pointer"
                 style={{
                   background: naam.trim()
@@ -653,7 +819,7 @@ export function HabitForm({
               >
                 <Plus size={16} className="inline mr-2" />
                 {isSubmitting
-                  ? "Opslaan..."
+                  ? "Opslaan…"
                   : initial
                     ? "Opslaan"
                     : "Habit toevoegen"}

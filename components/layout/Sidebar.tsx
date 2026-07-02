@@ -44,7 +44,12 @@ export function Sidebar() {
     return () => window.clearTimeout(initial);
   }, []);
 
-  if (!mounted || !isDesktop) return null;
+  // The aside itself renders during SSR/initial paint — `hidden md:flex`
+  // already keeps it off mobile, so returning null here only caused a
+  // post-hydration pop-in and an empty 256px gutter (md:ml-64 reserves the
+  // space regardless). Only the Clerk UserButton stays client-gated below,
+  // to prevent its popover portal from leaking on mobile.
+  const showUserButton = mounted && isDesktop;
 
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-full w-64 flex-col overflow-hidden border-r border-[var(--color-border)] bg-[#0a0a0f]/95 backdrop-blur-xl md:flex">
@@ -137,17 +142,21 @@ export function Sidebar() {
           </div>
         ) : isSignedIn ? (
           <div className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
-            <UserButton
-              appearance={{
-                elements: {
-                  avatarBox: "h-9 w-9 shrink-0",
-                  userButtonPopoverCard: {
-                    background: "#111118",
-                    border: "1px solid rgba(255,255,255,0.1)",
+            {showUserButton ? (
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "h-9 w-9 shrink-0",
+                    userButtonPopoverCard: {
+                      background: "#111118",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                    },
                   },
-                },
-              }}
-            />
+                }}
+              />
+            ) : (
+              <div className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[var(--color-border)]" />
+            )}
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-xs font-semibold text-slate-200">
                 {user.firstName ?? user.username ?? "Gebruiker"}

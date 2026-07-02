@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
@@ -40,6 +40,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
 
   const openConfirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
+      // A second openConfirm while one is still pending replaces the dialog —
+      // resolve the first promise as "cancelled" instead of leaving its caller
+      // hanging on a promise that can never settle.
+      resolveRef.current?.(false);
       resolveRef.current = resolve;
       setState({ ...options, resolve });
     });
@@ -47,6 +51,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
 
   const handleClose = useCallback((confirmed: boolean) => {
     resolveRef.current?.(confirmed);
+    resolveRef.current = null;
     setState(null);
   }, []);
 
@@ -65,8 +70,11 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
 
   const isDanger = state?.variant === "danger";
 
+  // Stable context value so consumers don't re-render when a dialog opens/closes.
+  const contextValue = useMemo(() => ({ openConfirm }), [openConfirm]);
+
   return (
-    <ConfirmContext.Provider value={{ openConfirm }}>
+    <ConfirmContext.Provider value={contextValue}>
       {children}
       <AnimatePresence>
         {state && (
@@ -95,7 +103,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             >
               <button
                 onClick={() => handleClose(false)}
-                className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition-colors"
+                className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300"
                 aria-label="Dialog sluiten"
               >
                 <X size={16} />
@@ -128,6 +136,9 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               <div className="flex gap-2 justify-end">
                 <button
                   onClick={() => handleClose(false)}
+                  // Danger dialogs autofocus "Annuleren" so a stray Enter cancels
+                  // rather than confirming a destructive action (R3).
+                  autoFocus={isDanger}
                   className="px-4 py-2 rounded-xl bg-[var(--color-surface)] text-slate-300 border border-[var(--color-border)] text-sm hover:bg-[var(--color-surface-hover)] transition-colors"
                 >
                   Annuleren
@@ -140,7 +151,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                     color: isDanger ? "#ef4444" : "#f59e0b",
                     border: `1px solid ${isDanger ? "rgba(239,68,68,0.30)" : "rgba(245,158,11,0.30)"}`,
                   }}
-                  autoFocus
+                  autoFocus={!isDanger}
                 >
                   {state.confirmLabel ?? "Bevestigen"}
                 </button>

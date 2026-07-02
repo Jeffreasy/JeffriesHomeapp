@@ -6,12 +6,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDevices } from "@/hooks/useDevices";
 import { useHabits } from "@/hooks/useHabits";
 import { useLoonstroken } from "@/hooks/useLoonstroken";
-import { useNotes, type NoteRecord } from "@/hooks/useNotes";
+import type { NoteRecord } from "@/hooks/useNotes";
 import { usePersonalEvents, getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { useSalary } from "@/hooks/useSalary";
 import { useSchedule } from "@/hooks/useSchedule";
-import { type FocusAttention, focusApi } from "@/lib/api";
+import { type FocusAttention, type NoteRow, focusApi, notesApi } from "@/lib/api";
 import { normalizeTime, type DienstRow } from "@/lib/schedule";
 import { calculateScheduleSalaryForecast } from "@/lib/salaryForecast";
 import {
@@ -46,16 +46,30 @@ export type FocusNoteItem = {
   href: string;
 };
 
+export type FocusAttentionNote = {
+  id: string;
+  title: string;
+  kind: "verlopen" | "vandaag" | "triage";
+  deadline: string | null;
+};
+
 export type FocusHabitItem = {
   id: string;
   title: string;
   meta: string;
   done: boolean;
+  /**
+   * Alleen positieve, niet-kwantitatieve, niet-gepauzeerde habits zijn vanaf
+   * de kiosk af te vinken — negatief ("schoon"-semantiek) en kwantitatief
+   * (stepper) horen op /habits thuis (R2-H7-lijn).
+   */
+  toggleable: boolean;
 };
 
 function getAmsterdamClock() {
   const now = new Date();
   return {
+    epochMs: now.getTime(),
     iso: now.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" }),
     time: new Intl.DateTimeFormat("nl-NL", {
       timeZone: "Europe/Amsterdam",
@@ -160,6 +174,41 @@ function titleFromNote(note: NoteRecord) {
   return (note.titel || note.inhoud.split("\n")[0] || "Naamloze notitie").trim();
 }
 
+/**
+ * R3-18: summary mode blanks `inhoud`, so an untitled note used to show
+ * "Naamloze notitie" on the kiosk. The backend now returns a `preview` (first
+ * ~80 chars) on the summary row — surface it as the note's first line. Defensive:
+ * falls back to whatever `inhoud` carried when `preview` is absent.
+ */
+function previewFromRow(row: NoteRow): string {
+  const preview = (row as NoteRow & { preview?: unknown }).preview;
+  if (typeof preview === "string" && preview.trim()) return preview;
+  return row.inhoud ?? "";
+}
+
+// De kiosk haalt notities via `fields=summary` + `limit` (M-G) i.p.v. het
+// volledige corpus; deze mapper vult het NoteRecord-vormpje dat noteScore/
+// makeFocusNotes verwachten (triage_flag reist mee via de spread).
+function summaryRowToNote(row: NoteRow): NoteRecord {
+  return {
+    ...row,
+    id: row.id ?? "",
+    user_id: row.user_id ?? "",
+    inhoud: previewFromRow(row),
+    tags: row.tags ?? [],
+    isPinned: row.is_pinned ?? false,
+    isArchived: row.is_archived ?? false,
+    isCompleted: row.is_completed ?? false,
+    is_pinned: row.is_pinned ?? false,
+    is_archived: row.is_archived ?? false,
+    is_completed: row.is_completed ?? false,
+    linkedEventId: row.linked_event_id,
+    businessContextTitle: row.business_context_title ?? null,
+    aangemaakt: row.aangemaakt ?? "",
+    gewijzigd: row.gewijzigd ?? "",
+  };
+}
+
 function noteScore(note: NoteRecord, todayIso?: string) {
   const priority = (note.prioriteit || "").toLowerCase();
   const triage = Boolean((note as NoteRecord & { triage_flag?: boolean }).triage_flag);
@@ -199,6 +248,7 @@ function makeHabitItems(todayHabits: ReturnType<typeof useHabits>["todayHabits"]
       title: `${habit.emoji ? `${habit.emoji} ` : ""}${habit.naam}`,
       meta: done ? "Afgerond" : habit.doelTijd ? `Doel ${habit.doelTijd}` : habit.roosterFilter || "Vandaag",
       done,
+      toggleable: habit.type !== "negatief" && !habit.isKwantitatief && !habit.isPauze,
     };
   });
 }
@@ -238,7 +288,7 @@ export function useFocusData() {
   const userId = user?.id ?? "";
   const queryClient = useQueryClient();
   const [dateInfo, setDateInfo] = useState<DashboardDateInfo | null>(null);
-  const [clock, setClock] = useState<{ iso: string; time: string } | null>(null);
+  const [clock, setClock] = useState<{ epochMs: number; iso: string; time: string } | null>(null);
 
   useEffect(() => {
     const update = () => {
@@ -246,41 +296,68 @@ export function useFocusData() {
       setClock(getAmsterdamClock());
     };
     update();
-    const interval = window.setInterval(update, 60_000);
-    return () => window.clearInterval(interval);
+    // Align the tick to the minute boundary (F2): a plain 60s interval started
+    // mid-minute makes the kiosk clock lag up to 59s behind the wall clock.
+    let interval: number | undefined;
+    const timeout = window.setTimeout(() => {
+      update();
+      interval = window.setInterval(update, 60_000);
+    }, 60_000 - (Date.now() % 60_000));
+    return () => {
+      window.clearTimeout(timeout);
+      if (interval !== undefined) window.clearInterval(interval);
+    };
   }, []);
 
   const { data: devices = [], isLoading: devicesLoading } = useDevices();
   const schedule = useSchedule();
   const personal = usePersonalEvents({ diensten: schedule.diensten });
-  const notes = useNotes();
   const habits = useHabits(dateInfo?.todayIso);
   const salary = useSalary();
   const loonstroken = useLoonstroken();
   const financePrivacy = usePrivacy("finance");
 
+  // M-G: eigen lichtgewicht notitiequery (limit + fields=summary) i.p.v.
+  // useNotes' volledige corpus — de 2-minuten-poll hertrok anders elke keer
+  // alle notitie-inhoud op een 24/7 kiosk.
+  const notesQuery = useQuery({
+    queryKey: ["focus-notes-summary", userId],
+    queryFn: () => notesApi.listSummary(userId, 100),
+    enabled: isLoaded && !!userId,
+    staleTime: 60_000,
+  });
+  const summaryNotes = useMemo<NoteRecord[]>(
+    () => (Array.isArray(notesQuery.data) ? notesQuery.data.map(summaryRowToNote) : []),
+    [notesQuery.data],
+  );
+  const activeNotes = useMemo(
+    () => summaryNotes.filter((note) => !note.isArchived && !note.isCompleted),
+    [summaryNotes],
+  );
+
   const summaryQuery = useQuery({
     queryKey: ["focus-summary", userId],
     queryFn: () => focusApi.summary(userId),
     enabled: isLoaded,
+    // Enige 30s-poll voor de summary — het handmatige interval hieronder
+    // dedupliceerde vroeger niet en pollde dubbel (2×/30s, M-G).
     refetchInterval: 30_000,
     refetchIntervalInBackground: true,
     staleTime: 15_000,
   });
-  const refetchFocus = summaryQuery.refetch;
   const refetchSchedule = schedule.refetch;
   const refetchPersonal = personal.refetch;
+  const refetchNotesSummary = notesQuery.refetch;
 
   useEffect(() => {
     if (!isLoaded) return;
     const fast = window.setInterval(() => {
-      void refetchFocus();
       void queryClient.invalidateQueries({ queryKey: ["devices"] });
     }, 30_000);
     const medium = window.setInterval(() => {
       void refetchSchedule();
       void refetchPersonal();
-      void queryClient.invalidateQueries({ queryKey: ["/notes"] });
+      void refetchNotesSummary();
       void queryClient.invalidateQueries({ queryKey: ["/habits"] });
       void queryClient.invalidateQueries({ queryKey: ["/habits/for-date"] });
       void queryClient.invalidateQueries({ queryKey: ["/habits/stats"] });
@@ -289,17 +366,36 @@ export function useFocusData() {
       window.clearInterval(fast);
       window.clearInterval(medium);
     };
-  }, [isLoaded, queryClient, refetchFocus, refetchPersonal, refetchSchedule]);
+  }, [isLoaded, queryClient, refetchNotesSummary, refetchPersonal, refetchSchedule]);
 
   const timeline = useMemo(
     () => makeTimeline(schedule.upcoming.slice(0, 12), personal.upcoming.slice(0, 16)),
-    [personal.upcoming, schedule.upcoming],
+    // `clock` staat er expliciet in: makeTimeline leest de wandklok intern, dus
+    // de minuut-tick moet het venster/nu-status laten herberekenen — ook als
+    // useSchedule.upcoming ooit gememoized raakt (low).
+    [personal.upcoming, schedule.upcoming, clock], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const nowItem = timeline.find((item) => item.status === "now") ?? null;
   const nextItem = nowItem ?? timeline.find((item) => item.status === "next") ?? timeline[0] ?? null;
-  const focusNotes = useMemo(() => makeFocusNotes(notes.active, dateInfo?.todayIso), [dateInfo?.todayIso, notes.active]);
+  const focusNotes = useMemo(() => makeFocusNotes(activeNotes, dateInfo?.todayIso), [dateInfo?.todayIso, activeNotes]);
   const habitItems = useMemo(() => makeHabitItems(habits.todayHabits), [habits.todayHabits]);
+
+  // Voeding voor de in-place "Notities met aandacht"-modal: dezelfde drie
+  // categorieën die het backend-attention-item telt (verlopen/vandaag/triage).
+  const attentionNotes = useMemo<FocusAttentionNote[]>(() => {
+    const todayKey = dateInfo?.todayIso;
+    if (!todayKey) return [];
+    const rank = { verlopen: 0, vandaag: 1, triage: 2 } as const;
+    const out: FocusAttentionNote[] = [];
+    for (const note of activeNotes) {
+      const deadline = note.deadline ? note.deadline.slice(0, 10) : null;
+      const triage = Boolean((note as NoteRecord & { triage_flag?: boolean }).triage_flag);
+      const kind = deadline && deadline < todayKey ? "verlopen" : deadline === todayKey ? "vandaag" : triage ? "triage" : null;
+      if (kind) out.push({ id: note.id, title: titleFromNote(note), kind, deadline });
+    }
+    return out.sort((a, b) => rank[a.kind] - rank[b.kind] || (a.deadline ?? "9999").localeCompare(b.deadline ?? "9999"));
+  }, [activeNotes, dateInfo?.todayIso]);
 
   const salaryForecast = useMemo(
     () =>
@@ -367,18 +463,37 @@ export function useFocusData() {
       isLoading: habits.isLoading,
     },
     notes: {
-      active: notes.active.length,
-      pinned: notes.pinned.length,
-      isLoading: notes.isLoading,
+      active: activeNotes.length,
+      pinned: activeNotes.filter((note) => note.isPinned).length,
+      isLoading: notesQuery.isLoading,
     },
     finance: {
       value: netLabel,
       hidden: financePrivacy.hidden,
+      // Same shared "finance" privacy scope as the eye-toggles on the other
+      // pages — the kiosk gets its own toggle instead of a Settings-only mask.
+      togglePrivacy: financePrivacy.toggle,
       meta: salaryForecast ? `${salaryForecast.aantalDiensten} diensten · ${salaryForecast.totaalUren}u rooster` : "Geen maandprognose",
     },
     business: summaryQuery.data?.business,
     generatedAt: summaryQuery.data?.generatedAt,
     sync: summaryQuery.data?.sync,
+    // Kiosk-interacties (R4): tijdlijn-items openen in-place modals i.p.v. een
+    // paginanavigatie die je uit het kiosk-scherm haalt. Daarvoor zijn de rúwe
+    // rijen nodig (de timeline-items zijn projecties) + de habit-toggle.
+    rawEvents: personal.upcoming,
+    rawDiensten: schedule.upcoming,
+    refetchPersonal: personal.refetch,
+    // In-place aandacht-modals (R4): conflicterende afspraken + hun meldingen,
+    // en de notities die het "Notities met aandacht"-item telt.
+    conflictEvents: personal.withConflicts,
+    conflictMap: personal.conflictMap,
+    attentionNotes,
+    habitActions: {
+      toggle: habits.toggle,
+      pendingIds: habits.pendingHabitIds,
+      announcement: habits.announcement,
+    },
     // On an unattended 24/7 kiosk, a sustained backend outage must look
     // different from an ordinary loading flicker - surface this so panels can
     // show a distinct error state instead of being stuck on "Laden" forever.
@@ -389,7 +504,7 @@ export function useFocusData() {
       devicesLoading ||
       schedule.isLoading ||
       personal.isLoading ||
-      notes.isLoading ||
+      notesQuery.isLoading ||
       habits.isLoading,
   };
 }

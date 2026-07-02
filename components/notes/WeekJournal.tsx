@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import { CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
 import { DayColumn } from "./DayColumn";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
@@ -18,6 +18,19 @@ interface WeekJournalProps {
   onCreate: (data: NoteCreateData) => Promise<void>;
   onToggleComplete: (id: string) => void | Promise<void>;
   agendaEvents?: PersonalEvent[];
+  isLoading?: boolean;
+  isError?: boolean;
+}
+
+function isoDate(d: Date): string {
+  return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" }); // YYYY-MM-DD
+}
+
+// "Vandaag" op de Europe/Amsterdam-kalender, noon-anchored zodat lokale
+// datum-wiskunde (getDay/setDate) in élke device-TZ dezelfde kalenderdag
+// oplevert als de dag-keys (die via isoDate ook Amsterdam-gepind zijn).
+function amsterdamToday(): Date {
+  return new Date(`${isoDate(new Date())}T12:00:00`);
 }
 
 function getMonday(d: Date): Date {
@@ -25,12 +38,10 @@ function getMonday(d: Date): Date {
   const day = date.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   date.setDate(date.getDate() + diff);
-  date.setHours(0, 0, 0, 0);
+  // Noon-anchor (i.p.v. middernacht): voorkomt dat isoDate() in TZ's ver van
+  // Amsterdam een dag verschuift.
+  date.setHours(12, 0, 0, 0);
   return date;
-}
-
-function isoDate(d: Date): string {
-  return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" }); // YYYY-MM-DD
 }
 
 function getWeekNumber(d: Date): number {
@@ -40,11 +51,26 @@ function getWeekNumber(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart, onWeekChange, onEdit, onCreate, onToggleComplete }: WeekJournalProps) {
-  const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart, onWeekChange, onEdit, onCreate, onToggleComplete, isLoading = false, isError = false }: WeekJournalProps) {
+  // "Vandaag" ververst op visibilitychange + minuutinterval (zelfde familie als
+  // de habits-pagefix): een PWA die over middernacht open blijft markeert de
+  // juiste kolom als vandaag.
+  const [today, setToday] = useState<Date>(() => amsterdamToday());
+  useEffect(() => {
+    const update = () =>
+      setToday((prev) => {
+        const next = amsterdamToday();
+        return isoDate(next) === isoDate(prev) ? prev : next;
+      });
+    const interval = window.setInterval(update, 60_000);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") update();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
 
   const todayMonday = useMemo(() => getMonday(today), [today]);
@@ -179,7 +205,26 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
         </div>
       </div>
 
-      {/* Dag-kolommen grid */}
+      {/* K2: storing ≠ lege week — expliciete fout-banner i.p.v. 7 lege kolommen. */}
+      {isError && (
+        <div role="alert" className="flex items-center gap-3 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3">
+          <AlertTriangle size={18} className="shrink-0 text-rose-400/80" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-200">Notities konden niet geladen worden</p>
+            <p className="text-xs text-slate-500">Het weekjournaal kan onvolledig zijn — controleer je verbinding.</p>
+          </div>
+        </div>
+      )}
+
+      {/* K2: skeleton-kolommen tijdens de eerste load. */}
+      {isLoading && !isError ? (
+        <div role="status" aria-live="polite" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+          {Array.from({ length: 7 }, (_, i) => (
+            <div key={i} className="h-44 animate-pulse rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/60" />
+          ))}
+          <span className="sr-only">Weekjournaal laden…</span>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
         {days.map((day) => {
           const key = isoDate(day);
@@ -205,8 +250,9 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
           );
         })}
       </div>
+      )}
     </div>
   );
 }
 
-export { getMonday };
+export { getMonday, amsterdamToday };

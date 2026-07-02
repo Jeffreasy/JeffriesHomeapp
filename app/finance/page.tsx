@@ -10,6 +10,7 @@ import {
   Eye,
   EyeOff,
   Landmark,
+  Loader2,
   RotateCcw,
   Search,
   ShieldCheck,
@@ -19,9 +20,11 @@ import { CsvUploader } from "@/components/finance/CsvUploader";
 import { TransactionList } from "@/components/finance/TransactionList";
 import { FilterPanel } from "@/components/finance/FilterPanel";
 import { SearchBar } from "@/components/finance/SearchBar";
-import { useTransactions, type TransactionFilter } from "@/hooks/useTransactions";
+import { useTransactions, EXPORT_MAX_ROWS, type TransactionFilter } from "@/hooks/useTransactions";
 import { useLoonstroken } from "@/hooks/useLoonstroken";
 import { usePrivacy } from "@/hooks/usePrivacy";
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { eur, eurExact, ibanLabel } from "@/lib/finance-constants";
 import {
@@ -50,6 +53,8 @@ export default function FinancePage() {
 
   const loonstroken = useLoonstroken();
   const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("finance");
+  const { error: toastError } = useToast();
+  const { openConfirm } = useConfirm();
   const {
     transactions,
     stats,
@@ -60,6 +65,9 @@ export default function FinancePage() {
     isDone,
     loadMore,
     updateCategorie,
+    fetchAll,
+    fetchRecurringSample,
+    cancelExport,
     refresh,
   } = useTransactions({ ibanFilter, zoekterm, jaarFilter: jaarFilter || undefined, ...filters });
 
@@ -77,14 +85,72 @@ export default function FinancePage() {
     setZoekterm("");
   };
 
-  const handleIbanTab = (iban: string | undefined) => {
-    setIbanFilter(iban);
+  // Wisselen van jaar cleart de periode-filters (maand + expliciete datums),
+  // net als handleIbanTab: anders tonen header/grafieken het nieuwe jaar
+  // terwijl de transactielijst op een maand uit het oude jaar blijft staan.
+  const handleJaarFilter = (year: string) => {
+    setJaarFilter(year);
     setFilters((current) => ({
       ...current,
       maandFilter: undefined,
+      datumVan: undefined,
+      datumTot: undefined,
+    }));
+  };
+
+  // FH8: exporteer de vólledige gefilterde set (server-side gepagineerd), niet
+  // alleen de rijen die toevallig in de lijst geladen zijn.
+  const [exportProgress, setExportProgress] = useState<{ loaded: number; total: number } | null>(null);
+  const isExporting = exportProgress !== null;
+
+  const handleExport = useCallback(async () => {
+    if (isExporting) return;
+    // Privacy-mask + export van echte bedragen bijt elkaar: de CSV bevat
+    // ongemaskeerde bedragen. Expliciet laten bevestigen als privacy aanstaat.
+    if (privacyOn) {
+      const confirmed = await openConfirm({
+        title: "Exporteren met echte bedragen?",
+        message: "Privacymodus staat aan — toch exporteren met echte bedragen?",
+        confirmLabel: "Toch exporteren",
+      });
+      if (!confirmed) return;
+    }
+    // Cap de beginteller op EXPORT_MAX_ROWS zodat de "0/N"-weergave niet hoger
+    // start dan waar de export ooit kan uitkomen (fetchAll capt daar ook op).
+    setExportProgress({ loaded: 0, total: Math.min(totalCount, EXPORT_MAX_ROWS) });
+    try {
+      const { rows, truncated, aborted } = await fetchAll((loaded, total) =>
+        setExportProgress({ loaded, total })
+      );
+      // F5: geannuleerd = geen CSV, geen foutmelding — de gebruiker vroeg erom.
+      if (aborted) return;
+      exportCsv(rows);
+      if (truncated) {
+        toastError(
+          `Export afgekapt op ${EXPORT_MAX_ROWS.toLocaleString("nl-NL")} rijen — verfijn je filters voor een volledige export.`
+        );
+      }
+    } catch {
+      toastError("Export mislukt. Probeer het opnieuw.");
+    } finally {
+      setExportProgress(null);
+    }
+  }, [isExporting, privacyOn, openConfirm, totalCount, fetchAll, toastError]);
+
+  const handleIbanTab = (iban: string | undefined) => {
+    setIbanFilter(iban);
+    // Wissel van rekening cleart álle periode/detail-filters (L13): anders blijft
+    // een maand/datumrange/zoekterm/categorie uit de vorige rekening hangen en
+    // toont de lijst een lege of misleidende selectie voor de nieuwe rekening.
+    setFilters((current) => ({
+      ...current,
+      maandFilter: undefined,
+      datumVan: undefined,
+      datumTot: undefined,
       onlyStorneringen: false,
       categorieFilter: undefined,
     }));
+    setZoekterm("");
   };
 
   const scrollToTransactions = useCallback(() => {
@@ -151,11 +217,24 @@ export default function FinancePage() {
     return [...stats.maanden].reverse().slice(0, 6);
   }, [stats]);
 
+  // F8: de lopende maand is per definitie onvolledig (op de 5e = 5 dagen vs 30),
+  // dus die uitsluiten van de "versus vorige maand"-delta — anders lijkt elke
+  // maandstart een enorme daling. Amsterdam-gepind zodat een device op UTC rond
+  // middernacht niet de verkeerde maand als "lopend" ziet.
+  const runningMonthKey = useMemo(
+    () => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" }).slice(0, 7),
+    []
+  );
+
   const momDelta = useMemo(() => {
-    if (!stats || stats.inUitPerMaand.length < 2) return null;
-    const arr = stats.inUitPerMaand;
-    const curr = arr[arr.length - 1];
-    const prev = arr[arr.length - 2];
+    if (!stats) return null;
+    // Sluit de lopende maand uit; vergelijk de twee meest recente vólledige maanden.
+    const complete = stats.inUitPerMaand.filter(
+      (m: { maand: string }) => m.maand !== runningMonthKey
+    );
+    if (complete.length < 2) return null;
+    const curr = complete[complete.length - 1];
+    const prev = complete[complete.length - 2];
     const inkomstenDelta = prev.inkomsten > 0
       ? Math.round(((curr.inkomsten - prev.inkomsten) / prev.inkomsten) * 1000) / 10
       : 0;
@@ -164,7 +243,7 @@ export default function FinancePage() {
       : 0;
 
     return { inkomstenDelta, uitgavenDelta };
-  }, [stats]);
+  }, [stats, runningMonthKey]);
 
   const salarisStat = useMemo(() => {
     if (loonstroken.count === 0) return null;
@@ -213,7 +292,7 @@ export default function FinancePage() {
               <h1 className="mt-1 truncate text-2xl font-bold text-white">Finance</h1>
               <p className="mt-1 text-sm text-slate-500">
                 {stats
-                  ? `${totalCount.toLocaleString("nl-NL")} transacties - ${stats.maanden.length} maanden - ${stats.aantalCategorieen} categorieen`
+                  ? `${totalCount.toLocaleString("nl-NL")} transacties · ${stats.maanden.length} maanden · ${stats.aantalCategorieen} categorieën`
                   : "Transacties en cashflow laden"}
               </p>
             </div>
@@ -273,7 +352,7 @@ export default function FinancePage() {
                       key={year || "all"}
                       active={jaarFilter === year}
                       icon={CalendarDays}
-                      onClick={() => setJaarFilter(year)}
+                      onClick={() => handleJaarFilter(year)}
                     >
                       {year || "Alles"}
                     </SegmentedButton>
@@ -324,7 +403,14 @@ export default function FinancePage() {
               {recentMonths.length > 0 && (
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-white">Snelle maandselectie</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">Snelle maandselectie</p>
+                      {(stats?.maanden?.length ?? 0) > recentMonths.length && (
+                        <p className="mt-0.5 text-[11px] text-slate-500">
+                          Laatste {recentMonths.length} maanden — oudere maanden via het maandfilter in de lijst.
+                        </p>
+                      )}
+                    </div>
                     {filters.maandFilter && (
                       <button
                         type="button"
@@ -437,8 +523,8 @@ export default function FinancePage() {
 
         {stats && hasData && (
           <CollapsibleSection
-            title="Abonnementen & Inzichten"
-            subtitle="Grootste uitgavenposten"
+            title="Inzichten"
+            subtitle="Grootste uitgavenposten en terugkerende betalingen"
             icon={<Eye size={18} />}
             theme="amber"
             defaultOpen={false}
@@ -446,8 +532,12 @@ export default function FinancePage() {
             <FinanceInsights
               stats={stats}
               latestCashflow={latestCashflow}
+              runningMonthKey={runningMonthKey}
               topCategory={topCategory}
               topMerchant={topMerchant}
+              transactions={transactions}
+              fetchRecurringSample={fetchRecurringSample}
+              periodKey={`${ibanFilter ?? ""}|${jaarFilter}|${filters.maandFilter ?? ""}|${filters.datumVan ?? ""}|${filters.datumTot ?? ""}`}
               filters={filters}
               zoekterm={zoekterm}
               setZoekterm={jumpSearchToTransactions}
@@ -473,11 +563,22 @@ export default function FinancePage() {
                 <button
                   type="button"
                   className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
-                  onClick={() => exportCsv(transactions)}
-                  title="Exporteer gefilterde transacties als CSV"
+                  onClick={isExporting ? cancelExport : handleExport}
+                  title={isExporting
+                    ? "Lopende export annuleren"
+                    : "Exporteer alle transacties binnen het huidige filter als CSV"}
                 >
-                  <Download size={16} />
-                  Export CSV
+                  {isExporting && exportProgress ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Annuleren ({exportProgress.loaded.toLocaleString("nl-NL")}/{exportProgress.total.toLocaleString("nl-NL")})
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} />
+                      Export CSV
+                    </>
+                  )}
                 </button>
               ) : null
             }
@@ -511,6 +612,10 @@ export default function FinancePage() {
                 onLoadMore={loadMore}
                 isLoading={isLoading || isSearching}
                 formatAmount={privacyOn ? formatPrivateSignedEuro : signedEuro}
+                formatBalance={privacyOn ? formatPrivateEuroExact : eurExact}
+                maskValue={mask}
+                isFirstRun={totalCount === 0 && selectedFilterCount === 0 && !zoekterm && !ibanFilter}
+                onSearchTegenpartij={jumpSearchToTransactions}
               />
             )}
           </div>

@@ -17,7 +17,9 @@ export const CODE_LABELS: Record<string, string> = {
   tb: "Overboeking", bc: "Betaalopdracht", id: "Incasso",
   ei: "Europese Incasso", ba: "Bankopdracht", bg: "Bankgiro",
   cb: "Creditcard", db: "Debetkaart", st: "Stornering",
-  sb: "SEPA", ga: "Geldautomaat", gb: "Geldautomaat", kh: "Kascheque",
+  // Rabobank-conventie: ga = Geldautomaat Euro, gb = Geldautomaat VV
+  // (vreemde valuta) — geen duplicaten in dropdowns.
+  sb: "SEPA", ga: "Geldautomaat (euro)", gb: "Geldautomaat (vreemde valuta)", kh: "Kascheque",
 };
 
 export function ibanLabel(iban: string): string {

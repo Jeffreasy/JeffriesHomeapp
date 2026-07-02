@@ -10,12 +10,24 @@ export function PwaRegistry() {
   );
 
   useEffect(() => {
+    let updateInterval: ReturnType<typeof setInterval> | undefined;
+
     const registerServiceWorker = () => {
+      // Only register the production SW build (L12) — in dev @serwist/next is
+      // disabled, so registering would serve a stale public/sw.js and cache
+      // dev responses.
+      if (process.env.NODE_ENV !== "production") return;
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker
           .register("/sw.js")
           .then((registration) => {
             console.log("Service Worker registered with scope:", registration.scope);
+            // Periodically check for a new deploy (M6) so long-lived tabs
+            // (kiosk!) pick up the new build instead of eventually dying on a
+            // ChunkLoadError against deleted chunk URLs.
+            updateInterval = setInterval(() => {
+              registration.update().catch(() => {});
+            }, 60 * 60 * 1000);
           })
           .catch((error) => {
             console.error("Service Worker registration failed:", error);
@@ -26,7 +38,14 @@ export function PwaRegistry() {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
 
-    window.addEventListener("load", registerServiceWorker);
+    // The window `load` event may already have fired by the time this effect
+    // runs (hydration after load) — in that case the listener would never
+    // fire and the service worker would silently never register.
+    if (document.readyState === "complete") {
+      registerServiceWorker();
+    } else {
+      window.addEventListener("load", registerServiceWorker);
+    }
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
@@ -34,6 +53,7 @@ export function PwaRegistry() {
       window.removeEventListener("load", registerServiceWorker);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      if (updateInterval !== undefined) clearInterval(updateInterval);
     };
   }, []);
 

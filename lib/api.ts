@@ -1,4 +1,7 @@
+import { del } from "idb-keyval";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
+
 
 export interface Room {
   id: string;
@@ -46,6 +49,51 @@ export class ApiError extends Error {
   }
 }
 
+// ─── Query-client registry ────────────────────────────────────────────────────
+// providers.tsx registers its QueryClient here so the 401 path below can wipe
+// the in-memory react-query cache before redirecting to sign-in (L5), without
+// importing @tanstack/react-query (or providers.tsx) into this module — that
+// would create a circular import.
+interface ClearableCache {
+  clear: () => void;
+}
+
+let registeredQueryClient: ClearableCache | null = null;
+
+export function registerQueryClient(client: ClearableCache) {
+  registeredQueryClient = client;
+}
+
+// ─── Session-expired signal ───────────────────────────────────────────────────
+// A 401 (GET or mutation) no longer hard-redirects — that would unmount an open
+// dirty form and destroy the user's input seconds after a "safe" toast (R3-H3).
+// Instead we fire a one-shot event; providers.tsx renders a persistent, blocking
+// overlay with an "Opnieuw inloggen"-button. The user chooses when to leave, so
+// an open form survives. Deduped: only the first 401 triggers the overlay.
+type SessionExpiredListener = () => void;
+
+let sessionExpiredListener: SessionExpiredListener | null = null;
+let sessionExpiredFired = false;
+
+export function registerSessionExpiredHandler(listener: SessionExpiredListener) {
+  sessionExpiredListener = listener;
+}
+
+function triggerSessionExpired() {
+  if (sessionExpiredFired) return;
+  sessionExpiredFired = true;
+  // Purge cached user data — the session is gone, so nothing user-scoped may
+  // survive in memory, IndexedDB or the service-worker caches.
+  registeredQueryClient?.clear();
+  if (typeof window !== "undefined") {
+    del("REACT_QUERY_OFFLINE_CACHE").catch(() => {});
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "CLEAR_ALL_CACHES" });
+    }
+  }
+  sessionExpiredListener?.();
+}
+
 // apiFetchWithStatus returns the parsed body AND the real HTTP status so callers
 // (e.g. the orval mutator) can discriminate responses instead of assuming 200.
 export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): Promise<{ data: T; status: number }> {
@@ -58,11 +106,34 @@ export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): P
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      // Session expired mid-use (R3-H3): NEVER hard-redirect here. A background
+      // GET-poll firing a redirect within ~10s used to destroy an open dirty
+      // form seconds after a "safe" mutation-toast. Instead fire a one-shot
+      // signal → providers.tsx shows a persistent, blocking "sessie verlopen"
+      // overlay with a re-login button. The cache-purge still happens (inside
+      // triggerSessionExpired). Both GET and mutation paths surface a readable
+      // Dutch error to their callers; the overlay handles the actual re-login.
+      triggerSessionExpired();
+      throw new ApiError("Je sessie is verlopen — log opnieuw in om verder te gaan.", 401);
+    }
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new ApiError(error.detail ?? `API error ${res.status}`, res.status);
   }
 
+
   if (res.status === 204) return { data: undefined as T, status: res.status };
+
+  // Guard against non-JSON 200s (e.g. an HTML page served after a silent
+  // redirect) so callers get a readable Dutch error instead of a raw
+  // "SyntaxError: Unexpected token '<'" (FH4).
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("json")) {
+    throw new ApiError(
+      "Onverwacht antwoord van de server (geen JSON). Herlaad de pagina of log opnieuw in.",
+      res.status
+    );
+  }
   return { data: await res.json(), status: res.status };
 }
 
@@ -176,10 +247,20 @@ export const transactionsApi = {
     if (filter.offset != null)   params.set("offset", String(filter.offset));
     return apiFetch<TransactionListResponse>(`/transactions?${params}`);
   },
-  stats: (userId: string, ibanFilter?: string, jaarFilter?: string) => {
+  stats: (
+    userId: string,
+    ibanFilter?: string,
+    jaarFilter?: string,
+    // Optioneel periodebereik: het stats-endpoint beperkt alle aggregaties tot
+    // datumVan/datumTot zodra ze meegegeven worden (F1).
+    datumVan?: string,
+    datumTot?: string,
+  ) => {
     const params = new URLSearchParams({ userId });
     if (ibanFilter) params.set("ibanFilter", ibanFilter);
     if (jaarFilter) params.set("jaarFilter", jaarFilter);
+    if (datumVan) params.set("datumVan", datumVan);
+    if (datumTot) params.set("datumTot", datumTot);
     return apiFetch<TransactionFullStats>(`/transactions/stats?${params}`);
   },
   import: (data: { userId: string; transactions: TransactionImportRow[] }) =>
@@ -228,6 +309,26 @@ export interface TransactionImportRow {
 }
 
 
+// ─── Habits (incidenten) ─────────────────────────────────────────────────────
+// The generated orval client covers the habits CRUD + POST incident; the DELETE
+// incident endpoint is newer and lives here. Mirrors the generated path
+// conventions (/habits/{id}/incident?userId=…).
+
+export const habitsApi = {
+  /**
+   * Removes the incident log for a habit on the given day.
+   * `datum` is "YYYY-MM-DD" (Amsterdam); omitted = today. Backend returns 204,
+   * or 404 when there is no incident on that day.
+   */
+  deleteIncident: (habitId: string, userId: string, datum?: string) => {
+    const params = new URLSearchParams({ userId });
+    if (datum) params.set("datum", datum);
+    return apiFetch<void>(`/habits/${encodeURIComponent(habitId)}/incident?${params}`, {
+      method: "DELETE",
+    });
+  },
+};
+
 // ─── Loonstroken ──────────────────────────────────────────────────────────────
 
 export const loonstrokenApi = {
@@ -266,6 +367,14 @@ export interface LoonstrookRow {
   componenten: string;
   geimporteerd_op: string;
 }
+
+// ─── Schedule (manual aanvulling op de generated hooks) ──────────────────────
+
+export const scheduleApi = {
+  /** Wist alle diensten van de gebruiker — DELETE /schedule?userId=… → 204. */
+  clear: (userId: string) =>
+    apiFetch<void>(`/schedule?userId=${encodeURIComponent(userId)}`, { method: "DELETE" }),
+};
 
 // ─── Personal Events ──────────────────────────────────────────────────────────
 
@@ -1087,6 +1196,8 @@ export interface LCMailbox {
   templates: LCMailTemplate[];
   outbox: LCMailOutboxItem[];
   inbox: LCMailInboxItem[];
+  /** Optionele fout van de laatste inbox-sync (bijv. ontbrekende Graph-machtiging). */
+  inboxError?: string | null;
 }
 
 export interface LCMailAISource {
@@ -1175,6 +1286,10 @@ export const laventecareApi = {
     to_name?: string;
     cc?: string[];
     bcc?: string[];
+    /** Optionele onderwerp-override (bijv. "Re: <origineel>" bij een reply). */
+    subject?: string;
+    /** Conversation-id van de thread waarop dit een antwoord is. */
+    conversation_id?: string;
     variables?: Record<string, string>;
     send?: boolean;
     attachments?: Array<{
@@ -1303,6 +1418,15 @@ export const laventecareApi = {
     status?: string;
   }) =>
     apiFetch<LCTimeEntry>("/laventecare/time-entries", { method: "POST", body: JSON.stringify(data) }),
+  // N10: urenregels zijn bewerkbaar/verwijderbaar zolang ze niet op een
+  // factuur staan (backend antwoordt 409 zodra invoice_id gezet is).
+  updateTimeEntry: (id: string, data: { omschrijving?: string; minuten?: number; status?: "open" | "afgeschreven" }) =>
+    apiFetch<LCTimeEntry>(`/laventecare/time-entries/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  deleteTimeEntry: (id: string) =>
+    apiFetch<void>(`/laventecare/time-entries/${encodeURIComponent(id)}`, { method: "DELETE" }),
   createInvoice: (data: {
     company_id?: string;
     project_id?: string;
@@ -1695,6 +1819,10 @@ export interface SyncCalendarResult {
   personalCount?: number;
   pendingProcessed?: number;
   pendingError?: string;
+  /** Set when the schedule write half of the sync failed (sync.go): the calendar
+   *  fetch may have succeeded while diensten weren't persisted, so the UI must
+   *  not claim a clean "gesynchroniseerd". */
+  scheduleWriteError?: string;
   message?: string;
 }
 
@@ -1709,6 +1837,7 @@ export interface NoteRow {
   kleur: string | null;
   is_pinned: boolean;
   is_archived: boolean;
+  is_completed?: boolean;
   deadline: string | null;
   linked_event_id: string | null;
   prioriteit: string | null;
@@ -1724,6 +1853,15 @@ export interface NoteRow {
 export const notesApi = {
   list: (userId: string) =>
     apiFetch<NoteRow[]>(`/notes?userId=${userId}`),
+  /**
+   * Lichtgewicht lijst voor de focus-kiosk: `fields=summary` laat de backend
+   * de volledige inhoud weg en `limit` begrenst het aantal rijen, zodat de
+   * 2-minuten-poll niet telkens het hele notitiecorpus hertrekt (M-G).
+   */
+  listSummary: (userId: string, limit = 100) =>
+    apiFetch<NoteRow[]>(
+      `/notes?userId=${encodeURIComponent(userId)}&limit=${limit}&fields=summary`,
+    ),
   search: (userId: string, query: string) =>
     apiFetch<NoteRow[]>(`/notes/search?userId=${userId}&q=${encodeURIComponent(query)}`),
   tags: (userId: string) =>

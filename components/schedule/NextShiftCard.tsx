@@ -1,19 +1,18 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
-import { type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { type DienstRow, getEndKey, getStartKey, shiftTypeColor } from "@/lib/schedule";
+import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type ConflictInfo } from "@/lib/conflictDetection";
 import { cn } from "@/lib/utils";
 import { AppIcon, type SymbolTone } from "@/components/ui/AppIcon";
 import type { AppIconName } from "@/lib/symbols";
-import { hoursValue } from "./RoosterUtils";
+import { hoursValue, formatShortDate } from "./RoosterUtils";
 
-/** Format ISO date string (YYYY-MM-DD) → DD-MM-YYYY veilig. */
-function formatDate(iso: string, style: "compact" | "full" = "full"): string {
-  const [year, month, day] = iso.split("-");
-  if (!year || !month || !day) return iso;
-  return style === "compact" ? `${day}-${month}` : `${day}-${month}-${year}`;
+/** Datumnotatie in nl-NL ("12 mrt") — gelijk aan de rest van de app i.p.v. de
+ *  eigen numerieke DD-MM(-YYYY)-variant die hier afweek (audit L datumdrift). */
+function formatDate(iso: string): string {
+  return formatShortDate(iso);
 }
 
 /** Bereken menselijke relatieve datum op basis van een stabiele Amsterdam-datum. */
@@ -37,13 +36,27 @@ function capitalize(value: string): string {
 interface NextShiftCardProps {
   dienst:     DienstRow | null;
   compact?:   boolean;
+  /** Cold-load flag — toont een skeleton i.p.v. "Geen aankomende diensten" (audit K3). */
+  loading?:   boolean;
   onImport?:  () => void;
   afspraken?: PersonalEvent[];
   conflictMap?: Map<string, ConflictInfo>;
   todayIso?: string | null;
 }
 
-export function NextShiftCard({ dienst, compact, onImport, afspraken = [], conflictMap, todayIso }: NextShiftCardProps) {
+export function NextShiftCard({ dienst, compact, loading = false, onImport, afspraken = [], conflictMap, todayIso }: NextShiftCardProps) {
+  if (!dienst && loading) {
+    return (
+      <div
+        aria-hidden="true"
+        className={cn(
+          "glass min-w-0 animate-pulse rounded-xl border border-[var(--color-border)]",
+          compact ? "h-[76px]" : "h-[120px]",
+        )}
+      />
+    );
+  }
+
   if (!dienst) {
     return (
       <div className={cn(
@@ -57,7 +70,9 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
               onClick={onImport}
               className="mt-2 text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 mx-auto"
             >
-              <AppIcon name="upload" tone="amber" size="xs" /> Rooster importeren
+              {/* onImport draait de Google-kalendersync, niet de CSV-import —
+                  daarom "synchroniseren" i.p.v. "importeren" (audit L). */}
+              <AppIcon name="refresh" tone="amber" size="xs" /> Rooster synchroniseren
             </button>
           )}
         </div>
@@ -69,8 +84,8 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
   const isBezig      = dienst.status === "Bezig";
   const relativeDay  = getRelativeDay(dienst.startDatum, todayIso);
   const relativeDate = relativeDay
-    ? `${capitalize(relativeDay)} (${formatDate(dienst.startDatum, "full")})`
-    : formatDate(dienst.startDatum, "full");
+    ? `${capitalize(relativeDay)} (${formatDate(dienst.startDatum)})`
+    : formatDate(dienst.startDatum);
   const isToday      = relativeDay === "vandaag";
   const isTomorrow   = relativeDay === "morgen";
   const isZondag     = dienst.dag === "Zondag";
@@ -80,9 +95,18 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
   const resolveConflict = (evt: PersonalEvent) => {
     const ci = conflictMap?.get(evt.eventId);
     const isHeledag = evt.heledag || !evt.startTijd;
+    // Fallback vergelijkt volledige datum+tijd-sleutels (zoals lib/conflictDetection),
+    // zodat nachtdiensten over de dagnachtgrens correct matchen (audit K9) —
+    // kale HH:MM-strings faalden daar.
+    const overlapsShift = () => {
+      if (isHeledag || !evt.eindTijd) return false;
+      const evStart = `${evt.startDatum} ${evt.startTijd}`;
+      const evEnd = `${getDisplayEndDate(evt)} ${evt.eindTijd}`;
+      return evStart < getEndKey(dienst) && getStartKey(dienst) < evEnd;
+    };
     const level = ci?.level
       ?? (isHeledag ? "soft"
-        : (evt.startTijd && evt.eindTijd && evt.startTijd < dienst.eindTijd && evt.eindTijd > dienst.startTijd) ? "hard"
+        : overlapsShift() ? "hard"
         : "info");
     return {
       textClass: level === "hard" ? "text-red-400" : level === "soft" ? "text-amber-400" : "text-blue-400",
@@ -116,7 +140,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
               {isBezig ? "Nu bezig" : "Volgende dienst"}
             </p>
             <p className={cn("text-sm font-bold", colors.text)}>
-              {dienst.dag} · {formatDate(dienst.startDatum, "compact")}
+              {dienst.dag} · {formatDate(dienst.startDatum)}
             </p>
             <p className="text-xs text-slate-400">
               {dienst.startTijd}–{dienst.eindTijd} · {dienst.shiftType} · {hoursValue(dienst.duur)}u
@@ -132,7 +156,7 @@ export function NextShiftCard({ dienst, compact, onImport, afspraken = [], confl
                   size="xs"
                   iconClassName={isToday ? "fill-current" : undefined}
                 />
-              {isToday ? "Vandaag" : relativeDay ? capitalize(relativeDay) : formatDate(dienst.startDatum, "compact")}
+              {isToday ? "Vandaag" : relativeDay ? capitalize(relativeDay) : formatDate(dienst.startDatum)}
               </p>
             )}
             {isZondag && (

@@ -1,14 +1,15 @@
 "use client";
 
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { Loader2, Plus, Workflow } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalCancelButton } from "@/components/ui/Modal";
 import type { CompanyItem, ProjectItem, WorkstreamForm } from "./LaventeCareTypes";
 import { LAVENTECARE_WORKSTREAM_TYPES } from "./LaventeCareTypes";
 
 export function LaventeCareWorkstreamModal({
   isOpen,
   onClose,
+  dirty,
   workstreamForm,
   setWorkstreamForm,
   companies,
@@ -18,6 +19,7 @@ export function LaventeCareWorkstreamModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
+  dirty?: boolean;
   workstreamForm: WorkstreamForm;
   setWorkstreamForm: Dispatch<SetStateAction<WorkstreamForm>>;
   companies: CompanyItem[];
@@ -28,25 +30,53 @@ export function LaventeCareWorkstreamModal({
   const filteredProjects = workstreamForm.companyId
     ? projects.filter((project) => project.company_id === workstreamForm.companyId)
     : projects;
+  const [titelError, setTitelError] = useState("");
+
+  // Inline validatie (M28/L1): markeer en focus het titelveld; de page-level
+  // handler houdt de toast en blokkeert de daadwerkelijke submit.
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (!workstreamForm.titel.trim()) {
+      setTitelError("Titel is verplicht");
+      window.setTimeout(() => document.getElementById("workstream-form-titel")?.focus(), 0);
+    } else {
+      setTitelError("");
+    }
+    void onSubmit(event);
+  };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      dirty={dirty}
       title="Nieuwe opdracht"
       icon={<Workflow size={18} className="text-violet-300" />}
       theme="violet"
       maxWidth="3xl"
     >
-      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} noValidate className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Titel</span>
+          <span className="text-xs font-semibold text-slate-400">
+            Titel <span className="text-rose-300">*</span>
+          </span>
           <input
+            id="workstream-form-titel"
+            required
+            aria-invalid={Boolean(titelError)}
             value={workstreamForm.titel}
             onChange={(event) => setWorkstreamForm((form) => ({ ...form, titel: event.target.value }))}
             placeholder="Bijv. Integratieonderzoek voor klant"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-violet-500"
+            className={`mt-1 w-full rounded-lg border bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 ${
+              titelError
+                ? "border-rose-400/60 focus:border-rose-400/60"
+                : "border-[var(--color-border)] focus:border-violet-500"
+            }`}
           />
+          {titelError ? (
+            <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+              {titelError}
+            </p>
+          ) : null}
         </label>
 
         <label className="block">
@@ -267,13 +297,11 @@ export function LaventeCareWorkstreamModal({
         </label>
 
         <div className="mt-4 flex justify-end border-t border-white/5 pt-4 sm:col-span-2">
-          <button
-            type="button"
-            onClick={onClose}
+          {/* R11: via de guarded close, zodat de dirty-guard ook hier geldt. */}
+          <ModalCancelButton
+            onFallback={onClose}
             className="mr-3 px-4 py-2 text-sm text-slate-300 transition-colors hover:text-white"
-          >
-            Annuleren
-          </button>
+          />
           <button type="submit" disabled={savingWorkstream} className="btn border-transparent bg-violet-500 px-6 text-white hover:bg-violet-600">
             {savingWorkstream ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Plus size={16} className="mr-2" />}
             Opdracht toevoegen

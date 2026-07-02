@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ChevronRight, ArrowRight, AlertTriangle, RefreshCw, type LucideIcon } from "lucide-react";
+import { ChevronRight, AlertTriangle, RefreshCw, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { type Tone, toneClasses } from "./DashboardUtils";
@@ -78,44 +78,8 @@ export function SectionHeader({
   );
 }
 
-export function MetricTile({
-  href,
-  icon,
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  href: string;
-  icon: IconSource;
-  label: string;
-  value: string;
-  sub: string;
-  tone: Tone;
-}) {
-  const classes = toneClasses[tone];
-
-  return (
-    <Link href={href} className="group block min-w-0">
-      <motion.div
-        whileHover={{ y: -2 }}
-        className={`min-h-[108px] rounded-xl border ${classes.border} ${classes.surface} p-3 transition-colors group-hover:bg-[var(--color-surface-hover)] sm:min-h-[132px] sm:rounded-2xl sm:p-4`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border sm:h-10 sm:w-10 ${classes.border} bg-black/10`}>
-            <RenderIcon icon={icon} size={17} className={classes.icon} />
-          </div>
-          <ArrowRight size={15} className="mt-1 text-slate-600 transition-colors group-hover:text-slate-300" />
-        </div>
-        <div className="mt-3 min-w-0 sm:mt-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:text-[11px]">{label}</p>
-          <p className="mt-1 line-clamp-2 break-words text-base font-bold leading-tight text-white sm:text-lg">{value}</p>
-          <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs sm:leading-5">{sub}</p>
-        </div>
-      </motion.div>
-    </Link>
-  );
-}
+// (MetricTile is verwijderd — H2: de home-metrics dupliceerden de
+// OverviewPanel-cellen, die nu zelf klikbare links zijn.)
 
 export function RouteTile({
   href,

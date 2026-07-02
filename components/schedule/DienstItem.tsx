@@ -78,7 +78,7 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
 
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-mono text-sm font-semibold tracking-tight text-slate-200">
-                {dienst.startTijd}<span className="mx-1 text-slate-600">-</span>{dienst.eindTijd}
+                {dienst.startTijd}<span className="mx-1 text-slate-600">–</span>{dienst.eindTijd}
               </span>
               <span className="rounded-md border border-white/8 bg-white/[0.03] px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-slate-500">
                 {hoursValue(dienst.duur)}u
@@ -104,44 +104,45 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
     );
   }
 
+  // Volle variant in dezelfde zachte huid als de compacte kaart (audit F14):
+  // rounded-xl, var(--color-border), font-semibold i.p.v. font-black caps en
+  // AA-leesbare labelkleuren. Layout (kolommen/badges) ongewijzigd.
   return (
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       whileHover={{ x: 2, backgroundColor: "rgba(255,255,255,0.05)" }}
-      className={`flex items-center gap-4 px-4 py-3 border-l-2 transition-all ${
-        isToday ? "border-b border-t border-r border-white/10" : "border-b border-white/5"
-      }`}
+      className="flex items-center gap-4 rounded-xl border border-[var(--color-border)] px-4 py-3 border-l-2 transition-all"
       style={{
         borderLeftColor: isToday ? shift.accent : isZondag ? "#eab308" : isZaterdag ? "#facc15" : "#475569",
-        background: isToday ? shift.accent + "10" : "transparent"
+        background: isToday ? shift.accent + "10" : "rgba(255,255,255,0.015)"
       }}
     >
       {/* Date */}
       <div className="w-12 text-center flex-shrink-0">
-        <p className={`text-sm font-black ${isWeekend ? "text-yellow-400" : "text-white"}`}>{dienst.startDatum.slice(8)}</p>
-        <p className={`text-[10px] font-bold uppercase tracking-widest ${isWeekend ? "text-yellow-600" : "text-slate-500"}`}>{dienst.dag?.slice(0, 2)}</p>
+        <p className={`text-sm font-bold ${isWeekend ? "text-yellow-300" : "text-white"}`}>{dienst.startDatum.slice(8)}</p>
+        <p className={`text-[10px] font-semibold uppercase tracking-wide ${isWeekend ? "text-amber-500/80" : "text-slate-400"}`}>{dienst.dag?.slice(0, 2)}</p>
         {isZondag && (
-          <p className="text-[9px] font-black tracking-widest text-yellow-500 mt-1">+ORT</p>
+          <p className="text-[10px] font-bold tracking-wide text-amber-400 mt-1">+ORT</p>
         )}
       </div>
 
       {/* Shift type badge */}
       <div
-        className="w-16 text-center py-1 text-[10px] uppercase tracking-widest font-black flex-shrink-0 border"
-        style={{ background: shift.accent + "10", color: shift.accent, borderColor: shift.accent + "30" }}
+        className="w-16 text-center py-1 text-[10px] uppercase tracking-wide font-semibold flex-shrink-0 rounded-md border"
+        style={{ background: shift.accent + "12", color: shift.accent, borderColor: shift.accent + "35" }}
       >
         {dienst.shiftType}
       </div>
 
       {/* Time + locatie */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-300 font-mono tracking-tighter">
+        <p className="text-sm text-slate-200 font-mono tracking-tight">
           {dienst.startTijd}<span className="text-slate-600 mx-1">–</span>{dienst.eindTijd}
-          <span className="text-[10px] text-slate-500 font-bold tracking-widest ml-2 uppercase">· {hoursValue(dienst.duur)}H</span>
+          <span className="text-[10px] text-slate-400 font-semibold tracking-wider ml-2">· {hoursValue(dienst.duur)}u</span>
         </p>
         {dienst.locatie && (
-          <p className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-1 uppercase font-bold tracking-widest">
+          <p className="text-[10px] text-slate-400 truncate flex items-center gap-1 mt-1 font-semibold uppercase tracking-wider">
             <MapPin size={10} className="flex-shrink-0" />
             {dienst.locatie}
           </p>
@@ -151,7 +152,7 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
       {/* Team badge — color-coded */}
       {team && dienst.team && (
         <span
-          className="text-[10px] font-black px-2 py-1 flex-shrink-0 tracking-widest uppercase border"
+          className="text-[10px] font-semibold px-2 py-1 flex-shrink-0 tracking-wide uppercase rounded-md border"
           style={{ background: team.bg, color: team.text, borderColor: team.border }}
         >
           {dienst.team}
@@ -161,8 +162,8 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
       {/* Afspraken badge */}
       {afspraken.length > 0 && (
         <span
-          className="flex items-center gap-1 text-[10px] font-black px-2 py-1 flex-shrink-0 border uppercase tracking-widest"
-          style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", borderColor: "rgba(99,102,241,0.3)" }}
+          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 flex-shrink-0 rounded-md border tracking-wide"
+          style={{ background: "rgba(99,102,241,0.15)", color: "#a5b4fc", borderColor: "rgba(99,102,241,0.3)" }}
           title={afspraken.map((e) => e.titel).join(" · ")}
         >
           <CalendarDays size={12} />
@@ -173,10 +174,10 @@ export function DienstItem({ dienst, isToday, afspraken = [], compact = false }:
       {/* TODAY indicator */}
       {isToday && (
         <span
-          className="text-[10px] font-black px-2 py-1 flex-shrink-0 uppercase tracking-widest border"
+          className="text-[10px] font-semibold px-2 py-1 flex-shrink-0 uppercase tracking-wide rounded-md border"
           style={{ background: shift.accent + "20", color: shift.accent, borderColor: shift.accent + "40" }}
         >
-          VANDAAG
+          Vandaag
         </span>
       )}
     </motion.div>

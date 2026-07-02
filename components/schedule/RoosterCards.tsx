@@ -1,14 +1,18 @@
 import { Calendar, RefreshCw, Upload, type LucideIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { toneClasses, type Tone } from "./RoosterUtils";
-import { cn } from "@/lib/utils";
+
+/* Visuele unificatie (audit F14): het desktoprooster gebruikt dezelfde zachte
+   huid als de compacte kaarten — rounded-xl, var(--color-border), subtiele
+   surfaces en font-semibold i.p.v. brutalistische font-black caps. Layout
+   ongewijzigd; alleen de skin. */
 
 export function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`bg-black/40 border border-white/10 p-4 sm:p-5 min-w-0 ${className}`}
+      className={`rounded-xl border border-[var(--color-border)] bg-white/[0.03] p-4 sm:p-5 min-w-0 ${className}`}
     >
       {children}
     </motion.div>
@@ -83,24 +87,24 @@ export function StatusMetric({
   const classes = toneClasses[tone];
 
   return (
-    <div className="min-h-[112px] min-w-0 border-b border-r border-t border-l-2 border-white/5 bg-black/40 p-3 transition-all hover:bg-white/5 sm:min-h-[132px] sm:p-5"
+    <div className="min-h-[112px] min-w-0 border-b border-r border-t border-l-2 border-[var(--color-border)] bg-white/[0.015] p-3 transition-colors hover:bg-white/[0.04] sm:min-h-[132px] sm:p-5"
          style={{ borderLeftColor: tone === "slate" ? "#94a3b8" : tone === "green" ? "#10b981" : tone === "amber" ? "#f59e0b" : tone === "rose" ? "#f43f5e" : tone === "indigo" ? "#6366f1" : "#3b82f6" }}>
-      <div className={`flex h-8 w-8 items-center justify-center border ${classes.border} ${classes.surface}`}>
+      <div className={`flex h-8 w-8 items-center justify-center rounded-lg border ${classes.border} ${classes.surface}`}>
         <Icon size={14} className={classes.icon} />
       </div>
-      <p className="mt-3 text-[8px] font-black uppercase tracking-widest text-slate-500 sm:mt-5 sm:text-[9px]">{label}</p>
-      <p className={`mt-0.5 truncate text-base font-black tracking-tight sm:text-xl ${classes.text}`}>{value}</p>
-      <p className="mt-1 line-clamp-2 text-[10px] font-bold uppercase leading-4 tracking-widest text-slate-500 sm:text-xs">{sub}</p>
+      <p className="mt-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400 sm:mt-5 sm:text-xs">{label}</p>
+      <p className={`mt-0.5 truncate text-base font-bold tracking-tight sm:text-xl ${classes.text}`}>{value}</p>
+      <p className="mt-1 line-clamp-2 text-[10px] font-medium leading-4 text-slate-400 sm:text-xs">{sub}</p>
     </div>
   );
 }
 
 export function MiniBreakdown({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="border border-white/10 bg-black/40 px-4 py-3 hover:bg-white/5 transition-colors">
-      <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</p>
-      <p className="mt-1 text-xl tracking-tight font-black text-white">{value}</p>
-      <p className="mt-0.5 text-[10px] uppercase font-bold tracking-widest text-slate-500">{sub}</p>
+    <div className="rounded-xl border border-[var(--color-border)] bg-white/[0.015] px-4 py-3 hover:bg-white/[0.04] transition-colors">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-1 text-xl tracking-tight font-bold text-white">{value}</p>
+      <p className="mt-0.5 text-[10px] font-medium text-slate-400">{sub}</p>
     </div>
   );
 }
@@ -119,13 +123,13 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex items-center gap-4 border border-white/10 bg-black/40 px-4 py-3 hover:bg-white/5 transition-colors">
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center border ${classes.border} ${classes.surface}`}>
+    <div className="flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-white/[0.015] px-4 py-3 hover:bg-white/[0.04] transition-colors">
+      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${classes.border} ${classes.surface}`}>
         <Icon size={14} className={classes.icon} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</p>
-        <p className="mt-0.5 truncate text-sm font-bold text-white tracking-tight">{value}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+        <p className="mt-0.5 truncate text-sm font-semibold text-white tracking-tight">{value}</p>
       </div>
     </div>
   );

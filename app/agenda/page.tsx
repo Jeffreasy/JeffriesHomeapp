@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Archive,
@@ -15,12 +15,12 @@ import {
 } from "lucide-react";
 
 import { useUser } from "@clerk/nextjs";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { syncApi, type SyncStatusResult } from "@/lib/api";
-import { getHistory as getDienstHistory, type DienstRow } from "@/lib/schedule";
+import { getHistory as getDienstHistory, withRuntimeStatus, type DienstRow } from "@/lib/schedule";
 import {
   getDisplayEndDate,
   usePersonalEvents,
@@ -38,7 +38,6 @@ import { businessContextFromEvent, contextTagsFromEvent, mergeTags, type Busines
 
 import {
   getAmsterdamTodayIso,
-  addDaysIso,
   formatDateLabel,
   formatDateTime,
   eventCoversDate,
@@ -51,6 +50,8 @@ import {
   NextEventCard,
   TimelineDay,
 } from "@/components/schedule/AgendaCards";
+import { TabBar, tabBarPanelId, tabBarTabId } from "@/components/schedule/TabBar";
+import { compareAllDayFirst, shortSyncError, getShiftAppointments } from "@/components/schedule/scheduleUtils";
 import { StatChip } from "@/components/ui/StatChip";
 
 type AgendaView = "today" | "upcoming" | "pending" | "history";
@@ -65,13 +66,17 @@ type TimelineGroup = {
   events: PersonalEvent[];
 };
 
-function sortByStart(a: PersonalEvent, b: PersonalEvent) {
-  return `${a.startTijd || "00:00"}-${a.titel}`.localeCompare(`${b.startTijd || "00:00"}-${b.titel}`);
-}
-
 function dienstToTimelineEvent(dienst: DienstRow): PersonalEvent {
   const title = dienst.titel || dienst.shiftType || "Dienst";
   const endDate = dienst.eindDatum || dienst.startDatum;
+  // Runtime-status toepassen zodat een lopende dienst óók op /agenda "Bezig"
+  // toont (rooster/focus doen dit al) i.p.v. altijd "Aankomend" (audit DEEL 2 #12).
+  const runtime = withRuntimeStatus(dienst);
+  const status =
+    runtime.status === "Gedraaid" ? "Voorbij"
+    : runtime.status === "VERWIJDERD" ? "VERWIJDERD"
+    : runtime.status === "Bezig" ? "Bezig"
+    : "Aankomend";
   return {
     _id: dienst.eventId,
     userId: "",
@@ -85,7 +90,7 @@ function dienstToTimelineEvent(dienst: DienstRow): PersonalEvent {
     locatie: dienst.locatie || undefined,
     beschrijving: dienst.beschrijving || undefined,
     symbol: "schedule",
-    status: dienst.status === "Gedraaid" ? "Voorbij" : dienst.status === "VERWIJDERD" ? "VERWIJDERD" : "Aankomend",
+    status,
     kalender: "Rooster",
     shiftType: dienst.shiftType,
     team: dienst.team,
@@ -141,7 +146,8 @@ function groupByDate(events: PersonalEvent[], todayIso: string, direction: "asc"
       date,
       label: formatDateLabel(date),
       isToday: date === todayIso,
-      events: [...groupEvents].sort(sortByStart),
+      // Gedeelde comparator met de kalender (audit L6): hele-dag eerst.
+      events: [...groupEvents].sort(compareAllDayFirst),
     }));
 }
 
@@ -150,7 +156,7 @@ function viewEmptyCopy(view: AgendaView) {
     case "today":
       return { title: "Vandaag geen afspraken", text: "Je dag is vrij." };
     case "pending":
-      return { title: "Geen wachtrij", text: "Alles is verwerkt." };
+      return { title: "Niets in de wachtrij", text: "Alles staat in Google Calendar." };
     case "history":
       return { title: "Geen historie", text: "Er zijn nog geen afgeronde afspraken." };
     default:
@@ -160,12 +166,14 @@ function viewEmptyCopy(view: AgendaView) {
 
 export default function AgendaPage() {
   const { user } = useUser();
+  const queryClient = useQueryClient();
   const { success, error: toastError, toast } = useToast();
   const {
     diensten,
     nextDienst,
     upcoming: upcomingDiensten,
     isLoading: scheduleLoading,
+    isError: scheduleIsError,
     refetch: refetchDiensten,
   } = useSchedule();
   const {
@@ -193,10 +201,15 @@ export default function AgendaPage() {
     refetch: refetchEvents,
   } = usePersonalEvents({ diensten });
 
+  // Adaptieve poll (audit L3): 10s alleen in de 2 minuten na een handmatige
+  // sync (dan is de status echt in beweging), anders 60s — een open kiosk-tab
+  // hamert de API zo niet meer 8.640×/dag.
+  const lastManualSyncRef = useRef(0);
   const { data: syncStatuses } = useQuery<SyncStatusResult>({
     queryKey: ["sync-status"],
     queryFn: () => syncApi.status(),
-    refetchInterval: 10000,
+    refetchInterval: () =>
+      Date.now() - lastManualSyncRef.current < 120_000 ? 10_000 : 60_000,
   });
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -213,14 +226,19 @@ export default function AgendaPage() {
   const [eventInitialDate, setEventInitialDate] = useState<string | undefined>();
   const [eventInitialTime, setEventInitialTime] = useState<string | undefined>();
   const [syncing, setSyncing] = useState(false);
+  // Persistent wachtrij-fout van de laatste sync — blijft zichtbaar in de
+  // sidebar tot een sync zonder wachtrij-fout slaagt (audit K11).
+  const [pendingSyncError, setPendingSyncError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<AgendaView>("today");
 
   const todayIso = getAmsterdamTodayIso();
   const [calendarMode, setCalendarMode] = useState<CalendarMode>("month");
   const [calendarCursorDate, setCalendarCursorDate] = useState(todayIso);
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(todayIso);
-  const monthEndIso = addDaysIso(todayIso, 30);
   const syncStatus = syncStatuses?.personal;
+  // Eén gedeelde laad-vlag voor chips, kalender en sidebar — koude loads tonen
+  // placeholders i.p.v. "0 conflicten"/"Geen aankomende diensten" (audit K3).
+  const agendaBusy = isLoading || scheduleLoading;
 
   // ─── Computed data ──────────────────────────────────────────────────────
 
@@ -263,11 +281,6 @@ export default function AgendaPage() {
   const notesByDate = useMemo(() => groupNotesByDate(activeNotes), [activeNotes]);
   const notesByEventId = useMemo(() => groupNotesByEventId(activeNotes), [activeNotes]);
   const todayNotes = notesByDate.get(todayIso) ?? [];
-
-  const monthEvents = useMemo(
-    () => upcomingTimelineEvents.filter((e) => getDisplayEndDate(e) >= todayIso && e.startDatum <= monthEndIso),
-    [monthEndIso, todayIso, upcomingTimelineEvents],
-  );
 
   const noteEventOptions = useMemo(
     () => mergeTimelineEvents(agendaEvents, upcomingDienstEvents, historyDienstEvents),
@@ -313,6 +326,9 @@ export default function AgendaPage() {
 
   const emptyCopy = viewEmptyCopy(activeView);
   const activeViewMeta = viewTabs.find((tab) => tab.id === activeView) ?? viewTabs[0];
+  // Heeft de agenda al (gecachte) data? Zo ja, dan is een refetch-fout slechts
+  // "verouderd", geen leeg foutscherm (audit H15).
+  const agendaHasData = upcoming.length > 0 || history.length > 0 || pending.length > 0;
   const historyHiddenCount = Math.max(0, historyTimelineEvents.length - HISTORY_RENDER_LIMIT);
 
   // ─── Actions ────────────────────────────────────────────────────────────
@@ -367,15 +383,27 @@ export default function AgendaPage() {
   };
 
   const handleSync = async () => {
+    if (syncing) return;
     if (!user?.id) { toastError("Niet ingelogd"); return; }
+    lastManualSyncRef.current = Date.now();
     setSyncing(true);
     try {
       const result = await syncApi.calendar(user.id);
       await refetchEvents();
       await refetchDiensten();
-      if (result.pendingError) {
+      // De header-StatusPill leest deze query — direct verversen i.p.v. op de
+      // 10s-poll wachten (audit K11).
+      queryClient.invalidateQueries({ queryKey: ["sync-status"] });
+      if (result.scheduleWriteError) {
+        // Kalender opgehaald, maar het rooster kon niet worden weggeschreven —
+        // geen schone "gesynchroniseerd" claimen (audit DEEL 2 #7).
+        setPendingSyncError(`Rooster opslaan mislukt: ${result.scheduleWriteError}`);
+        toastError(`Rooster opslaan mislukt: ${shortSyncError(result.scheduleWriteError)}`);
+      } else if (result.pendingError) {
+        setPendingSyncError(result.pendingError);
         toast(`Agenda opgehaald; wachtrij faalde: ${shortSyncError(result.pendingError)}`, "info");
       } else {
+        setPendingSyncError(null);
         success("Agenda gesynchroniseerd");
       }
     } catch (err) {
@@ -426,32 +454,15 @@ export default function AgendaPage() {
             </div>
           </div>
 
-          <div role="tablist" aria-label="Agenda-weergave" className="mt-3 flex gap-1 overflow-x-auto pb-0.5">
-            {viewTabs.map(({ id, label, count, icon: Icon }) => {
-              const active = activeView === id;
-              return (
-                <button
-                  key={id}
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setActiveView(id)}
-                  className={`flex h-9 min-w-max items-center gap-2 rounded-lg border px-3 text-xs font-medium transition-colors cursor-pointer ${
-                    active
-                      ? "border-sky-500/35 bg-sky-500/12 text-sky-200"
-                      : "border-transparent bg-white/[0.03] text-slate-500 hover:text-slate-300 hover:bg-white/[0.05]"
-                  }`}
-                >
-                  <Icon size={13} aria-hidden="true" />
-                  <span>{label}</span>
-                  <span className={`rounded-md px-1.5 py-0.5 text-[11px] tabular-nums ${
-                    active ? "bg-sky-400/12 text-sky-100" : "bg-white/[0.04] text-slate-500"
-                  }`}>
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          <TabBar
+            tabs={viewTabs}
+            active={activeView}
+            onChange={setActiveView}
+            idPrefix="agenda"
+            ariaLabel="Agenda-weergave"
+            tone="sky"
+            className="mt-3 pb-0.5"
+          />
         </div>
       </header>
 
@@ -460,6 +471,7 @@ export default function AgendaPage() {
         <div className="mb-4">
           <AgendaCalendar
             events={calendarEvents}
+            isLoading={agendaBusy}
             notesByDate={notesByDate}
             notesByEventId={notesByEventId}
             conflictMap={conflictMap}
@@ -479,16 +491,35 @@ export default function AgendaPage() {
         </div>
 
         {/* Compact summary chips — only the net-new counts; Vandaag/Wachtrij are
-            already shown as badges on the view-tabs in the header. */}
+            already shown as badges on the view-tabs in the header. The Komend-chip
+            counts the exact same list as the Komend-tab badge (audit K17). */}
         <section className="mb-5 flex flex-wrap items-center gap-1.5" aria-label="Agenda-overzicht">
-          <StatChip icon={CalendarDays} label="30 dagen" value={String(monthEvents.length)} meta={formatSplitCounts(monthEvents)} tone="sky" onClick={() => setActiveView("upcoming")} active={activeView === "upcoming"} />
-          <StatChip icon={AlertTriangle} label="Conflicten" value={String(withConflicts.length)} meta={withConflicts.length ? "te controleren" : "geen conflicten"} tone={withConflicts.length ? "amber" : "green"} onClick={withConflicts.length ? () => setActiveView("upcoming") : undefined} />
+          {agendaBusy ? (
+            <>
+              <span className="h-8 w-28 animate-pulse rounded-lg border border-[var(--color-border)] bg-white/[0.03]" aria-hidden="true" />
+              <span className="h-8 w-28 animate-pulse rounded-lg border border-[var(--color-border)] bg-white/[0.03]" aria-hidden="true" />
+              <span className="sr-only">Agenda-overzicht wordt geladen</span>
+            </>
+          ) : (
+            <>
+              <StatChip icon={CalendarDays} label="Komend" value={String(upcomingTimelineEvents.length)} meta={formatSplitCounts(upcomingTimelineEvents)} tone="sky" onClick={() => setActiveView("upcoming")} active={activeView === "upcoming"} />
+              <StatChip icon={AlertTriangle} label="Conflicten" value={String(withConflicts.length)} meta={withConflicts.length ? "te controleren" : "geen conflicten"} tone={withConflicts.length ? "amber" : "green"} onClick={withConflicts.length ? () => setActiveView("upcoming") : undefined} />
+            </>
+          )}
         </section>
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
 
           {/* ── Timeline ─────────────────────────────────────────────── */}
-          <div className="space-y-5">
+          {/* Onder xl komt de sidebar (volgende dienst + conflicten) BOVEN de
+              tijdlijn te staan (audit K5) — vandaar de order-utilities. */}
+          <div
+            className="order-2 space-y-5 xl:order-1"
+            role="tabpanel"
+            id={tabBarPanelId("agenda", activeView)}
+            aria-labelledby={tabBarTabId("agenda", activeView)}
+            tabIndex={0}
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold text-white">{activeViewMeta.label}</h2>
@@ -506,17 +537,66 @@ export default function AgendaPage() {
               )}
             </div>
 
-            {agendaError ? (
+            {/* Dienst-fout is óók zichtbaar (audit DEEL 2 #2): voorheen werd
+                alleen de events-fout getoond en leek een rooster-500 gewoon
+                een lege agenda. */}
+            {scheduleIsError && (
               <Panel className="border-amber-500/20 bg-amber-500/[0.045]">
-                <div className="flex items-start gap-3 text-sm text-amber-200">
+                <div className="flex flex-wrap items-start gap-3 text-sm text-amber-200">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                  <div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">Diensten konden niet worden geladen</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Je afspraken worden getoond, maar het rooster (diensten en conflicten) kan verouderd of onvolledig zijn.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void refetchDiensten()}
+                    className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+                  >
+                    Opnieuw proberen
+                  </button>
+                </div>
+              </Panel>
+            )}
+
+            {/* Failed ≠ empty (audit H15): een mislukte background-refetch mag
+                een gevulde agenda niet vervangen door een foutscherm. Alleen bij
+                écht geen data het volle foutpaneel; anders een compacte amber
+                stale-banner met retry (pariteit met /rooster). */}
+            {agendaError && agendaHasData ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+                <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+                <span className="min-w-0 flex-1">
+                  Agenda verversen mislukt — je ziet mogelijk verouderde afspraken.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void refetchEvents()}
+                  className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+                >
+                  Opnieuw proberen
+                </button>
+              </div>
+            ) : agendaError ? (
+              <Panel className="border-amber-500/20 bg-amber-500/[0.045]">
+                <div className="flex flex-wrap items-start gap-3 text-sm text-amber-200">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium">Agenda kon niet worden geladen</p>
                     <p className="mt-1 text-xs text-slate-400">{errorMessage(agendaError)}</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => void refetchEvents()}
+                    className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+                  >
+                    Opnieuw proberen
+                  </button>
                 </div>
               </Panel>
-            ) : isLoading || scheduleLoading ? (
+            ) : agendaBusy ? (
               <div className="space-y-4">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="space-y-2">
@@ -552,6 +632,19 @@ export default function AgendaPage() {
                   title={emptyCopy.title}
                   text={emptyCopy.text}
                 />
+                {/* Zelfde CTA als de kalender-empty-state (audit K12). */}
+                {activeView !== "history" && (
+                  <div className="flex justify-center pb-2">
+                    <button
+                      type="button"
+                      onClick={() => openNewEvent()}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/12 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/18 cursor-pointer"
+                    >
+                      <Plus size={14} />
+                      Nieuwe afspraak
+                    </button>
+                  </div>
+                )}
               </Panel>
             )}
 
@@ -571,7 +664,7 @@ export default function AgendaPage() {
               >
                 <span className="flex items-center gap-2 text-xs font-medium text-sky-200">
                   <Zap size={14} />
-                  {pending.length} in Google Calendar wachtrij
+                  {pending.length} {pending.length === 1 ? "afspraak" : "afspraken"} nog niet in Google Calendar
                 </span>
                 <span className="text-xs text-sky-300">Bekijken</span>
               </button>
@@ -579,12 +672,16 @@ export default function AgendaPage() {
           </div>
 
           {/* ── Sidebar ──────────────────────────────────────────────── */}
-          <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
+          <aside className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-20 xl:self-start">
 
             <NextShiftCard
               dienst={nextDienst}
               compact
-              afspraken={nextDienst ? (eventsByDate[nextDienst.startDatum] ?? []) : []}
+              loading={agendaBusy}
+              // Gedeelde helper (audit DEEL 2 NextShiftCard): alle afspraken over
+              // álle dagen die de dienst beslaat — nachtdiensten tonen nu ook de
+              // vroege-ochtendafspraak van de volgende dag.
+              afspraken={getShiftAppointments(nextDienst, eventsByDate)}
               conflictMap={conflictMap}
               todayIso={todayIso}
             />
@@ -663,6 +760,35 @@ export default function AgendaPage() {
               </Panel>
             )}
 
+            {/* Wachtrij-fout van de laatste handmatige sync — persistent i.p.v.
+                alleen een 4s-toast (audit K11). */}
+            {pendingSyncError && (
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-4 py-3">
+                <div className="mb-1 flex items-center gap-2">
+                  <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">Wachtrij-fout</p>
+                </div>
+                <p className="text-[10px] leading-relaxed text-amber-400/80">{shortSyncError(pendingSyncError)}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSync}
+                    disabled={syncing}
+                    className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50 cursor-pointer"
+                  >
+                    Opnieuw syncen
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingSyncError(null)}
+                    className="rounded-md px-2 py-1 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-300 cursor-pointer"
+                  >
+                    Verbergen
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Sync error — only surfaced when actionable; the header StatusPill
                 already shows the at-a-glance state, and Recent-voorbij lives on
                 the Historie tab + the no-conflict state on the Conflicten chip. */}
@@ -731,14 +857,4 @@ export default function AgendaPage() {
       </AnimatePresence>
     </div>
   );
-}
-
-function shortSyncError(error: string) {
-  const trimmed = error.trim();
-  if (trimmed.length <= 140) return trimmed;
-  // Truncate on a word boundary so the message never cuts mid-word.
-  const head = trimmed.slice(0, 137);
-  const lastSpace = head.lastIndexOf(" ");
-  const clipped = lastSpace > 80 ? head.slice(0, lastSpace) : head;
-  return `${clipped.trimEnd()}…`;
 }

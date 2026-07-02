@@ -12,6 +12,7 @@ export function StatChip({
   label,
   value,
   meta,
+  inlineMeta,
   tone = "slate",
   onClick,
   active = false,
@@ -20,6 +21,11 @@ export function StatChip({
   label: string;
   value: string;
   meta?: string;
+  /**
+   * Optional VISIBLE meta line rendered inline after the value (title-tooltips
+   * are unreachable on touch). Keep it short, e.g. "Volgende: 4 jul".
+   */
+  inlineMeta?: string;
   tone?: Tone;
   onClick?: () => void;
   active?: boolean;
@@ -30,6 +36,11 @@ export function StatChip({
       <Icon size={14} className={cn("shrink-0", t.icon)} />
       <span className="text-slate-400">{label}</span>
       <span className={cn("font-semibold tabular-nums", t.text)}>{value}</span>
+      {inlineMeta && (
+        <span className="max-w-[10rem] truncate text-xs text-slate-500">
+          · {inlineMeta}
+        </span>
+      )}
     </>
   );
   const cls = cn(

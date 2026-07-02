@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Loader2,
   AlertTriangle,
+  Clock3,
   FileText,
   Pin,
   Plus,
@@ -84,7 +85,18 @@ export function InlineStats({
 export function StatusPill({ status }: { status?: string }) {
   const isRunning = status === "running";
   const isSuccess = status === "success";
-  const label = isRunning ? "Synct…" : isSuccess ? "Gesynct" : status ? "Controleer" : "Geen sync";
+  // "pending" is een neutrale "nog niet gesynct"-staat, geen fout — daarom geen
+  // alarmerende "Controleer" met waarschuwingsicoon (audit L pending-pill).
+  const isPending = status === "pending" || status === "queued" || status === "idle";
+  const label = isRunning
+    ? "Synct…"
+    : isSuccess
+      ? "Gesynct"
+      : isPending
+        ? "Nog niet gesynct"
+        : status
+          ? "Controleer"
+          : "Geen sync";
   return (
     <span
       className={cn(
@@ -93,12 +105,15 @@ export function StatusPill({ status }: { status?: string }) {
           ? "bg-sky-500/10 text-sky-300"
           : isSuccess
             ? "bg-emerald-500/10 text-emerald-300"
-            : "bg-amber-500/10 text-amber-300",
+            : isPending
+              ? "bg-slate-500/10 text-slate-400"
+              : "bg-amber-500/10 text-amber-300",
       )}
     >
       {isRunning && <Loader2 size={10} className="animate-spin" />}
       {isSuccess && <CheckCircle2 size={10} />}
-      {!isRunning && !isSuccess && <AlertTriangle size={10} />}
+      {isPending && <Clock3 size={10} />}
+      {!isRunning && !isSuccess && !isPending && <AlertTriangle size={10} />}
       {label}
     </span>
   );
@@ -281,12 +296,4 @@ function NoteChip({ note, onEdit, tone }: { note: NoteRecord; onEdit?: (note: No
   );
 }
 
-/* ─── Legacy exports (keep DayBlock for other consumers) ──────────────── */
-
 export { type PersonalEvent } from "@/hooks/usePersonalEvents";
-
-// Re-export unused but previously exported names so any stale imports don't break
-export const MetricTile = () => null;
-export const SectionHeader = () => null;
-export const ToolbarButton = () => null;
-export const DayBlock = TimelineDay;

@@ -2,12 +2,14 @@
 
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
-import { type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { applyEventRowToCache, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
 import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
@@ -66,7 +68,9 @@ interface CreateEventModalProps {
 
 export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialDate, initialTime }: CreateEventModalProps) {
   const { user }  = useUser();
-  const { success, toast } = useToast();
+  const queryClient = useQueryClient();
+  const { success, toast, error: toastError } = useToast();
+  const { openConfirm } = useConfirm();
 
   const today = getAmsterdamTodayIso();
   const defaultDate = initialDate || today;
@@ -90,7 +94,24 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   const [symbolTouched,   setSymbolTouched]   = useState(false);
   const [loading,      setLoading]      = useState(false);
   const [error,        setError]        = useState("");
+  // Snapshot van een afspraak waarvan de achtergrond-upsert faalde. Bij een
+  // fout heropent de modal gevuld met deze rij zodat de getypte invoer niet
+  // verloren gaat (audit H1). Zolang gezet, gedraagt de modal zich alsof hij
+  // open staat met deze rij als "editEvent".
+  const [recoveryDraft, setRecoveryDraft] = useState<PersonalEvent | null>(null);
   const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
+
+  // Zodra de parent de modal expliciet (opnieuw) opent, vervalt een eventuele
+  // hangende herstel-rij — de parent-intentie wint.
+  useEffect(() => {
+    if (open) setRecoveryDraft(null);
+  }, [open]);
+
+  // De modal staat open als de parent hem opent óf als er een mislukte rij
+  // hersteld moet worden.
+  const isOpen = open || recoveryDraft !== null;
+  // Prefill-bron: parent-editEvent, of de herstelde mislukte rij.
+  const prefillEvent = editEvent ?? recoveryDraft;
 
   const reset = useCallback(() => {
     setTitel(""); setStartDatum(defaultDate); setEindDatum(defaultDate);
@@ -117,40 +138,43 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   }, [automaticBusinessContext, businessContext, businessContextTouched]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!isOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [open]);
+  }, [isOpen]);
 
   useEffect(() => {
-    if (open) {
-      if (editEvent) {
-        setTitel(editEvent.titel);
-        setStartDatum(editEvent.startDatum);
-        setEindDatum(editEvent.eindDatum);
-        setHeledag(editEvent.heledag);
-        setStartTijd(editEvent.startTijd ?? "09:00");
-        setEindTijd(editEvent.eindTijd ?? "10:00");
-        setLocatie(editEvent.locatie ?? "");
-        const metadata = parseEventMetadata(editEvent.beschrijving);
+    if (isOpen) {
+      if (prefillEvent) {
+        setTitel(prefillEvent.titel);
+        setStartDatum(prefillEvent.startDatum);
+        setEindDatum(prefillEvent.eindDatum);
+        setHeledag(prefillEvent.heledag);
+        setStartTijd(prefillEvent.startTijd ?? "09:00");
+        setEindTijd(prefillEvent.eindTijd ?? "10:00");
+        setLocatie(prefillEvent.locatie ?? "");
+        const metadata = parseEventMetadata(prefillEvent.beschrijving);
         const nextCategory = (metadata.category as CategoryId) ?? "overig";
         setCategorie(nextCategory);
-        setSymbol(resolveAppIconName(editEvent.symbol ?? metadata.symbol ?? parseSymbolFromDescription(editEvent.beschrijving), categoryIcon(nextCategory)));
+        setSymbol(resolveAppIconName(prefillEvent.symbol ?? metadata.symbol ?? parseSymbolFromDescription(prefillEvent.beschrijving), categoryIcon(nextCategory)));
         setEventTags(mergeTags(metadata.tags, metadata.contextIds));
-        setBusinessContext(businessContextFromEvent(editEvent));
+        setBusinessContext(businessContextFromEvent(prefillEvent));
         setBusinessContextTouched(false);
         setCategoryTouched(false);
         setSymbolTouched(false);
-        setBeschrijving(stripEventMetadata(editEvent.beschrijving ?? ""));
+        setBeschrijving(stripEventMetadata(prefillEvent.beschrijving ?? ""));
         setError("");
       } else {
         reset();
       }
     }
-  }, [open, editEvent, reset]);
+    // prefillEvent volgt editEvent/recoveryDraft; alleen bij een echte open/prefill-
+    // wisseling opnieuw invullen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, prefillEvent, reset]);
 
   useEffect(() => {
     if (detectedContext) {
@@ -181,19 +205,104 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
     }
   }, [automaticBusinessContext, businessContext, businessContextTouched, categorie, categoryTouched, detectedContext, symbol, symbolTouched]);
 
-  const handleClose = useCallback(() => { reset(); onClose(); }, [reset, onClose]);
+  const handleClose = useCallback(() => {
+    reset();
+    setRecoveryDraft(null);
+    onClose();
+  }, [reset, onClose]);
+
+  // ── Dirty-check vóór sluiten (audit K6) ──────────────────────────────────
+  // Alleen de door de gebruiker bewerkbare velden tellen mee; automatische
+  // context-verrijking (tags/categorie/symbool) maakt het formulier niet dirty.
+  const pristine = useMemo(() => (
+    editEvent
+      ? {
+          titel: editEvent.titel,
+          startDatum: editEvent.startDatum,
+          eindDatum: editEvent.eindDatum,
+          heledag: editEvent.heledag,
+          startTijd: editEvent.startTijd ?? "09:00",
+          eindTijd: editEvent.eindTijd ?? "10:00",
+          locatie: editEvent.locatie ?? "",
+          beschrijving: stripEventMetadata(editEvent.beschrijving ?? ""),
+        }
+      : {
+          titel: "",
+          startDatum: defaultDate,
+          eindDatum: defaultDate,
+          heledag: false,
+          startTijd: defaultStartTime,
+          eindTijd: defaultEndTime,
+          locatie: "",
+          beschrijving: "",
+        }
+  ), [defaultDate, defaultEndTime, defaultStartTime, editEvent]);
+
+  // Baseline-tags zoals ze na openen + automatische verrijking staan; auto-
+  // verrijking mag het formulier niet dirty maken, dus we ijken de baseline
+  // opnieuw zolang de gebruiker nog geen picker heeft aangeraakt.
+  const pickerTouched = categoryTouched || symbolTouched || businessContextTouched;
+  const baselineTagsRef = useRef<string[]>([]);
+  useEffect(() => {
+    // Zolang de gebruiker nog geen picker heeft aangeraakt volgt de baseline de
+    // (automatisch verrijkte) tags, zodat alleen echte handmatige wijzigingen
+    // daarna als dirty tellen.
+    if (isOpen && !pickerTouched) baselineTagsRef.current = eventTags;
+  }, [isOpen, pickerTouched, eventTags]);
+
+  const tagsChanged =
+    eventTags.length !== baselineTagsRef.current.length ||
+    eventTags.some((tag, i) => tag !== baselineTagsRef.current[i]);
+
+  const isDirty =
+    titel !== pristine.titel ||
+    startDatum !== pristine.startDatum ||
+    eindDatum !== pristine.eindDatum ||
+    heledag !== pristine.heledag ||
+    (!heledag && (startTijd !== pristine.startTijd || eindTijd !== pristine.eindTijd)) ||
+    locatie !== pristine.locatie ||
+    beschrijving !== pristine.beschrijving ||
+    // Picker-keuzes (categorie/symbool/context) + handmatige tag-wijzigingen
+    // tellen nu ook mee — de touched-vlaggen bestonden al maar werden genegeerd
+    // (audit K6/modal dirty-check).
+    (pickerTouched && tagsChanged) ||
+    categoryTouched ||
+    symbolTouched ||
+    businessContextTouched;
+
+  // Guard zodat Escape in de bevestigingsdialoog niet nogmaals hier afvangt.
+  const confirmingRef = useRef(false);
+  const handleCloseAttempt = useCallback(async () => {
+    if (confirmingRef.current) return;
+    if (!isDirty) {
+      handleClose();
+      return;
+    }
+    confirmingRef.current = true;
+    try {
+      const discard = await openConfirm({
+        title: "Wijzigingen verwerpen?",
+        message: "Je hebt niet-opgeslagen wijzigingen in deze afspraak.",
+        confirmLabel: "Verwerpen",
+        variant: "danger",
+      });
+      if (discard) handleClose();
+    } finally {
+      confirmingRef.current = false;
+    }
+  }, [handleClose, isDirty, openConfirm]);
 
   // Accessibility: trap focus in the dialog, restore focus on close, close on Escape.
   const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(open, dialogRef);
+  useFocusTrap(isOpen, dialogRef);
   useEffect(() => {
-    if (!open) return;
+    if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") void handleCloseAttempt();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, handleClose]);
+  }, [isOpen, handleCloseAttempt]);
 
   const handleCategoryChange = (nextCategory: CategoryId) => {
     setCategoryTouched(true);
@@ -214,8 +323,12 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
       return;
     }
 
+    // Pending-state dekt alleen de korte synchrone validatie/verrijking; de
+    // (tot ~20s trage) Google-push blokkeert de modal niet meer (audit F8).
     setLoading(true);
     setError("");
+    let row: PersonalEventRow | null = null;
+    let rollback: () => void = () => {};
     try {
       const rawDesc = beschrijving.trim();
       const enriched = enrichEventDraft({
@@ -236,7 +349,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
         tags: enriched.tags,
       });
 
-      const row: PersonalEventRow = {
+      row = {
         user_id:      user.id,
         event_id:     editEvent?.eventId ?? crypto.randomUUID(),
         titel:        titel.trim(),
@@ -256,39 +369,64 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
         kalender:     editEvent?.kalender ?? "Main",
       };
 
-      const result = await personalEventsApi.upsert(row);
-      if (result.instantSync) {
-        success(editEvent ? "Afspraak direct bijgewerkt in Google Calendar" : "Afspraak direct gesynchroniseerd met Google Calendar");
-      } else if (result.permanent) {
-        toast(
-          "Afspraak lokaal opgeslagen, maar kan niet naar Google gesynchroniseerd worden (vermoedelijk een automatisch Google-event, zoals een verjaardag). Pas dit aan in Google Agenda/Contacten zelf.",
-          "error"
-        );
-      } else {
-        toast(result.syncError
-          ? "Afspraak opgeslagen; Google sync blijft in de wachtrij."
-          : "Afspraak opgeslagen en staat in de Google Calendar wachtrij.",
-        "info");
-      }
-      await onSuccess?.();
-      handleClose();
+      // Optimistic: laat de afspraak direct in de lijst/kalender verschijnen;
+      // bij een fout wordt de cache-snapshot teruggezet (audit M16).
+      rollback = applyEventRowToCache(queryClient, user.id, row);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Opslaan mislukt");
-    } finally {
       setLoading(false);
+      return;
     }
+    setLoading(false);
+    if (!row) return;
+    const pendingRow = row;
+    const wasEdit = Boolean(editEvent);
+
+    // Modal direct sluiten (audit F8): de rij staat al optimistisch in de
+    // cache. De upsert wordt op de achtergrond afgerond met toast-feedback en
+    // rollback bij falen — zelfde patroon als het delete-pad.
+    handleClose();
+
+    void (async () => {
+      try {
+        const result = await personalEventsApi.upsert(pendingRow);
+        if (result.instantSync) {
+          success(wasEdit ? "Afspraak direct bijgewerkt in Google Calendar" : "Afspraak direct gesynchroniseerd met Google Calendar");
+        } else if (result.permanent) {
+          toast(
+            "Afspraak lokaal opgeslagen, maar kan niet naar Google gesynchroniseerd worden (vermoedelijk een automatisch Google-event, zoals een verjaardag). Pas dit aan in Google Agenda/Contacten zelf.",
+            "error"
+          );
+        } else {
+          toast(result.syncError
+            ? "Afspraak opgeslagen; Google sync blijft in de wachtrij."
+            : "Afspraak opgeslagen en staat in de Google Calendar wachtrij.",
+          "info");
+        }
+        await onSuccess?.();
+      } catch (err) {
+        // Optimistic rij terugdraaien; de modal is al dicht.
+        rollback();
+        // Dataverlies voorkomen (audit H1): heropen de modal gevuld met de
+        // mislukte rij zodat de getypte titel/beschrijving/locatie/context niet
+        // weg zijn. De gebruiker kan met één klik ("Aanmaken"/"Opslaan")
+        // opnieuw proberen.
+        setRecoveryDraft(rowToRecoveryEvent(pendingRow));
+        toastError(`Opslaan mislukt: ${err instanceof Error ? err.message : "onbekende fout"} — je invoer is bewaard, probeer opnieuw.`);
+      }
+    })();
   };
 
   return (
     <AnimatePresence>
-      {open && (
+      {isOpen && (
         <>
           {/* Overlay */}
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             data-app-modal="agenda-event"
             className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
-            onClick={handleClose}
+            onClick={() => void handleCloseAttempt()}
           />
 
           {/* Modal */}
@@ -318,7 +456,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 <button
                   type="button"
                   aria-label="Afspraakmodal sluiten"
-                  onClick={handleClose}
+                  onClick={() => void handleCloseAttempt()}
                   className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
                   <AppIcon name="close" tone="slate" size="sm" />
                 </button>
@@ -330,10 +468,11 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
 
                 {/* Titel */}
                 <div>
-                  <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label htmlFor="agenda-event-titel" className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                     Titel *
                   </label>
                   <input
+                    id="agenda-event-titel"
                     type="text"
                     value={titel}
                     onChange={e => setTitel(e.target.value)}
@@ -369,19 +508,19 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 {/* Datum */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="agenda-event-start-datum" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                       <AppIcon name="calendar" tone="slate" size="xs" /> Start
                     </label>
-                    <input type="date" value={startDatum}
+                    <input id="agenda-event-start-datum" type="date" value={startDatum}
                       onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
                       className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                   <div>
-                    <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                    <label htmlFor="agenda-event-eind-datum" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                       <AppIcon name="calendar" tone="slate" size="xs" /> Eind
                     </label>
-                    <input type="date" value={eindDatum} min={startDatum}
+                    <input id="agenda-event-eind-datum" type="date" value={eindDatum} min={startDatum}
                       onChange={e => setEindDatum(e.target.value)}
                       className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
@@ -393,18 +532,18 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }} className="grid grid-cols-2 gap-3 overflow-hidden">
                     <div>
-                      <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                      <label htmlFor="agenda-event-start-tijd" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                         <AppIcon name="time" tone="slate" size="xs" /> Van
                       </label>
-                      <input type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
+                      <input id="agenda-event-start-tijd" type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
                         className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                     <div>
-                      <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                      <label htmlFor="agenda-event-eind-tijd" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                         <AppIcon name="time" tone="slate" size="xs" /> Tot
                       </label>
-                      <input type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
+                      <input id="agenda-event-eind-tijd" type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
                         className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
@@ -413,10 +552,10 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
 
                 {/* Locatie */}
                 <div>
-                  <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label htmlFor="agenda-event-locatie" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                     <AppIcon name="location" tone="slate" size="xs" /> Locatie (optioneel)
                   </label>
-                  <input type="text" value={locatie} onChange={e => setLocatie(e.target.value)}
+                  <input id="agenda-event-locatie" type="text" value={locatie} onChange={e => setLocatie(e.target.value)}
                     placeholder="bijv. Amsterdam"
                     className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
@@ -478,10 +617,10 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
 
                 {/* Beschrijving */}
                 <div>
-                  <label className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
+                  <label htmlFor="agenda-event-notitie" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                     <AppIcon name="note" tone="slate" size="xs" /> Notitie (optioneel)
                   </label>
-                  <textarea value={beschrijving} onChange={e => setBeschrijving(e.target.value)}
+                  <textarea id="agenda-event-notitie" value={beschrijving} onChange={e => setBeschrijving(e.target.value)}
                     rows={2} placeholder="Aantekeningen..."
                     className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none"
                   />
@@ -497,15 +636,15 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 {/* Info */}
                 <p className="text-[10px] text-slate-600">
                   {editEvent
-                    ? "Wijzigingen worden direct naar Google Calendar gepusht. Als Google niet reageert, blijft de actie in de Render-wachtrij."
-                    : "Afspraak wordt direct naar Google Calendar gepusht. Als Google niet reageert, blijft de actie in de Render-wachtrij."
+                    ? "Wijzigingen worden direct naar Google Calendar gepusht. Als Google niet reageert, blijft de wijziging in de wachtrij (nog niet in Google)."
+                    : "Afspraak wordt direct naar Google Calendar gepusht. Als Google niet reageert, blijft de afspraak in de wachtrij (nog niet in Google)."
                   }
                 </p>
                 </div>
 
                 {/* Actions */}
                 <div className="flex shrink-0 gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))]">
-                  <button type="button" onClick={handleClose}
+                  <button type="button" onClick={() => void handleCloseAttempt()}
                     className="min-h-[44px] flex-1 rounded-xl border border-[var(--color-border)] text-sm font-semibold text-slate-500 transition-all hover:bg-[var(--color-surface-hover)] hover:text-slate-300 cursor-pointer">
                     Annuleren
                   </button>
@@ -522,6 +661,34 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
       )}
     </AnimatePresence>
   );
+}
+
+/**
+ * Reconstruct a PersonalEvent from the row that failed to upsert so the modal
+ * can re-open pre-filled with exactly the user's submitted values (audit H1).
+ * The description still carries the [categorie:…]/[symbol:…]/tag-metadata, which
+ * the open-effect parses back into the pickers.
+ */
+function rowToRecoveryEvent(row: PersonalEventRow): PersonalEvent {
+  return {
+    _id: "",
+    userId: row.user_id,
+    eventId: row.event_id,
+    titel: row.titel,
+    startDatum: row.start_datum,
+    startTijd: row.start_tijd ?? undefined,
+    eindDatum: row.eind_datum,
+    eindTijd: row.eind_tijd ?? undefined,
+    heledag: row.heledag,
+    locatie: row.locatie ?? undefined,
+    beschrijving: row.beschrijving ?? undefined,
+    symbol: (row.symbol as AppIconName) ?? undefined,
+    businessContextType: row.business_context_type ?? undefined,
+    businessContextId: row.business_context_id ?? undefined,
+    businessContextTitle: row.business_context_title ?? undefined,
+    status: row.status,
+    kalender: row.kalender,
+  };
 }
 
 function addHours(time: string, hours: number) {

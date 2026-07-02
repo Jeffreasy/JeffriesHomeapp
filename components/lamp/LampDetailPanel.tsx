@@ -2,9 +2,10 @@
 
 import { useEffect, useId, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Lightbulb, Power, Wifi, WifiOff } from "lucide-react";
+import { X, Lightbulb, Loader2, Power, Wifi, WifiOff } from "lucide-react";
 import { type Device } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { LampControl } from "./LampControl";
 import { kelvinToHex, rgbToHex, cn } from "@/lib/utils";
 
@@ -22,6 +23,12 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
   const { mutate: sendCommand, isPending } = useLampCommand();
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+
+  // Focus trap (ronde-1 M22): Tab/Shift+Tab blijven binnen het paneel en de
+  // focus keert terug naar de trigger bij sluiten — zelfde hook als
+  // BottomSheet/AutomationForm.
+  useFocusTrap(!!device, panelRef);
 
   useEffect(() => {
     if (!device) return;
@@ -76,9 +83,11 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
 
           <motion.aside
             key={device.id}
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
+            tabIndex={-1}
             initial={{ opacity: 0, x: 32 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 32 }}
@@ -116,8 +125,22 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
                   ) : (
                     <WifiOff size={10} className="text-red-400" />
                   )}
-                  <span className="text-xs text-slate-500">
-                    {isOnline ? (isOn ? `${brightness}% · ${colorTemp}K` : "Uit") : "Offline"}
+                  <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                    {/* RGB-modus: toon de kleur i.p.v. een stale kelvin-waarde */}
+                    {isOnline && isOn && isRgbMode && (
+                      <span
+                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full border border-white/20"
+                        style={{ background: glowColor }}
+                        aria-hidden="true"
+                      />
+                    )}
+                    {isOnline
+                      ? isOn
+                        ? isRgbMode
+                          ? `${brightness}% · ${glowColor.toUpperCase()}`
+                          : `${brightness}% · ${colorTemp}K`
+                        : "Uit"
+                      : "Offline"}
                   </span>
                 </div>
               </div>
@@ -133,10 +156,15 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
                   isOn
                     ? "border border-amber-500/40 bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 active:scale-90"
                     : "border border-[var(--color-border)] bg-[rgba(255,255,255,0.05)] text-slate-500 hover:bg-[rgba(255,255,255,0.1)] active:scale-90",
-                  !isOnline && "cursor-not-allowed opacity-40"
+                  !isOnline && "cursor-not-allowed opacity-40",
+                  isPending && "cursor-wait opacity-60"
                 )}
               >
-                <Power size={14} />
+                {isPending ? (
+                  <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Power size={14} aria-hidden="true" />
+                )}
               </button>
 
               {/* Close */}
@@ -170,7 +198,12 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
                 <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
                   <WifiOff size={28} className="mb-3 text-slate-600" />
                   <p className="text-sm text-slate-500">Lamp is offline</p>
-                  <p className="mt-1 text-xs text-slate-600">Controleer de netwerkverbinding</p>
+                  <p className="mt-1 text-xs font-mono text-slate-500">
+                    IP: {device.ip_address ?? "onbekend"}
+                  </p>
+                  <p className="mt-2 max-w-xs text-xs leading-5 text-slate-600">
+                    Controleer of de lamp stroom heeft en met hetzelfde wifi-netwerk is verbonden. Laatst bijgewerkt: {device.last_seen ? new Date(device.last_seen).toLocaleString("nl-NL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "onbekend"}.
+                  </p>
                 </div>
               )}
             </div>

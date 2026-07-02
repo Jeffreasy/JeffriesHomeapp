@@ -1,13 +1,14 @@
 "use client";
 
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { Building2, Loader2, Plus, Save } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalCancelButton } from "@/components/ui/Modal";
 import type { CompanyForm } from "./LaventeCareTypes";
 
 export function LaventeCareCompanyModal({
   isOpen,
   onClose,
+  dirty,
   companyForm,
   setCompanyForm,
   savingCompany,
@@ -16,30 +17,60 @@ export function LaventeCareCompanyModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
+  dirty?: boolean;
   companyForm: CompanyForm;
   setCompanyForm: Dispatch<SetStateAction<CompanyForm>>;
   savingCompany: boolean;
   editingCompany: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const [naamError, setNaamError] = useState("");
+
+  // Inline validatie (M28): markeer en focus het naamveld; de page-level
+  // handler houdt de toast en blokkeert de daadwerkelijke submit.
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (!companyForm.naam.trim()) {
+      setNaamError("Naam is verplicht");
+      window.setTimeout(() => document.getElementById("company-form-naam")?.focus(), 0);
+    } else {
+      setNaamError("");
+    }
+    void onSubmit(event);
+  };
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      dirty={dirty}
       title={editingCompany ? "Klant bewerken" : "Nieuwe klant"}
       icon={<Building2 size={18} className="text-amber-300" />}
       theme="amber"
       maxWidth="4xl"
     >
-      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} noValidate className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Klantdossiernaam</span>
+          <span className="text-xs font-semibold text-slate-400">
+            Klantdossiernaam <span className="text-rose-300">*</span>
+          </span>
           <input
+            id="company-form-naam"
+            required
+            aria-invalid={Boolean(naamError)}
             value={companyForm.naam}
             onChange={(event) => setCompanyForm((form) => ({ ...form, naam: event.target.value }))}
             placeholder="Klant, organisatie, opdrachtgever of eigen project"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-amber-500"
+            className={`mt-1 w-full rounded-lg border bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 ${
+              naamError
+                ? "border-rose-400/60 focus:border-rose-400/60"
+                : "border-[var(--color-border)] focus:border-amber-500"
+            }`}
           />
+          {naamError ? (
+            <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+              {naamError}
+            </p>
+          ) : null}
         </label>
 
         <label className="block">
@@ -139,6 +170,7 @@ export function LaventeCareCompanyModal({
             <label className="block">
               <span className="text-xs font-semibold text-slate-400">Factuurmail</span>
               <input
+                type="email"
                 value={companyForm.billingEmail}
                 onChange={(event) => setCompanyForm((form) => ({ ...form, billingEmail: event.target.value }))}
                 placeholder="administratie@..."
@@ -263,13 +295,11 @@ export function LaventeCareCompanyModal({
         </label>
 
         <div className="sticky bottom-0 -mx-5 -mb-5 mt-2 flex flex-col-reverse gap-2 border-t border-white/5 bg-[rgba(15,23,42,0.96)] px-5 py-4 backdrop-blur sm:col-span-2 sm:-mx-6 sm:-mb-6 sm:flex-row sm:justify-end sm:px-6">
-          <button
-            type="button"
-            onClick={onClose}
+          {/* R11: via de guarded close, zodat de dirty-guard ook hier geldt. */}
+          <ModalCancelButton
+            onFallback={onClose}
             className="inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-slate-300 transition-colors hover:text-white"
-          >
-            Annuleren
-          </button>
+          />
           <button
             type="submit"
             disabled={savingCompany}

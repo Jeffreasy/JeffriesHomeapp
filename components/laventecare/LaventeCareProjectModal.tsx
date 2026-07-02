@@ -1,14 +1,15 @@
 "use client";
 
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { FolderKanban, Loader2, Plus } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalCancelButton } from "@/components/ui/Modal";
 import type { CompanyItem, ProjectForm } from "./LaventeCareTypes";
 import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES } from "./LaventeCareTypes";
 
 export function LaventeCareProjectModal({
   isOpen,
   onClose,
+  dirty,
   projectForm,
   setProjectForm,
   companies,
@@ -17,22 +18,39 @@ export function LaventeCareProjectModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
+  dirty?: boolean;
   projectForm: ProjectForm;
   setProjectForm: Dispatch<SetStateAction<ProjectForm>>;
   companies: CompanyItem[];
   savingProject: boolean;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
+  const dossierSelected = Boolean(projectForm.companyId);
+  const [naamError, setNaamError] = useState("");
+
+  // Inline validatie (M28): markeer en focus het naamveld; de page-level
+  // handler houdt de toast en blokkeert de daadwerkelijke submit.
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (!projectForm.naam.trim()) {
+      setNaamError("Naam is verplicht");
+      window.setTimeout(() => document.getElementById("project-form-naam")?.focus(), 0);
+    } else {
+      setNaamError("");
+    }
+    void onSubmit(event);
+  };
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
+      dirty={dirty}
       title="Nieuw project toevoegen"
       icon={<FolderKanban size={18} className="text-emerald-300" />}
       theme="emerald"
       maxWidth="2xl"
     >
-      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} noValidate className="grid gap-4 sm:grid-cols-2">
         <label className="block sm:col-span-2">
           <span className="text-xs font-semibold text-slate-400">Bestaande klant</span>
           <select
@@ -57,31 +75,53 @@ export function LaventeCareProjectModal({
           </select>
         </label>
         <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Naam</span>
+          <span className="text-xs font-semibold text-slate-400">
+            Naam <span className="text-rose-300">*</span>
+          </span>
           <input
+            id="project-form-naam"
+            required
+            aria-invalid={Boolean(naamError)}
             value={projectForm.naam}
             onChange={(event) => setProjectForm((form) => ({ ...form, naam: event.target.value }))}
             placeholder="Naam van het project"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500"
+            className={`mt-1 w-full rounded-lg border bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 ${
+              naamError
+                ? "border-rose-400/60 focus:border-rose-400/60"
+                : "border-[var(--color-border)] focus:border-emerald-500"
+            }`}
           />
+          {naamError ? (
+            <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
+              {naamError}
+            </p>
+          ) : null}
         </label>
         <label className="block">
           <span className="text-xs font-semibold text-slate-400">Nieuwe klantnaam</span>
           <input
             value={projectForm.companyName}
+            disabled={dossierSelected}
             onChange={(event) => setProjectForm((form) => ({ ...form, companyName: event.target.value }))}
             placeholder="Alleen invullen bij nieuwe klant"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500"
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
           />
+          {dossierSelected ? (
+            <span className="mt-1 block text-[11px] text-slate-500">wordt overgenomen uit klantdossier</span>
+          ) : null}
         </label>
         <label className="block">
           <span className="text-xs font-semibold text-slate-400">Website</span>
           <input
             value={projectForm.website}
+            disabled={dossierSelected}
             onChange={(event) => setProjectForm((form) => ({ ...form, website: event.target.value }))}
             placeholder="https://..."
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500"
+            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
           />
+          {dossierSelected ? (
+            <span className="mt-1 block text-[11px] text-slate-500">wordt overgenomen uit klantdossier</span>
+          ) : null}
         </label>
         <label className="block">
           <span className="text-xs font-semibold text-slate-400">Fase</span>
@@ -146,13 +186,11 @@ export function LaventeCareProjectModal({
           />
         </label>
         <div className="mt-4 flex justify-end border-t border-white/5 pt-4 sm:col-span-2">
-          <button
-            type="button"
-            onClick={onClose}
+          {/* R11: via de guarded close, zodat de dirty-guard ook hier geldt. */}
+          <ModalCancelButton
+            onFallback={onClose}
             className="mr-3 px-4 py-2 text-sm text-slate-300 transition-colors hover:text-white"
-          >
-            Annuleren
-          </button>
+          />
           <button type="submit" disabled={savingProject} className="btn border-transparent bg-emerald-500 px-6 text-white hover:bg-emerald-600">
             {savingProject ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Plus size={16} className="mr-2" />}
             Project toevoegen
