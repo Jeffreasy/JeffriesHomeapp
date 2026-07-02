@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import {
   formatStreak,
+  formatStreakShort,
   formatXP,
   MOEILIJKHEID_LABELS,
   FREQUENTIE_LABELS,
@@ -54,6 +55,12 @@ const ROOSTER_LABELS: Record<string, string> = {
 
 interface HabitCardProps {
   habit: HabitWithLog;
+  /**
+   * The Amsterdam YYYY-MM-DD this card writes to. When it changes (date
+   * navigation) any parked stepper commit is cancelled and the draft reset,
+   * so accumulated taps can never be misattributed to the newly-shown date.
+   */
+  datum?: string;
   onToggle: () => void;
   onIncrement: (stap: number) => void;
   onIncident: (trigger?: string, notitie?: string) => void;
@@ -78,6 +85,7 @@ interface HabitCardProps {
 
 export function HabitCard({
   habit,
+  datum,
   onToggle,
   onIncrement,
   onIncident,
@@ -99,6 +107,17 @@ export function HabitCard({
   const [triggerNotitie, setTriggerNotitie] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const menuListRef = useRef<HTMLDivElement>(null);
+
+  // A11y (R3): move focus into the action menu when it opens so keyboard users
+  // land on the first menuitem (roving tabindex handles the rest via arrows).
+  useEffect(() => {
+    if (!showMenu) return;
+    const first = menuListRef.current?.querySelector<HTMLButtonElement>(
+      '[role="menuitem"]',
+    );
+    first?.focus();
+  }, [showMenu]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -184,6 +203,20 @@ export function HabitCard({
       commitWaarde(target);
     }
   }, [pending, commitWaarde]);
+
+  // Cross-date guard (R3): when the shown date changes the card instance is
+  // kept (keyed by habit id), so any parked stepper commit for the previous
+  // date must be dropped — otherwise it would write to the new date. The card
+  // then falls back to the fresh server value for the new day.
+  const prevDatumRef = useRef(datum);
+  useEffect(() => {
+    if (prevDatumRef.current === datum) return;
+    prevDatumRef.current = datum;
+    debouncedCommit.cancel();
+    pendingCommitRef.current = null;
+    setDraftWaarde(null);
+    setWaardeInput(null);
+  }, [datum, debouncedCommit]);
 
   const displayedWaarde = draftWaarde ?? currentWaarde;
   const doelWaarde = habit.doelWaarde ?? 0;
@@ -346,7 +379,7 @@ export function HabitCard({
               className="text-sm font-semibold truncate"
               style={{
                 color: isSuccess
-                  ? "rgba(255,255,255,0.4)"
+                  ? "rgba(255,255,255,0.55)"
                   : hasIncident
                     ? "#f87171"
                     : "rgba(255,255,255,0.9)",
@@ -385,7 +418,7 @@ export function HabitCard({
             )}
             {habit.huidigeStreak > 0 && (
               <span className="text-[10px] text-orange-400/80 font-medium">
-                {formatStreak(habit.huidigeStreak)}
+                {formatStreak(habit.huidigeStreak, habit.frequentie)}
               </span>
             )}
             {habit.log?.xpVerdiend ? (
@@ -463,7 +496,17 @@ export function HabitCard({
       </div>
 
       {/* ─── Kwantitatief Stepper (eigen rij onder de habit info) ──────────── */}
-      {isQuantitative && (
+      {/* M-C (R3): op de Overzicht-tab mag een niet-geplande, niet-periodieke
+          habit géén stepper tonen — anders schrijft +stap stilletjes een log
+          naar een dag waarop de habit niet gepland staat. */}
+      {isQuantitative && toggleBlocked && (
+        <div className="px-3.5 pb-3">
+          <p className="text-[10px] text-[var(--color-text-muted)]">
+            Vandaag niet gepland
+          </p>
+        </div>
+      )}
+      {isQuantitative && !toggleBlocked && (
         <div className="px-3.5 pb-3">
           {/* Progress bar */}
           <div className="h-1.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden mb-2">
@@ -561,6 +604,16 @@ export function HabitCard({
                 </p>
               )}
 
+              {/* Incident→streak uitleg voor negatieve habits (R3): maak het
+                  gamification-effect expliciet — een schone dag bouwt de streak,
+                  een gelogd incident zet hem terug op nul. */}
+              {isNegative && !masked && (
+                <p className="mb-3 rounded-lg border border-red-500/10 bg-red-500/[0.05] px-2.5 py-2 text-[11px] leading-relaxed text-slate-400">
+                  Elke dag zonder incident bouwt je streak op; een gelogd
+                  incident zet de streak terug op nul.
+                </p>
+              )}
+
               {/* Stats grid */}
               <div className="grid grid-cols-3 gap-2 mb-3">
                 <DetailStat
@@ -572,7 +625,7 @@ export function HabitCard({
                 <DetailStat
                   icon={<Trophy size={12} />}
                   label="Langste streak"
-                  value={`${habit.langsteStreak}d`}
+                  value={formatStreakShort(habit.langsteStreak, habit.frequentie)}
                   color="#f59e0b"
                 />
                 <DetailStat
@@ -712,8 +765,8 @@ export function HabitCard({
                   onChange={(e) => setTriggerNotitie(e.target.value)}
                   placeholder={
                     selectedTrigger === "anders"
-                      ? "Beschrijf de trigger..."
-                      : "Optionele notitie..."
+                      ? "Beschrijf de trigger…"
+                      : "Optionele notitie…"
                   }
                   aria-required={selectedTrigger === "anders"}
                   className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500/30 min-h-[44px] mb-3"
@@ -762,12 +815,14 @@ export function HabitCard({
           className="border-t border-[var(--color-border)] overflow-hidden"
         >
           <div
+            ref={menuListRef}
             role="menu"
             aria-label={`Acties voor ${displayName}`}
             className="p-2.5 flex gap-2"
             onKeyDown={handleMenuKeyDown}
           >
             <MenuBtn
+              first
               icon={<Edit3 size={15} />}
               label="Bewerken"
               onClick={() => {
@@ -812,16 +867,20 @@ function MenuBtn({
   label,
   onClick,
   danger,
+  first,
 }: {
   icon: React.ReactNode;
   label: string;
   onClick: () => void;
   danger?: boolean;
+  /** Roving tabindex: only the first menuitem is tab-reachable (a11y R3). */
+  first?: boolean;
 }) {
   return (
     <button
       type="button"
       role="menuitem"
+      tabIndex={first ? 0 : -1}
       onClick={onClick}
       aria-label={label}
       className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl transition-all active:scale-95 min-h-[52px] cursor-pointer"

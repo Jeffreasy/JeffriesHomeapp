@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, Plus, Loader2 } from "lucide-react";
 import {
@@ -27,7 +27,19 @@ interface AutomationFormProps {
   onSave: (a: Omit<Automation, "id" | "createdAt" | "lastFiredAt">) => void | Promise<void>;
 }
 
-export function AutomationForm({ initialData, existing = [], onClose, onSave }: AutomationFormProps) {
+/**
+ * Imperatieve handle: laat de bovenliggende pagina (bv. de header-"Annuleren")
+ * het formulier sluiten via dezelfde dirty-guard als Escape/backdrop/X, i.p.v.
+ * de state direct te resetten en het formulier onbewaakt te unmounten.
+ */
+export interface AutomationFormHandle {
+  requestClose: () => void;
+}
+
+export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormProps>(function AutomationForm(
+  { initialData, existing = [], onClose, onSave },
+  ref
+) {
   const [name, setName] = useState(initialData?.name ?? "");
   const [time, setTime] = useState(initialData?.trigger.time ?? "07:00");
   const [triggerType, setTriggerType] = useState<"time" | "schedule">(
@@ -84,6 +96,9 @@ export function AutomationForm({ initialData, existing = [], onClose, onSave }: 
     onClose();
   };
 
+  // Stel dezelfde dirty-guarded sluiting beschikbaar aan de parent (fix 7).
+  useImperativeHandle(ref, () => ({ requestClose: () => void requestClose() }), [requestClose]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || confirmingRef.current) return;
@@ -120,9 +135,14 @@ export function AutomationForm({ initialData, existing = [], onClose, onSave }: 
   // Waarom de opslaan-knop disabled is — als inline uitleg getoond.
   const validationHint = !name
     ? "Geef een naam op"
-    : triggerType === "time" && days.length === 0
-      ? "Kies minstens één dag"
-      : null;
+    : !time
+      // Een leeg tijdveld passeert de HTML-validatie wél, maar de engine
+      // (ShouldFire) breekt af op een lege tijd → een automatisering die stil
+      // nooit vuurt. Blokkeer opslaan tot er een tijdstip is gekozen.
+      ? "Kies een tijdstip"
+      : triggerType === "time" && days.length === 0
+        ? "Kies minstens één dag"
+        : null;
 
   const handleSave = async () => {
     if (validationHint || saving) return;
@@ -404,7 +424,7 @@ export function AutomationForm({ initialData, existing = [], onClose, onSave }: 
             <input
               id="auto-colortemp"
               type="range"
-              min={153}
+              min={154}
               max={455}
               value={colorTempMireds}
               onChange={(e) => setColorTempMireds(+e.target.value)}
@@ -481,4 +501,4 @@ export function AutomationForm({ initialData, existing = [], onClose, onSave }: 
       </motion.div>
     </div>
   );
-}
+});

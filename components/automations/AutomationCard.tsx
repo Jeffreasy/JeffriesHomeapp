@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { AlarmClock, Clock, Loader2, Play, PauseCircle, Trash2 } from "lucide-react";
 import {
@@ -52,6 +53,23 @@ export function AutomationCard({ automation, togglePending = false, onToggle, on
         minute: "2-digit",
       })
     : null;
+
+  // "Volgende run" wordt puur uit de klok afgeleid en veroudert dus zonder
+  // refetch. Hertel elke minuut en bij terugkeer naar de tab, zodat het label
+  // niet blijft hangen op een tijdstip dat al voorbij is.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (!automation.enabled) return;
+    const id = window.setInterval(() => forceTick((n) => n + 1), 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") forceTick((n) => n + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [automation.enabled]);
 
   // M4: client-side "volgende run" voor vaste-dagen-triggers (Amsterdam).
   const nextRun = automation.enabled ? nextRunLabel(automation.trigger) : null;

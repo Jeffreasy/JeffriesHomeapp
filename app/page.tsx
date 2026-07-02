@@ -14,6 +14,7 @@ import { type ScenePreset } from "@/lib/scenes";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
+import { getShiftAppointments } from "@/components/schedule/scheduleUtils";
 import { QuickNote } from "@/components/notes/QuickNote";
 import { DailyChecklist } from "@/components/habits/DailyChecklist";
 
@@ -94,9 +95,13 @@ export default function DashboardPage() {
   };
   const dashboardAppointments = personalUpcomingEvents.slice(0, 3);
   const moreAppointments = Math.max(0, personalUpcomingEvents.length - dashboardAppointments.length);
-  const nextShiftEvents = nextDienst
-    ? (eventsByDate[nextDienst.startDatum] ?? []).filter((event) => event.kalender !== "Rooster" && getDashboardConflict(event))
-    : [];
+  // Gedeelde helper (overnight-aware, over alle dagen die de dienst beslaat) i.p.v.
+  // alleen de startdag — zelfde contract als /rooster en /agenda. Home houdt zijn
+  // eigen conflict-definitie (geen info-level, geen soft+heledag), dus zonder
+  // conflictMap ophalen en daarna filteren.
+  const nextShiftEvents = getShiftAppointments(nextDienst, eventsByDate).filter(
+    (event) => event.kalender !== "Rooster" && getDashboardConflict(event)
+  );
   const nextEvent = personalUpcomingEvents[0] ?? null;
   const hardConflicts = withConflicts.filter((event) => conflictMap.get(event.eventId)?.level === "hard").length;
   const actionableConflicts = personalUpcomingEvents.filter((event) => getDashboardConflict(event)).length;
@@ -238,6 +243,8 @@ export default function DashboardPage() {
             scheduleFailed={Boolean(scheduleError)}
             devicesLoading={devicesLoading}
             devicesFailed={Boolean(devicesError)}
+            financeLoading={financeLoading}
+            financeFailed={financeFailed}
           />
 
           {devicesError ? (
@@ -449,7 +456,7 @@ export default function DashboardPage() {
                 <StatusRow
                   icon="hide"
                   label="Privacy"
-                  value={privacyOn ? "Financiele waarden verborgen" : "Financiele waarden zichtbaar"}
+                  value={privacyOn ? "Financiële waarden verborgen" : "Financiële waarden zichtbaar"}
                   tone={privacyOn ? "green" : "slate"}
                 />
               </div>

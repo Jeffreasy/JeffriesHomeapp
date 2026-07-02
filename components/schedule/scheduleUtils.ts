@@ -1,4 +1,6 @@
 import type { PersonalEvent } from "@/hooks/usePersonalEvents";
+import { type DienstRow, getEndKey } from "@/lib/schedule";
+import type { ConflictInfo } from "@/lib/conflictDetection";
 
 /**
  * Shared schedule/agenda helpers — extracted so the agenda page, rooster page
@@ -42,4 +44,50 @@ export function compareAllDayFirst(a: PersonalEvent, b: PersonalEvent) {
     `${b.startTijd || "00:00"}-${b.titel}`,
     "nl",
   );
+}
+
+/** Noon-anchored ISO date advance — matches the keys in eventsByDate. */
+function advanceIsoDay(iso: string, days: number): string {
+  const date = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return iso;
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * The single "afspraken bij dienst" contract shared by the rooster page, the
+ * agenda page and the home dashboard — previously three diverging versions
+ * (conflicts×all-days / all×start-day / conflicts×start-day) fed the same
+ * NextShiftCard (audit F10 / DEEL 2 NextShiftCard).
+ *
+ * Collects the personal events that fall on *any* calendar day the shift spans,
+ * so a night shift (e.g. 22:00–07:00) that rolls past midnight still surfaces an
+ * early-morning appointment on the following day (the K9 overnight fix). Results
+ * are deduplicated by eventId and sorted (all-day first, then by start time).
+ *
+ * When `conflictMap` is passed, the list is narrowed to events that map has an
+ * (actionable) conflict for — what the rooster hero and home dashboard want.
+ * Omit it to get every appointment across the spanned days (the agenda sidebar).
+ */
+export function getShiftAppointments(
+  dienst: DienstRow | null | undefined,
+  eventsByDate: Record<string, PersonalEvent[]>,
+  conflictMap?: Map<string, ConflictInfo>,
+): PersonalEvent[] {
+  if (!dienst) return [];
+  const endDay = getEndKey(dienst).slice(0, 10);
+  const seen = new Set<string>();
+  const result: PersonalEvent[] = [];
+  let day = dienst.startDatum;
+  let guard = 0;
+  while (day <= endDay && guard++ < 32) {
+    for (const event of eventsByDate[day] ?? []) {
+      if (seen.has(event.eventId)) continue;
+      if (conflictMap && !conflictMap.has(event.eventId)) continue;
+      seen.add(event.eventId);
+      result.push(event);
+    }
+    day = advanceIsoDay(day, 1);
+  }
+  return result.sort(compareAllDayFirst);
 }

@@ -202,7 +202,7 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
                     IP: {device.ip_address ?? "onbekend"}
                   </p>
                   <p className="mt-2 max-w-xs text-xs leading-5 text-slate-600">
-                    Controleer of de lamp stroom heeft en met hetzelfde wifi-netwerk is verbonden. Laatste contact: {device.last_seen ? new Date(device.last_seen).toLocaleString("nl-NL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "onbekend"}.
+                    Controleer of de lamp stroom heeft en met hetzelfde wifi-netwerk is verbonden. Laatst bijgewerkt: {device.last_seen ? new Date(device.last_seen).toLocaleString("nl-NL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "onbekend"}.
                   </p>
                 </div>
               )}

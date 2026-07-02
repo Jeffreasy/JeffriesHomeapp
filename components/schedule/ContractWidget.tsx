@@ -9,6 +9,9 @@ import { hoursValue } from "./RoosterUtils";
 import { formatWeekLabel } from "./scheduleUtils";
 
 export function ContractWidget({ contractUren = 16 }: { contractUren?: number } = {}) {
+  // Eigen useSchedule-mount naast de pagina + MonthBalanceChart. Acceptabel:
+  // react-query dedupt de /schedule-fetch (één netwerkcall, gedeelde cache), en
+  // de afgeleiden zijn nu gememoized in de hook (audit DEEL 2 #14).
   const { diensten } = useSchedule();
 
   const stats = useMemo(() => {

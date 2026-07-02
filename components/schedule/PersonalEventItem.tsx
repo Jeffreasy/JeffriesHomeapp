@@ -31,6 +31,8 @@ function statusBadge(event: PersonalEvent) {
   if (event.status === "PendingCreate") return { label: "Nieuw", className: "bg-sky-500/10 text-sky-300 border-sky-500/20" };
   if (event.status === "PendingUpdate") return { label: "Wijziging", className: "bg-violet-500/10 text-violet-300 border-violet-500/20" };
   if (event.status === "PendingDelete") return { label: "Verwijderen", className: "bg-red-500/10 text-red-300 border-red-500/20" };
+  // Lopende dienst: zelfde "Bezig"-vocabulaire als rooster/focus (audit DEEL 2 #12).
+  if (event.status === "Bezig") return { label: "Bezig", className: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" };
   if (event.status === "Voorbij") return { label: "Voorbij", className: "bg-slate-500/10 text-slate-500 border-slate-500/15" };
   if (event.kalender === "Rooster") return { label: "Dienst", className: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20" };
   return null;

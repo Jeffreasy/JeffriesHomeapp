@@ -22,9 +22,9 @@ const COLOR_PRESETS = [
   { hex: "#ff8800", label: "Oranje" },
   { hex: "#ffcc00", label: "Geel" },
   { hex: "#00e5ff", label: "Cyaan" },
-  { hex: "#00c2a0", label: "Teal" },
+  { hex: "#00c2a0", label: "Turkoois" },
   { hex: "#3b82f6", label: "Blauw" },
-  { hex: "#8b5cf6", label: "Indigo" },
+  { hex: "#8b5cf6", label: "Paars" },
   { hex: "#ff69b4", label: "Roze" },
 ];
 
@@ -88,7 +88,9 @@ export function LampControl({ device }: LampControlProps) {
         old?.map((d) => (d.id === device.id ? fresh : d))
       );
     } catch {
-      toastError("Staat verversen mislukt — lamp niet bereikbaar");
+      // Dit haalt de laatst bekende serverstaat op (DB-rij), niet de lamp zelf —
+      // een fout betekent dat de API onbereikbaar is, niet per se de lamp.
+      toastError("Serverstatus ophalen mislukt — probeer het opnieuw");
     } finally {
       setRefreshing(false);
     }
@@ -225,8 +227,8 @@ export function LampControl({ device }: LampControlProps) {
             <button
               onClick={refresh}
               disabled={refreshing}
-              aria-label="Staat verversen"
-              title="Staat verversen van lamp"
+              aria-label="Serverstatus ophalen"
+              title="Haal de laatst bekende serverstatus op"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white/5 hover:text-slate-400"
             >
               <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} aria-hidden="true" />
@@ -278,7 +280,7 @@ export function LampControl({ device }: LampControlProps) {
           </div>
           <input
             type="range"
-            min={153}
+            min={154}
             max={455}
             value={localMireds}
             onChange={(e) => handleColorTemp(+e.target.value)}
@@ -346,6 +348,7 @@ export function LampControl({ device }: LampControlProps) {
               onChange={(e) => handleHexInput(e.target.value)}
               onBlur={() => setHexDraft(localHex)}
               aria-invalid={!hexDraftValid}
+              aria-describedby={!hexDraftValid ? `${hexInputId}-error` : undefined}
               className={cn(
                 "w-24 shrink-0 rounded-lg border bg-[var(--color-surface)] px-2 py-1.5 text-center font-mono text-xs text-slate-300 outline-none transition-colors",
                 hexDraftValid
@@ -354,6 +357,11 @@ export function LampControl({ device }: LampControlProps) {
               )}
             />
           </div>
+          {!hexDraftValid && (
+            <p id={`${hexInputId}-error`} role="alert" className="text-right text-[10px] text-rose-300">
+              Voer een geldige hexkleur in (#rrggbb).
+            </p>
+          )}
         </div>
       )}
       </div>

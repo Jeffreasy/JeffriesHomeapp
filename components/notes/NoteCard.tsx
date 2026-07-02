@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useState, useRef, useEffect, useCallback, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { motion } from "framer-motion";
 import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2, CheckCircle2 } from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
@@ -58,6 +58,13 @@ export function NoteCard({
   const age = formatAge(note.gewijzigd);
   const checklistInfo = getChecklistInfo(note.inhoud);
   const allLines = note.inhoud.split("\n");
+  // R3-15 (DayColumn's guard): quick-capture stores the full line as BOTH titel
+  // and inhoud, so the title and the first preview line were identical. When the
+  // first content line matches the shown title, drop it from the preview.
+  const previewSourceLines =
+    note.titel && allLines[0]?.trim() === note.titel.trim()
+      ? allLines.slice(1)
+      : allLines;
   const deadlineInfo = note.deadline ? getDeadlineInfo(note.deadline) : null;
   const prio = PRIORITEIT_STYLES[note.prioriteit ?? "normaal"] ?? PRIORITEIT_STYLES.normaal;
   const symbol = resolveAppIconName(note.symbol, "note");
@@ -78,21 +85,61 @@ export function NoteCard({
     }
   };
 
+  // R3-14: a second checkbox tick while a PATCH is in flight was dropped
+  // silently. Instead we QUEUE the latest requested line and replay it once the
+  // in-flight action settles — by then the parent has re-rendered with the fresh
+  // gewijzigd (from onSuccess), so the replay carries a valid concurrency token.
+  const noteRef = useRef(note);
+  noteRef.current = note;
+  const queuedLineRef = useRef<number | null>(null);
+  const checkInFlightRef = useRef(false);
+
+  const runCheckToggle = useCallback(
+    async (originalLineIndex: number) => {
+      if (!onUpdateContent) return;
+      const current = noteRef.current;
+      const lines = current.inhoud.split("\n");
+      const line = lines[originalLineIndex];
+      if (!line) return;
+      if (/^- \[ \]/.test(line)) {
+        lines[originalLineIndex] = line.replace(/^- \[ \]/, "- [x]");
+      } else if (/^- \[[xX]\]/.test(line)) {
+        lines[originalLineIndex] = line.replace(/^- \[[xX]\]/, "- [ ]");
+      } else {
+        return;
+      }
+      await onUpdateContent(current.id, lines.join("\n"), current.gewijzigd);
+    },
+    [onUpdateContent],
+  );
+
   const toggleCheckbox = async (originalLineIndex: number) => {
     if (!onUpdateContent) return;
-    const lines = [...allLines];
-    const line = lines[originalLineIndex];
-    if (!line) return;
-    if (/^- \[ \]/.test(line)) {
-      lines[originalLineIndex] = line.replace(/^- \[ \]/, "- [x]");
-    } else if (/^- \[[xX]\]/.test(line)) {
-      lines[originalLineIndex] = line.replace(/^- \[[xX]\]/, "- [ ]");
-    } else {
+    // Already saving: remember this tick (last one wins) and bail — the settle
+    // effect below will replay it.
+    if (checkInFlightRef.current) {
+      queuedLineRef.current = originalLineIndex;
       return;
     }
-    await runAction("check", () => onUpdateContent(note.id, lines.join("\n"), note.gewijzigd));
-
+    checkInFlightRef.current = true;
+    setPendingAction("check");
+    try {
+      await runCheckToggle(originalLineIndex);
+    } finally {
+      setPendingAction(null);
+      checkInFlightRef.current = false;
+    }
   };
+
+  // Drain a queued tick after the note prop refreshed (fresh token in hand).
+  useEffect(() => {
+    if (checkInFlightRef.current) return;
+    const queued = queuedLineRef.current;
+    if (queued == null) return;
+    queuedLineRef.current = null;
+    void toggleCheckbox(queued);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note.gewijzigd]);
 
   return (
     <motion.div
@@ -188,7 +235,7 @@ export function NoteCard({
 
         {/* Content preview with checklist + wiki-link support */}
         <div className={`mb-2 break-words text-xs leading-relaxed text-slate-400 ${compact ? "line-clamp-3" : "line-clamp-4"}`}>
-          {masked ? "•••• •••• ••••" : renderPreview(allLines, onUpdateContent ? toggleCheckbox : undefined, onNavigateToNote)}
+          {masked ? "•••• •••• ••••" : renderPreview(previewSourceLines, onUpdateContent ? toggleCheckbox : undefined, onNavigateToNote, allLines.length - previewSourceLines.length)}
         </div>
 
         {/* Checklist progress */}
@@ -342,10 +389,12 @@ function getDeadlineInfo(deadline: string): { label: string; style: string; over
   };
 }
 
-function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void | Promise<void>, onNavigateToNote?: (title: string) => void) {
+function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) => void | Promise<void>, onNavigateToNote?: (title: string) => void, indexOffset = 0) {
   const previewLines = allLines.slice(0, 4);
   return previewLines.map((line, previewIdx) => {
-    const originalIdx = previewIdx;
+    // Map back to the real note-line index so checkbox toggles hit the right
+    // line even when a leading duplicate-title line was dropped (R3-15).
+    const originalIdx = previewIdx + indexOffset;
 
     const item = CHECKLIST_ITEM.exec(line);
     if (item) {

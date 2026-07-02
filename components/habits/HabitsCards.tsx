@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Plus, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type Tone, toneClasses, maskHabitName } from "./HabitsUtils";
+import { formatStreakShort } from "@/lib/habit-constants";
 
 export function MetricCard({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: string; value: string; tone: Tone }) {
   const classes = toneClasses[tone];
@@ -56,7 +57,7 @@ export function TopStreaks({
   streaks,
   masked,
 }: {
-  streaks: Array<{ naam: string; emoji: string; streak: number; type?: string }>;
+  streaks: Array<{ naam: string; emoji: string; streak: number; type?: string; frequentie?: string }>;
   masked: boolean;
 }) {
   return (
@@ -74,7 +75,7 @@ export function TopStreaks({
                 </p>
                 <p className="mt-0.5 text-[10px] uppercase text-slate-600">{masked ? "Afgeschermd" : streak.type ?? "habit"}</p>
               </div>
-              <span className="shrink-0 text-sm font-bold text-amber-200">{streak.streak}d</span>
+              <span className="shrink-0 text-sm font-bold text-amber-200">{formatStreakShort(streak.streak, streak.frequentie)}</span>
             </div>
           ))}
         </div>

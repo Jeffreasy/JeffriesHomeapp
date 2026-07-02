@@ -32,7 +32,7 @@ export function NotesHeader({
   onTabChange: (tab: NotesTab) => void;
 }) {
   const tabs: { id: NotesTab; label: string; icon: AppIconName }[] = [
-    { id: "journal", label: "Week Journal", icon: "book" },
+    { id: "journal", label: "Weekjournaal", icon: "book" },
     { id: "collection", label: "Collectie", icon: "list" },
   ];
 
@@ -68,7 +68,7 @@ export function NotesHeader({
             <h1 className="text-lg font-bold text-white">Notities</h1>
             <p className="text-xs text-[var(--color-text-muted)]">
               {isLoading
-                ? "Laden..."
+                ? "Laden…"
                 : `${count} actief · ${completedCount} afgerond · ${archivedCount} archief · ${pinnedCount} vastgezet`}
             </p>
           </div>

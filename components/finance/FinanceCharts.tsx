@@ -72,6 +72,15 @@ export function FinanceCharts({
   formatPrivateEuro: (value: number) => string;
   formatPrivateEuroExact: (value: number) => string;
 }) {
+  // F1/scope: de charts beslaan de hele periode; categorie-/richting-/bedrag-
+  // filters gelden alléén voor de lijst. Label dat op de pie zodra zo'n filter
+  // actief is (zoekterm leeft in de page, dus die dekt de metrics-grid-label).
+  const listOnlyFilterActive = Boolean(
+    filters.categorieFilter || filters.richting ||
+    filters.minBedrag !== undefined || filters.maxBedrag !== undefined ||
+    filters.onlyStorneringen
+  );
+
   // Top-N categorieën + één geaggregeerde rest-slice, zodat de pie, de
   // legenda én het center-totaal exact dezelfde dataset beschrijven.
   const pieData = useMemo(() => {
@@ -157,6 +166,7 @@ export function FinanceCharts({
                 <Area
                   type="monotone"
                   dataKey="saldo"
+                  name="Saldo"
                   stroke="#f59e0b"
                   strokeWidth={2.5}
                   fill="url(#financeSaldoGradient)"
@@ -193,7 +203,11 @@ export function FinanceCharts({
         <SectionTitle
           icon={PieChartIcon}
           title="Verdeling"
-          subtitle={`${stats.aantalCategorieen} categorieën`}
+          subtitle={
+            listOnlyFilterActive
+              ? `${stats.aantalCategorieen} categorieën · hele periode (lijst-filters gelden hier niet)`
+              : `${stats.aantalCategorieen} categorieën`
+          }
         />
         <div
           className="mt-4 h-[238px] min-h-[238px]"

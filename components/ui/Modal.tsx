@@ -113,15 +113,15 @@ export function Modal({
     onClose();
   }, [dirty, onClose]);
 
-  // Prevent scrolling when modal is open
+  // Prevent scrolling when modal is open. Save and restore the PREVIOUS value
+  // (mirroring BottomNav) so a Modal opened above a BottomSheet/More-sheet
+  // doesn't unlock body scroll while that sheet is still open (R3).
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     return () => {
-      document.body.style.overflow = "unset";
+      document.body.style.overflow = previousOverflow;
     };
   }, [isOpen]);
 

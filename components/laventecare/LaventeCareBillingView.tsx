@@ -131,6 +131,11 @@ export function LaventeCareBillingView({
   onDownloadInvoiceUBL,
   onRefreshInvoicePayment,
   onOpenMailboxForInvoice,
+  onSendInvoiceReminder,
+  pendingPaymentActions,
+  onDismissPendingPaymentAction,
+  settingsHref,
+  prefillCompanyId,
   updatingTimeEntryId,
   onUpdateTimeEntry,
   onWriteOffTimeEntry,
@@ -167,6 +172,15 @@ export function LaventeCareBillingView({
   onDownloadInvoiceUBL: (id: string) => Promise<void>;
   onRefreshInvoicePayment: (id: string) => Promise<void>;
   onOpenMailboxForInvoice?: (id: string) => void;
+  /** R3-maandafsluiting: prefill een herinneringsmail voor een te-late factuur. */
+  onSendInvoiceReminder?: (id: string) => void;
+  /** R3-H6: per-factuur pending betaalverzoek dat nog bevestigd moet worden. */
+  pendingPaymentActions?: Record<string, { message: string; code?: string; pendingActionId?: string }>;
+  onDismissPendingPaymentAction?: (id: string) => void;
+  /** R3-H6: deep-link naar de Settings pending-actions sectie. */
+  settingsHref?: string;
+  /** R3-maandafsluiting: voorgeselecteerde klant vanuit het dossier. */
+  prefillCompanyId?: string;
   /** N10: urenregels bewerken/afschrijven/verwijderen. */
   updatingTimeEntryId?: string | null;
   onUpdateTimeEntry?: (id: string, data: { omschrijving?: string; minuten?: number }) => Promise<void>;
@@ -193,6 +207,25 @@ export function LaventeCareBillingView({
   const [invoiceErrors, setInvoiceErrors] = useState<Record<string, string>>({});
   // FH6: standaard 8 open urenregels tonen, met expander voor de rest.
   const [showAllUninvoiced, setShowAllUninvoiced] = useState(false);
+  // M6: de inline urenregel-editor telt óók als niet-opgeslagen invoer voor de
+  // tabwissel-dirty-guard.
+  const [timeEntryEditing, setTimeEntryEditing] = useState(false);
+
+  // R3-maandafsluiting: dossier→Commercie-brug. Als er een klant is
+  // voorgeselecteerd, seed die in de drie formulieren (alleen als het veld nog
+  // leeg is, zodat we geen handmatige keuze overschrijven).
+  useEffect(() => {
+    if (!prefillCompanyId) return;
+    setTimeForm((current) =>
+      current.companyId ? current : { ...current, companyId: prefillCompanyId },
+    );
+    setQuoteForm((current) =>
+      current.companyId ? current : { ...current, companyId: prefillCompanyId },
+    );
+    setInvoiceForm((current) =>
+      current.companyId ? current : { ...current, companyId: prefillCompanyId },
+    );
+  }, [prefillCompanyId]);
 
   const focusField = (id: string) => {
     window.setTimeout(() => document.getElementById(id)?.focus(), 0);
@@ -245,6 +278,33 @@ export function LaventeCareBillingView({
   const allowedUninvoicedIds = useMemo(() => {
     return new Set(uninvoicedEntries.map((entry) => entry.id));
   }, [uninvoicedEntries]);
+
+  // R3-maandafsluiting: totaal-preview van de factuurselectie (minuten + €
+  // excl./incl. 21% btw) vóór "Factuur maken", zodat het bedrag geen verrassing
+  // is. Werkt zowel voor geselecteerde open uren als een handmatige regel.
+  const INVOICE_VAT_BPS = 2100;
+  const invoiceSelectionPreview = useMemo(() => {
+    const selected = uninvoicedEntries.filter((entry) =>
+      invoiceForm.selectedTimeEntryIds.includes(entry.id),
+    );
+    let minutes = 0;
+    let exclCents = 0;
+    if (selected.length > 0) {
+      for (const entry of selected) {
+        minutes += entry.minutes;
+        exclCents += Math.round((entry.minutes * entry.hourly_rate_cents) / 60);
+      }
+    } else {
+      const manualMinutes = asNumber(invoiceForm.minutes);
+      const manualRate = asNumber(invoiceForm.hourlyRate);
+      if (manualMinutes > 0 && manualRate > 0) {
+        minutes = manualMinutes;
+        exclCents = Math.round((manualMinutes * euroToCents(manualRate)) / 60);
+      }
+    }
+    const inclCents = Math.round(exclCents * (1 + INVOICE_VAT_BPS / 10000));
+    return { count: selected.length, minutes, exclCents, inclCents };
+  }, [uninvoicedEntries, invoiceForm]);
 
   const invoicesByQuoteId = useMemo(() => {
     const byQuote = new Map<string, InvoiceItem>();
@@ -301,7 +361,9 @@ export function LaventeCareBillingView({
       invoiceForm.description.trim() ||
         invoiceForm.notes.trim() ||
         invoiceForm.selectedTimeEntryIds.length > 0,
-    );
+    ) ||
+    // M6: een openstaande inline urenregel-editor telt ook mee.
+    timeEntryEditing;
   useEffect(() => {
     onDirtyChange?.(formsDirty);
   }, [formsDirty, onDirtyChange]);
@@ -515,7 +577,7 @@ export function LaventeCareBillingView({
           detail={
             billing?.summary.bunqReady
               ? "API key, user en rekening staan klaar"
-              : "wacht op Render env"
+              : "provider-configuratie op server ontbreekt"
           }
         />
       </div>
@@ -525,7 +587,7 @@ export function LaventeCareBillingView({
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                Commerciele workflow
+                Commerciële workflow
               </p>
               <h3 className="mt-1 text-lg font-bold text-white">
                 Offerte, uren en factuur
@@ -614,6 +676,7 @@ export function LaventeCareBillingView({
                   label="Minuten"
                   id="billing-time-minutes"
                   required
+                  integer
                   error={timeErrors.minutes}
                   value={timeForm.minutes}
                   onChange={(minutes) =>
@@ -735,6 +798,7 @@ export function LaventeCareBillingView({
               <div className="grid gap-3 sm:grid-cols-3">
                 <NumberField
                   label="Aantal"
+                  integer
                   value={quoteForm.quantity}
                   onChange={(quantity) =>
                     setQuoteForm((current) => ({ ...current, quantity }))
@@ -960,6 +1024,7 @@ export function LaventeCareBillingView({
               <div className="grid gap-3 sm:grid-cols-3">
                 <NumberField
                   label="Minuten"
+                  integer
                   value={invoiceForm.minutes}
                   disabled={invoiceForm.selectedTimeEntryIds.length > 0}
                   onChange={(minutes) =>
@@ -1010,6 +1075,20 @@ export function LaventeCareBillingView({
                   placeholder="Bijv. bunq betaalverzoek volgt na akkoord"
                 />
               </label>
+              {invoiceSelectionPreview.exclCents > 0 ? (
+                <div className="flex flex-col gap-1 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-semibold text-amber-100">
+                    Totaal van deze factuur
+                    {invoiceSelectionPreview.count > 0
+                      ? ` (${invoiceSelectionPreview.count} urenregel${invoiceSelectionPreview.count === 1 ? "" : "s"}, ${formatMinutes(invoiceSelectionPreview.minutes)})`
+                      : ` (${formatMinutes(invoiceSelectionPreview.minutes)})`}
+                  </span>
+                  <span className="font-bold text-white">
+                    {formatCents(invoiceSelectionPreview.exclCents)} excl. ·{" "}
+                    {formatCents(invoiceSelectionPreview.inclCents)} incl. btw
+                  </span>
+                </div>
+              ) : null}
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -1201,6 +1280,34 @@ export function LaventeCareBillingView({
                 invoice.status !== "betaald" && invoice.status !== "geannuleerd"
                   ? daysPastDue(invoice.due_date)
                   : 0;
+              // R3-maandafsluiting: "Herinnering sturen" op te-late facturen —
+              // prefilt een herinneringstemplate in de Mailbox met deze factuur.
+              if (overdueDays > 0 && onSendInvoiceReminder) {
+                actions.push({
+                  label: "Herinnering",
+                  busy: false,
+                  onClick: () => onSendInvoiceReminder(invoice.id),
+                });
+              }
+              // R3-H6: persistente, actionabele melding als er een betaalverzoek
+              // op bevestiging wacht (i.p.v. een wegtikkende code-toast). Zodra
+              // de factuur een gekoppeld betaalverzoek/betaal-URL heeft is de
+              // bevestiging rond en verdwijnt de melding.
+              const pending = hasPaymentRequest
+                ? undefined
+                : pendingPaymentActions?.[invoice.id];
+              const notice = pending
+                ? {
+                    text: pending.message,
+                    tone: "amber" as const,
+                    link: settingsHref
+                      ? { label: "Bevestig in Settings", href: settingsHref }
+                      : undefined,
+                    onDismiss: onDismissPendingPaymentAction
+                      ? () => onDismissPendingPaymentAction(invoice.id)
+                      : undefined,
+                  }
+                : undefined;
               return {
                 id: invoice.id,
                 title: invoice.invoice_number,
@@ -1220,6 +1327,7 @@ export function LaventeCareBillingView({
                     : undefined,
                 filterKeys: [invoice.status, ...(overdueDays > 0 ? ["te_laat"] : [])],
                 searchText: `${invoice.invoice_number} ${invoice.company_name ?? ""} ${invoice.notes ?? ""}`,
+                notice,
                 actions,
               };
             })}
@@ -1235,6 +1343,7 @@ export function LaventeCareBillingView({
               onWriteOff={onWriteOffTimeEntry}
               onReopen={onReopenTimeEntry}
               onDelete={onDeleteTimeEntry}
+              onEditingChange={setTimeEntryEditing}
             />
           ) : null}
         </div>
@@ -1298,7 +1407,7 @@ function ProviderStatus({ billing }: { billing?: BillingItem }) {
           <p className="mt-2 text-sm leading-5 text-slate-400">
             {ready
               ? "Facturen maken eerst een bevestigingsactie. Na akkoord wordt een bunq RequestInquiry gekoppeld en krijgt de factuur status verstuurd; mailen doe je daarna via Mailbox."
-              : "Zet BUNQ_API_KEY, BUNQ_USER_ID en BUNQ_MONETARY_ACCOUNT_ID op Render voordat live betaalverzoeken aan gaan."}
+              : "De betaalprovider-configuratie op de server ontbreekt nog; die moet compleet zijn voordat live betaalverzoeken aangaan."}
           </p>
         </div>
       </div>
@@ -1429,6 +1538,7 @@ function NumberField({
   required,
   error,
   hint,
+  integer,
 }: {
   label: string;
   value: number | "";
@@ -1439,6 +1549,9 @@ function NumberField({
   error?: string;
   /** Kleine toelichting achter het label, bijv. "excl. 21% btw" (M-G). */
   hint?: string;
+  /** M8: minuten/aantal worden backend-side als int gedecodeerd; forceer hele
+   *  getallen (step=1 + afronden) zodat "90,5" geen decode-fail-toast geeft. */
+  integer?: boolean;
 }) {
   return (
     <label className="block">
@@ -1453,14 +1566,19 @@ function NumberField({
         id={id}
         type="number"
         min={0}
-        step="0.01"
+        step={integer ? 1 : "0.01"}
         value={value}
         disabled={disabled}
         required={required}
         aria-invalid={Boolean(error)}
-        onChange={(event) =>
-          onChange(event.target.value === "" ? "" : Number(event.target.value))
-        }
+        onChange={(event) => {
+          if (event.target.value === "") {
+            onChange("");
+            return;
+          }
+          const parsed = Number(event.target.value);
+          onChange(integer ? Math.round(parsed) : parsed);
+        }}
         className={cn(
           inputClass,
           error && "border-rose-400/60 focus:border-rose-400/60",
@@ -1485,6 +1603,14 @@ type ListPanelItem = {
   filterKeys?: string[];
   /** Tekst waarop het zoekveld matcht (M-H); valt terug op titel + meta. */
   searchText?: string;
+  /** R3-H6: persistente, actionabele melding onder de regel (bijv. een
+   *  betaalverzoek dat nog bevestigd moet worden). */
+  notice?: {
+    text: string;
+    tone?: "amber" | "rose";
+    link?: { label: string; href: string };
+    onDismiss?: () => void;
+  };
   action?: { label: string; busy: boolean; onClick: () => void };
   actions?: Array<{ label: string; busy: boolean; onClick: () => void }>;
 };
@@ -1660,6 +1786,45 @@ function ListPanel({
                   )}
                 </div>
               </div>
+              {item.notice ? (
+                <div
+                  className={cn(
+                    "mt-3 flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-center sm:justify-between",
+                    item.notice.tone === "rose"
+                      ? "border-rose-500/25 bg-rose-500/10"
+                      : "border-amber-500/25 bg-amber-500/10",
+                  )}
+                >
+                  <p
+                    className={cn(
+                      "min-w-0 text-xs leading-5",
+                      item.notice.tone === "rose" ? "text-rose-100" : "text-amber-100",
+                    )}
+                  >
+                    {item.notice.text}
+                  </p>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {item.notice.link ? (
+                      <a
+                        href={item.notice.link.href}
+                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/15 bg-white/[0.06] px-2.5 text-xs font-bold text-white transition hover:bg-white/[0.12]"
+                      >
+                        {item.notice.link.label}
+                      </a>
+                    ) : null}
+                    {item.notice.onDismiss ? (
+                      <button
+                        type="button"
+                        onClick={item.notice.onDismiss}
+                        aria-label="Melding sluiten"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+                      >
+                        <XCircle size={14} />
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ))
         ) : (
@@ -1700,6 +1865,7 @@ function TimeEntriesPanel({
   onWriteOff,
   onReopen,
   onDelete,
+  onEditingChange,
 }: {
   timeEntries: TimeEntryItem[];
   busyId: string | null;
@@ -1707,6 +1873,8 @@ function TimeEntriesPanel({
   onWriteOff: (entry: TimeEntryItem) => Promise<void>;
   onReopen?: (entry: TimeEntryItem) => Promise<void>;
   onDelete: (entry: TimeEntryItem) => Promise<void>;
+  /** M6: meldt de bovenliggende view of de inline editor open staat. */
+  onEditingChange?: (editing: boolean) => void;
 }) {
   const [tab, setTab] = useState<TimeEntryTab>("open");
   const [showAll, setShowAll] = useState(false);
@@ -1714,6 +1882,15 @@ function TimeEntriesPanel({
   const [editDescription, setEditDescription] = useState("");
   const [editMinutes, setEditMinutes] = useState<number | "">("");
   const [editError, setEditError] = useState("");
+  // R3-maandafsluiting: klant-/tekstfilter op het urenpaneel.
+  const [entryQuery, setEntryQuery] = useState("");
+
+  // M6: lift de "editor open"-status zodat een tabwissel eerst om bevestiging
+  // vraagt als er een urenregel in bewerking staat.
+  useEffect(() => {
+    onEditingChange?.(editingId !== null);
+    return () => onEditingChange?.(false);
+  }, [editingId, onEditingChange]);
 
   const openEntries = useMemo(
     () => timeEntries.filter((entry) => !entry.invoice_id && entry.status !== "afgeschreven"),
@@ -1728,8 +1905,14 @@ function TimeEntriesPanel({
     [timeEntries],
   );
 
-  const tabEntries =
+  const rawTabEntries =
     tab === "open" ? openEntries : tab === "afgeschreven" ? writtenOffEntries : invoicedEntries;
+  const entryNeedle = entryQuery.trim().toLowerCase();
+  const tabEntries = entryNeedle
+    ? rawTabEntries.filter((entry) =>
+        `${entry.description} ${entry.company_name ?? ""}`.toLowerCase().includes(entryNeedle),
+      )
+    : rawTabEntries;
   const visibleEntries = showAll ? tabEntries : tabEntries.slice(0, TIME_ENTRIES_INITIAL_COUNT);
 
   const startEdit = (entry: TimeEntryItem) => {
@@ -1766,6 +1949,7 @@ function TimeEntriesPanel({
     setShowAll(false);
     setEditingId(null);
     setEditError("");
+    setEntryQuery("");
   };
 
   return (
@@ -1797,14 +1981,31 @@ function TimeEntriesPanel({
           ))}
         </div>
       </div>
+      {rawTabEntries.length > 0 ? (
+        <div className="relative mt-3">
+          <Search
+            size={13}
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"
+          />
+          <input
+            value={entryQuery}
+            onChange={(event) => setEntryQuery(event.target.value)}
+            placeholder="Filter op omschrijving of klant..."
+            aria-label="Urenregels filteren"
+            className="w-full rounded-lg border border-white/10 bg-black/20 py-1.5 pl-8 pr-3 text-xs text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/50"
+          />
+        </div>
+      ) : null}
       <div className="mt-3 space-y-2">
         {tabEntries.length === 0 ? (
           <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-3 text-sm text-slate-500">
-            {tab === "open"
-              ? "Geen open urenregels."
-              : tab === "afgeschreven"
-                ? "Geen afgeschreven urenregels."
-                : "Nog geen gefactureerde urenregels."}
+            {entryNeedle
+              ? `Geen urenregels gevonden voor "${entryQuery}".`
+              : tab === "open"
+                ? "Geen open urenregels."
+                : tab === "afgeschreven"
+                  ? "Geen afgeschreven urenregels."
+                  : "Nog geen gefactureerde urenregels."}
           </p>
         ) : (
           visibleEntries.map((entry) => {

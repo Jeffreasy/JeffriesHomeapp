@@ -146,14 +146,22 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
           >
             <Upload className="dropzone__icon" size={28} />
             <p className="dropzone__title">Sleep je Rabobank CSV hier naartoe</p>
-            <label className="btn btn--primary" htmlFor="csv-input">Kies bestand</label>
-            <input id="csv-input" type="file" accept=".csv" className="visually-hidden"
+            {/* L13: input vóór het label zodat peer-focus-visible werkt — een
+                toetsenbordgebruiker die naar de (verborgen) input tabt ziet nu
+                een zichtbare focusring op de "Kies bestand"-knop. */}
+            <input id="csv-input" type="file" accept=".csv" className="peer visually-hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleFile(file);
                 // Reset zodat hetzelfde bestand opnieuw kiezen wél een change-event geeft.
                 e.target.value = "";
               }} />
+            <label
+              className="btn btn--primary peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-amber-400"
+              htmlFor="csv-input"
+            >
+              Kies bestand
+            </label>
             {state === "error" && errorMsg && (
               <div className="dropzone__error"><AlertCircle size={15} /><span>{errorMsg}</span></div>
             )}

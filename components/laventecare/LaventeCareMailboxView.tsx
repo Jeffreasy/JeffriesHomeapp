@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, type ChangeEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ExternalLink, Eye, FileText, Loader2, MailCheck, MailPlus, MessagesSquare, Paperclip, Pencil, Reply, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import type { LCMailAISuggestion } from "@/lib/api";
 import { extractLaventeCareMailAttachmentContext, type LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
 import type {
@@ -65,6 +66,30 @@ const MAX_MAIL_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 // payloads pas server-side, dus we vangen dit vooraf af.
 const MAX_MAIL_ATTACHMENT_TOTAL_BYTES = 10 * 1024 * 1024;
 
+// M6: de standaard-variabelenset. Losgetrokken als constante zodat de
+// dirty-detectie kan zien of de gebruiker het variabelenveld écht aanpaste
+// (i.p.v. false-positive te zijn bij pure prefill/resolutie-output).
+const DEFAULT_MAIL_VARIABLES = [
+  "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
+  "laventecare.email=jeffrey@laventecare.nl",
+  "laventecare.tagline=Van idee tot werkend systeem",
+  "cta.label=Afstemmen",
+  "quote.summary=scope, planning en uitvoering volgens afspraak",
+  "project.status=in uitvoering",
+  "project.update=De voortgang loopt volgens afspraak.",
+  "project.risk=geen bijzonderheden",
+  "pilot.scope=de afgesproken testscope",
+  "pilot.criteria=kernfunctionaliteit, gebruiksgemak en betrouwbaarheid",
+  "pilot.feedback_moment=na de eerste testperiode",
+  "pilot.access_summary=pilottoegang stemmen we voor de start af via het afgesproken kanaal",
+  "documentation.summary=De klantdocumentatie voor de pilot staat klaar als praktische start- en naslagset.",
+  "documentation.attachments=quickstart, workflowhandleiding, pilotafspraken en vrijgave/datakwaliteit",
+  "documentation.next_step=Loop de documenten rustig door; daarna stemmen we de pilotstart en eventuele vragen samen af.",
+  "meeting.topic=afstemming",
+  "meeting.summary=De besproken punten zijn vastgelegd in het klantdossier.",
+  "meeting.actions=de vervolgstap wordt opgepakt",
+].join("\n");
+
 export function LaventeCareMailboxView({
   mailbox,
   mailboxLoading,
@@ -74,6 +99,7 @@ export function LaventeCareMailboxView({
   activeWorkstreams,
   invoices,
   prefillInvoiceId,
+  prefillIntent,
   templates,
   outbox,
   inbox,
@@ -97,6 +123,9 @@ export function LaventeCareMailboxView({
   activeWorkstreams: WorkstreamItem[];
   invoices: InvoiceItem[];
   prefillInvoiceId?: string;
+  /** R3-maandafsluiting: "reminder" preselecteert een herinneringstemplate en
+   *  zet een passende AI-intentie. */
+  prefillIntent?: "reminder" | null;
   templates: MailTemplateItem[];
   outbox: MailOutboxItem[];
   inbox: MailInboxItem[];
@@ -117,7 +146,20 @@ export function LaventeCareMailboxView({
   /** M-D: meldt de pagina of de opsteller niet-verzonden invoer bevat. */
   onDirtyChange?: (dirty: boolean) => void;
 }) {
-  const [templateId, setTemplateId] = useState("");
+  // R3-maandafsluiting: bij intent "reminder" een herinneringstemplate
+  // voorselecteren (op naam/categorie), anders leeg starten.
+  const reminderTemplate = useMemo(
+    () =>
+      prefillIntent === "reminder"
+        ? templates.find((template) =>
+            /herinner|reminder|aanmaning|openstaand/i.test(
+              `${template.name} ${template.category} ${template.subject_template}`,
+            ),
+          )
+        : undefined,
+    [prefillIntent, templates],
+  );
+  const [templateId, setTemplateId] = useState(reminderTemplate?.id ?? "");
   const [companyId, setCompanyId] = useState("");
   const [contactId, setContactId] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -138,7 +180,11 @@ export function LaventeCareMailboxView({
     conversationId: string | null;
   } | null>(null);
   const [showAllDrafts, setShowAllDrafts] = useState(false);
-  const [aiIntent, setAiIntent] = useState("Maak een klantmail op basis van de gekoppelde LaventeCare context.");
+  const [aiIntent, setAiIntent] = useState(
+    prefillIntent === "reminder"
+      ? "Stuur een vriendelijke betalingsherinnering voor de gekoppelde openstaande factuur."
+      : "Maak een klantmail op basis van de gekoppelde LaventeCare context.",
+  );
   const [aiTone, setAiTone] = useState("professioneel, warm en concreet");
   const [aiSuggestion, setAiSuggestion] = useState<LCMailAISuggestion | null>(null);
   const [attachments, setAttachments] = useState<MailAttachment[]>([]);
@@ -147,28 +193,7 @@ export function LaventeCareMailboxView({
   const [mailModal, setMailModal] = useState<MailModalState | null>(null);
   const [threadConv, setThreadConv] = useState<MailConversation | null>(null);
   const [showAllConversations, setShowAllConversations] = useState(false);
-  const [variables, setVariables] = useState(
-    [
-      "next_step=Ik stel voor om de eerstvolgende stap samen scherp te zetten.",
-      "laventecare.email=jeffrey@laventecare.nl",
-      "laventecare.tagline=Van idee tot werkend systeem",
-      "cta.label=Afstemmen",
-      "quote.summary=scope, planning en uitvoering volgens afspraak",
-      "project.status=in uitvoering",
-      "project.update=De voortgang loopt volgens afspraak.",
-      "project.risk=geen bijzonderheden",
-      "pilot.scope=de afgesproken testscope",
-      "pilot.criteria=kernfunctionaliteit, gebruiksgemak en betrouwbaarheid",
-      "pilot.feedback_moment=na de eerste testperiode",
-      "pilot.access_summary=pilottoegang stemmen we voor de start af via het afgesproken kanaal",
-      "documentation.summary=De klantdocumentatie voor de pilot staat klaar als praktische start- en naslagset.",
-      "documentation.attachments=quickstart, workflowhandleiding, pilotafspraken en vrijgave/datakwaliteit",
-      "documentation.next_step=Loop de documenten rustig door; daarna stemmen we de pilotstart en eventuele vragen samen af.",
-      "meeting.topic=afstemming",
-      "meeting.summary=De besproken punten zijn vastgelegd in het klantdossier.",
-      "meeting.actions=de vervolgstap wordt opgepakt",
-    ].join("\n")
-  );
+  const [variables, setVariables] = useState(DEFAULT_MAIL_VARIABLES);
 
   const activeTemplates = useMemo(
     () => templates.filter((template) => template.status === "active"),
@@ -216,9 +241,21 @@ export function LaventeCareMailboxView({
     [parsedVariables, variableHints],
   );
 
-  // M-D: meld de pagina dat de opsteller niet-verzonden invoer bevat, zodat
-  // een tabwissel eerst om bevestiging vraagt.
-  const composerDirty = Boolean(resolvedEmail || attachments.length > 0);
+  // M-D/M6: meld de pagina dat de opsteller niet-verzonden invoer bevat, zodat
+  // een tabwissel eerst om bevestiging vraagt. Gebaseerd op door de gebruiker
+  // bewerkte staat (ontvanger/naam handmatig aangepast, bijlagen, gewijzigde
+  // variabelen, AI-briefing of een actieve reply-context) i.p.v. de
+  // resolutie-output — dat gaf false positives bij pure prefill én miste
+  // bewerkte variabelen/AI-briefing.
+  const variablesEdited = variables.trim() !== DEFAULT_MAIL_VARIABLES;
+  const composerDirty = Boolean(
+    emailEdited ||
+      nameEdited ||
+      attachments.length > 0 ||
+      variablesEdited ||
+      aiSuggestion ||
+      replyContext,
+  );
   useEffect(() => {
     onDirtyChange?.(composerDirty);
   }, [composerDirty, onDirtyChange]);
@@ -364,6 +401,19 @@ export function LaventeCareMailboxView({
     setToName(item.to_name ?? "");
     setEmailEdited(false);
     setNameEdited(false);
+    // M5: een mislukte reply die je opnieuw wilt versturen moet in dezelfde
+    // thread blijven. subject + conversation_id staan op het outbox-item, dus
+    // herstel de reply-context als het item bij een conversatie hoort of een
+    // eigen (niet-template) onderwerp draagt.
+    const outboxSubject = (item.subject ?? "").trim();
+    if (item.conversation_id || /^re:/i.test(outboxSubject)) {
+      setReplyContext({
+        subject: outboxSubject || buildReplySubject(item.subject),
+        conversationId: item.conversation_id ?? null,
+      });
+    } else {
+      setReplyContext(null);
+    }
     setMailModal(null);
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -390,6 +440,10 @@ export function LaventeCareMailboxView({
     setToName(item.from_name ?? "");
     setEmailEdited(false);
     setNameEdited(false);
+    // M4: reset het contact — een eerder gekozen contactpersoon (mogelijk van
+    // een andere klant) mag niet stilzwijgend in het reply-payload belanden en
+    // de mail aan de verkeerde persoon loggen.
+    setContactId("");
     if (item.company_id) setCompanyId(item.company_id);
     // M-E: echte reply — zelfde thread (conversation_id) en "Re:"-onderwerp.
     setReplyContext({
@@ -444,6 +498,9 @@ export function LaventeCareMailboxView({
     }
     setEmailEdited(false);
     setNameEdited(false);
+    // M4: reset het contact zodat een eerder gekozen contactpersoon (mogelijk
+    // van een andere klant) niet stil in het reply-payload meegaat.
+    setContactId("");
     // M-E: echte reply — zelfde thread (conversation_id) en "Re:"-onderwerp.
     setReplyContext({
       subject: buildReplySubject(replySubject),
@@ -503,7 +560,10 @@ export function LaventeCareMailboxView({
     <div className="min-w-0 space-y-4">
       <section className="grid min-w-0 gap-3 lg:grid-cols-4">
         <MailboxMetric label="Gesprekken" value={conversations.length} detail={unreadCount ? `${unreadCount} ongelezen` : "geen ongelezen"} tone={unreadCount ? "warn" : "default"} />
-        <MailboxMetric label="Verzonden" value={mailbox?.summary.sent ?? 0} detail={failedCount ? `${failedCount} mislukt` : "bezorgd"} tone={failedCount ? "warn" : "default"} />
+        {/* L12: value = all-time SQL-telling; het "mislukt"-detail komt uit de
+            recent geladen outbox, dus expliciet "recent" om de mix duidelijk te
+            maken. */}
+        <MailboxMetric label="Verzonden" value={mailbox?.summary.sent ?? 0} detail={failedCount ? `${failedCount} recent mislukt` : "bezorgd"} tone={failedCount ? "warn" : "default"} />
         <MailboxMetric label="Concepten" value={mailbox?.summary.drafts ?? draftOutbox.length} detail="wachten op verzending" />
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
           <div className="flex items-start gap-3">
@@ -513,7 +573,7 @@ export function LaventeCareMailboxView({
               <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
             )}
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-slate-500">Graph sender</p>
+              <p className="text-xs font-semibold uppercase text-slate-500">Mailafzender</p>
               <p className="mt-1 truncate text-sm font-bold text-white">
                 {mailbox?.summary.configured ? mailbox.summary.senderEmail || "Geconfigureerd" : "Nog niet live"}
               </p>
@@ -529,11 +589,25 @@ export function LaventeCareMailboxView({
             event.preventDefault();
             void handleSend(false);
           }}
+          onKeyDown={(event) => {
+            // M7: Enter in een tekst-/select-veld mag niet stil een
+            // outbox-concept aanmaken. Concept/versturen loopt uitsluitend via
+            // de expliciete knoppen; Enter in een textarea houdt zijn newline.
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              event.target instanceof HTMLElement &&
+              event.target.tagName !== "TEXTAREA" &&
+              event.target.tagName !== "BUTTON"
+            ) {
+              event.preventDefault();
+            }
+          }}
           className="glass min-w-0 max-w-full overflow-hidden p-4 sm:p-5"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-500">Templated mail</p>
+              <p className="text-xs font-semibold uppercase text-slate-500">Sjabloonmail</p>
               <h3 className="mt-1 text-lg font-bold text-white">Nieuwe klantmail</h3>
               <p className="mt-1 text-sm leading-6 text-slate-400">
                 Render een vaste LaventeCare-template met klant, contact en extra variabelen. Concepten blijven in de outbox staan.
@@ -884,7 +958,7 @@ export function LaventeCareMailboxView({
                   <p className="mt-1 text-xs leading-5 text-slate-500">Controle voor jou. Deze regels worden niet in de mail gezet.</p>
                 </div>
                 <span className={`w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold ${readinessBadgeClass(sendReadiness.status)}`}>
-                  {sendReadiness.status === "ok" ? "Send ready" : sendReadiness.status === "warn" ? "Controleer" : "Niet klaar"}
+                  {sendReadiness.status === "ok" ? "Klaar om te versturen" : sendReadiness.status === "warn" ? "Controleer" : "Niet klaar"}
                 </span>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -1019,7 +1093,10 @@ export function LaventeCareMailboxView({
           <section className="glass min-w-0 p-4">
             <p className="text-xs font-semibold uppercase text-slate-500">Templatebibliotheek</p>
             <div className="mt-3 space-y-2">
-              {templates.map((template) => (
+              {/* L12: alleen actieve templates — een inactieve aanklikken zette
+                  templateId op een id die niet in de select-lijst zit, waardoor
+                  de selectie leeg leek. */}
+              {activeTemplates.map((template) => (
                 <button
                   key={template.id}
                   type="button"
@@ -1199,6 +1276,9 @@ type MailModalState = {
 // message (read-only + reply). The iframe is sandboxed and renders exactly the escaped
 // HTML that gets sent — preview == artifact.
 function MailPreviewModal({ state, onClose }: { state: MailModalState | null; onClose: () => void }) {
+  // L12-a11y: focus-trap + focus-restore rond de preview/bevestig-modal.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(Boolean(state), dialogRef);
   useEffect(() => {
     if (!state) return;
     const onKey = (event: KeyboardEvent) => {
@@ -1215,6 +1295,8 @@ function MailPreviewModal({ state, onClose }: { state: MailModalState | null; on
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         className="glass flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
@@ -1377,6 +1459,9 @@ function MailThreadModal({
   onOpenEntry: (entry: ThreadEntry) => void;
   onReply: (conversation: MailConversation) => void;
 }) {
+  // L12-a11y: focus-trap + focus-restore rond de thread-modal.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(Boolean(conversation), dialogRef);
   useEffect(() => {
     if (!conversation) return;
     const onKey = (event: KeyboardEvent) => {
@@ -1394,6 +1479,8 @@ function MailThreadModal({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         className="glass flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"

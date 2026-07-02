@@ -118,14 +118,28 @@ export function SalarisView({ diensten = [] }: SalarisViewProps) {
   }
 
   if (displayRecords.length === 0) {
+    // H8: de uploader is de databron van deze tab — hij mag niet achter de
+    // lege staat verdwijnen. Toon 'm hier óók, en verbreed de copy zodat beide
+    // routes (rooster óf loonstrook uploaden) genoemd worden.
     return (
-      <div className="glass rounded-2xl p-12 text-center border border-dashed border-[var(--color-border)]">
-        <Euro size={36} className="text-slate-600 mx-auto mb-4" />
-        <h3 className="text-base font-semibold text-slate-300 mb-1">Geen salarisdata</h3>
-        <p className="text-sm text-slate-500">
-          Importeer of synchroniseer je rooster zodat diensten beschikbaar zijn.<br />
-          Daarna rekent deze tab automatisch uren, contracturen en ORT door.
-        </p>
+      <div className="space-y-6">
+        <div className="glass rounded-2xl p-12 text-center border border-dashed border-[var(--color-border)]">
+          <Euro size={36} className="text-slate-600 mx-auto mb-4" />
+          <h3 className="text-base font-semibold text-slate-300 mb-1">Nog geen salarisdata</h3>
+          <p className="text-sm text-slate-500">
+            Upload hieronder je loonstroken, of importeer/synchroniseer je rooster
+            zodat diensten beschikbaar zijn.<br />
+            Deze tab rekent dan automatisch uren, contracturen en ORT door.
+          </p>
+        </div>
+
+        <div className="glass rounded-2xl p-5 border border-[var(--color-border)] min-w-0">
+          <div className="flex items-center gap-2 mb-4">
+            <FileUp size={14} className="text-indigo-400" />
+            <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-bold">Loonstroken uploaden</p>
+          </div>
+          <LoonstrookUploader />
+        </div>
       </div>
     );
   }
@@ -171,7 +185,7 @@ export function SalarisView({ diensten = [] }: SalarisViewProps) {
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-sky-300/80">Roosterberekening actief</p>
               <p className="mt-1 leading-relaxed text-slate-400">
-                {scheduleForecastCount} maand(en) worden direct uit je diensten berekend. Loonstroken blijven leidend zodra ze geimporteerd zijn.
+                {scheduleForecastCount} maand(en) worden direct uit je diensten berekend. Loonstroken blijven leidend zodra ze geïmporteerd zijn.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-right sm:min-w-52">
@@ -212,7 +226,7 @@ export function SalarisView({ diensten = [] }: SalarisViewProps) {
 
       {/* Disclaimer + Finance link */}
       <p className="text-[10px] text-slate-500 text-center leading-relaxed">
-        Maanden met geimporteerde loonstrook gebruiken werkelijke bedragen; overige maanden blijven prognoses.
+        Maanden met geïmporteerde loonstrook gebruiken werkelijke bedragen; overige maanden blijven prognoses.
         {"\u2248"} Netto prognose is een schatting op basis van de 2026-loonheffingstabel.
         De exacte verrekening door {"'"}s Heeren Loo kan afwijken door tijdvakfactor en heffingskortingen.
       </p>

@@ -27,6 +27,7 @@ export function HabitsVandaagTab({
   todayHabits,
   isLoading,
   isToday,
+  activeDate,
   setShowForm,
   privacyOn,
   toggle,
@@ -46,6 +47,9 @@ export function HabitsVandaagTab({
   todayHabits: HabitWithLog[];
   isLoading: boolean;
   isToday: boolean;
+  /** The Amsterdam YYYY-MM-DD shown — cards are keyed by it so a parked stepper
+   *  commit can never write to the newly-navigated date (R3). */
+  activeDate: string;
   setShowForm: (show: boolean) => void;
   privacyOn: boolean;
   toggle: (id: string) => void;
@@ -97,6 +101,7 @@ export function HabitsVandaagTab({
               <HabitCard
                 key={habit._id}
                 habit={habit}
+                datum={activeDate}
                 masked={privacyOn}
                 pending={pendingHabitIds.has(habit._id)}
                 onToggle={() => toggle(habit._id!)}
@@ -127,7 +132,7 @@ export function HabitsVandaagTab({
               tone="amber"
             />
             <MiniStat
-              label="Clean"
+              label="Schoon"
               value={dayHealth.negativeClear.toString()}
               tone="green"
             />
@@ -148,6 +153,7 @@ export function HabitsVandaagTab({
               emoji: h.emoji,
               streak: h.huidigeStreak,
               type: h.type,
+              frequentie: h.frequentie,
             }))}
           masked={privacyOn}
         />

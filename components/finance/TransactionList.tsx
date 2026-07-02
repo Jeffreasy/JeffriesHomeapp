@@ -44,6 +44,12 @@ function CategorieEditor({
         close(true);
         return;
       }
+      // Tab uit het menu: sluit het menu (zonder focus terug te trekken) zodat
+      // het niet open blijft hangen terwijl de focus al elders staat.
+      if (e.key === "Tab") {
+        close(false);
+        return;
+      }
       // Pijltjesnavigatie tussen de menu-items (rondlopend), zoals bij een
       // echt role="menu" hoort.
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -141,8 +147,14 @@ interface Props {
   formatAmount?: (amount: number) => string;
   /** Formatter voor niet-getekende bedragen in het detail (saldo na transactie) — privacy-mask aware. */
   formatBalance?: (amount: number) => string;
+  /** Privacy-mask voor vrije tekstwaarden (bv. oorspronkelijk bedrag in
+   *  vreemde valuta) — dezelfde helper als usePrivacy("finance").mask. */
+  maskValue?: (value: string) => string;
   /** F2: "Meer van deze tegenpartij" zet de zoekterm op de tegenpartijnaam. */
   onSearchTegenpartij?: (naam: string) => void;
+  /** True wanneer er nog helemaal geen transacties zijn (lege DB, geen filters)
+   *  — dan is de lege staat een import-CTA, geen "geen resultaten"-melding. */
+  isFirstRun?: boolean;
   isDone: boolean;
   onLoadMore: () => void;
   isLoading: boolean;
@@ -157,7 +169,9 @@ export function TransactionList({
   onCategorie,
   formatAmount = defaultFormatAmount,
   formatBalance = eurExact,
+  maskValue = (value: string) => value,
   onSearchTegenpartij,
+  isFirstRun = false,
   isDone,
   onLoadMore,
   isLoading,
@@ -181,11 +195,17 @@ export function TransactionList({
   if (transactions.length === 0 && !isLoading) {
     return (
       <div className="tx-empty">
-        <p>Geen transacties gevonden voor deze filters.</p>
-        {!isDone && (
-          <button className="btn btn--ghost btn--sm" onClick={onLoadMore}>
-            Verder zoeken
-          </button>
+        {isFirstRun ? (
+          <p>Nog geen transacties — importeer je eerste Rabobank-CSV hierboven.</p>
+        ) : (
+          <>
+            <p>Geen transacties gevonden voor deze filters.</p>
+            {!isDone && (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={onLoadMore}>
+                Verder zoeken
+              </button>
+            )}
+          </>
         )}
       </div>
     );
@@ -284,7 +304,7 @@ export function TransactionList({
                     <dt className="text-slate-500">Oorspronkelijk bedrag</dt>
                     <dd className="font-medium tabular-nums text-slate-300">
                       {typeof tx.oorsp_bedrag === "number" && tx.oorsp_munt
-                        ? `${tx.oorsp_bedrag.toLocaleString("nl-NL", { minimumFractionDigits: 2 })} ${tx.oorsp_munt}`
+                        ? maskValue(`${tx.oorsp_bedrag.toLocaleString("nl-NL", { minimumFractionDigits: 2 })} ${tx.oorsp_munt}`)
                         : "—"}
                     </dd>
                   </div>

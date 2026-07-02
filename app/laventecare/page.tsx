@@ -228,6 +228,17 @@ export default function LaventeCarePage() {
   );
   const [activeView, setActiveView] = useState<PortalView>("overview");
   const [mailboxInvoiceId, setMailboxInvoiceId] = useState("");
+  // R3-maandafsluiting: signaleer de mailbox dat een herinnering bedoeld is,
+  // zodat die de herinneringstemplate voorselecteert.
+  const [mailboxIntent, setMailboxIntent] = useState<"reminder" | null>(null);
+  // R3-H6: per-factuur pending betaalverzoek dat op bevestiging wacht; leeft op
+  // de pagina zodat de instructie persistent en actionabel op de factuurrij staat.
+  const [pendingPaymentActions, setPendingPaymentActions] = useState<
+    Record<string, { message: string; code?: string; pendingActionId?: string }>
+  >({});
+  // R3-maandafsluiting: klant voorgeselecteerd bij het openen van Commercie
+  // vanuit het dossier.
+  const [commercePrefillCompanyId, setCommercePrefillCompanyId] = useState("");
   const [search, setSearch] = useState("");
   // N10: per-regel busy-vlag voor urenregel-acties.
   const [processingTimeEntryId, setProcessingTimeEntryId] = useState<
@@ -308,7 +319,7 @@ export default function LaventeCarePage() {
     const invoiceCount = billing?.summary.invoices ?? invoices.length;
     const hasCommercialData =
       quoteCount > 0 || timeEntryCount > 0 || invoiceCount > 0;
-    return [
+    const rows: CapabilityRow[] = [
       {
         label: "Klantenbasis",
         detail: `${companies.length} klanten, ${contacts.length} contactpersonen`,
@@ -425,15 +436,15 @@ export default function LaventeCarePage() {
         label: "Bunq betalingen",
         detail: billing?.summary.bunqReady
           ? "API en rekening staan klaar"
-          : "Render env mist nog providerdata",
+          : "Betaalprovider-configuratie op de server ontbreekt nog",
         status: billing?.summary.bunqReady ? "ready" : "missing",
         owner: "Finance",
         view: "commerce",
         score: billing?.summary.bunqReady ? 100 : 20,
         priority: billing?.summary.bunqReady ? "laag" : "hoog",
         nextStep: billing?.summary.bunqReady
-          ? "Koppel het eerste betaalverzoek aan een factuur zodra de commerciele flow gevuld is."
-          : "Vul Render env voor Bunq volledig aan voordat betaalverzoeken live kunnen.",
+          ? "Koppel het eerste betaalverzoek aan een factuur zodra de commerciële flow gevuld is."
+          : "De betaalprovider-configuratie op de server ontbreekt nog; die moet compleet zijn voordat betaalverzoeken live kunnen.",
         actionLabel: "Open betalingen",
       },
       {
@@ -484,7 +495,7 @@ export default function LaventeCarePage() {
       },
       {
         label: "Documentbasis",
-        detail: `${summary.documents}/${LAVENTECARE_DOCUMENT_TOTAL} templates geindexeerd`,
+        detail: `${summary.documents}/${LAVENTECARE_DOCUMENT_TOTAL} templates geïndexeerd`,
         status:
           summary.documents >= LAVENTECARE_DOCUMENT_TOTAL
             ? "ready"
@@ -508,6 +519,16 @@ export default function LaventeCarePage() {
         actionLabel: "Open kennisbank",
       },
     ];
+    // R3-11: koppel de volwassenheidsscore aan de status. Meerdere rijen hadden
+    // hardcoded score 100 terwijl hun status "attention" ("Inrichten") kon zijn
+    // — dat gaf "~84% volwassen" naast zeven "Inrichten"-badges. Een nog niet
+    // ingerichte flow telt niet als 100% volwassen.
+    return rows.map((row) => {
+      if (row.status === "ready") return row;
+      if (row.status === "attention" && row.score > 70) return { ...row, score: 65 };
+      if (row.status === "missing" && row.score > 40) return { ...row, score: 20 };
+      return row;
+    });
   }, [
     activeLeads.length,
     activeProjects.length,
@@ -1536,14 +1557,32 @@ export default function LaventeCarePage() {
     try {
       const result = await createInvoicePaymentRequestMut.mutateAsync(id);
       if (result.confirmationRequired) {
-        success(
-          result.code
-            ? `Betaalverzoek klaar. Bevestig met code ${result.code}`
-            : "Betaalverzoek staat klaar voor bevestiging",
-        );
+        // R3-H6: de backend geeft een expliciete vervolgstap mee ("Bevestig via
+        // Settings of Telegram met /approve X"). Bewaar die persistent op de
+        // factuurrij i.p.v. hem in een wegtikkende toast te laten verdwijnen.
+        setPendingPaymentActions((current) => ({
+          ...current,
+          [id]: {
+            message:
+              result.message ||
+              (result.code
+                ? `Betaalverzoek staat klaar. Bevestig met code ${result.code} via Settings of Telegram (/approve ${result.code}).`
+                : "Betaalverzoek staat klaar voor bevestiging via Settings of Telegram."),
+            code: result.code,
+            pendingActionId: result.pendingActionId,
+          },
+        }));
+        success(result.message || "Betaalverzoek staat klaar voor bevestiging");
       } else if (result.alreadyCreated) {
         success("Deze factuur heeft al een gekoppeld betaalverzoek");
       } else {
+        // Verwerkt zonder bevestiging: een eventuele oude melding kan weg.
+        setPendingPaymentActions((current) => {
+          if (!current[id]) return current;
+          const next = { ...current };
+          delete next[id];
+          return next;
+        });
         success(result.message || "Betaalverzoek verwerkt");
       }
     } catch {
@@ -1551,6 +1590,32 @@ export default function LaventeCarePage() {
     } finally {
       setRequestingPaymentInvoiceId(null);
     }
+  };
+
+  const dismissPendingPaymentAction = useCallback((id: string) => {
+    setPendingPaymentActions((current) => {
+      if (!current[id]) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  // R3-maandafsluiting: dossier→Commercie met de klant voorgeselecteerd.
+  const handleOpenCommerceForCompany = async (company: CompanyItem) => {
+    const switched = await handleChangeView("commerce");
+    if (!switched) return;
+    setCommercePrefillCompanyId(company._id ?? company.id);
+    setSelectedCompanyId(null);
+  };
+
+  // R3-maandafsluiting: prefill een herinneringsmail voor een te-late factuur.
+  const handleSendInvoiceReminder = async (id: string) => {
+    const switched = await handleChangeView("mailbox");
+    if (!switched) return;
+    setMailboxInvoiceId(id);
+    setMailboxIntent("reminder");
+    success("Factuur klaargezet in Mailbox — kies de herinneringstemplate");
   };
 
   const handleOpenInvoiceDocument = async (id: string) => {
@@ -1629,6 +1694,7 @@ export default function LaventeCarePage() {
     const switched = await handleChangeView("mailbox");
     if (!switched) return;
     setMailboxInvoiceId(id);
+    setMailboxIntent(null);
     success("Factuur klaargezet in Mailbox");
   };
 
@@ -1710,6 +1776,7 @@ export default function LaventeCarePage() {
     }
     if (activeView === "mailbox" && view !== "mailbox") {
       setMailboxInvoiceId("");
+      setMailboxIntent(null);
     }
     commerceDirtyRef.current = false;
     mailboxDirtyRef.current = false;
@@ -1891,6 +1958,9 @@ export default function LaventeCarePage() {
             setSelectedCompanyId(null);
             handleStartWorkstreamForCompany(company);
           }}
+          onOpenCommerce={(company) => {
+            void handleOpenCommerceForCompany(company);
+          }}
           onCreateActivity={handleCreateActivityEvent}
           onCreateAccessCredential={handleCreateAccessCredential}
           updatingAccessCredentialId={updatingAccessCredentialId}
@@ -1906,7 +1976,9 @@ export default function LaventeCarePage() {
           projects={activeProjects.length}
           invoices={invoices.length}
           documents={summary.documents}
-          onOpenCapabilities={() => setActiveView("overview")}
+          onOpenCapabilities={() => {
+            void handleChangeView("overview");
+          }}
         />
 
         <PortalNavigation
@@ -1944,7 +2016,9 @@ export default function LaventeCarePage() {
                 />
                 <CapabilityMatrix
                   capabilityRows={capabilityRows}
-                  onOpenView={setActiveView}
+                  onOpenView={(view) => {
+                    void handleChangeView(view);
+                  }}
                 />
                 <details className="glass min-w-0 overflow-hidden">
                   <summary className="cursor-pointer list-none p-4 text-sm font-bold text-white marker:hidden">
@@ -1957,12 +2031,20 @@ export default function LaventeCarePage() {
                     <CapabilityMatrix
                       capabilityRows={capabilityRows}
                       expanded
-                      onOpenView={setActiveView}
+                      onOpenView={(view) => {
+                        void handleChangeView(view);
+                      }}
                     />
                     <PortalRoadmapPanel
-                      onOpenCommerce={() => setActiveView("commerce")}
-                      onOpenOperations={() => setActiveView("operations")}
-                      onOpenKnowledge={() => setActiveView("knowledge")}
+                      onOpenCommerce={() => {
+                        void handleChangeView("commerce");
+                      }}
+                      onOpenOperations={() => {
+                        void handleChangeView("operations");
+                      }}
+                      onOpenKnowledge={() => {
+                        void handleChangeView("knowledge");
+                      }}
                     />
                   </div>
                 </details>
@@ -2066,6 +2148,13 @@ export default function LaventeCarePage() {
                 onOpenMailboxForInvoice={(id) => {
                   void handleOpenMailboxForInvoice(id);
                 }}
+                onSendInvoiceReminder={(id) => {
+                  void handleSendInvoiceReminder(id);
+                }}
+                pendingPaymentActions={pendingPaymentActions}
+                onDismissPendingPaymentAction={dismissPendingPaymentAction}
+                settingsHref="/settings"
+                prefillCompanyId={commercePrefillCompanyId}
                 updatingTimeEntryId={processingTimeEntryId}
                 onUpdateTimeEntry={handleEditTimeEntry}
                 onWriteOffTimeEntry={handleWriteOffTimeEntry}
@@ -2105,6 +2194,7 @@ export default function LaventeCarePage() {
                 activeWorkstreams={activeWorkstreams}
                 invoices={invoices}
                 prefillInvoiceId={mailboxInvoiceId}
+                prefillIntent={mailboxIntent}
                 templates={mailTemplates}
                 outbox={mailOutbox}
                 inbox={mailInbox}

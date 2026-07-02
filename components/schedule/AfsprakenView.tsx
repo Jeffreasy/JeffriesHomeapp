@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Calendar, CalendarClock, CalendarDays, ChevronDown, History, Plus, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
@@ -10,7 +11,7 @@ import { type DienstRow } from "@/lib/schedule";
 import { useToast } from "@/components/ui/Toast";
 import { StatChip } from "@/components/ui/StatChip";
 import { PersonalEventItem } from "./PersonalEventItem";
-import { getAmsterdamTodayIso } from "./RoosterUtils";
+import { getAmsterdamTodayIso, formatShortDate } from "./RoosterUtils";
 import { shortSyncError } from "./scheduleUtils";
 import { syncApi } from "@/lib/api";
 
@@ -37,10 +38,11 @@ export function AfsprakenView({
   onSyncingChange,
   onPendingSyncError,
 }: AfsprakenViewProps) {
-  const { upcoming, history, withConflicts, pending, conflictMap, isLoading, refetch } =
+  const { upcoming, history, withConflicts, pending, conflictMap, isLoading, error: eventsError, refetch } =
     usePersonalEvents({ diensten });
 
   const { user } = useUser();
+  const queryClient = useQueryClient();
   const { success, error, toast } = useToast();
   // Gecontroleerd (gedeelde vlag van de pagina) of lokaal — F9.
   const [localProcessing, setLocalProcessing] = useState(false);
@@ -56,8 +58,18 @@ export function AfsprakenView({
     setProcessing(true);
     try {
       const result = await syncApi.calendar(user.id);
+      // De calendar-sync herschrijft server-side óók het rooster + meta, dus
+      // die caches moeten mee-invalideren — anders toont /rooster een verouderd
+      // rooster naast verse afspraken (audit DEEL 2 #8).
+      queryClient.invalidateQueries({ queryKey: ["/schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["/schedule/meta"] });
       await refetch();
-      if (result.pendingError) {
+      if (result.scheduleWriteError) {
+        // Kalender opgehaald maar rooster-write faalde — geen schone claim
+        // (audit DEEL 2 #7).
+        onPendingSyncError?.(`Rooster opslaan mislukt: ${result.scheduleWriteError}`);
+        error(`Rooster opslaan mislukt: ${shortSyncError(result.scheduleWriteError)}`);
+      } else if (result.pendingError) {
         onPendingSyncError?.(result.pendingError);
         toast(`Agenda opgehaald; wachtrij faalde: ${shortSyncError(result.pendingError)}`, "info");
       } else {
@@ -85,6 +97,27 @@ export function AfsprakenView({
         {[...Array(4)].map((_, i) => (
           <div key={i} className="h-14 rounded-xl bg-[var(--color-surface)] animate-pulse" />
         ))}
+      </div>
+    );
+  }
+
+  // Fout ≠ leeg (audit DEEL 2 #6): een mislukte fetch mag niet als "geen
+  // afspraken gevonden" verschijnen — anders lijkt een 500 een lege agenda.
+  if (eventsError && upcoming.length === 0 && history.length === 0 && pending.length === 0) {
+    return (
+      <div className="glass rounded-2xl p-10 text-center border border-amber-500/20 bg-amber-500/[0.04]">
+        <AlertTriangle size={32} className="text-amber-400 mx-auto mb-4" />
+        <h3 className="text-base font-semibold text-amber-100 mb-1">Afspraken konden niet worden geladen</h3>
+        <p className="text-sm text-slate-400 mb-4">
+          {eventsError instanceof Error ? eventsError.message : "Controleer je verbinding en probeer het opnieuw."}
+        </p>
+        <button
+          type="button"
+          onClick={() => void refetch()}
+          className="inline-flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+        >
+          Opnieuw proberen
+        </button>
       </div>
     );
   }
@@ -197,7 +230,7 @@ export function AfsprakenView({
                 <div>
                   <span className="font-medium text-slate-200">{e.titel}</span>
                   <span className="ml-2 text-slate-500">
-                    {e.startDatum} {e.startTijd ? `· ${e.startTijd}` : "· Hele dag"}
+                    {formatShortDate(e.startDatum)} {e.startTijd ? `· ${e.startTijd}` : "· Hele dag"}
                   </span>
                 </div>
                 <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-300">
@@ -228,7 +261,7 @@ export function AfsprakenView({
             className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-300 cursor-pointer"
           >
             <History size={12} aria-hidden="true" />
-            Geschiedenis ({history.length})
+            Historie ({history.length})
             <ChevronDown
               size={13}
               aria-hidden="true"

@@ -75,7 +75,7 @@ export function LaventeCareKnowledgeView({
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <KnowledgeMetric label="Catalogus" value={`${indexedKeys.size}/${LAVENTECARE_DOCUMENT_TOTAL}`} detail="geindexeerd" />
+          <KnowledgeMetric label="Catalogus" value={`${indexedKeys.size}/${LAVENTECARE_DOCUMENT_TOTAL}`} detail="geïndexeerd" />
           <KnowledgeMetric label="Extern bruikbaar" value={externallyUsable} detail="publiek, contract of op aanvraag" />
           <KnowledgeMetric label="Dossiergebruik" value={dossierKeys.size} detail="vastgelegd als PDF" />
           <KnowledgeMetric label="Zoekresultaat" value={filteredCount} detail={search.trim() ? "gefilterd" : "zichtbaar"} />

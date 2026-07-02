@@ -35,6 +35,10 @@ const EXPORT_PAGE_SIZE = 500;
 // Safety cap for CSV exports; beyond this the export is truncated and the
 // caller is expected to tell the user to narrow the filters.
 export const EXPORT_MAX_ROWS = 10_000;
+// F3: bovengrens voor de recurring-detectie-steekproef. Ruim genoeg om
+// meerdere maanden per tegenpartij te dekken, licht genoeg om niet te
+// concurreren met een volledige export.
+export const RECURRING_SAMPLE_ROWS = 800;
 
 // monthEnd returns the real last calendar day of a "YYYY-MM" month, e.g.
 // "2026-02" -> "2026-02-28". Using a hardcoded "-31" produces invalid dates
@@ -256,6 +260,12 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
         applyPeriodRange(apiFilter, filter);
 
         const result = await getTransactions(apiFilter);
+        // F5: re-check ná de await — een cancel tijdens (ook) de láátste pagina
+        // moet nog steeds `aborted` opleveren, anders schrijft de laatste
+        // request alsnog een CSV weg terwijl de gebruiker net annuleerde.
+        if (exportAbortRef.current) {
+          return { rows, totalCount: total, truncated: false, aborted: true };
+        }
         if (typeof result.data === "string") {
           throw new Error("Onverwacht antwoord van de server.");
         }
@@ -274,6 +284,54 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
       }
     },
     [userId, filter, deferredZoek]
+  );
+
+  // F3: recurring-detectie heeft ≥3 verschillende maanden nodig; de eerste 50
+  // geladen rijen dekken hooguit een paar weken. Deze losse fetch haalt een
+  // bredere, periode-scoped set op (iban/jaar/maand/datum tellen mee, maar
+  // niet zoekterm/categorie/richting — anders krijg je nooit meerdere maanden
+  // per tegenpartij te zien). Gecapt op RECURRING_SAMPLE_ROWS zodat het licht
+  // blijft. De aanroeper roept dit één keer aan (bij mount van de inzichten).
+  const fetchRecurringSample = useCallback(
+    async (): Promise<TransactionRow[]> => {
+      if (!userId) return [];
+      const rows: TransactionRow[] = [];
+      let sampleOffset = 0;
+      for (;;) {
+        const apiFilter: GetTransactionsParams = {
+          userId,
+          // Alleen periode-scoping — geen zoekterm/categorie/richting/bedrag.
+          ibanFilter: filter.ibanFilter,
+          jaarFilter: filter.jaarFilter,
+          datumVan: filter.datumVan,
+          datumTot: filter.datumTot,
+          excludeIntern: true,
+          limit: EXPORT_PAGE_SIZE,
+          offset: sampleOffset,
+        };
+        applyPeriodRange(apiFilter, {
+          ibanFilter: filter.ibanFilter,
+          jaarFilter: filter.jaarFilter,
+          maandFilter: filter.maandFilter,
+          datumVan: filter.datumVan,
+          datumTot: filter.datumTot,
+        } as TransactionFilter);
+
+        const result = await getTransactions(apiFilter);
+        if (typeof result.data === "string") return rows;
+        const pageItems = (result.data.page ?? []).map(mapTransaction);
+        rows.push(...pageItems);
+        if (
+          rows.length >= RECURRING_SAMPLE_ROWS ||
+          (result.data.isDone ?? true) ||
+          pageItems.length === 0
+        ) {
+          return rows.slice(0, RECURRING_SAMPLE_ROWS);
+        }
+        sampleOffset += pageItems.length;
+      }
+    },
+    [userId, filter.ibanFilter, filter.jaarFilter, filter.maandFilter, filter.datumVan, filter.datumTot]
   );
 
   const updateCategorie = useCallback(
@@ -329,6 +387,7 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     stats,
     totalCount: totalCount || stats?.aantalTxs || stats?.aantalAlleTxs || 0,
     fetchAll,
+    fetchRecurringSample,
     cancelExport,
     updateCategorie,
     loadMore,

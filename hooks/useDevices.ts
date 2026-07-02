@@ -53,9 +53,15 @@ export function useBridgeStatus() {
   });
 
   const bridge = (data?.bridge ?? null) as BridgeStatus | null;
-  // Alleen "offline" melden als er ooit een bridge-heartbeat bekend was —
-  // zonder bridge-config (direct-modus) is er niets om over te waarschuwen.
-  const bridgeOffline = bridge !== null && !bridge.online;
+  // De backend serialiseert het bridge-object áltijd — óók in direct-modus,
+  // waar er geen bridge en dus geen offline-toestand is. Alleen waarschuwen
+  // wanneer commando's daadwerkelijk via de queue lopen (queue-modus) én de
+  // bridge offline is; buiten queue-modus voert de backend direct uit en is
+  // een "offline"-banner een false positive.
+  const queueMode = Boolean(
+    (data?.integrations as { queueLightCommands?: boolean } | undefined)?.queueLightCommands
+  );
+  const bridgeOffline = queueMode && bridge !== null && bridge.online === false;
   return { bridge, bridgeOffline };
 }
 
@@ -86,8 +92,12 @@ export function useLampCommand() {
       );
       return { previous };
     },
-    onSuccess: (_data, vars) => {
-      if (!vars.batch) queryClient.invalidateQueries({ queryKey: ["devices"] });
+    onSuccess: () => {
+      // Bewust géén onmiddellijke invalidate: de backend schrijft de nieuwe
+      // device-state pas na het 204 weg (kort daarna, buiten deze request).
+      // Meteen refetchen leest de nog-oude rij terug → zichtbare revert-flikker.
+      // We laten de optimistic patch staan; de 10s-poll (refetchInterval)
+      // reconvergeert vanzelf op de echte serverstaat.
     },
     onError: (_err, vars, context) => {
       // Rollback naar de snapshot van vóór dit command.
@@ -112,7 +122,9 @@ export function useLampCommand() {
       void Promise.allSettled(
         targets.map((d) => mutateAsync({ id: d.id, cmd, batch: true }))
       ).then((results) => {
-        queryClient.invalidateQueries({ queryKey: ["devices"] });
+        // Geen onmiddellijke invalidate (read-after-write-flikker, zie onSuccess):
+        // de optimistic patches blijven staan en de 10s-poll reconvergeert.
+        // Bij mislukte lampen is de cache al teruggerold door onError.
         // L9: benoem wélke lampen niet reageerden (eerste 3 + "en X meer").
         const failedNames = targets
           .filter((_, index) => results[index].status === "rejected")

@@ -64,6 +64,36 @@ export function registerQueryClient(client: ClearableCache) {
   registeredQueryClient = client;
 }
 
+// ─── Session-expired signal ───────────────────────────────────────────────────
+// A 401 (GET or mutation) no longer hard-redirects — that would unmount an open
+// dirty form and destroy the user's input seconds after a "safe" toast (R3-H3).
+// Instead we fire a one-shot event; providers.tsx renders a persistent, blocking
+// overlay with an "Opnieuw inloggen"-button. The user chooses when to leave, so
+// an open form survives. Deduped: only the first 401 triggers the overlay.
+type SessionExpiredListener = () => void;
+
+let sessionExpiredListener: SessionExpiredListener | null = null;
+let sessionExpiredFired = false;
+
+export function registerSessionExpiredHandler(listener: SessionExpiredListener) {
+  sessionExpiredListener = listener;
+}
+
+function triggerSessionExpired() {
+  if (sessionExpiredFired) return;
+  sessionExpiredFired = true;
+  // Purge cached user data — the session is gone, so nothing user-scoped may
+  // survive in memory, IndexedDB or the service-worker caches.
+  registeredQueryClient?.clear();
+  if (typeof window !== "undefined") {
+    del("REACT_QUERY_OFFLINE_CACHE").catch(() => {});
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: "CLEAR_ALL_CACHES" });
+    }
+  }
+  sessionExpiredListener?.();
+}
+
 // apiFetchWithStatus returns the parsed body AND the real HTTP status so callers
 // (e.g. the orval mutator) can discriminate responses instead of assuming 200.
 export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): Promise<{ data: T; status: number }> {
@@ -77,31 +107,15 @@ export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): P
 
   if (!res.ok) {
     if (res.status === 401) {
-      // Session expired mid-use (FH4): purge cached user data in every case —
-      // the session is gone, so nothing user-scoped may survive in IndexedDB
-      // or the service-worker caches.
-      const method = (init?.method ?? "GET").toUpperCase();
-      if (typeof window !== "undefined") {
-        del("REACT_QUERY_OFFLINE_CACHE").catch(() => {});
-        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({ type: "CLEAR_ALL_CACHES" });
-        }
-        if (method === "GET") {
-          // Reads: also drop the in-memory react-query cache (L5) and send the
-          // user to sign-in, preserving the current location for the round-trip.
-          registeredQueryClient?.clear();
-          window.location.href = `/sign-in?redirect_url=${encodeURIComponent(
-            window.location.pathname + window.location.search
-          )}`;
-        }
-      }
-      if (method !== "GET") {
-        // Mutations: do NOT redirect — that would unmount the open form and
-        // destroy everything the user typed (M4). Let the error bubble to the
-        // caller's normal toast path; the form and its input survive.
-        throw new ApiError("Je sessie is verlopen — log opnieuw in om verder te gaan.", 401);
-      }
-      throw new ApiError("Niet ingelogd. Je wordt doorgestuurd naar de inlogpagina.", 401);
+      // Session expired mid-use (R3-H3): NEVER hard-redirect here. A background
+      // GET-poll firing a redirect within ~10s used to destroy an open dirty
+      // form seconds after a "safe" mutation-toast. Instead fire a one-shot
+      // signal → providers.tsx shows a persistent, blocking "sessie verlopen"
+      // overlay with a re-login button. The cache-purge still happens (inside
+      // triggerSessionExpired). Both GET and mutation paths surface a readable
+      // Dutch error to their callers; the overlay handles the actual re-login.
+      triggerSessionExpired();
+      throw new ApiError("Je sessie is verlopen — log opnieuw in om verder te gaan.", 401);
     }
     const error = await res.json().catch(() => ({ detail: res.statusText }));
     throw new ApiError(error.detail ?? `API error ${res.status}`, res.status);
@@ -1805,6 +1819,10 @@ export interface SyncCalendarResult {
   personalCount?: number;
   pendingProcessed?: number;
   pendingError?: string;
+  /** Set when the schedule write half of the sync failed (sync.go): the calendar
+   *  fetch may have succeeded while diensten weren't persisted, so the UI must
+   *  not claim a clean "gesynchroniseerd". */
+  scheduleWriteError?: string;
   message?: string;
 }
 

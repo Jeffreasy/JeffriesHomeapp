@@ -196,10 +196,20 @@ export function AgendaCalendar({
       selectDate(date);
       return;
     }
-    if (!target || !gridDates.includes(target)) return;
+    if (!target) return;
     event.preventDefault();
+    // Pijltoetsen over de maand-/weekgrens laten de kalender mee-navigeren i.p.v.
+    // dood te lopen op de rand (audit L a11y): valt het doel buiten het huidige
+    // grid, verschuif dan de cursor zodat de doeldatum in beeld komt.
+    if (!gridDates.includes(target)) {
+      onCursorDateChange(target);
+    }
     setFocusedDate(target);
-    document.getElementById(`agenda-cal-cell-${target}`)?.focus();
+    // Na een cursorwissel bestaat de cel pas na de volgende render — focus in een
+    // microtask zodat de nieuwe grid-cel er is.
+    requestAnimationFrame(() => {
+      document.getElementById(`agenda-cal-cell-${target}`)?.focus();
+    });
   };
 
   return (
@@ -314,6 +324,12 @@ export function AgendaCalendar({
                 <ChevronRight size={16} />
               </button>
             </div>
+
+            {/* Maand-/weekwissel hoorbaar aankondigen voor screenreaders — de
+                zichtbare titel is puur visueel (audit L a11y). */}
+            <span className="sr-only" role="status" aria-live="polite">
+              {title}
+            </span>
 
             <button
               type="button"

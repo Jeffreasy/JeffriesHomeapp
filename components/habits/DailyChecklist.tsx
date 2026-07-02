@@ -181,7 +181,7 @@ function HabitCheckItem({ habit, onToggle, onIncrement, masked, pending }: { hab
         <span
           className="text-sm font-medium truncate transition-all"
           style={{
-            color: isSuccess ? "rgba(255,255,255,0.4)" : hasIncident ? "#f87171" : "rgba(255,255,255,0.85)",
+            color: isSuccess ? "rgba(255,255,255,0.55)" : hasIncident ? "#f87171" : "rgba(255,255,255,0.85)",
             textDecoration: isSuccess && !isNegative ? "line-through" : "none",
           }}
         >

@@ -1,17 +1,19 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, Crosshair } from "lucide-react";
 import {
   groupByYear,
   groupByWeekNr,
   calcTotalHours,
+  monthLabel,
   type MonthStats,
   type YearStats,
   type DienstRow,
 } from "@/lib/schedule";
 import { hoursValue, getAmsterdamTodayIso } from "./RoosterUtils";
+import { formatWeekLabel } from "./scheduleUtils";
 
 const SHIFT_COLORS: Record<string, string> = {
   Vroeg:  "#f97316", // Orange
@@ -130,7 +132,7 @@ function MonthDetailStream({ stats }: { stats: MonthStats }) {
               
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white">
-                  Week {weeknr}
+                  {formatWeekLabel(weeknr)}
                 </p>
                 <p className="text-[10px] font-bold text-slate-400">{hoursValue(wkHours)}u</p>
               </div>
@@ -209,6 +211,18 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
   const [activeYear,  setActiveYear]  = useState<string>(() => years.at(-1)?.year ?? "");
   const [activeMonth, setActiveMonth] = useState<string | null>(null);
 
+  // Bij een koude mount is `years` nog leeg, dus activeYear blijft "" en er
+  // verschijnt geen hero terwijl de tabs al klaarstaan. Zodra de data binnen is
+  // (of de huidige selectie uit de lijst valt) pinnen we op het nieuwste jaar
+  // (audit StatsView empty-year hang).
+  useEffect(() => {
+    if (years.length === 0) return;
+    if (!years.some(y => y.year === activeYear)) {
+      setActiveYear(years.at(-1)!.year);
+      setActiveMonth(null);
+    }
+  }, [years, activeYear]);
+
   const yearData  = years.find(y => y.year === activeYear);
   const monthData = yearData?.months.find(m => m.month === activeMonth);
 
@@ -219,7 +233,9 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
       const key = `${activeYear}-${String(i).padStart(2, "0")}`;
       filled.push(
         yearData.months.find(m => m.month === key) ?? {
-          month: key, label: key, rows: [], totalHours: 0, count: 0,
+          // Echt maandlabel via de gedeelde formatter — anders rendert de
+          // maand-stream "202" uit de ISO-key (audit H13).
+          month: key, label: monthLabel(key), rows: [], totalHours: 0, count: 0,
           shifts: {}, teams: {}, avgDuur: 0, gedraaid: 0,
         }
       );

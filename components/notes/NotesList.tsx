@@ -83,7 +83,7 @@ export function NotesList({
           title={viewMode === "active" ? "Notitie-board" : viewMode === "completed" ? "Afgeronde notities" : "Archief"}
           subtitle={
             isLoading
-              ? "Laden..."
+              ? "Laden…"
               : `${displayed.length} zichtbaar · ${boardMode === "board" ? "board · gegroepeerd" : `grid · ${activeSort.label.toLowerCase()}`}`
           }
           action={

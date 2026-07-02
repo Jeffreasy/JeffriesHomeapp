@@ -61,7 +61,7 @@ export default function SignInPage() {
             >
               Jeffries Dashboard
             </h1>
-            <p className="text-sm mt-1" style={{ color: "#64748b" }}>
+            <p className="text-sm mt-1" style={{ color: "#8b98a9" }}>
               Jouw persoonlijke dashboard
             </p>
           </div>
@@ -76,7 +76,7 @@ export default function SignInPage() {
               colorInputBackground: "#1a1a24",
               colorInputText: "#f1f5f9",
               colorText: "#f1f5f9",
-              colorTextSecondary: "#64748b",
+              colorTextSecondary: "#8b98a9",
               borderRadius: "12px",
               fontFamily: "Inter, sans-serif",
             },
@@ -88,7 +88,7 @@ export default function SignInPage() {
                 backdropFilter: "blur(20px)",
               },
               headerTitle: { color: "#f1f5f9", fontWeight: "700" },
-              headerSubtitle: { color: "#64748b" },
+              headerSubtitle: { color: "#8b98a9" },
               socialButtonsBlockButton: {
                 background: "rgba(255,255,255,0.05)",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -98,7 +98,7 @@ export default function SignInPage() {
                 background: "rgba(255,255,255,0.1)",
               },
               dividerLine: { background: "rgba(255,255,255,0.08)" },
-              dividerText: { color: "#475569" },
+              dividerText: { color: "#8b98a9" },
               formFieldInput: {
                 background: "#1a1a24",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -116,7 +116,7 @@ export default function SignInPage() {
           }}
         />
 
-        <p className="text-xs" style={{ color: "#334155" }}>
+        <p className="text-xs" style={{ color: "#8b98a9" }}>
           Persoonlijk gebruik · Jeffrey Lavente
         </p>
       </div>

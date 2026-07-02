@@ -66,6 +66,7 @@ export default function FinancePage() {
     loadMore,
     updateCategorie,
     fetchAll,
+    fetchRecurringSample,
     cancelExport,
     refresh,
   } = useTransactions({ ibanFilter, zoekterm, jaarFilter: jaarFilter || undefined, ...filters });
@@ -114,7 +115,9 @@ export default function FinancePage() {
       });
       if (!confirmed) return;
     }
-    setExportProgress({ loaded: 0, total: totalCount });
+    // Cap de beginteller op EXPORT_MAX_ROWS zodat de "0/N"-weergave niet hoger
+    // start dan waar de export ooit kan uitkomen (fetchAll capt daar ook op).
+    setExportProgress({ loaded: 0, total: Math.min(totalCount, EXPORT_MAX_ROWS) });
     try {
       const { rows, truncated, aborted } = await fetchAll((loaded, total) =>
         setExportProgress({ loaded, total })
@@ -136,12 +139,18 @@ export default function FinancePage() {
 
   const handleIbanTab = (iban: string | undefined) => {
     setIbanFilter(iban);
+    // Wissel van rekening cleart álle periode/detail-filters (L13): anders blijft
+    // een maand/datumrange/zoekterm/categorie uit de vorige rekening hangen en
+    // toont de lijst een lege of misleidende selectie voor de nieuwe rekening.
     setFilters((current) => ({
       ...current,
       maandFilter: undefined,
+      datumVan: undefined,
+      datumTot: undefined,
       onlyStorneringen: false,
       categorieFilter: undefined,
     }));
+    setZoekterm("");
   };
 
   const scrollToTransactions = useCallback(() => {
@@ -208,11 +217,24 @@ export default function FinancePage() {
     return [...stats.maanden].reverse().slice(0, 6);
   }, [stats]);
 
+  // F8: de lopende maand is per definitie onvolledig (op de 5e = 5 dagen vs 30),
+  // dus die uitsluiten van de "versus vorige maand"-delta — anders lijkt elke
+  // maandstart een enorme daling. Amsterdam-gepind zodat een device op UTC rond
+  // middernacht niet de verkeerde maand als "lopend" ziet.
+  const runningMonthKey = useMemo(
+    () => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" }).slice(0, 7),
+    []
+  );
+
   const momDelta = useMemo(() => {
-    if (!stats || stats.inUitPerMaand.length < 2) return null;
-    const arr = stats.inUitPerMaand;
-    const curr = arr[arr.length - 1];
-    const prev = arr[arr.length - 2];
+    if (!stats) return null;
+    // Sluit de lopende maand uit; vergelijk de twee meest recente vólledige maanden.
+    const complete = stats.inUitPerMaand.filter(
+      (m: { maand: string }) => m.maand !== runningMonthKey
+    );
+    if (complete.length < 2) return null;
+    const curr = complete[complete.length - 1];
+    const prev = complete[complete.length - 2];
     const inkomstenDelta = prev.inkomsten > 0
       ? Math.round(((curr.inkomsten - prev.inkomsten) / prev.inkomsten) * 1000) / 10
       : 0;
@@ -221,7 +243,7 @@ export default function FinancePage() {
       : 0;
 
     return { inkomstenDelta, uitgavenDelta };
-  }, [stats]);
+  }, [stats, runningMonthKey]);
 
   const salarisStat = useMemo(() => {
     if (loonstroken.count === 0) return null;
@@ -270,7 +292,7 @@ export default function FinancePage() {
               <h1 className="mt-1 truncate text-2xl font-bold text-white">Finance</h1>
               <p className="mt-1 text-sm text-slate-500">
                 {stats
-                  ? `${totalCount.toLocaleString("nl-NL")} transacties - ${stats.maanden.length} maanden - ${stats.aantalCategorieen} categorieën`
+                  ? `${totalCount.toLocaleString("nl-NL")} transacties · ${stats.maanden.length} maanden · ${stats.aantalCategorieen} categorieën`
                   : "Transacties en cashflow laden"}
               </p>
             </div>
@@ -381,7 +403,14 @@ export default function FinancePage() {
               {recentMonths.length > 0 && (
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-white">Snelle maandselectie</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">Snelle maandselectie</p>
+                      {(stats?.maanden?.length ?? 0) > recentMonths.length && (
+                        <p className="mt-0.5 text-[11px] text-slate-500">
+                          Laatste {recentMonths.length} maanden — oudere maanden via het maandfilter in de lijst.
+                        </p>
+                      )}
+                    </div>
                     {filters.maandFilter && (
                       <button
                         type="button"
@@ -503,9 +532,12 @@ export default function FinancePage() {
             <FinanceInsights
               stats={stats}
               latestCashflow={latestCashflow}
+              runningMonthKey={runningMonthKey}
               topCategory={topCategory}
               topMerchant={topMerchant}
               transactions={transactions}
+              fetchRecurringSample={fetchRecurringSample}
+              periodKey={`${ibanFilter ?? ""}|${jaarFilter}|${filters.maandFilter ?? ""}|${filters.datumVan ?? ""}|${filters.datumTot ?? ""}`}
               filters={filters}
               zoekterm={zoekterm}
               setZoekterm={jumpSearchToTransactions}
@@ -581,6 +613,8 @@ export default function FinancePage() {
                 isLoading={isLoading || isSearching}
                 formatAmount={privacyOn ? formatPrivateSignedEuro : signedEuro}
                 formatBalance={privacyOn ? formatPrivateEuroExact : eurExact}
+                maskValue={mask}
+                isFirstRun={totalCount === 0 && selectedFilterCount === 0 && !zoekterm && !ibanFilter}
                 onSearchTegenpartij={jumpSearchToTransactions}
               />
             )}

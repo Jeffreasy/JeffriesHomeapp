@@ -7,17 +7,24 @@ export function exportCsv(transactions: TransactionRow[]) {
   // convention (nl-NL uses the decimal comma, so ";" is the list separator).
   // Comma-separated files open as one single column there.
   const SEP = ";";
-  const header = ["Datum", "Tegenpartij", "Omschrijving", "Bedrag", "Code", "Categorie"].join(SEP);
+  // IBAN (rekening) + saldo na transactie erbij, zodat een export met meerdere
+  // rekeningen tegen de bankafschriften afgestemd kan worden (L13).
+  const header = ["Datum", "Rekening", "Tegenpartij", "Tegenrekening", "Omschrijving", "Bedrag", "Saldo na", "Code", "Categorie"].join(SEP);
   const DQ = String.fromCharCode(34);
   // Escape embedded double-quotes and collapse any CR/LF inside a field to a
   // single space, so the value stays on one CSV line for naive consumers.
   const escQ = (s: string) => s.replaceAll(DQ, DQ + DQ).replace(/[\r\n]+/g, " ");
+  const euroCell = (n: number | undefined) =>
+    typeof n === "number" ? n.toFixed(2).replace(".", ",") : "";
   const rows = transactions.map((tx) =>
     [
       tx.datum,
+      tx.rekening_iban ?? "",
       `"${escQ(tx.tegenpartijNaam ?? "Onbekend")}"`,
+      tx.tegenrekening_iban ?? "",
       `"${escQ(tx.omschrijving)}"`,
       `"${tx.bedrag.toFixed(2).replace(".", ",")}"`,
+      `"${euroCell(tx.saldo_na_trn)}"`,
       tx.code,
       tx.categorie ?? "Overig",
     ].join(SEP)

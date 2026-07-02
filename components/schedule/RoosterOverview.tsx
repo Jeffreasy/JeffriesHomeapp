@@ -110,7 +110,7 @@ export function OverviewPanel({
         </motion.div>
 
         <motion.div variants={itemVariants} className="hidden px-5 py-4 sm:grid sm:grid-cols-3 sm:px-6 gap-0">
-          <MiniBreakdown label="Shifts" value={`V ${shifts["Vroeg"] ?? 0} / L ${shifts["Laat"] ?? 0}`} sub={`${shifts["Dienst"] ?? 0} dagdienst`} />
+          <MiniBreakdown label="Diensten" value={`V ${shifts["Vroeg"] ?? 0} / L ${shifts["Laat"] ?? 0}`} sub={`${shifts["Dienst"] ?? 0} dagdienst`} />
           <MiniBreakdown label="Team R." value={String(teams["R."] ?? 0)} sub="komende diensten" />
           <MiniBreakdown label="Team A." value={String(teams["A."] ?? 0)} sub="komende diensten" />
         </motion.div>
@@ -163,6 +163,9 @@ export function OverviewTab({
   const [showAllHistory, setShowAllHistory] = useState(false);
   const visibleHistory = showAllHistory ? history : history.slice(0, 8);
   const hiddenHistoryCount = history.length - visibleHistory.length;
+  // Op mobiel is de aside (afspraken/datakwaliteit/historie) inklapbaar onder de
+  // tijdlijn i.p.v. volledig verborgen (audit DEEL 2 #13).
+  const [showMobileAside, setShowMobileAside] = useState(false);
 
   return (
     <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -224,7 +227,26 @@ export function OverviewTab({
         )}
       </div>
 
-      <aside className="hidden space-y-5 md:block xl:sticky xl:top-32 xl:self-start">
+      {/* Mobiele toegang tot de aside — op md+ verborgen; de aside toont daar zelf. */}
+      <button
+        type="button"
+        onClick={() => setShowMobileAside((current) => !current)}
+        aria-expanded={showMobileAside}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] md:hidden"
+      >
+        <span className="flex items-center gap-2">
+          <CalendarDays size={15} className="text-slate-400" />
+          Afspraken, datakwaliteit &amp; historie
+        </span>
+        <ChevronDown size={16} className={cn("shrink-0 text-slate-500 transition-transform", showMobileAside && "rotate-180")} />
+      </button>
+
+      <aside
+        className={cn(
+          "space-y-5 md:block xl:sticky xl:top-32 xl:self-start",
+          showMobileAside ? "block" : "hidden",
+        )}
+      >
         <Panel>
           <SectionTitle
             icon={CalendarDays}
@@ -271,7 +293,7 @@ export function OverviewTab({
             <StatusRow
               icon={Zap}
               label="Wachtrij"
-              value={pendingEvents.length > 0 ? `${pendingEvents.length} pending` : "Geen pending acties"}
+              value={pendingEvents.length > 0 ? `${pendingEvents.length} in wachtrij` : "Geen wachtrij-acties"}
               tone={pendingEvents.length > 0 ? "indigo" : "green"}
             />
             <StatusRow icon={CalendarClock} label="Deze maand" value={pluralize(thisMonthEvents, "afspraak", "afspraken")} tone="slate" />

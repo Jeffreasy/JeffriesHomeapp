@@ -7,13 +7,12 @@ import { type ConflictInfo } from "@/lib/conflictDetection";
 import { cn } from "@/lib/utils";
 import { AppIcon, type SymbolTone } from "@/components/ui/AppIcon";
 import type { AppIconName } from "@/lib/symbols";
-import { hoursValue } from "./RoosterUtils";
+import { hoursValue, formatShortDate } from "./RoosterUtils";
 
-/** Format ISO date string (YYYY-MM-DD) → DD-MM-YYYY veilig. */
-function formatDate(iso: string, style: "compact" | "full" = "full"): string {
-  const [year, month, day] = iso.split("-");
-  if (!year || !month || !day) return iso;
-  return style === "compact" ? `${day}-${month}` : `${day}-${month}-${year}`;
+/** Datumnotatie in nl-NL ("12 mrt") — gelijk aan de rest van de app i.p.v. de
+ *  eigen numerieke DD-MM(-YYYY)-variant die hier afweek (audit L datumdrift). */
+function formatDate(iso: string): string {
+  return formatShortDate(iso);
 }
 
 /** Bereken menselijke relatieve datum op basis van een stabiele Amsterdam-datum. */
@@ -71,7 +70,9 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
               onClick={onImport}
               className="mt-2 text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 mx-auto"
             >
-              <AppIcon name="upload" tone="amber" size="xs" /> Rooster importeren
+              {/* onImport draait de Google-kalendersync, niet de CSV-import —
+                  daarom "synchroniseren" i.p.v. "importeren" (audit L). */}
+              <AppIcon name="refresh" tone="amber" size="xs" /> Rooster synchroniseren
             </button>
           )}
         </div>
@@ -83,8 +84,8 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
   const isBezig      = dienst.status === "Bezig";
   const relativeDay  = getRelativeDay(dienst.startDatum, todayIso);
   const relativeDate = relativeDay
-    ? `${capitalize(relativeDay)} (${formatDate(dienst.startDatum, "full")})`
-    : formatDate(dienst.startDatum, "full");
+    ? `${capitalize(relativeDay)} (${formatDate(dienst.startDatum)})`
+    : formatDate(dienst.startDatum);
   const isToday      = relativeDay === "vandaag";
   const isTomorrow   = relativeDay === "morgen";
   const isZondag     = dienst.dag === "Zondag";
@@ -139,7 +140,7 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
               {isBezig ? "Nu bezig" : "Volgende dienst"}
             </p>
             <p className={cn("text-sm font-bold", colors.text)}>
-              {dienst.dag} · {formatDate(dienst.startDatum, "compact")}
+              {dienst.dag} · {formatDate(dienst.startDatum)}
             </p>
             <p className="text-xs text-slate-400">
               {dienst.startTijd}–{dienst.eindTijd} · {dienst.shiftType} · {hoursValue(dienst.duur)}u
@@ -155,7 +156,7 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
                   size="xs"
                   iconClassName={isToday ? "fill-current" : undefined}
                 />
-              {isToday ? "Vandaag" : relativeDay ? capitalize(relativeDay) : formatDate(dienst.startDatum, "compact")}
+              {isToday ? "Vandaag" : relativeDay ? capitalize(relativeDay) : formatDate(dienst.startDatum)}
               </p>
             )}
             {isZondag && (

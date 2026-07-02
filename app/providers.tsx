@@ -12,7 +12,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { PwaRegistry } from "@/components/pwa/PwaRegistry";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import { registerQueryClient } from "@/lib/api";
+import { registerQueryClient, registerSessionExpiredHandler } from "@/lib/api";
 
 const PERSIST_DENY_PREFIXES = [
   "/notes",
@@ -27,6 +27,11 @@ const PERSIST_DENY_PREFIXES = [
   // "/laventecare" entry never matched, so client dossiers/invoices/mail
   // bodies ended up in IndexedDB anyway (R6, privacy-sensitive).
   "laventecare",
+  // Finance/habits are maskable scopes in the privacy-center, yet their orval
+  // query-keys (["/transactions", …] / ["/habits", …]) were persisted to
+  // IndexedDB unencrypted (R3). Keep them out of the offline cache.
+  "/transactions",
+  "/habits",
 ];
 
 // Invalidate the persisted cache whenever the deployed build changes, so a
@@ -58,6 +63,69 @@ function AuthCachePurger() {
   return null;
 }
 
+
+// Persistent, blocking session-expired overlay (R3-H3). Driven by a one-shot
+// module-level signal the api layer fires on any 401. Sits above everything
+// (z-[120], above toast 110) so an open dirty form survives until the user
+// chooses to re-login — no silent hard-redirect can steal their input.
+function SessionExpiredOverlay() {
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    registerSessionExpiredHandler(() => setExpired(true));
+  }, []);
+
+  if (!expired) return null;
+
+  const relogin = () => {
+    if (typeof window === "undefined") return;
+    const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = `/sign-in?redirect_url=${redirect}`;
+  };
+
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="session-expired-title"
+      aria-describedby="session-expired-desc"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+    >
+      <div className="w-full max-w-sm rounded-2xl border border-[var(--color-border)] bg-[rgba(15,23,42,0.97)] p-6 text-center shadow-2xl">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <h2 id="session-expired-title" className="mb-1 text-base font-semibold text-white">
+          Je sessie is verlopen
+        </h2>
+        <p id="session-expired-desc" className="mb-5 text-sm text-slate-400">
+          Log opnieuw in om verder te gaan. Je openstaande invoer blijft staan tot je hierop klikt.
+        </p>
+        <button
+          type="button"
+          onClick={relogin}
+          autoFocus
+          className="w-full rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 px-4 py-2.5 text-sm font-bold text-[#0a0a0f] transition-opacity hover:opacity-90"
+        >
+          Opnieuw inloggen
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => {
@@ -97,6 +165,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         setItem: async (key, value) => await set(key, value),
         removeItem: async (key) => await del(key),
       },
+      // Serializing the whole cache on every poll tick (default 1s throttle) is
+      // main-thread pressure on a long-running kiosk (R3). 5s coalesces bursts
+      // without breaking offline-restore — the last write still lands.
+      throttleTime: 5000,
     })
   );
 
@@ -107,6 +179,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         persistOptions={{
           persister,
           buster: PERSIST_BUSTER,
+          // Match gcTime (24h): a persisted cache older than this is dropped on
+          // restore rather than hydrating stale data into a fresh session.
+          maxAge: 1000 * 60 * 60 * 24,
           dehydrateOptions: {
             shouldDehydrateQuery: (query) =>
               defaultShouldDehydrateQuery(query) && shouldPersistQuery(query.queryKey),
@@ -122,6 +197,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             </ErrorBoundary>
           </ConfirmProvider>
         </ToastProvider>
+        <SessionExpiredOverlay />
       </PersistQueryClientProvider>
     </ClerkProvider>
   );

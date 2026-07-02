@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { usePrivacy } from "@/hooks/usePrivacy";
 
 type UploadState = "idle" | "parsing" | "preview" | "importing" | "done" | "error";
 
@@ -26,6 +27,9 @@ export function LoonstrookUploader() {
   const { user } = useUser();
   const queryClient = useQueryClient();
   const { mutateAsync: importLoonstroken } = usePostLoonstrokenImport();
+  // L10/finance-mask: netto/salaris/ORT in de preview zijn bedragen — respecteer
+  // dezelfde privacy-scope als de rest van finance/salaris.
+  const { mask } = usePrivacy("finance");
 
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const pdfs = Array.from(files).filter(f => f.name.toLowerCase().endsWith(".pdf"));
@@ -92,8 +96,12 @@ export function LoonstrookUploader() {
       }));
 
       const response = await importLoonstroken({ data: { userId: user.id, items: payload } });
-      const apiRes = response.data as unknown as { inserted: number; total: number };
-      const res = { toegevoegd: apiRes.inserted, bijgewerkt: apiRes.total - apiRes.inserted };
+      // H7: de backend doet nu een echte upsert (ON CONFLICT DO UPDATE) en
+      // rapporteert een waarheidsgetrouwe `updated`-telling. Lees die direct;
+      // val voor oude backends terug op total - inserted (dan == updated).
+      const apiRes = response.data as unknown as { inserted: number; updated?: number; total: number };
+      const bijgewerkt = apiRes.updated ?? apiRes.total - apiRes.inserted;
+      const res = { toegevoegd: apiRes.inserted, bijgewerkt };
       
       await queryClient.invalidateQueries({ queryKey: getGetLoonstrokenQueryKey() });
 
@@ -131,8 +139,11 @@ export function LoonstrookUploader() {
             <p className="dropzone__sub" style={{ fontSize: "0.75rem", color: "var(--color-text-muted)", marginTop: 4 }}>
               Meerdere bestanden tegelijk mogelijk
             </p>
-            <label className="btn btn--primary" htmlFor="pdf-input">Kies bestanden</label>
-            <input id="pdf-input" type="file" accept=".pdf" multiple className="visually-hidden"
+            {/* L13: het label fungeert als knop. De (verborgen) input staat
+                vóór het label zodat de peer-focus-visible-sibling-selector werkt:
+                een toetsenbordgebruiker die naar de input tabt ziet nu een
+                zichtbare focusring op de knop. */}
+            <input id="pdf-input" type="file" accept=".pdf" multiple className="peer visually-hidden"
               onChange={(e) => {
                 // Kopieer eerst: de FileList kan leeggemaakt worden door de reset.
                 const files = Array.from(e.target.files ?? []);
@@ -141,6 +152,12 @@ export function LoonstrookUploader() {
                 // change-event geeft (zelfde patroon als de rooster-CSV-input).
                 e.target.value = "";
               }} />
+            <label
+              className="btn btn--primary peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-amber-400"
+              htmlFor="pdf-input"
+            >
+              Kies bestanden
+            </label>
             {state === "error" && errorMsg && (
               <div className="dropzone__error"><AlertCircle size={15} /><span>{errorMsg}</span></div>
             )}
@@ -175,9 +192,9 @@ export function LoonstrookUploader() {
                   {parseResult.items.map((ls) => (
                     <tr key={ls.periodeLabel} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                       <td style={{ padding: "6px 8px", fontWeight: 600 }}>{ls.periodeLabel}</td>
-                      <td style={{ padding: "6px 8px", textAlign: "right", color: "#34d399" }}>{fmt(ls.netto)}</td>
-                      <td style={{ padding: "6px 8px", textAlign: "right" }}>{fmt(ls.salarisBasis)}</td>
-                      <td style={{ padding: "6px 8px", textAlign: "right", color: "#60a5fa" }}>{fmt(ls.ortTotaal)}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right", color: "#34d399" }}>{mask(fmt(ls.netto))}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right" }}>{mask(fmt(ls.salarisBasis))}</td>
+                      <td style={{ padding: "6px 8px", textAlign: "right", color: "#60a5fa" }}>{mask(fmt(ls.ortTotaal))}</td>
                       <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "0.7rem", color: "var(--color-text-muted)" }}>
                         {ls.schaalnummer}-{ls.trede}
                       </td>

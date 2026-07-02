@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { Columns3, FolderOpen, LayoutGrid, Pencil, RotateCcw, Search, Settings2, SlidersHorizontal, Tag, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -90,7 +91,7 @@ export function NotesFilters({
           <input
             ref={searchRef}
             type="search"
-            placeholder={privacyOn ? "Zoeken staat uit in privacymodus" : "Zoeken in notities..."}
+            placeholder={privacyOn ? "Zoeken staat uit in privacymodus" : "Zoeken in notities…"}
             value={privacyOn ? "" : search}
             onChange={(event) => setSearch(event.target.value)}
             disabled={privacyOn}
@@ -278,6 +279,10 @@ function TagManagerModal({
   const [renameValue, setRenameValue] = useState("");
   const [busyTag, setBusyTag] = useState<string | null>(null);
   const [progress, setProgress] = useState("");
+  // R3-15: keep Tab focus inside the dialog + restore focus on close (the modal
+  // rolled its own dialog without a trap).
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(true, dialogRef);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -326,6 +331,7 @@ function TagManagerModal({
         onClick={() => { if (!busyTag) onClose(); }}
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Tags beheren"

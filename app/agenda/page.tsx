@@ -20,7 +20,7 @@ import { AnimatePresence } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { syncApi, type SyncStatusResult } from "@/lib/api";
-import { getHistory as getDienstHistory, type DienstRow } from "@/lib/schedule";
+import { getHistory as getDienstHistory, withRuntimeStatus, type DienstRow } from "@/lib/schedule";
 import {
   getDisplayEndDate,
   usePersonalEvents,
@@ -51,7 +51,7 @@ import {
   TimelineDay,
 } from "@/components/schedule/AgendaCards";
 import { TabBar, tabBarPanelId, tabBarTabId } from "@/components/schedule/TabBar";
-import { compareAllDayFirst, shortSyncError } from "@/components/schedule/scheduleUtils";
+import { compareAllDayFirst, shortSyncError, getShiftAppointments } from "@/components/schedule/scheduleUtils";
 import { StatChip } from "@/components/ui/StatChip";
 
 type AgendaView = "today" | "upcoming" | "pending" | "history";
@@ -69,6 +69,14 @@ type TimelineGroup = {
 function dienstToTimelineEvent(dienst: DienstRow): PersonalEvent {
   const title = dienst.titel || dienst.shiftType || "Dienst";
   const endDate = dienst.eindDatum || dienst.startDatum;
+  // Runtime-status toepassen zodat een lopende dienst óók op /agenda "Bezig"
+  // toont (rooster/focus doen dit al) i.p.v. altijd "Aankomend" (audit DEEL 2 #12).
+  const runtime = withRuntimeStatus(dienst);
+  const status =
+    runtime.status === "Gedraaid" ? "Voorbij"
+    : runtime.status === "VERWIJDERD" ? "VERWIJDERD"
+    : runtime.status === "Bezig" ? "Bezig"
+    : "Aankomend";
   return {
     _id: dienst.eventId,
     userId: "",
@@ -82,7 +90,7 @@ function dienstToTimelineEvent(dienst: DienstRow): PersonalEvent {
     locatie: dienst.locatie || undefined,
     beschrijving: dienst.beschrijving || undefined,
     symbol: "schedule",
-    status: dienst.status === "Gedraaid" ? "Voorbij" : dienst.status === "VERWIJDERD" ? "VERWIJDERD" : "Aankomend",
+    status,
     kalender: "Rooster",
     shiftType: dienst.shiftType,
     team: dienst.team,
@@ -318,6 +326,9 @@ export default function AgendaPage() {
 
   const emptyCopy = viewEmptyCopy(activeView);
   const activeViewMeta = viewTabs.find((tab) => tab.id === activeView) ?? viewTabs[0];
+  // Heeft de agenda al (gecachte) data? Zo ja, dan is een refetch-fout slechts
+  // "verouderd", geen leeg foutscherm (audit H15).
+  const agendaHasData = upcoming.length > 0 || history.length > 0 || pending.length > 0;
   const historyHiddenCount = Math.max(0, historyTimelineEvents.length - HISTORY_RENDER_LIMIT);
 
   // ─── Actions ────────────────────────────────────────────────────────────
@@ -383,7 +394,12 @@ export default function AgendaPage() {
       // De header-StatusPill leest deze query — direct verversen i.p.v. op de
       // 10s-poll wachten (audit K11).
       queryClient.invalidateQueries({ queryKey: ["sync-status"] });
-      if (result.pendingError) {
+      if (result.scheduleWriteError) {
+        // Kalender opgehaald, maar het rooster kon niet worden weggeschreven —
+        // geen schone "gesynchroniseerd" claimen (audit DEEL 2 #7).
+        setPendingSyncError(`Rooster opslaan mislukt: ${result.scheduleWriteError}`);
+        toastError(`Rooster opslaan mislukt: ${shortSyncError(result.scheduleWriteError)}`);
+      } else if (result.pendingError) {
         setPendingSyncError(result.pendingError);
         toast(`Agenda opgehaald; wachtrij faalde: ${shortSyncError(result.pendingError)}`, "info");
       } else {
@@ -545,14 +561,39 @@ export default function AgendaPage() {
               </Panel>
             )}
 
-            {agendaError ? (
+            {/* Failed ≠ empty (audit H15): een mislukte background-refetch mag
+                een gevulde agenda niet vervangen door een foutscherm. Alleen bij
+                écht geen data het volle foutpaneel; anders een compacte amber
+                stale-banner met retry (pariteit met /rooster). */}
+            {agendaError && agendaHasData ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+                <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+                <span className="min-w-0 flex-1">
+                  Agenda verversen mislukt — je ziet mogelijk verouderde afspraken.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void refetchEvents()}
+                  className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+                >
+                  Opnieuw proberen
+                </button>
+              </div>
+            ) : agendaError ? (
               <Panel className="border-amber-500/20 bg-amber-500/[0.045]">
-                <div className="flex items-start gap-3 text-sm text-amber-200">
+                <div className="flex flex-wrap items-start gap-3 text-sm text-amber-200">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium">Agenda kon niet worden geladen</p>
                     <p className="mt-1 text-xs text-slate-400">{errorMessage(agendaError)}</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => void refetchEvents()}
+                    className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
+                  >
+                    Opnieuw proberen
+                  </button>
                 </div>
               </Panel>
             ) : agendaBusy ? (
@@ -637,7 +678,10 @@ export default function AgendaPage() {
               dienst={nextDienst}
               compact
               loading={agendaBusy}
-              afspraken={nextDienst ? (eventsByDate[nextDienst.startDatum] ?? []) : []}
+              // Gedeelde helper (audit DEEL 2 NextShiftCard): alle afspraken over
+              // álle dagen die de dienst beslaat — nachtdiensten tonen nu ook de
+              // vroege-ochtendafspraak van de volgende dag.
+              afspraken={getShiftAppointments(nextDienst, eventsByDate)}
               conflictMap={conflictMap}
               todayIso={todayIso}
             />

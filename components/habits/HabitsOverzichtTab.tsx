@@ -24,6 +24,7 @@ type DayHealth = {
 export function HabitsOverzichtTab({
   groupedHabits,
   isLoading,
+  activeDate,
   setShowForm,
   privacyOn,
   toggle,
@@ -42,6 +43,8 @@ export function HabitsOverzichtTab({
 }: {
   groupedHabits: GroupedHabits;
   isLoading: boolean;
+  /** The Amsterdam YYYY-MM-DD shown — cards keyed by it (see HabitsVandaagTab). */
+  activeDate: string;
   setShowForm: (show: boolean) => void;
   privacyOn: boolean;
   toggle: (id: string) => void;
@@ -84,6 +87,7 @@ export function HabitsOverzichtTab({
                 return (
                   <HabitCard
                     key={habit._id}
+                    datum={activeDate}
                     habit={{
                       ...habit,
                       log: todayVersion?.log ?? null,
@@ -147,6 +151,7 @@ export function HabitsOverzichtTab({
                 emoji: h.emoji,
                 streak: h.huidigeStreak,
                 type: h.type,
+                frequentie: h.frequentie,
               }))}
             masked={privacyOn}
           />

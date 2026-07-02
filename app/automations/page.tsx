@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, X, Activity } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { useAutomations } from "@/hooks/useAutomations";
@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
 import { AutomationCard } from "@/components/automations/AutomationCard";
-import { AutomationForm } from "@/components/automations/AutomationForm";
+import { AutomationForm, type AutomationFormHandle } from "@/components/automations/AutomationForm";
 import { DienstWekkerSection } from "@/components/automations/DienstWekkerSection";
 import { type Automation, type DienstWekkerTimes, type ShiftType } from "@/lib/automations";
 import { cn } from "@/lib/utils";
@@ -22,8 +22,19 @@ export default function AutomationsPage() {
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [busyWekkerType, setBusyWekkerType] = useState<ManagedShiftType | null>(null);
   const [togglingIds, setTogglingIds] = useState<string[]>([]);
+  const formRef = useRef<AutomationFormHandle>(null);
   const { openConfirm } = useConfirm();
   const { success, error } = useToast();
+
+  // Header-toggle: bij een open formulier via de dirty-guarded requestClose
+  // sluiten (mirror van Escape/backdrop/X), niet de state hard resetten.
+  const handleHeaderToggle = () => {
+    if (editingId) {
+      formRef.current?.requestClose();
+    } else {
+      setEditingId("new");
+    }
+  };
 
   // Het formulier awaicht deze promise: pas sluiten bij succes. Een fout
   // bubbelt naar AutomationForm, dat open blijft en zelf een inline
@@ -125,7 +136,7 @@ export default function AutomationsPage() {
 
             <div className="flex shrink-0 items-center gap-2">
               <button
-                onClick={() => setEditingId((v) => (v ? null : "new"))}
+                onClick={handleHeaderToggle}
                 aria-expanded={!!editingId}
                 aria-label={editingId ? "Formulier sluiten" : "Nieuwe automatisering toevoegen"}
                 className={cn(
@@ -148,6 +159,10 @@ export default function AutomationsPage() {
           <DienstWekkerSection
             automations={automations}
             busyType={busyWekkerType}
+            // Opslaan/verwijderen pas toestaan als de lijst betrouwbaar geladen
+            // is: tijdens load/fout is `docs` leeg → oude pack-ids onvindbaar →
+            // opslaan zou een dubbel pack aanmaken (fix 8a).
+            listReady={!isLoading && !isError}
             onSave={handleSaveWekkerPack}
             onRemove={handleRemoveWekkerPack}
           />
@@ -185,6 +200,7 @@ export default function AutomationsPage() {
           <AnimatePresence>
             {editingId && (
               <AutomationForm
+                ref={formRef}
                 initialData={editingId !== "new" ? automations.find(a => a.id === editingId) : undefined}
                 existing={automations}
                 onClose={() => setEditingId(null)}

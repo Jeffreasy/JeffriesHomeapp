@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Trophy } from "lucide-react";
 import { useHabits } from "@/hooks/useHabits";
@@ -14,6 +15,11 @@ export function BadgeShowcase() {
 
   const badgeSet = new Set(badges.map((b) => b.badgeId));
   const recentBadge = badges.length > 0 ? badges[0] : null;
+  // Tap-to-detail (R3): title-tooltips don't exist on touch, so a tapped badge
+  // reveals its criteria in a line below the grid — locked badges too.
+  const [selectedBadgeId, setSelectedBadgeId] = useState<string | null>(null);
+  const selectedBadge =
+    BADGE_DEFINITIONS.find((d) => d.id === selectedBadgeId) ?? null;
 
   return (
     <div className="glass rounded-2xl p-4">
@@ -59,19 +65,29 @@ export function BadgeShowcase() {
           const unlocked = badgeSet.has(def.id);
           const isNew = recentBadge?.badgeId === def.id;
 
+          const isSelected = selectedBadgeId === def.id;
           return (
-            <motion.div
+            <motion.button
+              type="button"
               key={def.id}
-              className="relative flex flex-col items-center p-3 rounded-xl transition-all min-h-[80px] justify-center"
+              onClick={() =>
+                setSelectedBadgeId((prev) => (prev === def.id ? null : def.id))
+              }
+              title={`${def.naam} — ${def.beschrijving}${unlocked ? "" : " (nog vergrendeld)"}`}
+              aria-label={`${unlocked ? "Behaald" : "Vergrendeld"}: ${def.naam}. ${def.beschrijving}`}
+              aria-pressed={isSelected}
+              className="relative flex flex-col items-center p-3 rounded-xl transition-all min-h-[80px] justify-center cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-400"
               style={{
                 background: unlocked
                   ? "rgba(255,255,255,0.04)"
                   : "rgba(255,255,255,0.01)",
-                border: isNew
-                  ? "1px solid rgba(249,115,22,0.25)"
-                  : unlocked
-                    ? "1px solid rgba(255,255,255,0.06)"
-                    : "1px solid rgba(255,255,255,0.03)",
+                border: isSelected
+                  ? "1px solid rgba(251,191,36,0.5)"
+                  : isNew
+                    ? "1px solid rgba(249,115,22,0.25)"
+                    : unlocked
+                      ? "1px solid rgba(255,255,255,0.06)"
+                      : "1px solid rgba(255,255,255,0.03)",
                 boxShadow: isNew ? "0 0 20px rgba(249,115,22,0.1)" : "none",
               }}
               whileHover={unlocked ? { scale: 1.05 } : {}}
@@ -91,7 +107,7 @@ export function BadgeShowcase() {
                 style={{
                   color: unlocked
                     ? "rgba(255,255,255,0.7)"
-                    : "rgba(255,255,255,0.2)",
+                    : "rgba(255,255,255,0.45)",
                 }}
               >
                 {def.naam}
@@ -116,10 +132,26 @@ export function BadgeShowcase() {
                   transition={{ duration: 2, repeat: 0 }}
                 />
               )}
-            </motion.div>
+            </motion.button>
           );
         })}
       </div>
+
+      {/* Tapped-badge detail (R3): criteria of any badge, locked or not. */}
+      {selectedBadge && (
+        <p
+          className="mt-3 rounded-lg border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2 text-[11px] text-slate-300"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="mr-1.5">
+            {badgeSet.has(selectedBadge.id) ? selectedBadge.emoji : "🔒"}
+          </span>
+          <span className="font-semibold text-slate-200">{selectedBadge.naam}</span>
+          {" — "}
+          {selectedBadge.beschrijving} · +{selectedBadge.xpBonus} XP
+        </p>
+      )}
     </div>
   );
 }

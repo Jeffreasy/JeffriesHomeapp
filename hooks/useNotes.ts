@@ -16,6 +16,7 @@ import {
   getGetNotesTagsQueryKey,
 } from "@/lib/api/generated/notes/notes";
 import type { HandlerNoteCreateBody, HandlerNoteUpdateBody, ModelNote, ModelNoteRevision } from "@/lib/api/model";
+import { ApiError } from "@/lib/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -368,7 +369,14 @@ export function useNotes() {
         }
       },
       onError: (err, variables, context) => {
-        toastError("Kon wijzigingen niet opslaan.");
+        // H2 (R3): a 409 conflict is handled inline by the editor (reload vs
+        // overwrite choice), so suppress the generic toast for it — otherwise
+        // the user gets a wegtikkende toast on top of the inline recovery UI.
+        const thrown = err as unknown;
+        const status = thrown instanceof ApiError ? thrown.status : undefined;
+        if (status !== 409) {
+          toastError("Kon wijzigingen niet opslaan.");
+        }
         if (context?.previousNotes) {
           queryClient.setQueryData(queryKey, context.previousNotes);
         }

@@ -1,4 +1,5 @@
 import { eur } from "@/lib/finance-constants";
+import { formatMonth } from "./FinanceUtils";
 
 // ─── Recharts custom tooltips ─────────────────────────────────────────────────
 
@@ -8,13 +9,16 @@ interface TooltipProps {
   payload?: TooltipItem[];
   label?: string;
   valueFormatter?: (value: number) => string;
+  /** Formatteert het as-label; default = maandformatter, zodat de tooltip
+   *  "mrt 2026" toont i.p.v. de rauwe "2026-03" (de as gebruikt dezelfde). */
+  labelFormatter?: (label: string) => string;
 }
 
-export function ChartTooltip({ active, payload, label, valueFormatter = eur }: TooltipProps) {
+export function ChartTooltip({ active, payload, label, valueFormatter = eur, labelFormatter = formatMonth }: TooltipProps) {
   if (!active || !payload?.length) return null;
   return (
     <div className="chart-tooltip">
-      <p className="chart-tooltip__label">{label}</p>
+      <p className="chart-tooltip__label">{label ? labelFormatter(label) : label}</p>
       {payload.map((p) => (
         <p key={p.name} className="chart-tooltip__value" style={{ color: p.color }}>
           {p.name}: {valueFormatter(p.value)}

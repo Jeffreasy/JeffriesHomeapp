@@ -32,7 +32,7 @@ export default function SignUpPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight" style={{ color: "#f1f5f9" }}>Jeffries Dashboard</h1>
-            <p className="text-sm mt-1" style={{ color: "#64748b" }}>Account aanmaken</p>
+            <p className="text-sm mt-1" style={{ color: "#8b98a9" }}>Account aanmaken</p>
           </div>
         </div>
 
@@ -44,7 +44,7 @@ export default function SignUpPage() {
               colorInputBackground: "#1a1a24",
               colorInputText: "#f1f5f9",
               colorText: "#f1f5f9",
-              colorTextSecondary: "#64748b",
+              colorTextSecondary: "#8b98a9",
               borderRadius: "12px",
               fontFamily: "Inter, sans-serif",
             },
@@ -56,7 +56,7 @@ export default function SignUpPage() {
                 backdropFilter: "blur(20px)",
               },
               headerTitle: { color: "#f1f5f9", fontWeight: "700" },
-              headerSubtitle: { color: "#64748b" },
+              headerSubtitle: { color: "#8b98a9" },
               formButtonPrimary: {
                 background: "linear-gradient(135deg, #f59e0b, #d97706)",
                 color: "#0a0a0f",

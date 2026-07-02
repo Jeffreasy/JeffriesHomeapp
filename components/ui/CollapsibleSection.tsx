@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -69,6 +69,15 @@ export function CollapsibleSection({
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const contentId = useId();
   const currentTheme = themeClasses[theme];
+  const reduceMotion = useReducedMotion();
+  // Under prefers-reduced-motion, collapse the height/opacity spring to a
+  // near-instant tween so the section just snaps open/closed (R3).
+  const expandTransition = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 300, damping: 25, mass: 0.8 };
+  const chevronTransition = reduceMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 300, damping: 20 };
 
   return (
     <div
@@ -108,7 +117,7 @@ export function CollapsibleSection({
         )}>
           <motion.div
             animate={{ rotate: isOpen ? 180 : 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            transition={chevronTransition}
           >
             <ChevronDown size={18} />
           </motion.div>
@@ -120,7 +129,7 @@ export function CollapsibleSection({
           id={contentId}
           initial={false}
           animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
+          transition={expandTransition}
           className="overflow-hidden"
         >
           <div className={cn("p-4 sm:px-6 sm:pb-6 pt-2 border-t border-white/5", contentClassName, !isOpen && "pointer-events-none")}>
@@ -135,7 +144,7 @@ export function CollapsibleSection({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
+              transition={expandTransition}
               className="overflow-hidden"
             >
               <div className={cn("p-4 sm:px-6 sm:pb-6 pt-2 border-t border-white/5", contentClassName)}>

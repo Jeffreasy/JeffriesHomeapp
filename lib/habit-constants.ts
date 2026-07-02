@@ -54,10 +54,30 @@ export const TYPE_LABELS: Record<string, { label: string; emoji: string }> = {
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
-export function formatStreak(days: number): string {
-  if (days === 0) return "Geen streak";
-  if (days === 1) return "1 dag 🔥";
-  return `${days} dagen 🔥`;
+/**
+ * The streak "unit" depends on the habit's frequency: weekly/monthly habits
+ * count PERIODES, not days, so labelling them "dagen" was wrong (a 4-week
+ * streak read as "4 dagen 🔥"). Daily/weekday/custom habits stay in days.
+ */
+type StreakUnit = { one: string; many: string; short: string };
+
+export function streakUnit(frequentie?: string): StreakUnit {
+  if (frequentie === "x_per_week")
+    return { one: "week", many: "weken", short: "w" };
+  if (frequentie === "x_per_maand")
+    return { one: "maand", many: "maanden", short: "mnd" };
+  return { one: "dag", many: "dagen", short: "d" };
+}
+
+export function formatStreak(count: number, frequentie?: string): string {
+  if (count === 0) return "Geen streak";
+  const unit = streakUnit(frequentie);
+  return `${count} ${count === 1 ? unit.one : unit.many} 🔥`;
+}
+
+/** Compact streak label ("4w", "3mnd", "12d") for tight badges. */
+export function formatStreakShort(count: number, frequentie?: string): string {
+  return `${count}${streakUnit(frequentie).short}`;
 }
 
 export function formatXP(xp: number): string {
@@ -95,7 +115,7 @@ export const LEVEL_THRESHOLDS = [
 
 const LEVEL_TITLES = [
   "Beginner", "Leerling", "Gewoonte-bouwer", "Discipline", "Strijder",
-  "Kampioen", "Meester", "Expert", "Legende", "Titan", "Onstopbaar", "Grandmaster",
+  "Kampioen", "Meester", "Expert", "Legende", "Titan", "Onstuitbaar", "Grootmeester",
 ];
 
 export interface LevelInfo {
@@ -121,7 +141,7 @@ export function getLevel(totalXP: number): LevelInfo {
     xp: totalXP,
     nextXP: isMax ? 0 : nextThreshold - totalXP,
     progress: Math.min(1, Math.max(0, progress)),
-    titel: LEVEL_TITLES[level - 1] ?? "Grandmaster",
+    titel: LEVEL_TITLES[level - 1] ?? "Grootmeester",
   };
 }
 
@@ -178,10 +198,10 @@ export interface BadgeDefinition {
 
 export const BADGE_DEFINITIONS: BadgeDefinition[] = [
   { id: "streak_3",   naam: "Beginner",        emoji: "🌱", beschrijving: "3 dagen streak bereikt",    trigger: "streak", waarde: 3,    xpBonus: 25    },
-  { id: "streak_7",   naam: "Week Warrior",    emoji: "⚡", beschrijving: "7 dagen streak bereikt",    trigger: "streak", waarde: 7,    xpBonus: 50    },
+  { id: "streak_7",   naam: "Weekstrijder",    emoji: "⚡", beschrijving: "7 dagen streak bereikt",    trigger: "streak", waarde: 7,    xpBonus: 50    },
   { id: "streak_14",  naam: "Twee Weken",      emoji: "🔥", beschrijving: "14 dagen streak bereikt",   trigger: "streak", waarde: 14,   xpBonus: 100   },
-  { id: "streak_30",  naam: "Maand Master",    emoji: "💎", beschrijving: "30 dagen streak bereikt",   trigger: "streak", waarde: 30,   xpBonus: 250   },
-  { id: "streak_60",  naam: "Discipline King", emoji: "👑", beschrijving: "60 dagen streak bereikt",   trigger: "streak", waarde: 60,   xpBonus: 500   },
+  { id: "streak_30",  naam: "Maandmeester",    emoji: "💎", beschrijving: "30 dagen streak bereikt",   trigger: "streak", waarde: 30,   xpBonus: 250   },
+  { id: "streak_60",  naam: "Discipline-koning", emoji: "👑", beschrijving: "60 dagen streak bereikt", trigger: "streak", waarde: 60,   xpBonus: 500   },
   { id: "streak_100", naam: "Centurion",       emoji: "🏆", beschrijving: "100 dagen streak bereikt",  trigger: "streak", waarde: 100,  xpBonus: 1000  },
   { id: "streak_365", naam: "Jaarlegenda",     emoji: "🌟", beschrijving: "365 dagen streak bereikt",  trigger: "streak", waarde: 365,  xpBonus: 5000  },
   { id: "total_10",   naam: "Eerste Stappen",  emoji: "👣", beschrijving: "10 keer voltooid",          trigger: "total",  waarde: 10,   xpBonus: 20    },

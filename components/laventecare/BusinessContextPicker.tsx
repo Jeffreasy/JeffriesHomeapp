@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BriefcaseBusiness, ChevronDown } from "lucide-react";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { normalizeBusinessContext, type BusinessContextValue } from "@/lib/workspace-context";
@@ -25,13 +25,37 @@ type BusinessContextPickerProps = {
 export function BusinessContextPicker({
   value,
   onChange,
-  label = "Business context",
+  label = "Zakelijke context",
   compact = false,
 }: BusinessContextPickerProps) {
   const { options, isError } = useLaventeCareBusinessContextOptions();
   const normalized = normalizeBusinessContext(value);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // L12-a11y: sluit de dropdown op Escape en bij een klik buiten de picker.
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+    };
+  }, [open]);
 
   const selectedKey = getBusinessContextOptionKey(normalized);
   const selected =
@@ -71,11 +95,14 @@ export function BusinessContextPicker({
         <BriefcaseBusiness size={12} />
         {label}
       </label>
-      <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
+      <div ref={containerRef} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
         <button
           type="button"
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-controls="business-context-listbox"
+          role="combobox"
           className="flex w-full min-w-0 items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-white/[0.04]"
         >
           <AppIcon name="business" tone={normalized ? "cyan" : "slate"} size="xs" framed className="h-7 w-7 rounded-lg" />
@@ -98,12 +125,18 @@ export function BusinessContextPicker({
               autoFocus
               className="min-h-[38px] w-full rounded-lg border border-[var(--color-border)] bg-[#0d0d15] px-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/50"
             />
-            <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+            <div
+              id="business-context-listbox"
+              role="listbox"
+              aria-label="Zakelijke context"
+              className="max-h-56 space-y-2 overflow-y-auto pr-1"
+            >
               {selectedKey === "custom" ? (
                 <button
                   type="button"
+                  role="option"
                   onClick={() => setOpen(false)}
-                  aria-pressed
+                  aria-selected
                   className="w-full rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-3 py-2 text-left text-cyan-100"
                 >
                   <span className="block truncate text-xs font-bold">{selected.label}</span>
@@ -124,8 +157,9 @@ export function BusinessContextPicker({
                         <button
                           key={option.key}
                           type="button"
+                          role="option"
                           onClick={() => pick(option)}
-                          aria-pressed={isSelected}
+                          aria-selected={isSelected}
                           className={`w-full rounded-lg border px-3 py-2 text-left transition ${
                             isSelected
                               ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-100"

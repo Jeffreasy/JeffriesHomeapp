@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight,
   Receipt,
@@ -16,8 +16,10 @@ import type { TransactionFilter, TransactionRow } from "@/hooks/useTransactions"
 
 // ─── F3: lichte client-side recurring-detectie ────────────────────────────────
 // Zelfde tegenpartij in ≥3 verschillende maanden met een maandbedrag dat
-// minder dan 5% varieert = terugkerende uitgave. Berekend over de geladen
-// transactielijst (de stats-payload heeft geen maandgroepering per merchant).
+// minder dan 5% varieert = terugkerende uitgave. Berekend over een bredere,
+// periode-scoped steekproef (fetchRecurringSample) i.p.v. de eerste 50 geladen
+// lijstrijen — die dekten hooguit een paar weken, waardoor de detectie in de
+// praktijk nooit ≥3 maanden zag en dus altijd leeg bleef.
 
 type RecurringItem = { naam: string; gemiddeld: number; maanden: number };
 
@@ -59,9 +61,12 @@ function detectRecurring(transactions: TransactionRow[]): RecurringItem[] {
 export function FinanceInsights({
   stats,
   latestCashflow,
+  runningMonthKey,
   topCategory,
   topMerchant,
   transactions = [],
+  fetchRecurringSample,
+  periodKey,
   filters,
   zoekterm,
   setZoekterm,
@@ -72,10 +77,16 @@ export function FinanceInsights({
 }: {
   stats: any;
   latestCashflow: any;
+  /** "YYYY-MM" van de lopende (onvolledige) maand — label de laatste-maand-kaart. */
+  runningMonthKey?: string;
   topCategory: any;
   topMerchant: any;
-  /** Geladen transactielijst — bron voor de recurring-detectie (F3). */
+  /** Geladen transactielijst — fallback-bron voor de recurring-detectie (F3). */
   transactions?: TransactionRow[];
+  /** F3: haalt een bredere periode-scoped steekproef op voor recurring-detectie. */
+  fetchRecurringSample?: () => Promise<TransactionRow[]>;
+  /** Verandert wanneer de periode-selectie wijzigt → herlaad de steekproef. */
+  periodKey?: string;
   filters: TransactionFilter;
   zoekterm: string;
   setZoekterm: (term: string) => void;
@@ -84,7 +95,30 @@ export function FinanceInsights({
   formatPrivateEuroExact: (value: number) => string;
   formatPrivateSignedEuro: (value: number) => string;
 }) {
-  const recurring = useMemo(() => detectRecurring(transactions), [transactions]);
+  // F3: laad een bredere periode-scoped steekproef zodra de sectie mount (en
+  // opnieuw als de periode wijzigt). Zolang die er nog niet is, valt de
+  // detectie terug op de al geladen lijstrijen.
+  const [sample, setSample] = useState<TransactionRow[] | null>(null);
+  useEffect(() => {
+    if (!fetchRecurringSample) return;
+    let cancelled = false;
+    setSample(null);
+    fetchRecurringSample()
+      .then((rows) => {
+        if (!cancelled) setSample(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setSample(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchRecurringSample, periodKey]);
+
+  const recurring = useMemo(
+    () => detectRecurring(sample ?? transactions),
+    [sample, transactions]
+  );
 
   return (
     <>
@@ -155,7 +189,7 @@ export function FinanceInsights({
         <SectionTitle
           icon={RefreshCw}
           title="Terugkerende uitgaven"
-          subtitle="op basis van geladen transacties"
+          subtitle={sample ? "op basis van de geselecteerde periode" : "op basis van geladen transacties"}
         />
         <div className="mt-4">
           {recurring.length > 0 ? (
@@ -199,11 +233,17 @@ export function FinanceInsights({
       </section>
 
       <section className="glass p-4">
-        <SectionTitle icon={Wallet} title="Financiele signalen" subtitle="Korte checks op de geselecteerde periode" />
+        <SectionTitle icon={Wallet} title="Financiële signalen" subtitle="Korte checks op de geselecteerde periode" />
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <InsightRow
             icon={ArrowLeftRight}
-            label="Laatste maand"
+            // F8: de laatste maand is doorgaans de lopende (onvolledige) maand —
+            // label dat expliciet zodat een lage netto niet als daling leest.
+            label={
+              latestCashflow && runningMonthKey && latestCashflow.maand === runningMonthKey
+                ? "Lopende maand (onvolledig)"
+                : "Laatste maand"
+            }
             value={latestCashflow ? `${formatPrivateSignedEuro(latestCashflow.netto)}` : "Geen data"}
             tone={latestCashflow ? getDeltaTone(latestCashflow.netto) : "slate"}
           />

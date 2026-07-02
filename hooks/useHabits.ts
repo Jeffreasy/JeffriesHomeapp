@@ -259,6 +259,32 @@ function toBadge(row: ModelHabitBadge): HabitBadgeRecord {
   };
 }
 
+/**
+ * Newly-earned badges the backend attaches to a toggle response. The 200 body
+ * is an open map, so we read defensively across the likely field names and only
+ * keep entries with a display name — absent/empty means "no badge data" and the
+ * caller falls back to the milestone self-toast.
+ */
+type EarnedBadge = { naam: string; emoji?: string };
+
+function newlyEarnedBadges(data: unknown): EarnedBadge[] {
+  if (!data || typeof data !== "object") return [];
+  const row = data as Record<string, unknown>;
+  const raw =
+    row.new_badges ?? row.newBadges ?? row.badges ?? row.earned_badges;
+  if (!Array.isArray(raw)) return [];
+  const out: EarnedBadge[] = [];
+  for (const b of raw) {
+    if (!b || typeof b !== "object") continue;
+    const rec = b as Record<string, unknown>;
+    const naam = rec.naam ?? rec.name;
+    if (typeof naam !== "string" || !naam) continue;
+    const emoji = typeof rec.emoji === "string" ? rec.emoji : undefined;
+    out.push({ naam, emoji });
+  }
+  return out;
+}
+
 function numberFrom(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -535,6 +561,10 @@ export function useHabits(datum?: string) {
       if (snapshot !== undefined) {
         queryClient.setQueryData(forDateQueryKey, snapshot);
       }
+      // A11y (R3): the optimistic path already announced success; on rollback
+      // that announcement is now a lie. Correct it so screenreaders hear the
+      // action was reverted instead of a stale "voltooid".
+      setAnnouncement("Niet gewijzigd — bijwerken is mislukt");
       toastError(
         err instanceof ApiError && err.status === 409 && err.message
           ? err.message
@@ -555,12 +585,26 @@ export function useHabits(datum?: string) {
   // Streak-milestone feedback (low): a completing toggle for TODAY that pushes
   // the streak exactly onto 7/30/100 earns a celebratory toast. Derived from
   // the pre-toggle streak (+1) — deterministic for a same-day completion.
-  const maybeCelebrateStreak = (
+  // Gamification (R3): prefer the server truth. When the toggle-response carries
+  // newly-earned badges, show ONE toast per badge (covers 3/14/60/365 and the
+  // total_*/first_habit awards the old hardcoded 7/30/100 self-toast ignored,
+  // and avoids the double-toast when a badge coincides with a milestone). Only
+  // when the response carries NO badge data do we fall back to the milestone
+  // self-toast, and never for period habits (the +1 math is unsound there).
+  const celebrate = (
     habit: HabitWithLogRecord | undefined,
     becameVoltooid: boolean,
+    earned: EarnedBadge[],
   ) => {
+    if (earned.length > 0) {
+      for (const badge of earned) {
+        toastSuccess(`${badge.emoji ? `${badge.emoji} ` : ""}Badge behaald: ${badge.naam}`);
+      }
+      return;
+    }
     if (!becameVoltooid || !habit) return;
     if (queryParams.datum !== todayStr()) return;
+    if (isPeriodHabit(habit)) return;
     const reached = (habit.huidigeStreak ?? 0) + 1;
     if (STREAK_MILESTONES.includes(reached)) {
       toastSuccess(`🔥 ${reached} dagen streak!`);
@@ -599,6 +643,7 @@ export function useHabits(datum?: string) {
       // optimistic patch below is honest instead of a snap-back lie.
       const nextVoltooid = !(habit?.log?.voltooid ?? false);
       const naam = habit?.naam ?? "Habit";
+      let earned: EarnedBadge[] = [];
       const ok = await runOptimisticHabitAction(
         habitId,
         () => {
@@ -610,7 +655,7 @@ export function useHabits(datum?: string) {
           setAnnouncement(`${naam} ${nextVoltooid ? "voltooid" : "heropend"}`);
         },
         async () => {
-          await postHabitsIdToggle(
+          const res = await postHabitsIdToggle(
             habitId,
             toApiPayload({
               datum: queryParams.datum,
@@ -620,10 +665,11 @@ export function useHabits(datum?: string) {
             }),
             { userId },
           );
+          earned = newlyEarnedBadges(res?.data);
         },
         "Habit bijwerken is mislukt",
       );
-      if (ok) maybeCelebrateStreak(habit, nextVoltooid);
+      if (ok) celebrate(habit, nextVoltooid, earned);
       return ok;
     },
     increment: async (habitId: string, stap: number) => {
@@ -636,6 +682,7 @@ export function useHabits(datum?: string) {
       const wasVoltooid = habit?.log?.voltooid ?? false;
       const nextVoltooid = doel != null ? nextWaarde >= doel : wasVoltooid;
       const naam = habit?.naam ?? "Habit";
+      let earned: EarnedBadge[] = [];
       const ok = await runOptimisticHabitAction(
         habitId,
         () => {
@@ -651,7 +698,7 @@ export function useHabits(datum?: string) {
           );
         },
         async () => {
-          await postHabitsIdToggle(
+          const res = await postHabitsIdToggle(
             habitId,
             toApiPayload({
               datum: queryParams.datum,
@@ -660,10 +707,11 @@ export function useHabits(datum?: string) {
             }),
             { userId },
           );
+          earned = newlyEarnedBadges(res?.data);
         },
         "Habit bijwerken is mislukt",
       );
-      if (ok) maybeCelebrateStreak(habit, nextVoltooid && !wasVoltooid);
+      if (ok) celebrate(habit, nextVoltooid && !wasVoltooid, earned);
       return ok;
     },
     incident: (habitId: string, trigger?: string, notitie?: string) =>

@@ -44,7 +44,9 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
 
   const applyScene = (scene: ScenePreset) => {
     sendBatch(onlineDevices, scene.command);
-    success(`${scene.label} toegepast in ${room.name}`);
+    // "Verstuurd": sendBatch meldt zelf welke lampen niet reageerden — geen
+    // valse "toegepast"-belofte vóór de batch-uitkomst bekend is.
+    success(`${scene.label} verstuurd naar ${room.name}`);
     setShowScenes(false);
   };
 

@@ -36,7 +36,7 @@ export const CUSTOM_SCENES: ScenePreset[] = [
 // ─── WiZ native ingebouwde effecten (sceneId 1–32) ──────────────────────────
 export const WIZ_SCENES: ScenePreset[] = [
   { id: "wiz-romance",   label: "Romance",     color: "#ff4060", command: { on: true, scene_id: 2  } },
-  { id: "wiz-sunset",    label: "Zonsonder",   color: "#ff6030", command: { on: true, scene_id: 3  } },
+  { id: "wiz-sunset",    label: "Zonsondergang", color: "#ff6030", command: { on: true, scene_id: 3  } },
   { id: "wiz-party",     label: "Party",       color: "#ff20a0", command: { on: true, scene_id: 4  } },
   { id: "wiz-fireplace", label: "Haard",       color: "#ff8030", command: { on: true, scene_id: 5  } },
   { id: "wiz-wakeup",    label: "Ontwaken",    color: "#ffcc60", command: { on: true, scene_id: 9  } },

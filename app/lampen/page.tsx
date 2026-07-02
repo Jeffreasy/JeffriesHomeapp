@@ -117,7 +117,7 @@ export default function LampenPage() {
                 </p>
                 <h1 className="mt-1 truncate text-2xl font-bold text-white">Verlichting</h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  {onlineDevices.length}/{devices.length} online - {onDevices.length} aan
+                  {onlineDevices.length}/{devices.length} online · {onDevices.length} aan
                 </p>
               </div>
             </div>

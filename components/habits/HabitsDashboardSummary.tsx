@@ -148,7 +148,7 @@ export function HabitsDashboardSummary({
                 {privacyOn ? "Verborgen" : "Zichtbaar"}
               </p>
               <p className="mt-1 text-sm text-indigo-100/60">
-                {privacyOn ? "Prive modus actief" : "Details zichtbaar"}
+                {privacyOn ? "Privé modus actief" : "Details zichtbaar"}
               </p>
             </div>
           </div>

@@ -40,8 +40,24 @@ export function FinanceMetricsGrid({
 }) {
   if (!stats) return null;
 
+  // F1/scope: de stats (metrics + pie/charts) beslaan de hele periode
+  // (iban/jaar/maand/datum). Categorie-, zoek- en richting-filters gelden
+  // alléén voor de transactielijst — label dat eerlijk zodra er zo'n
+  // lijst-only filter actief is, anders lijken de kaarten die filters te volgen.
+  const listOnlyFilterActive = Boolean(
+    filters.categorieFilter || filters.richting || zoekterm ||
+    filters.minBedrag !== undefined || filters.maxBedrag !== undefined ||
+    filters.onlyStorneringen
+  );
+
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="space-y-2">
+    {listOnlyFilterActive && (
+      <p className="text-[11px] text-slate-500">
+        Kaarten tonen de hele periode — categorie-, zoek- en richting-filters gelden alleen voor de lijst.
+      </p>
+    )}
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <MetricCard
         label="Saldo"
         value={formatPrivateEuro(stats.huidigSaldo)}
@@ -108,6 +124,7 @@ export function FinanceMetricsGrid({
         icon={Filter}
         tone={selectedFilterCount > 0 || zoekterm ? "sky" : "slate"}
       />
+    </div>
     </section>
   );
 }

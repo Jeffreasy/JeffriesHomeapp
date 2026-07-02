@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { laventecareApi } from "@/lib/api";
 import {
   Activity,
   Building2,
@@ -46,6 +48,7 @@ import {
   formatMinutes,
   formatMoney,
   isDossierDocumentForCompany,
+  isPastDate,
   label,
   projectFaseLabel,
   projectStatusLabel,
@@ -147,6 +150,7 @@ export function LaventeCareCustomerDossier({
   onEditCompany,
   onAddContact,
   onStartWorkstream,
+  onOpenCommerce,
   onCreateActivity,
   onCreateAccessCredential,
   onUpdateAccessCredential,
@@ -171,6 +175,8 @@ export function LaventeCareCustomerDossier({
   onEditCompany: (company: CompanyItem) => void;
   onAddContact: (company: CompanyItem) => void;
   onStartWorkstream: (company: CompanyItem) => void;
+  /** R3-maandafsluiting: open Commercie met deze klant voorgeselecteerd. */
+  onOpenCommerce?: (company: CompanyItem) => void;
   onCreateActivity: (payload: ActivityEventSubmitPayload) => Promise<void>;
   onCreateAccessCredential: (payload: {
     company_id: string;
@@ -203,6 +209,23 @@ export function LaventeCareCustomerDossier({
   // gelift zodat de modal-dirty-guard hem meeneemt.
   const [accessFormDirty, setAccessFormDirty] = useState(false);
   const companyId = company?._id ?? company?.id ?? "";
+
+  // R3-9: per-klant activiteit + toegang direct uit de list-endpoints, i.p.v.
+  // de globaal op 30 afgekapte cockpit-payload (waar een drukke klant de rest
+  // uit de timeline/credentials verdringt). Alleen actief zolang het dossier
+  // open is.
+  const { data: companyActivityData } = useQuery({
+    queryKey: ["laventecare", "activity", "company", companyId],
+    queryFn: () => laventecareApi.listActivityEvents({ companyId, limit: 250 }),
+    enabled: isOpen && Boolean(companyId),
+    staleTime: 15_000,
+  });
+  const { data: companyAccessData } = useQuery({
+    queryKey: ["laventecare", "access-credentials", "company", companyId],
+    queryFn: () => laventecareApi.listAccessCredentials({ companyId, limit: 250 }),
+    enabled: isOpen && Boolean(companyId),
+    staleTime: 15_000,
+  });
 
   // Nooit een stale moment-draft van een ander/dezelfde klantdossier
   // terug laten komen: reset zodra het dossier wisselt of sluit.
@@ -252,12 +275,19 @@ export function LaventeCareCustomerDossier({
     [dossierDocuments, companyId, companyName, leadIds, projectIds, workstreamIds]
   );
   const companyActivity = useMemo(
-    () => activityEvents.filter((event) => event.company_id === companyId),
-    [activityEvents, companyId]
+    () =>
+      // R3-9: prefereer de uncapped per-klant-query; val terug op de cockpit-
+      // lijst zolang die nog laadt.
+      (companyActivityData ??
+        activityEvents.filter((event) => event.company_id === companyId)) as ActivityEventItem[],
+    [companyActivityData, activityEvents, companyId]
   );
   const companyAccess = useMemo(
-    () => accessCredentials.filter((item) => item.company_id === companyId),
-    [accessCredentials, companyId]
+    () =>
+      (companyAccessData
+        ? companyAccessData.map((item) => ({ ...item, _id: item.id }))
+        : accessCredentials.filter((item) => item.company_id === companyId)) as AccessCredentialItem[],
+    [companyAccessData, accessCredentials, companyId]
   );
   // M-J: uren en facturen van deze klant (direct of via project/opdracht).
   const companyTimeEntries = useMemo(
@@ -423,6 +453,18 @@ export function LaventeCareCustomerDossier({
                 <Workflow size={14} />
                 <span className="hidden sm:inline">Opdracht</span>
               </button>
+              {onOpenCommerce ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenCommerce(company)}
+                  className="btn btn--ghost btn--sm justify-center"
+                  aria-label={`Open Commercie voor ${company.naam}`}
+                  title="Open in Commercie (klant voorgeselecteerd)"
+                >
+                  <ReceiptText size={14} />
+                  <span className="hidden sm:inline">Commercie</span>
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -1660,7 +1702,14 @@ function buildTimeline(input: {
       ]
         .filter(Boolean)
         .join(" - "),
-      tone: invoice.status === "betaald" ? "emerald" : "rose",
+      // L12: rood alleen voor écht te-late facturen; betaald = groen, een verse
+      // concept/verstuurd-factuur is neutraal (amber), niet alarmerend rood.
+      tone:
+        invoice.status === "betaald"
+          ? "emerald"
+          : invoice.status !== "geannuleerd" && isPastDate(invoice.due_date)
+            ? "rose"
+            : "amber",
     });
   }
 

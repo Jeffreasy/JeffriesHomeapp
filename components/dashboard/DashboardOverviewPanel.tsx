@@ -65,6 +65,8 @@ export function OverviewPanel({
   scheduleFailed,
   devicesLoading,
   devicesFailed,
+  financeLoading,
+  financeFailed,
 }: {
   nextDienst: ReturnType<typeof useSchedule>["nextDienst"];
   nextEvent: PersonalEvent | null;
@@ -83,6 +85,8 @@ export function OverviewPanel({
   scheduleFailed?: boolean;
   devicesLoading?: boolean;
   devicesFailed?: boolean;
+  financeLoading?: boolean;
+  financeFailed?: boolean;
 }) {
   const conflictLabel = hardConflicts > 0 ? `${hardConflicts} harde overlap` : `${conflicts} aandachtspunt(en)`;
 
@@ -169,7 +173,9 @@ export function OverviewPanel({
         />
         <OverviewCell
           icon={Wallet}
-          tone="green"
+          // DEEL2/finance-cel: laden/fout/waarde — spiegel de rose fout-tone
+          // van de dienst/afspraak/lampen-cellen; niet permanent hardcoded groen.
+          tone={financeFailed ? "rose" : financeLoading ? "slate" : "green"}
           label={nettoLabel}
           value={nettoValue}
           sub={nettoSub}

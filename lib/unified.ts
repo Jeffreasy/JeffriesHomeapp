@@ -16,6 +16,10 @@ export interface UnifiedWeek {
   dienstenAantal: number;
 }
 
+/** Pending afspraken die nog wél op de tijdlijn horen (H14). PendingDelete niet:
+ *  die wordt al vóór dit punt uit `upcoming` gefilterd. */
+const PENDING_TIMELINE_STATUSES = new Set(["PendingCreate", "PendingUpdate"]);
+
 /**
  * ─── Helpers ──────────────────────────────────────────────────────────────────
  */
@@ -51,9 +55,14 @@ export function generateUnifiedTimeline(diensten: DienstRow[], events: PersonalE
     });
   }
 
-  // 2. Transformeer Afspraken 
+  // 2. Transformeer Afspraken
   for (const e of events) {
-    if (e.status !== "Aankomend") continue;
+    // Aankomend én de pending-statussen (PendingCreate/PendingUpdate) horen op
+    // de tijdlijn: een net-aangemaakte afspraak staat wél in de chips, dus hij
+    // mag niet van het hoofdoppervlak verdwijnen zolang hij nog synct
+    // (audit H14). Voorbij/verwijderd/PendingDelete filtert usePersonalEvents al
+    // uit `upcoming`, dus die bereiken deze lijst niet.
+    if (e.status !== "Aankomend" && !PENDING_TIMELINE_STATUSES.has(e.status)) continue;
     // Note: voor meerdaagse afspraken kopiëren in de toekomst, voor nu startDatum
     allItems.push({
       type: "afspraak",

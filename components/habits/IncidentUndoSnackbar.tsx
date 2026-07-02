@@ -74,7 +74,7 @@ export function IncidentUndoSnackbar({
             disabled={busy}
             className="shrink-0 rounded-lg border border-amber-500/30 bg-amber-500/15 px-2.5 py-1.5 text-xs font-bold text-amber-200 transition-colors hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {busy ? "Bezig..." : "Ongedaan maken"}
+            {busy ? "Bezig…" : "Ongedaan maken"}
           </button>
           <button
             type="button"

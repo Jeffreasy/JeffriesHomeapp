@@ -41,9 +41,18 @@ export class ErrorBoundary extends Component<Props, State> {
           <h3 className="text-sm font-semibold text-slate-300 mb-1">
             Er is iets misgegaan
           </h3>
-          <p className="text-xs text-slate-500 mb-4 max-w-xs">
-            {this.state.error?.message ?? "Onbekende fout"}
+          <p className="text-xs text-slate-400 mb-2 max-w-xs">
+            Dit onderdeel kon niet worden weergegeven. Probeer het opnieuw.
           </p>
+          {/* Raw error text only as a small secondary detail line — never as the
+              headline (mirrors app/error.tsx): it is usually English jargon. */}
+          {this.state.error?.message ? (
+            <p className="text-[11px] leading-4 text-slate-500 mb-4 max-w-xs break-words">
+              {this.state.error.message}
+            </p>
+          ) : (
+            <span className="mb-2" />
+          )}
           <button
             onClick={this.reset}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--color-surface)] text-slate-300 border border-[var(--color-border)] text-sm hover:bg-[var(--color-surface-hover)] transition-colors"

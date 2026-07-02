@@ -161,6 +161,18 @@ function titleFromNote(note: NoteRecord) {
   return (note.titel || note.inhoud.split("\n")[0] || "Naamloze notitie").trim();
 }
 
+/**
+ * R3-18: summary mode blanks `inhoud`, so an untitled note used to show
+ * "Naamloze notitie" on the kiosk. The backend now returns a `preview` (first
+ * ~80 chars) on the summary row — surface it as the note's first line. Defensive:
+ * falls back to whatever `inhoud` carried when `preview` is absent.
+ */
+function previewFromRow(row: NoteRow): string {
+  const preview = (row as NoteRow & { preview?: unknown }).preview;
+  if (typeof preview === "string" && preview.trim()) return preview;
+  return row.inhoud ?? "";
+}
+
 // De kiosk haalt notities via `fields=summary` + `limit` (M-G) i.p.v. het
 // volledige corpus; deze mapper vult het NoteRecord-vormpje dat noteScore/
 // makeFocusNotes verwachten (triage_flag reist mee via de spread).
@@ -169,7 +181,7 @@ function summaryRowToNote(row: NoteRow): NoteRecord {
     ...row,
     id: row.id ?? "",
     user_id: row.user_id ?? "",
-    inhoud: row.inhoud ?? "",
+    inhoud: previewFromRow(row),
     tags: row.tags ?? [],
     isPinned: row.is_pinned ?? false,
     isArchived: row.is_archived ?? false,

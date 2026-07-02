@@ -20,6 +20,10 @@ interface ShortcutOptions {
 export function useGlobalShortcuts({ devices, allOn, sendBatch }: ShortcutOptions) {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Spatie ingedrukt houden vuurt key-repeat events — zonder deze guard
+      // stuurt elke repeat een volledige toggle-batch (strobe/command-storm).
+      if (e.repeat) return;
+
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
 

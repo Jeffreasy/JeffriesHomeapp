@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sun, Moon, Sunset, Popcorn, Zap, Coffee,
@@ -34,16 +34,46 @@ function ColorPill({ devices }: { devices: Device[] }) {
   const { sendBatch } = useLampCommand();
   const { success } = useToast();
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Popover-hygiëne: Escape + klik-buiten sluiten, en focus verplaatst naar de
+  // popover bij openen en terug naar de trigger bij sluiten.
+  useEffect(() => {
+    if (!open) return;
+    closeBtnRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [open]);
+
   const apply = () => {
     const { r, g, b } = hexToRgb(hex);
+    // sendBatch meldt zelf welke lampen niet reageerden; hier alleen bevestigen
+    // dat het commando de deur uit is, niet dat het al is aangekomen.
     sendBatch(devices, { r, g, b, on: true });
-    success("Kleur toegepast op alle lampen");
+    success("Kleur verstuurd naar alle lampen");
     setOpen(false);
   };
 
   return (
-    <div className="relative flex-shrink-0">
+    <div ref={containerRef} className="relative flex-shrink-0">
       <motion.button
+        ref={triggerRef}
         whileTap={{ scale: 0.93 }}
         onClick={() => setOpen((v) => !v)}
         className={cn(
@@ -76,6 +106,7 @@ function ColorPill({ devices }: { devices: Device[] }) {
             <div className="flex items-center justify-between mb-3">
               <p className="text-xs font-medium text-slate-300">Kleur instellen</p>
               <button
+                ref={closeBtnRef}
                 onClick={() => setOpen(false)}
                 className="text-slate-500 hover:text-slate-300 transition-colors"
                 aria-label="Sluiten"
@@ -118,7 +149,9 @@ export function SceneBar() {
     // sendBatch doet de optimistic cache-patch per lamp (instant feedback)
     // en invalideert de devices-query één keer aan het eind.
     sendBatch(onlineDevices, scene.command);
-    success(`Scène "${scene.label}" toegepast`);
+    // "Verstuurd" i.p.v. "toegepast": sendBatch is fire-and-forget en meldt
+    // zelf welke lampen niet reageerden — geen valse succesbelofte vooraf.
+    success(`Scène "${scene.label}" verstuurd`);
     setShowWiz(false);
   };
 

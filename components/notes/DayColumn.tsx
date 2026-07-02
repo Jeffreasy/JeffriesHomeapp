@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, Clock, ListChecks, Plus, RotateCcw } from "lucide-react";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
@@ -64,7 +64,7 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
       }
       await onCreate({
         inhoud: text,
-        titel: titleChars.length > 80 ? titleChars.slice(0, 77).join("") + "..." : text,
+        titel: titleChars.length > 80 ? titleChars.slice(0, 77).join("") + "…" : text,
         deadline,
       });
       setQuickText("");
@@ -242,7 +242,7 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
             value={quickText}
             onChange={(e) => setQuickText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Schrijf iets..."
+            placeholder="Schrijf iets…"
             disabled={saving}
             className="flex-1 bg-transparent text-base sm:text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-subtle)] outline-none disabled:opacity-50"
           />
@@ -284,12 +284,6 @@ function JournalNoteButton({
   const checklist = getChecklistInfo(note.inhoud);
   const previewTitle = note.titel || note.inhoud.split("\n")[0].slice(0, 50) || "Zonder titel";
   const openNote = () => onEdit(note);
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-
-    event.preventDefault();
-    openNote();
-  };
 
   return (
     <motion.div
@@ -297,12 +291,10 @@ function JournalNoteButton({
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      role="button"
-      tabIndex={0}
-      aria-label={`Notitie openen: ${previewTitle}`}
-      onClick={openNote}
-      onKeyDown={handleKeyDown}
-      className="group/item w-full cursor-pointer rounded-lg px-2.5 py-2 text-left outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-amber-400/60"
+      // N2/R3-13: plain container — the TITLE is the real focusable open-control
+      // (a role="button" div wrapping the real Afronden button was invalid ARIA
+      // nesting, like the pre-N2 NoteCard).
+      className="group/item w-full rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-white/5 focus-within:bg-white/5"
     >
       <div className="flex items-start gap-2">
         <AppIcon
@@ -314,9 +306,14 @@ function JournalNoteButton({
           iconClassName={note.kleur ? undefined : "text-[var(--color-text-muted)]"}
         />
         <div className="min-w-0 flex-1">
-          <p className={`truncate text-sm font-medium ${completed ? "text-slate-500 line-through decoration-emerald-400/50" : "text-[var(--color-text)]"}`}>
+          <button
+            type="button"
+            onClick={openNote}
+            aria-label={`Notitie openen: ${previewTitle}`}
+            className={`block w-full truncate rounded text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${completed ? "text-slate-500 line-through decoration-emerald-400/50" : "text-[var(--color-text)]"}`}
+          >
             {previewTitle}
-          </p>
+          </button>
           {note.titel && note.inhoud !== note.titel && (
             <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
               {note.inhoud.split("\n")[0].slice(0, 60)}
@@ -339,7 +336,7 @@ function JournalNoteButton({
         <div className="flex shrink-0 items-center gap-1">
           {/* K3: [@media(hover:hover)]-guard zoals NoteCard — touch-apparaten
               (geen hover) zien tijd en Afronden-knop altijd. */}
-          <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-[var(--color-text-subtle)] opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100">
+          <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-[var(--color-text-subtle)] opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100">
             {bucketedByDeadline && <Clock size={9} aria-hidden="true" />}
             {bucketedByDeadline ? formatTime(note.deadline!) : formatTime(note.aangemaakt)}
           </span>
@@ -350,7 +347,9 @@ function JournalNoteButton({
               void onToggleComplete(note);
             }}
             disabled={pending}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 opacity-100 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40 sm:[@media(hover:hover)]:opacity-0 sm:group-hover/item:opacity-100"
+            // R3-13: also reveal on keyboard focus within the card, not only on
+            // pointer hover, so keyboard users can reach Afronden.
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 opacity-100 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40 sm:[@media(hover:hover)]:opacity-0 sm:group-hover/item:opacity-100 sm:group-focus-within/item:opacity-100"
             aria-label={completed ? "Heropenen" : "Afronden"}
             title={completed ? "Heropenen" : "Afronden"}
           >

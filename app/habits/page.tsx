@@ -220,6 +220,30 @@ export default function HabitsPage() {
     [openConfirm, removeIncident, success],
   );
 
+  // Pause honesty (R3): pausing does NOT protect the streak — paused days still
+  // count in the streak calculation — so warn before pausing (never on resume).
+  // The backend is improving the semantics; until then this stops the opposite
+  // expectation the bare "Pauzeren" action created.
+  const handlePause = useCallback(
+    async (id: string) => {
+      const habit = habits.find((h) => h._id === id);
+      if (habit?.isPauze) {
+        // Resuming needs no warning.
+        pause(id);
+        return;
+      }
+      const confirmed = await openConfirm({
+        title: "Habit pauzeren?",
+        message:
+          "Let op: gepauzeerde dagen tellen mee voor je streak-berekening.",
+        confirmLabel: "Pauzeren",
+      });
+      if (!confirmed) return;
+      pause(id);
+    },
+    [habits, openConfirm, pause],
+  );
+
   const moveDate = (days: number) => {
     setSelectedDate((date) => shiftDate(date || todayStr(), days));
   };
@@ -337,6 +361,7 @@ export default function HabitsPage() {
                 todayHabits={todayHabits}
                 isLoading={isLoading}
                 isToday={isToday}
+                activeDate={activeDate}
                 setShowForm={setShowForm}
                 privacyOn={privacyOn}
                 toggle={toggle}
@@ -344,7 +369,7 @@ export default function HabitsPage() {
                 incident={handleIncident}
                 removeIncident={handleRemoveIncident}
                 incidentAllowed={incidentAllowed}
-                pause={pause}
+                pause={handlePause}
                 archive={archive}
                 setConfirmDelete={requestDelete}
                 setEditingHabit={setEditingHabit}
@@ -371,6 +396,7 @@ export default function HabitsPage() {
               <HabitsOverzichtTab
                 groupedHabits={groupedHabits}
                 isLoading={isLoading}
+                activeDate={activeDate}
                 setShowForm={setShowForm}
                 privacyOn={privacyOn}
                 toggle={toggle}
@@ -378,7 +404,7 @@ export default function HabitsPage() {
                 incident={handleIncident}
                 removeIncident={handleRemoveIncident}
                 incidentAllowed={incidentAllowed}
-                pause={pause}
+                pause={handlePause}
                 archive={archive}
                 setConfirmDelete={requestDelete}
                 setEditingHabit={setEditingHabit}

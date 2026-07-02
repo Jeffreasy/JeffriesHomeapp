@@ -208,9 +208,15 @@ export function MaandBalk({ record, maxNetto, mask = noMask, selected, onSelect 
   selected?: boolean;
   onSelect?: () => void;
 }) {
-  const pct    = maxNetto > 0 ? (record.nettoPrognose / maxNetto) * 100 : 0;
   const isEenm = record.eenmaligTotaal > 0;
   const isWerkelijk = record.bron === "werkelijk";
+  // Privacy: mask() maskeert alleen de tekst, maar de bar-hoogte lekt de
+  // relatieve netto-verhoudingen nog. Detecteer de mask-staat en vlak de
+  // balken af tot een uniforme hoogte zodra privacy aanstaat.
+  const isMasked = mask(" ") === "••••";
+  const pct = isMasked
+    ? 100
+    : maxNetto > 0 ? (record.nettoPrognose / maxNetto) * 100 : 0;
   const detail = `${MAANDEN[record.maand - 1]}: ${mask(fmt(record.nettoPrognose))} (${isWerkelijk ? "werkelijk" : "prognose"})`;
 
   return (
@@ -269,7 +275,14 @@ export function JaarSectie({ jaar, records, mask = noMask }: { jaar: number; rec
           {jaar}
         </span>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          {werkelijkAantal > 0 && <span className="text-emerald-400">{werkelijkAantal} werkelijk</span>}
+          {/* Scope: jaartotalen mengen werkelijke loonstrookmaanden met
+              prognosemaanden — label dat zodra beide soorten meetellen. */}
+          {werkelijkAantal > 0 && werkelijkAantal < sorted.length && (
+            <span className="text-slate-500">{werkelijkAantal} werkelijk · {sorted.length - werkelijkAantal} prognose</span>
+          )}
+          {werkelijkAantal > 0 && werkelijkAantal === sorted.length && (
+            <span className="text-emerald-400">{werkelijkAantal} werkelijk</span>
+          )}
           <span className="text-slate-500">Bruto <span className="text-slate-300 font-medium">{mask(fmt(totBruto))}</span></span>
           <span className="text-slate-500">Netto <span className="text-emerald-400 font-bold">{mask(fmt(totNetto))}</span></span>
         </div>

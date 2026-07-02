@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Debounce a value: only update the returned value after `delay` ms of no changes.
@@ -17,27 +17,68 @@ export function useDebounce<T>(value: T, delay: number): T {
 }
 
 /**
- * Debounced callback: fires the callback only after `delay` ms of no calls.
- * Used to prevent API spam while dragging sliders.
+ * A debounced callback that also exposes `flush` and `cancel`.
+ * - Calling it schedules `callback` after `delay` ms of no calls.
+ * - `flush()` runs any pending call immediately (used on unmount so parked
+ *   taps aren't lost — HabitCard stepper).
+ * - `cancel()` drops any pending call without running it (used when the shown
+ *   date changes so a parked commit never writes to the new date).
  */
+export interface DebouncedCallback<Args extends unknown[]> {
+  (...args: Args): void;
+  flush: () => void;
+  cancel: () => void;
+}
+
 export function useDebouncedCallback<Args extends unknown[]>(
   callback: (...args: Args) => void,
   delay: number
-): (...args: Args) => void {
+): DebouncedCallback<Args> {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cbRef = useRef(callback);
+  // Remember the last scheduled args so flush() can replay them.
+  const pendingArgsRef = useRef<Args | null>(null);
 
   useEffect(() => {
     cbRef.current = callback;
   }, [callback]);
 
-  useEffect(() => {
-    return () => clearTimeout(timerRef.current);
+  const cancel = useCallback(() => {
+    clearTimeout(timerRef.current);
+    timerRef.current = undefined;
+    pendingArgsRef.current = null;
   }, []);
 
-  return useCallback((...args: Args) => {
+  const flush = useCallback(() => {
+    if (timerRef.current === undefined) return;
     clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => cbRef.current(...args), delay);
-  }, [delay]);
+    timerRef.current = undefined;
+    const args = pendingArgsRef.current;
+    pendingArgsRef.current = null;
+    if (args) cbRef.current(...args);
+  }, []);
+
+  // Flush (not drop) on unmount: a pending stepper commit must still persist.
+  useEffect(() => {
+    return () => flush();
+  }, [flush]);
+
+  // Build the composite (callable + flush/cancel) inside useMemo so the methods
+  // are assigned to a freshly-created local function, not onto a frozen memoized
+  // value (which the React-compiler lint forbids mutating).
+  return useMemo(() => {
+    const fn = ((...args: Args) => {
+      clearTimeout(timerRef.current);
+      pendingArgsRef.current = args;
+      timerRef.current = setTimeout(() => {
+        timerRef.current = undefined;
+        pendingArgsRef.current = null;
+        cbRef.current(...args);
+      }, delay);
+    }) as DebouncedCallback<Args>;
+    fn.flush = flush;
+    fn.cancel = cancel;
+    return fn;
+  }, [delay, flush, cancel]);
 }
 

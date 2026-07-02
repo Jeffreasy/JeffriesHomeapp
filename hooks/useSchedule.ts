@@ -162,13 +162,9 @@ export function useSchedule() {
     }
   }, [userId, invalidateAll]);
 
-  const toggleStatus = async (event_id: string, status: string) => {
-    const dienst = diensten.find((d) => d.eventId === event_id);
-    if (!dienst) return;
-    setVersion((v) => v + 1);
-    await postScheduleImport({ userId, fileName: "status-update", rows: [{ ...dienst, status }] } as unknown as Parameters<typeof postScheduleImport>[0]);
-    invalidateAll();
-  };
+  // toggleStatus verwijderd (audit L dead-code): geen consumenten, en het
+  // her-importeerde één dienst met fileName "status-update" wat de rooster-meta
+  // (fileName/totalRows) zou overschrijven — een meta-clobber-footgun.
 
   const dienstenByDate = useMemo(() => {
     const map: Record<string, DienstRow[]> = {};
@@ -178,19 +174,25 @@ export function useSchedule() {
     return map;
   }, [diensten]);
 
+  // Afgeleiden memoizen (audit DEEL 2 #14): inline getNextDienst/getThisWeek/
+  // getUpcoming in de return gaven bij elke render verse array/object-identiteiten,
+  // wat downstream memo's en effecten onnodig hertriggerde.
+  const nextDienst = useMemo(() => getNextDienst(diensten), [diensten]);
+  const thisWeek   = useMemo(() => getThisWeek(diensten), [diensten]);
+  const upcoming   = useMemo(() => getUpcoming(diensten, 30), [diensten]);
+
   return {
     diensten,
     meta,
     dienstenByDate,
-    nextDienst: getNextDienst(diensten),
-    thisWeek:   getThisWeek(diensten),
-    upcoming:   getUpcoming(diensten, 30),
+    nextDienst,
+    thisWeek,
+    upcoming,
     isLoading,
     isError,
     error,
     importCsv,
     clear,
-    toggleStatus,
     refetch,
     version,
   };

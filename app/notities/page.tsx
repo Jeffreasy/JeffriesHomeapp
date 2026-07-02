@@ -32,6 +32,8 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
 import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
+import { ApiError } from "@/lib/api";
+import { NoteConflictError } from "@/components/notes/NoteEditor";
 
 export default function NotitiesPage() {
   const { user } = useUser();
@@ -96,9 +98,17 @@ export default function NotitiesPage() {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
 
-      if ((event.key === "n" || event.key === "N") && activeTab === "collection") {
+      if (
+        (event.key === "n" || event.key === "N") &&
+        // R3-15: a bare "n" only — Ctrl/Meta/Alt+N are browser/OS shortcuts and
+        // must not hijack into a new note.
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        activeTab === "collection"
+      ) {
         // N6: nooit een editor-remount triggeren vanaf knoppen/contentEditable
         // of terwijl de editor dan wel een dialog openstaat — een "n" met focus
         // op een toolbar-knop vernietigde anders de in-memory draft.
@@ -264,8 +274,20 @@ export default function NotitiesPage() {
     setEditorOpen(true);
   };
 
+  // R3-12: "Open in editor" carries the captured text + parsed #tags into the
+  // editor instead of opening it empty (which silently orphaned the typed line).
+  const [editorSeed, setEditorSeed] = useState<{ titel: string; tags: string[] } | null>(null);
+
   const handleNew = () => {
     setEditNote(null);
+    setEditorSeed(null);
+    setEditorOpen(true);
+  };
+
+  const handleOpenInEditor = () => {
+    const { cleanText, extractedTags } = parseHashTags(quickText);
+    setEditNote(null);
+    setEditorSeed(cleanText ? { titel: cleanText, tags: extractedTags } : null);
     setEditorOpen(true);
   };
 
@@ -299,14 +321,52 @@ export default function NotitiesPage() {
     }
   };
 
-  const handleSave = async (data: NoteCreateData) => {
-    if (editNote) {
-      // Send the gewijzigd we opened with so a background change to this note is
-      // not silently overwritten — the backend returns 409 and the editor keeps
-      // the draft + shows an error instead of clobbering the other write.
-      await update(editNote.id, { ...data, expectedGewijzigd: editNote.gewijzigd });
-    } else {
+  // H2 (R3): after a 409 we refetch the note and let the editor resubmit with
+  // the FRESH gewijzigd on explicit "Toch overschrijven" — this ref carries that
+  // refreshed token so the second attempt isn't rejected by the same stale one.
+  const overwriteTokenRef = useRef<{ id: string; gewijzigd: string } | null>(null);
+
+  const handleSave = async (data: NoteCreateData, overwrite?: boolean) => {
+    if (!editNote) {
       await create(data);
+      // R3-12: only now that the create succeeded do we clear the capture field
+      // that seeded this editor (and drop the seed).
+      if (editorSeed) {
+        setQuickText("");
+        setEditorSeed(null);
+      }
+      return;
+    }
+    // On an explicit overwrite, prefer the token we captured from the conflict
+    // refetch; otherwise the gewijzigd we opened with.
+    const expectedGewijzigd =
+      overwrite && overwriteTokenRef.current?.id === editNote.id
+        ? overwriteTokenRef.current.gewijzigd
+        : editNote.gewijzigd;
+    try {
+      await update(editNote.id, { ...data, expectedGewijzigd });
+      overwriteTokenRef.current = null;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        // Refetch so the editor can show the newest version + a real overwrite
+        // path instead of retrying the same doomed token forever.
+        let fresh: NoteRecord | null = null;
+        try {
+          const res = await refetch();
+          const rows = res.data?.data;
+          const match = Array.isArray(rows)
+            ? (rows as Array<{ id?: string }>).find((n) => n.id === editNote.id)
+            : undefined;
+          fresh = (match as unknown as NoteRecord) ?? null;
+        } catch {
+          fresh = null;
+        }
+        if (fresh?.gewijzigd) {
+          overwriteTokenRef.current = { id: editNote.id, gewijzigd: fresh.gewijzigd };
+        }
+        throw new NoteConflictError(fresh);
+      }
+      throw err;
     }
   };
 
@@ -475,7 +535,7 @@ export default function NotitiesPage() {
               saving={quickSaving}
               onChange={setQuickText}
               onSave={handleQuickCreate}
-              onOpenEditor={handleNew}
+              onOpenEditor={handleOpenInEditor}
             />
 
             <NotesMetricsRow
@@ -556,6 +616,8 @@ export default function NotitiesPage() {
             key={editNote?.id ?? "new-note"}
             note={editNote}
             userId={user?.id}
+            initialTitle={!editNote ? editorSeed?.titel : undefined}
+            initialTags={!editNote ? editorSeed?.tags : undefined}
             onSave={handleSave}
             onClose={() => {
               setEditorOpen(false);

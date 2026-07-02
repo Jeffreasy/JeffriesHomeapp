@@ -111,26 +111,41 @@ export function HabitForm({
   // close — the only modal in the app that rolled its own dialog without one.
   useFocusTrap(open, sheetRef);
 
+  // R3: freeze `initial` at open-time. The habits query can return a new object
+  // identity while the editor is open (e.g. a Telegram check-off + refocus);
+  // that used to recompute the dirty baseline AND re-run the reset effect,
+  // wiping the user's typed edits. Capturing once on open decouples the form
+  // from live server churn.
+  const frozenInitialRef = useRef<Partial<HabitCreateData> | undefined>(initial);
+  const wasOpenRef = useRef(false);
+  if (open && !wasOpenRef.current) {
+    frozenInitialRef.current = initial;
+    wasOpenRef.current = true;
+  } else if (!open && wasOpenRef.current) {
+    wasOpenRef.current = false;
+  }
+  const frozenInitial = frozenInitialRef.current;
+
   // Dirty check (H6): compare against the same defaults the open-effect resets to.
   const initialSnapshot = useMemo(
     () =>
       formSnapshot({
-        naam: initial?.naam ?? "",
-        emoji: initial?.emoji ?? "🎯",
-        type: initial?.type ?? "positief",
-        frequentie: initial?.frequentie ?? "dagelijks",
-        aangepasteDagen: initial?.aangepasteDagen ?? [],
-        moeilijkheid: initial?.moeilijkheid ?? "normaal",
-        roosterFilter: initial?.roosterFilter ?? "alle",
-        kleur: initial?.kleur ?? HABIT_COLORS[0],
-        beschrijving: initial?.beschrijving ?? "",
-        isKwantitatief: initial?.isKwantitatief ?? false,
-        doelWaarde: initial?.doelWaarde,
-        eenheid: initial?.eenheid ?? "",
-        doelAantal: initial?.doelAantal,
-        doelTijd: initial?.doelTijd ?? "",
+        naam: frozenInitial?.naam ?? "",
+        emoji: frozenInitial?.emoji ?? "🎯",
+        type: frozenInitial?.type ?? "positief",
+        frequentie: frozenInitial?.frequentie ?? "dagelijks",
+        aangepasteDagen: frozenInitial?.aangepasteDagen ?? [],
+        moeilijkheid: frozenInitial?.moeilijkheid ?? "normaal",
+        roosterFilter: frozenInitial?.roosterFilter ?? "alle",
+        kleur: frozenInitial?.kleur ?? HABIT_COLORS[0],
+        beschrijving: frozenInitial?.beschrijving ?? "",
+        isKwantitatief: frozenInitial?.isKwantitatief ?? false,
+        doelWaarde: frozenInitial?.doelWaarde,
+        eenheid: frozenInitial?.eenheid ?? "",
+        doelAantal: frozenInitial?.doelAantal,
+        doelTijd: frozenInitial?.doelTijd ?? "",
       }),
-    [initial],
+    [frozenInitial],
   );
   const isDirty =
     formSnapshot({
@@ -185,32 +200,35 @@ export function HabitForm({
     return () => window.removeEventListener("keydown", handler);
   }, [open, handleCloseAttempt]);
 
-  // Reset state when form opens or initial values change
+  // Reset state ONLY when the form opens (R3): keyed on `[open]`, not `initial`,
+  // so a concurrent server refresh of the habits list can't wipe typed edits.
+  // Reads the frozen snapshot captured at open-time above.
   useEffect(() => {
     if (!open) return;
+    const snap = frozenInitialRef.current;
 
     const timeout = window.setTimeout(() => {
-      setNaam(initial?.naam ?? "");
-      setEmoji(initial?.emoji ?? "🎯");
-      setType(initial?.type ?? "positief");
-      setFrequentie(initial?.frequentie ?? "dagelijks");
-      setAangepasteDagen(initial?.aangepasteDagen ?? []);
-      setMoeilijkheid(initial?.moeilijkheid ?? "normaal");
-      setRoosterFilter(initial?.roosterFilter ?? "alle");
-      setKleur(initial?.kleur ?? HABIT_COLORS[0]);
-      setBeschrijving(initial?.beschrijving ?? "");
-      setIsKwantitatief(initial?.isKwantitatief ?? false);
-      setDoelWaarde(initial?.doelWaarde);
-      setEenheid(initial?.eenheid ?? "");
-      setDoelAantal(initial?.doelAantal);
-      setDoelTijd(initial?.doelTijd ?? "");
+      setNaam(snap?.naam ?? "");
+      setEmoji(snap?.emoji ?? "🎯");
+      setType(snap?.type ?? "positief");
+      setFrequentie(snap?.frequentie ?? "dagelijks");
+      setAangepasteDagen(snap?.aangepasteDagen ?? []);
+      setMoeilijkheid(snap?.moeilijkheid ?? "normaal");
+      setRoosterFilter(snap?.roosterFilter ?? "alle");
+      setKleur(snap?.kleur ?? HABIT_COLORS[0]);
+      setBeschrijving(snap?.beschrijving ?? "");
+      setIsKwantitatief(snap?.isKwantitatief ?? false);
+      setDoelWaarde(snap?.doelWaarde);
+      setEenheid(snap?.eenheid ?? "");
+      setDoelAantal(snap?.doelAantal);
+      setDoelTijd(snap?.doelTijd ?? "");
       setShowEmojis(false);
       setIsSubmitting(false);
       setSubmitError(null);
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [open, initial]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -357,7 +375,7 @@ export function HabitForm({
                   type="text"
                   value={naam}
                   onChange={(e) => setNaam(e.target.value)}
-                  placeholder="Naam van habit..."
+                  placeholder="Naam van habit…"
                   className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 min-h-[56px]"
                 />
               </div>
@@ -401,7 +419,7 @@ export function HabitForm({
                 type="text"
                 value={beschrijving}
                 onChange={(e) => setBeschrijving(e.target.value)}
-                placeholder="Optionele beschrijving..."
+                placeholder="Optionele beschrijving…"
                 className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-orange-500/30 mb-4 min-h-[48px]"
               />
 
@@ -801,7 +819,7 @@ export function HabitForm({
               >
                 <Plus size={16} className="inline mr-2" />
                 {isSubmitting
-                  ? "Opslaan..."
+                  ? "Opslaan…"
                   : initial
                     ? "Opslaan"
                     : "Habit toevoegen"}

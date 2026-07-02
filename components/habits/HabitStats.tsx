@@ -29,7 +29,7 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
     .filter(h => h.huidigeStreak > 0)
     .sort((a, b) => b.huidigeStreak - a.huidigeStreak)
     .slice(0, 5)
-    .map(h => ({ naam: h.naam, emoji: h.emoji, streak: h.huidigeStreak, type: h.type }));
+    .map(h => ({ naam: h.naam, emoji: h.emoji, streak: h.huidigeStreak, type: h.type, frequentie: h.frequentie }));
 
   const langsteStreakOoit = Math.max(0, ...habits.map(h => h.langsteStreak));
 
@@ -71,7 +71,7 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
       <div className="grid grid-cols-2 gap-2">
         <StatMiniCard
           icon={<Target size={14} className="text-blue-400" />}
-          label="Totaal Habits"
+          label="Actieve Habits"
           value={(stats.activeHabits ?? 0).toString()}
           accent="blue"
         />
@@ -110,12 +110,12 @@ export function HabitStats({ masked = false }: { masked?: boolean }) {
                   <span className="truncate text-xs text-slate-300">{masked ? `Habit ${i + 1}` : s.naam}</span>
                   {s.type === "negatief" && (
                     <span className="shrink-0 rounded border border-green-500/10 bg-green-500/10 px-1 py-0.5 text-[8px] text-green-400/70">
-                      {masked ? "Prive" : "Auto"}
+                      {masked ? "Privé" : "Auto"}
                     </span>
                   )}
                 </div>
                 <span className="shrink-0 text-xs font-bold text-orange-400">
-                  {formatStreak(s.streak)}
+                  {formatStreak(s.streak, s.frequentie)}
                 </span>
               </div>
             ))}

@@ -1,24 +1,30 @@
 "use client";
 
-import { useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { Activity } from "lucide-react";
 import { HEATMAP_COLORS, getHeatmapLevel } from "@/lib/habit-constants";
 import { useGetHabitsHeatmap } from "@/lib/api/generated/habits/habits";
 import { useUser } from "@clerk/nextjs";
 
 const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "Mei",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Okt",
-  "Nov",
-  "Dec",
+  "jan",
+  "feb",
+  "mrt",
+  "apr",
+  "mei",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "okt",
+  "nov",
+  "dec",
 ];
 // Rij 0 is écht maandag: de reeks wordt terug-gepad tot de eerste maandag (M-D).
 const DAYS = ["Ma", "", "Wo", "", "Vr", "", ""];
@@ -100,6 +106,15 @@ export function HabitHeatmap() {
     return { weeks: wks, monthLabels: labels };
   }, [days]);
 
+  // R3: open scrolled to "today" (the rightmost, most-recent column) instead of
+  // a year ago on the far left.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!days.length) return;
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [days.length]);
+
   // M-E: één tabstop voor het hele grid — roving tabindex + pijltjes/Home/End
   // (zelfde patroon als de tabbalk op /habits).
   const [focusIndex, setFocusIndex] = useState<number | null>(null);
@@ -175,7 +190,7 @@ export function HabitHeatmap() {
       </h3>
 
       {/* Scrollable container for mobile */}
-      <div className="overflow-x-auto -mx-1 px-1 pb-2 scrollbar-none">
+      <div ref={scrollRef} className="overflow-x-auto -mx-1 px-1 pb-2 scrollbar-none">
         <div
           className="inline-flex flex-col gap-1"
           style={{ minWidth: "max-content" }}
@@ -231,7 +246,17 @@ export function HabitHeatmap() {
                     const level = getHeatmapLevel(day.rate);
                     const dueText =
                       typeof day.due === "number" ? `/${day.due}` : "";
-                    const label = `${day.datum}: ${day.count}${dueText} habits (${Math.round(day.rate * 100)}%)`;
+                    // A11y (R3): announce a human nl-NL date, not the raw ISO
+                    // string ("maandag 3 maart 2026" i.p.v. "2026-03-03").
+                    const spokenDate = new Date(
+                      `${day.datum}T12:00:00`,
+                    ).toLocaleDateString("nl-NL", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    });
+                    const label = `${spokenDate}: ${day.count}${dueText} habits (${Math.round(day.rate * 100)}%)`;
                     const isSelected = selectedDay?.datum === day.datum;
                     return (
                       <button

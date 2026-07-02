@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useCallback, useState, useRef } from "react";
+import { createContext, useContext, useCallback, useMemo, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, CheckCircle, AlertCircle, Info } from "lucide-react";
 
@@ -95,6 +95,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const success = useCallback((m: string) => toast(m, "success"), [toast]);
   const error = useCallback((m: string) => toast(m, "error"), [toast]);
 
+  // Stable context value so every consumer doesn't re-render on show/hide.
+  const contextValue = useMemo(() => ({ toast, success, error }), [toast, success, error]);
+
   const icons = { success: CheckCircle, error: AlertCircle, info: Info };
   const colors = {
     success: "border-green-500/30 bg-green-500/10 text-green-400",
@@ -103,7 +106,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <ToastContext.Provider value={{ toast, success, error }}>
+    <ToastContext.Provider value={contextValue}>
       {children}
       {/* Toast container — lifted above the mobile bottom nav and clear of the iOS
           safe area. z-[110] keeps toasts above Modal (100), ConfirmDialog (101) and

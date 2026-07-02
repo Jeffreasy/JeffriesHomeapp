@@ -2,7 +2,6 @@
 
 import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { useToast } from "@/components/ui/Toast";
 import { useDevices, useLampCommand } from "@/hooks/useDevices";
@@ -12,8 +11,7 @@ import {
   type FocusTimelineItem,
   useFocusData,
 } from "@/hooks/useFocusData";
-import type { Device, DeviceCommand, FocusAttention, FocusBusinessStatus, FocusSyncSummary } from "@/lib/api";
-import { applyCommandToDevice } from "@/lib/deviceCommands";
+import type { DeviceCommand, FocusAttention, FocusBusinessStatus, FocusSyncSummary } from "@/lib/api";
 import { CUSTOM_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
 import { cn } from "@/lib/utils";
 
@@ -323,8 +321,7 @@ const FOCUS_LIGHT_SCENE_IDS = ["focus", "avond", "nacht", "ochtend"] as const;
 
 function FocusLightControls() {
   const { data: devices = [], isLoading } = useDevices();
-  const { mutate: sendCommand, isPending } = useLampCommand();
-  const queryClient = useQueryClient();
+  const { sendBatch, isPending } = useLampCommand();
   const { success, error } = useToast();
 
   const onlineDevices = useMemo(() => devices.filter((device) => device.status === "online"), [devices]);
@@ -348,12 +345,13 @@ function FocusLightControls() {
       return;
     }
 
-    queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
-      old?.map((device) => (device.status === "online" ? applyCommandToDevice(device, cmd) : device)),
-    );
-
-    onlineDevices.forEach((device) => sendCommand({ id: device.id, cmd }));
-    success(`${label} toegepast op ${onlineDevices.length} lampen`);
+    // R3-16: use the shared sendBatch path (like home/lampen) — one optimistic
+    // patch + one bundled error toast, instead of N invalidate-refetches and up
+    // to N error toasts from forEach(sendCommand). The toast reports what was
+    // SENT (the real outcome surfaces via sendBatch's bundled failure toast),
+    // not a premature success claim.
+    sendBatch(onlineDevices, cmd);
+    success(`${label} verstuurd naar ${onlineDevices.length} lampen`);
   };
 
   return (
@@ -465,13 +463,17 @@ function HabitNotePanel({
 
 function BusinessPanel({ business, summaryError }: { business?: FocusBusinessStatus; summaryError?: boolean }) {
   const headerValue = business ? `${business.activeProjects} projecten` : summaryError ? "Fout" : "Laden";
+  // F3 parity (R3-17): while the summary hasn't loaded, unknown ≠ zero — show
+  // "—" for every metric (matching the outstandingCents treatment) instead of a
+  // misleading row of 0's.
+  const metric = (value?: number) => (business ? `${value ?? 0}` : "—");
   return (
     <section className={`${PANEL} h-full min-h-[230px] p-4 xl:min-h-0 xl:p-3.5`}>
       <PanelHeader icon="business" label="LaventeCare" value={headerValue} />
       <div className="mt-4 grid grid-cols-2 gap-2 xl:mt-3 xl:grid-cols-4 xl:gap-1.5">
-        <Metric label="Opdrachten" value={`${business?.activeWorkstreams ?? 0}`} tone="blue" />
-        <Metric label="Acties" value={`${business?.openActions ?? 0}`} tone={(business?.overdueActions ?? 0) > 0 ? "rose" : "green"} />
-        <Metric label="Offertes" value={`${business?.openQuotes ?? 0}`} tone="amber" />
+        <Metric label="Opdrachten" value={metric(business?.activeWorkstreams)} tone="blue" />
+        <Metric label="Acties" value={metric(business?.openActions)} tone={(business?.overdueActions ?? 0) > 0 ? "rose" : "green"} />
+        <Metric label="Offertes" value={metric(business?.openQuotes)} tone="amber" />
         <Metric label="Open" value={formatEuroCents(business?.outstandingCents)} tone={(business?.openInvoices ?? 0) > 0 ? "amber" : "green"} />
       </div>
     </section>

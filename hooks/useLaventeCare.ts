@@ -80,6 +80,26 @@ export function useLaventeCare() {
     staleTime: 15_000,
   });
 
+  // R3-H5: dedicated, uncapped companies/contacts queries on the paginated
+  // list-endpoints. The cockpit only returns the 30 most-recently-touched
+  // rows (ORDER BY updated_at DESC LIMIT 30), so feeding pickers, the customer
+  // list and search from it silently drops the least-recent customer(s) out of
+  // the entire CRM. These lists back the pickers and the customer list instead.
+  const {
+    data: allCompaniesData,
+    isError: companiesError,
+  } = useQuery({
+    queryKey: ["laventecare", "companies", "all"],
+    queryFn: () => laventecareApi.listCompanies({ limit: 250 }),
+    staleTime: 15_000,
+  });
+
+  const { data: allContactsData } = useQuery({
+    queryKey: ["laventecare", "contacts", "all"],
+    queryFn: () => laventecareApi.listContacts({ limit: 500 }),
+    staleTime: 15_000,
+  });
+
   const { data: allWorkstreamsData } = useQuery({
     queryKey: ["laventecare", "workstreams", "all"],
     queryFn: () => laventecareApi.listWorkstreams({ includeClosed: true, limit: 100 }),
@@ -350,25 +370,29 @@ export function useLaventeCare() {
   });
 
   const documents = useMemo(() => (cockpit?.documentCatalog ?? []) as DocumentItem[], [cockpit]);
+  // R3-H5: prefer the full companies/contacts lists (uncapped) over the cockpit's
+  // 30-row cap so every customer stays reachable in pickers, the customer list
+  // and (client-side) search. Falls back to the cockpit payload while the
+  // dedicated queries are still loading.
   const companies = useMemo(
     () =>
-      (cockpit?.companies ?? []).map((c) => ({
+      (allCompaniesData ?? cockpit?.companies ?? []).map((c) => ({
         ...c,
         _id: c.id,
         laatsteContact: c.laatste_contact ?? undefined,
         volgendeActie: c.volgende_actie ?? undefined,
       })) as CompanyItem[],
-    [cockpit]
+    [allCompaniesData, cockpit]
   );
   const contacts = useMemo(
     () =>
-      (cockpit?.contacts ?? []).map((c) => ({
+      (allContactsData ?? cockpit?.contacts ?? []).map((c) => ({
         ...c,
         _id: c.id,
         companyId: c.company_id ?? undefined,
         isPrimary: c.is_primary,
       })) as ContactItem[],
-    [cockpit]
+    [allContactsData, cockpit]
   );
   const accessCredentials = useMemo(
     () =>
@@ -547,6 +571,10 @@ export function useLaventeCare() {
     cockpit,
     companies,
     contacts,
+    companiesError,
+    // R3-H5: server-side klant-zoekopdracht (q + ruime limit) zodat de
+    // klantenlijst niet client-side over een afgekapte lijst hoeft te zoeken.
+    searchCompanies: (q: string) => laventecareApi.listCompanies({ q, limit: 250 }),
     accessCredentials,
     documents,
     leads,

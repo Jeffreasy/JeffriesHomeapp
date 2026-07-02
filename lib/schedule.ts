@@ -20,10 +20,7 @@ export interface DienstRow {
   heledag:    boolean;
 }
 
-// ─── Storage ──────────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = "homeapp_schedule";
-const META_KEY    = "homeapp_schedule_meta";
+// ─── Meta ─────────────────────────────────────────────────────────────────────
 
 export interface ScheduleMeta {
   importedAt: string;
@@ -31,28 +28,9 @@ export interface ScheduleMeta {
   totalRows:  number;
 }
 
-export function loadSchedule(): DienstRow[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-export function saveSchedule(rows: DienstRow[], meta: ScheduleMeta): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
-  localStorage.setItem(META_KEY, JSON.stringify(meta));
-}
-
-export function loadScheduleMeta(): ScheduleMeta | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(META_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-}
-
+// Note: the schedule now lives server-side (useSchedule + Go API). The old
+// localStorage load/save helpers had zero importers and were removed (audit L
+// dead-code sweep).
 
 // ─── CSV → DienstRow ──────────────────────────────────────────────────────────
 
@@ -257,7 +235,7 @@ function getRuntimeStatus(dienst: DienstRow, nowKey = getNowKey()): DienstRow["s
   return dienst.status;
 }
 
-function withRuntimeStatus(dienst: DienstRow, nowKey = getNowKey()): DienstRow {
+export function withRuntimeStatus(dienst: DienstRow, nowKey = getNowKey()): DienstRow {
   const status = getRuntimeStatus(dienst, nowKey);
   return status === dienst.status ? dienst : { ...dienst, status };
 }
@@ -389,7 +367,7 @@ const NL_MONTHS = [
   "Juli","Augustus","September","Oktober","November","December"
 ];
 
-function monthLabel(ym: string): string {
+export function monthLabel(ym: string): string {
   const [y, m] = ym.split("-");
   return `${NL_MONTHS[parseInt(m, 10) - 1]} ${y}`;
 }

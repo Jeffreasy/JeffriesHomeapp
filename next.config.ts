@@ -8,6 +8,14 @@ const withSerwist = withSerwistInit({
 });
 
 const nextConfig: NextConfig = {
+  // Give the persisted-cache buster (app/providers.tsx) a real per-build value.
+  // Evaluated at build time in the Node config context (not shipped to the
+  // client as a live call), so Date.now() is a fine last-resort fallback when
+  // no CI commit SHA is present.
+  env: {
+    NEXT_PUBLIC_BUILD_ID:
+      process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.RENDER_GIT_COMMIT ?? String(Date.now()),
+  },
   outputFileTracingIncludes: {
     "/api/laventecare/pdf/[documentKey]": [
       "./node_modules/@fontsource/outfit/files/outfit-latin-400-normal.woff",
