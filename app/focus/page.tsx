@@ -1,17 +1,24 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
+import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { useDevices, useLampCommand } from "@/hooks/useDevices";
+import type { PersonalEvent } from "@/hooks/usePersonalEvents";
 import {
   formatNextAppointmentMeta,
   formatTimelineMeta,
+  type FocusHabitItem,
   type FocusTimelineItem,
   useFocusData,
 } from "@/hooks/useFocusData";
-import type { DeviceCommand, FocusAttention, FocusBusinessStatus, FocusSyncSummary } from "@/lib/api";
+import { notesApi, type DeviceCommand, type FocusAttention, type FocusBusinessStatus, type FocusSyncSummary } from "@/lib/api";
+import type { DienstRow } from "@/lib/schedule";
 import { CUSTOM_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
 import { cn } from "@/lib/utils";
 
@@ -230,11 +237,13 @@ function HeroPanel({
   todayIso,
   clock,
   isLoading,
+  onOpen,
 }: {
   item: FocusTimelineItem | null;
   todayIso?: string;
   clock?: { iso: string; time: string } | null;
   isLoading?: boolean;
+  onOpen: (item: FocusTimelineItem) => void;
 }) {
   const accent = item ? accentFor(item) : ACCENTS.dienst;
   const countdown = item ? countdownLabel(item, clock) : null;
@@ -257,7 +266,9 @@ function HeroPanel({
         </div>
 
         {item ? (
-          <Link href={item.href} className="group mt-4 block">
+          // In-place detail (afspraak-modal / dienst-modal) i.p.v. een
+          // paginanavigatie die je van het kiosk-scherm haalt (R4-interactie).
+          <button type="button" onClick={() => onOpen(item)} className="group mt-4 block w-full text-left">
             <div className="flex items-baseline justify-between gap-3">
               <h1 className="min-w-0 truncate text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
                 {item.title}
@@ -275,7 +286,7 @@ function HeroPanel({
                 {formatTimelineMeta(item, todayIso)}
               </span>
             </div>
-          </Link>
+          </button>
         ) : isLoading ? (
           <div role="status" aria-live="polite" className="mt-4 animate-pulse rounded-xl border border-white/[0.07] bg-white/[0.03] p-6">
             <p className="text-lg font-semibold text-slate-400">Laden…</p>
@@ -310,11 +321,13 @@ function TimelinePanel({
   heroId,
   todayIso,
   isLoading,
+  onOpen,
 }: {
   items: FocusTimelineItem[];
   heroId?: string;
   todayIso?: string;
   isLoading?: boolean;
+  onOpen: (item: FocusTimelineItem) => void;
 }) {
   // De hero toont het eerste item al groot — hier niet nogmaals (dedupe).
   const visible = items.filter((item) => item.id !== heroId).slice(0, 8);
@@ -350,11 +363,12 @@ function TimelinePanel({
                 {group.items.map((item) => {
                   const accent = accentFor(item);
                   return (
-                    <Link
+                    <button
                       key={item.id}
-                      href={item.href}
+                      type="button"
+                      onClick={() => onOpen(item)}
                       className={cn(
-                        "grid min-h-[52px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-white/[0.02] px-3 py-2 transition-colors hover:bg-white/[0.055]",
+                        "grid min-h-[52px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-white/[0.02] px-3 py-2 text-left transition-colors hover:bg-white/[0.055]",
                         item.status === "now" ? "border-emerald-400/30" : "border-white/[0.06]",
                       )}
                     >
@@ -376,7 +390,7 @@ function TimelinePanel({
                       >
                         {item.status === "now" ? "Nu" : item.kind === "dienst" ? "Dienst" : "Afspraak"}
                       </span>
-                    </Link>
+                    </button>
                   );
                 })}
               </div>
@@ -413,10 +427,17 @@ function AttentionPanel({ items, isLoading }: { items: FocusAttention[]; isLoadi
                     size="sm"
                     iconClassName={cn("mt-0.5 shrink-0", severityIconTone(item.severity))}
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-white">{item.title}</p>
                     <p className="mt-1 text-xs leading-5 text-slate-300">{item.detail}</p>
                   </div>
+                  {/* Aandacht = "ga het afhandelen": deze kaarten verlaten bewust
+                      de kiosk — maak dat zichtbaar met een pijl. */}
+                  {item.href && (
+                    <span aria-hidden className="mt-0.5 shrink-0 text-sm font-semibold text-slate-500">
+                      →
+                    </span>
+                  )}
                 </div>
               </div>
             );
@@ -627,11 +648,17 @@ function HabitNotePanel({
   habitProgress,
   notes,
   isLoading,
+  onToggleHabit,
+  habitPendingIds,
+  onOpenNote,
 }: {
-  habits: Array<{ id: string; title: string; meta: string; done: boolean }>;
+  habits: FocusHabitItem[];
   habitProgress: { due: number; completed: number };
   notes: Array<{ id: string; title: string; meta: string; priority: string; href: string }>;
   isLoading?: boolean;
+  onToggleHabit: (id: string) => void;
+  habitPendingIds: ReadonlySet<string>;
+  onOpenNote: (id: string) => void;
 }) {
   const visibleNotes = notes.slice(0, 4);
   return (
@@ -648,25 +675,45 @@ function HabitNotePanel({
             {isLoading && habits.length === 0 ? (
               <SkeletonLines rows={3} />
             ) : habits.length > 0 ? (
-              habits.map((habit) => (
-                <div
-                  key={habit.id}
-                  className={cn(
-                    "flex min-h-11 items-center gap-3 rounded-xl border border-white/[0.06] px-3 py-2",
-                    habit.done ? "bg-emerald-500/[0.05]" : "bg-white/[0.02]",
-                  )}
-                >
-                  <AppIcon
-                    name={habit.done ? "statusOk" : "statusActive"}
-                    size="sm"
-                    iconClassName={habit.done ? "text-emerald-300" : "text-slate-500"}
-                  />
-                  <div className="min-w-0">
-                    <p className={cn("truncate text-sm font-semibold", habit.done ? "text-slate-400" : "text-white")}>{habit.title}</p>
-                    <p className="truncate text-xs text-slate-500">{habit.meta}</p>
+              habits.map((habit) => {
+                const pending = habitPendingIds.has(habit.id);
+                const inner = (
+                  <>
+                    <AppIcon
+                      name={habit.done ? "statusOk" : "statusActive"}
+                      size="sm"
+                      iconClassName={cn(habit.done ? "text-emerald-300" : "text-slate-500", pending && "animate-pulse")}
+                    />
+                    <div className="min-w-0">
+                      <p className={cn("truncate text-sm font-semibold", habit.done ? "text-slate-400" : "text-white")}>{habit.title}</p>
+                      <p className="truncate text-xs text-slate-500">{habit.meta}</p>
+                    </div>
+                  </>
+                );
+                const rowClass = cn(
+                  "flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/[0.06] px-3 py-2 text-left",
+                  habit.done ? "bg-emerald-500/[0.05]" : "bg-white/[0.02]",
+                );
+                // Afvinken direct op de kiosk (optimistic via useHabits); negatief/
+                // kwantitatief/gepauzeerd blijft alleen-lezen (R2-H7-semantiek).
+                return habit.toggleable ? (
+                  <button
+                    key={habit.id}
+                    type="button"
+                    onClick={() => onToggleHabit(habit.id)}
+                    disabled={pending}
+                    aria-pressed={habit.done}
+                    title={habit.done ? "Heropenen" : "Afvinken"}
+                    className={cn(rowClass, "transition-colors hover:bg-white/[0.055] disabled:cursor-wait")}
+                  >
+                    {inner}
+                  </button>
+                ) : (
+                  <div key={habit.id} className={rowClass}>
+                    {inner}
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <EmptyLine title="Geen habits gepland" detail="Vandaag heeft geen actieve habit-items." />
             )}
@@ -679,10 +726,11 @@ function HabitNotePanel({
               <SkeletonLines rows={3} />
             ) : visibleNotes.length > 0 ? (
               visibleNotes.map((note) => (
-                <Link
+                <button
                   key={note.id}
-                  href={note.href}
-                  className="flex min-h-11 items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 transition-colors hover:bg-white/[0.055]"
+                  type="button"
+                  onClick={() => onOpenNote(note.id)}
+                  className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left transition-colors hover:bg-white/[0.055]"
                 >
                   <span
                     aria-hidden
@@ -695,7 +743,7 @@ function HabitNotePanel({
                     <p className="truncate text-sm font-semibold text-white">{note.title}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-500">{note.meta}</p>
                   </div>
-                </Link>
+                </button>
               ))
             ) : (
               <EmptyLine title="Geen notitie-focus" detail="Geen pinned, deadline of triage notities." />
@@ -786,6 +834,132 @@ function addDaysIso(iso: string, days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+/* ─── Kiosk-modals: details in-place i.p.v. paginanavigatie ──────────────── */
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+      <p className="text-[11px] text-slate-500">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function ModalFooter({ href, hrefLabel, onClose }: { href: string; hrefLabel: string; onClose: () => void }) {
+  return (
+    <div className="mt-5 flex items-center justify-end gap-2 border-t border-white/[0.06] pt-4">
+      <Link
+        href={href}
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
+      >
+        {hrefLabel}
+        <span aria-hidden>→</span>
+      </Link>
+      <button
+        type="button"
+        onClick={onClose}
+        className="inline-flex h-10 items-center rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-500/15"
+      >
+        Sluiten
+      </button>
+    </div>
+  );
+}
+
+/** Dienst-detail in de kiosk — er bestaat geen dienst-modal elders (diensten
+ *  zijn read-only rooster-rijen), dus dit is de lichtgewicht variant met een
+ *  secundaire "Open rooster"-uitgang voor wie echt de pagina wil. */
+function DienstDetailModal({ dienst, todayIso, onClose }: { dienst: DienstRow | null; todayIso?: string; onClose: () => void }) {
+  return (
+    <Modal isOpen={Boolean(dienst)} onClose={onClose} title="Dienst" icon={<AppIcon name="calendarDays" size="sm" />} maxWidth="md" theme="amber">
+      {dienst && (
+        <div>
+          <p className="text-3xl font-bold tracking-tight text-white">{dienst.shiftType || dienst.titel || "Dienst"}</p>
+          <p className="mt-1 text-sm capitalize text-slate-400">
+            {relativeDayLabel(dienst.startDatum, todayIso)} · {dienst.werktijd || `${dienst.startTijd}–${dienst.eindTijd}`}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <DetailRow label="Locatie" value={dienst.locatie || "—"} />
+            <DetailRow label="Team" value={dienst.team || "—"} />
+            <DetailRow label="Duur" value={dienst.duur ? `${dienst.duur}u` : "—"} />
+            <DetailRow label="Status" value={dienst.status || "—"} />
+          </div>
+          {dienst.beschrijving && (
+            <p className="mt-3 whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-sm leading-6 text-slate-300">
+              {dienst.beschrijving}
+            </p>
+          )}
+          <ModalFooter href="/rooster" hrefLabel="Open rooster" onClose={onClose} />
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/** Notitie-viewer: de kiosk heeft alleen summary-previews in cache, dus de
+ *  volledige inhoud wordt on-demand opgehaald. Lezen gebeurt hier; bewerken
+ *  blijft op /notities (volledige editor met concurrency/drafts). */
+function NoteViewModal({ noteId, onClose }: { noteId: string | null; onClose: () => void }) {
+  const open = Boolean(noteId);
+  const noteQuery = useQuery({
+    queryKey: ["focus-note-detail", noteId],
+    queryFn: () => notesApi.get(noteId as string),
+    enabled: open,
+    staleTime: 30_000,
+  });
+  const note = noteQuery.data;
+  const title = note ? (note.titel || note.inhoud?.split("\n")[0] || "Naamloze notitie").trim() : "";
+  const deadline = note?.deadline
+    ? new Date(note.deadline).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" })
+    : null;
+  return (
+    <Modal isOpen={open} onClose={onClose} title="Notitie" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" theme="sky">
+      {noteQuery.isLoading ? (
+        <SkeletonLines rows={4} />
+      ) : noteQuery.isError || !note ? (
+        <div className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-4 py-3">
+          <p className="text-sm font-bold text-white">Notitie kon niet worden geladen</p>
+          <p className="mt-1 text-xs text-slate-300">Controleer de verbinding en probeer het opnieuw.</p>
+        </div>
+      ) : (
+        <div>
+          <p className="text-2xl font-bold leading-tight tracking-tight text-white">{title}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {note.prioriteit && (
+              <span
+                className={cn(
+                  "rounded-md border px-2 py-0.5 text-[11px] font-semibold capitalize",
+                  note.prioriteit === "hoog"
+                    ? "border-rose-400/30 bg-rose-500/10 text-rose-200"
+                    : "border-white/[0.08] bg-white/[0.03] text-slate-300",
+                )}
+              >
+                {note.prioriteit}
+              </span>
+            )}
+            {deadline && (
+              <span className="rounded-md border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[11px] font-semibold text-amber-200">
+                {deadline}
+              </span>
+            )}
+            {(note.tags ?? []).slice(0, 4).map((tag) => (
+              <span key={tag} className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[11px] font-semibold text-slate-400">
+                #{tag}
+              </span>
+            ))}
+          </div>
+          {note.inhoud && (
+            <p className="mt-4 max-h-[46dvh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 text-sm leading-6 text-slate-200">
+              {note.inhoud}
+            </p>
+          )}
+          <ModalFooter href="/notities" hrefLabel="Bewerken in Notities" onClose={onClose} />
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 /* ─── Pagina ─────────────────────────────────────────────────────────────── */
 
 // De focus-summary refresht elke 30s; ~2 gemiste intervallen betekent dat de
@@ -794,7 +968,34 @@ const GENERATED_AT_STALE_MS = 90_000;
 
 export default function FocusPage() {
   const focus = useFocusData();
+  const router = useRouter();
   const todayIso = focus.dateInfo?.todayIso;
+
+  // R4-interactie: tijdlijn/hero-taps openen details in-place. Afspraken
+  // hergebruiken de bestaande CreateEventModal (zelfde embed als home);
+  // diensten krijgen een lichtgewicht detail-modal; alleen als de rauwe rij
+  // onvindbaar is (bv. buiten het geladen venster) valt de tap terug op de
+  // oude paginanavigatie.
+  const [eventModal, setEventModal] = useState<PersonalEvent | null>(null);
+  const [dienstModal, setDienstModal] = useState<DienstRow | null>(null);
+  const [noteModalId, setNoteModalId] = useState<string | null>(null);
+
+  const openTimelineItem = (item: FocusTimelineItem) => {
+    if (item.kind === "afspraak") {
+      const event = focus.rawEvents.find((row) => `event-${row.eventId}` === item.id);
+      if (event) {
+        setEventModal(event);
+        return;
+      }
+    } else {
+      const dienst = focus.rawDiensten.find((row) => `dienst-${row.eventId}` === item.id);
+      if (dienst) {
+        setDienstModal(dienst);
+        return;
+      }
+    }
+    router.push(item.href);
+  };
   // Pure staleness check: vergelijk tegen de minuut-klok in state i.p.v.
   // Date.now() tijdens render (react-hooks/purity); de klok tikt elke minuut,
   // ruim vaak genoeg voor een 90s-drempel.
@@ -844,7 +1045,7 @@ export default function FocusPage() {
        */}
       <main className="grid gap-3 p-3 sm:p-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(310px,0.98fr)_minmax(430px,1.35fr)_minmax(310px,0.98fr)]">
         <div className="order-1 flex min-h-0 flex-col gap-3 xl:order-none">
-          <HeroPanel item={focus.nextItem} todayIso={todayIso} clock={focus.clock} isLoading={focus.isLoading} />
+          <HeroPanel item={focus.nextItem} todayIso={todayIso} clock={focus.clock} isLoading={focus.isLoading} onOpen={openTimelineItem} />
           <SystemPanel
             devices={focus.devices}
             finance={focus.finance}
@@ -855,12 +1056,15 @@ export default function FocusPage() {
         </div>
 
         <div className="order-3 flex min-h-0 flex-col gap-3 xl:order-none">
-          <TimelinePanel items={focus.timeline} heroId={focus.nextItem?.id} todayIso={todayIso} isLoading={focus.isLoading} />
+          <TimelinePanel items={focus.timeline} heroId={focus.nextItem?.id} todayIso={todayIso} isLoading={focus.isLoading} onOpen={openTimelineItem} />
           <HabitNotePanel
             habits={focus.habitItems}
             habitProgress={{ due: focus.habits.due, completed: focus.habits.completed }}
             notes={focus.focusNotes}
             isLoading={focus.isLoading}
+            onToggleHabit={(id) => void focus.habitActions.toggle(id)}
+            habitPendingIds={focus.habitActions.pendingIds}
+            onOpenNote={setNoteModalId}
           />
         </div>
 
@@ -869,6 +1073,22 @@ export default function FocusPage() {
           <BusinessPanel business={focus.business} summaryError={focus.summaryError} />
         </div>
       </main>
+
+      {/* Kiosk-modals: details openen in-place; navigatie is de secundaire
+          uitgang in de modal-footer (of de fallback als de rij niet geladen is). */}
+      <CreateEventModal
+        open={Boolean(eventModal)}
+        editEvent={eventModal}
+        onClose={() => setEventModal(null)}
+        onSuccess={() => void focus.refetchPersonal()}
+      />
+      <DienstDetailModal dienst={dienstModal} todayIso={todayIso} onClose={() => setDienstModal(null)} />
+      <NoteViewModal noteId={noteModalId} onClose={() => setNoteModalId(null)} />
+
+      {/* SR-aankondiging van optimistic habit-toggles (zelfde patroon als /habits). */}
+      <p aria-live="polite" className="sr-only">
+        {focus.habitActions.announcement}
+      </p>
     </div>
   );
 }

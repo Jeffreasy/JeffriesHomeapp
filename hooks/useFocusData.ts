@@ -51,6 +51,12 @@ export type FocusHabitItem = {
   title: string;
   meta: string;
   done: boolean;
+  /**
+   * Alleen positieve, niet-kwantitatieve, niet-gepauzeerde habits zijn vanaf
+   * de kiosk af te vinken — negatief ("schoon"-semantiek) en kwantitatief
+   * (stepper) horen op /habits thuis (R2-H7-lijn).
+   */
+  toggleable: boolean;
 };
 
 function getAmsterdamClock() {
@@ -235,6 +241,7 @@ function makeHabitItems(todayHabits: ReturnType<typeof useHabits>["todayHabits"]
       title: `${habit.emoji ? `${habit.emoji} ` : ""}${habit.naam}`,
       meta: done ? "Afgerond" : habit.doelTijd ? `Doel ${habit.doelTijd}` : habit.roosterFilter || "Vandaag",
       done,
+      toggleable: habit.type !== "negatief" && !habit.isKwantitatief && !habit.isPauze,
     };
   });
 }
@@ -448,6 +455,17 @@ export function useFocusData() {
     business: summaryQuery.data?.business,
     generatedAt: summaryQuery.data?.generatedAt,
     sync: summaryQuery.data?.sync,
+    // Kiosk-interacties (R4): tijdlijn-items openen in-place modals i.p.v. een
+    // paginanavigatie die je uit het kiosk-scherm haalt. Daarvoor zijn de rúwe
+    // rijen nodig (de timeline-items zijn projecties) + de habit-toggle.
+    rawEvents: personal.upcoming,
+    rawDiensten: schedule.upcoming,
+    refetchPersonal: personal.refetch,
+    habitActions: {
+      toggle: habits.toggle,
+      pendingIds: habits.pendingHabitIds,
+      announcement: habits.announcement,
+    },
     // On an unattended 24/7 kiosk, a sustained backend outage must look
     // different from an ordinary loading flicker - surface this so panels can
     // show a distinct error state instead of being stuck on "Laden" forever.
