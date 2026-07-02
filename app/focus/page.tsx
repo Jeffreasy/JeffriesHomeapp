@@ -677,6 +677,7 @@ function HabitNotePanel({
   isLoading,
   onToggleHabit,
   habitPendingIds,
+  onOpenHabits,
   onOpenNote,
 }: {
   habits: FocusHabitItem[];
@@ -685,6 +686,9 @@ function HabitNotePanel({
   isLoading?: boolean;
   onToggleHabit: (id: string) => void;
   habitPendingIds: ReadonlySet<string>;
+  /** Kwantitatieve/negatieve/gepauzeerde habits zijn niet één-tik af te vinken;
+   *  een tik opent de volledige checklist-modal (mét stepper) i.p.v. niets. */
+  onOpenHabits: () => void;
   onOpenNote: (id: string) => void;
 }) {
   const visibleNotes = notes.slice(0, 4);
@@ -718,11 +722,13 @@ function HabitNotePanel({
                   </>
                 );
                 const rowClass = cn(
-                  "flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/[0.06] px-3 py-2 text-left",
+                  "flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/[0.06] px-3 py-2 text-left transition-colors hover:bg-white/[0.055]",
                   habit.done ? "bg-emerald-500/[0.05]" : "bg-white/[0.02]",
                 );
-                // Afvinken direct op de kiosk (optimistic via useHabits); negatief/
-                // kwantitatief/gepauzeerd blijft alleen-lezen (R2-H7-semantiek).
+                // Toggle-bare (positieve, niet-kwantitatieve) habits: één tik vinkt
+                // direct af (optimistic via useHabits). Kwantitatief/negatief/
+                // gepauzeerd is niet één-tik af te vinken, maar een tik opent de
+                // volledige checklist-modal (mét stepper) i.p.v. niets te doen.
                 return habit.toggleable ? (
                   <button
                     key={habit.id}
@@ -731,14 +737,21 @@ function HabitNotePanel({
                     disabled={pending}
                     aria-pressed={habit.done}
                     title={habit.done ? "Heropenen" : "Afvinken"}
-                    className={cn(rowClass, "transition-colors hover:bg-white/[0.055] disabled:cursor-wait")}
+                    className={cn(rowClass, "disabled:cursor-wait")}
                   >
                     {inner}
                   </button>
                 ) : (
-                  <div key={habit.id} className={rowClass}>
+                  <button
+                    key={habit.id}
+                    type="button"
+                    onClick={onOpenHabits}
+                    title="Open in checklist"
+                    className={rowClass}
+                  >
                     {inner}
-                  </div>
+                    <span aria-hidden className="ml-auto shrink-0 text-sm font-semibold text-slate-600">▸</span>
+                  </button>
                 );
               })
             ) : (
@@ -1317,6 +1330,7 @@ export default function FocusPage() {
             isLoading={focus.isLoading}
             onToggleHabit={(id) => void focus.habitActions.toggle(id)}
             habitPendingIds={focus.habitActions.pendingIds}
+            onOpenHabits={() => setAttentionModal("habits")}
             onOpenNote={setNoteModalId}
           />
         </div>
