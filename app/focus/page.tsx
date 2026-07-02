@@ -15,33 +15,74 @@ import type { DeviceCommand, FocusAttention, FocusBusinessStatus, FocusSyncSumma
 import { CUSTOM_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
 import { cn } from "@/lib/utils";
 
-const PANEL = "rounded-lg border border-white/10 bg-white/[0.035] shadow-[0_18px_60px_rgba(0,0,0,0.26)]";
+/*
+ * Kiosk-designtaal (R4-redesign):
+ *  - Kleur = betekenis. Kaarten zijn neutraal; een dunne accent-rail codeert de
+ *    sóórt (dienst = amber, afspraak = sky), emerald = nu bezig, en alleen échte
+ *    urgentie (aandachtspunten) krijgt een gevulde rose/amber-kaart. Voorheen
+ *    kleurde het shift-type hele kaarten donkerrood en oogde het hele board als
+ *    één storing.
+ *  - Alles past ALTIJD in de viewport op xl: kolommen zijn flex-cols met
+ *    min-h-0 + interne overflow, geen vaste grid-rows die content afkappen.
+ *  - De hero toont het eerstvolgende item groot mét countdown — niet het woord
+ *    "Focus". De tijdlijn begint ná het hero-item (geen duplicaat).
+ */
+
+const PANEL =
+  "rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.045] to-white/[0.015] shadow-[0_18px_50px_rgba(0,0,0,0.35)]";
+
+type Accent = {
+  rail: string;
+  text: string;
+  chip: string;
+  glow: string;
+};
+
+const ACCENTS: Record<"dienst" | "afspraak" | "now", Accent> = {
+  dienst: {
+    rail: "bg-amber-400",
+    text: "text-amber-200",
+    chip: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+    glow: "rgba(245,158,11,0.14)",
+  },
+  afspraak: {
+    rail: "bg-sky-400",
+    text: "text-sky-200",
+    chip: "border-sky-400/25 bg-sky-400/10 text-sky-200",
+    glow: "rgba(56,189,248,0.13)",
+  },
+  now: {
+    rail: "bg-emerald-400",
+    text: "text-emerald-200",
+    chip: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+    glow: "rgba(52,211,153,0.16)",
+  },
+};
+
+function accentFor(item: FocusTimelineItem): Accent {
+  if (item.status === "now") return ACCENTS.now;
+  return item.kind === "dienst" ? ACCENTS.dienst : ACCENTS.afspraak;
+}
 
 function severityClasses(severity: string) {
   switch (severity) {
     case "high":
-      return "border-rose-400/25 bg-rose-500/10 text-rose-100";
+      return "border-rose-400/30 bg-rose-500/[0.12]";
     case "medium":
-      return "border-amber-400/25 bg-amber-500/10 text-amber-100";
+      return "border-amber-400/25 bg-amber-500/10";
     default:
-      return "border-sky-400/20 bg-sky-500/10 text-sky-100";
+      return "border-sky-400/20 bg-sky-500/[0.08]";
   }
 }
 
-function toneClasses(tone: FocusTimelineItem["tone"]) {
-  switch (tone) {
-    case "green":
-      return "border-emerald-400/25 bg-emerald-500/10 text-emerald-100";
-    case "amber":
-      return "border-amber-400/25 bg-amber-500/10 text-amber-100";
-    case "rose":
-      return "border-rose-400/25 bg-rose-500/10 text-rose-100";
-    case "blue":
-      return "border-sky-400/25 bg-sky-500/10 text-sky-100";
-    case "indigo":
-      return "border-indigo-400/25 bg-indigo-500/10 text-indigo-100";
+function severityIconTone(severity: string) {
+  switch (severity) {
+    case "high":
+      return "text-rose-300";
+    case "medium":
+      return "text-amber-300";
     default:
-      return "border-white/10 bg-white/[0.035] text-slate-100";
+      return "text-sky-300";
   }
 }
 
@@ -61,6 +102,8 @@ function formatEuroCents(value?: number) {
     maximumFractionDigits: 0,
   }).format(value / 100);
 }
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
 
 function Header({
   time,
@@ -84,16 +127,17 @@ function Header({
 }) {
   // F4: op een wandkiosk moet een hangende refresh zichtbaar zijn — rose bij
   // een echte fout, amber wanneer de data ouder is dan ~2 refresh-intervallen.
-  const timestampClass = summaryError
-    ? "text-rose-300"
-    : stale
-      ? "text-amber-300"
-      : "text-slate-500";
+  const timestampClass = summaryError ? "text-rose-300" : stale ? "text-amber-300" : "text-slate-500";
   return (
-    <header className="flex shrink-0 flex-col gap-3 border-b border-white/8 bg-black/20 px-3 py-3 backdrop-blur-xl sm:px-5 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex min-w-0 items-end gap-4">
+    <header className="relative flex shrink-0 flex-col gap-3 border-b border-white/[0.07] bg-black/25 px-4 py-3 backdrop-blur-xl sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+      {/* Dunne accentlijn onderaan de header — geeft de kiosk een as. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent"
+      />
+      <div className="flex min-w-0 items-end gap-5">
         <div
-          className="font-mono text-5xl font-semibold leading-none text-white sm:text-6xl"
+          className="font-mono text-5xl font-semibold leading-none tracking-tight text-white sm:text-6xl"
           style={{
             // Alleen transform (geen reflow); verschuift elke paar minuten 1-2px.
             transform: `translate(${jitter?.x ?? 0}px, ${jitter?.y ?? 0}px)`,
@@ -103,19 +147,23 @@ function Header({
           {time ?? "--:--"}
         </div>
         <div className="min-w-0 pb-1">
-          <p className="truncate text-sm font-semibold text-slate-200 sm:text-base">{today ?? "Focus laden"}</p>
-          <p className={`mt-1 text-xs ${timestampClass}`}>
-            Laatst bijgewerkt {formatGeneratedAt(generatedAt)}
+          <p className="truncate text-base font-semibold capitalize text-slate-100">{today ?? "Focus laden"}</p>
+          <p className={`mt-0.5 text-xs ${timestampClass}`}>
+            Bijgewerkt {formatGeneratedAt(generatedAt)}
             {summaryError ? " · verversen mislukt" : stale ? " · verouderd" : ""}
           </p>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center">
-        <StatusPill icon="radar" label={`${attentionCount} aandacht`} active={attentionCount === 0} />
-        <StatusPill icon={bridgeOnline ? "wifi" : "wifiOff"} label={bridgeOnline ? "Bridge live" : "Bridge offline"} active={bridgeOnline} />
+      <div className="flex items-center gap-2">
+        <HeaderPill
+          icon="radar"
+          label={attentionCount === 0 ? "Alles rustig" : `${attentionCount} aandacht`}
+          tone={attentionCount === 0 ? "ok" : "warn"}
+        />
+        <HeaderPill icon={bridgeOnline ? "wifi" : "wifiOff"} label={bridgeOnline ? "Bridge live" : "Bridge offline"} tone={bridgeOnline ? "ok" : "warn"} />
         <Link
           href="/"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
         >
           <AppIcon name="dashboard" size="xs" />
           App
@@ -125,18 +173,23 @@ function Header({
   );
 }
 
-function StatusPill({ icon, label, active }: { icon: "radar" | "wifi" | "wifiOff"; label: string; active: boolean }) {
+function HeaderPill({ icon, label, tone }: { icon: "radar" | "wifi" | "wifiOff"; label: string; tone: "ok" | "warn" }) {
   return (
     <div
-      className={`inline-flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold ${
-        active ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-amber-400/25 bg-amber-500/10 text-amber-100"
-      }`}
+      className={cn(
+        "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-semibold",
+        tone === "ok"
+          ? "border-emerald-400/20 bg-emerald-500/[0.08] text-emerald-200"
+          : "border-amber-400/30 bg-amber-500/10 text-amber-200",
+      )}
     >
       <AppIcon name={icon} size="xs" />
       <span className="truncate">{label}</span>
     </div>
   );
 }
+
+/* ─── Hero: eerstvolgende item, groot ────────────────────────────────────── */
 
 // M9: while data is loading the kiosk must show placeholders — a confident
 // "Geen blokkades / Geen habits gepland" on a cold start is indistinguishable
@@ -145,46 +198,93 @@ function SkeletonLines({ rows = 3 }: { rows?: number }) {
   return (
     <div role="status" aria-live="polite" className="space-y-2">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-12 animate-pulse rounded-lg border border-white/8 bg-white/[0.03]" />
+        <div key={i} className="h-12 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]" />
       ))}
       <span className="sr-only">Laden…</span>
     </div>
   );
 }
 
-function NowPanel({ item, todayIso, isLoading }: { item: FocusTimelineItem | null; todayIso?: string; isLoading?: boolean }) {
-  return (
-    <section className={`${PANEL} flex h-full min-h-[260px] flex-col p-4 sm:p-5 xl:min-h-0`}>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase text-slate-500">Nu centraal</p>
-          <h1 className="mt-1 text-2xl font-bold text-white sm:text-3xl">Focus</h1>
-        </div>
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-amber-400/20 bg-amber-500/10">
-          <AppIcon name="radar" size="md" iconClassName="text-amber-200" />
-        </div>
-      </div>
+/**
+ * Countdown t.o.v. de Amsterdam-minuutklok. Beide kanten worden als kale
+ * wall-time geparsed (device-lokaal), dus het verschil klopt onafhankelijk van
+ * de device-timezone (op DST-overgangsuren na — acceptabel voor een countdown).
+ */
+function countdownLabel(item: FocusTimelineItem, clock?: { iso: string; time: string } | null) {
+  if (!clock) return null;
+  if (item.status === "now") return item.endTime ? `Bezig · tot ${item.endTime}` : "Nu bezig";
+  const pad = (t: string) => (t.length === 4 ? `0${t}` : t);
+  const start = Date.parse(`${item.date}T${pad(item.startTime || "00:00")}:00`);
+  const now = Date.parse(`${clock.iso}T${pad(clock.time)}:00`);
+  if (Number.isNaN(start) || Number.isNaN(now)) return null;
+  const min = Math.round((start - now) / 60_000);
+  if (min <= 0) return null;
+  if (min < 60) return `Over ${min} min`;
+  const hours = Math.round(min / 60);
+  if (hours < 48) return `Over ${hours} uur`;
+  return `Over ${Math.round(hours / 24)} dagen`;
+}
 
-      <div className="mt-6 flex flex-1 flex-col justify-center">
+function HeroPanel({
+  item,
+  todayIso,
+  clock,
+  isLoading,
+}: {
+  item: FocusTimelineItem | null;
+  todayIso?: string;
+  clock?: { iso: string; time: string } | null;
+  isLoading?: boolean;
+}) {
+  const accent = item ? accentFor(item) : ACCENTS.dienst;
+  const countdown = item ? countdownLabel(item, clock) : null;
+  return (
+    <section className={`${PANEL} relative shrink-0 overflow-hidden p-5`}>
+      {/* Zachte glow in de accentkleur — de hero mag als enige paneel gloeien. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full blur-3xl"
+        style={{ background: item ? accent.glow : "rgba(245,158,11,0.08)" }}
+      />
+      <div className="relative">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Nu centraal</p>
+          {item && (
+            <span className={cn("rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide", accent.chip)}>
+              {item.status === "now" ? "Bezig" : "Volgende"}
+            </span>
+          )}
+        </div>
+
         {item ? (
-          <Link href={item.href} className={`block rounded-lg border p-4 transition-colors hover:bg-white/[0.06] ${toneClasses(item.tone)}`}>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold uppercase">{item.status === "now" ? "Bezig" : "Volgende"}</p>
-              <span className="rounded-md border border-white/10 bg-black/20 px-2 py-1 font-mono text-sm">{item.timeLabel}</span>
+          <Link href={item.href} className="group mt-4 block">
+            <div className="flex items-baseline justify-between gap-3">
+              <h1 className="min-w-0 truncate text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
+                {item.title}
+              </h1>
+              <span className="hidden shrink-0 font-mono text-lg font-semibold text-slate-300 sm:block">{item.timeLabel}</span>
             </div>
-            <h2 className="mt-4 line-clamp-2 text-3xl font-bold leading-tight text-white sm:text-4xl">{item.title}</h2>
-            <p className="mt-3 line-clamp-2 text-base leading-6 text-slate-300">{item.subtitle}</p>
-            <p className="mt-5 text-sm font-semibold text-slate-400">{formatTimelineMeta(item, todayIso)}</p>
+            <p className="mt-2 truncate text-base text-slate-400">{item.subtitle}</p>
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              {countdown && (
+                <span className={cn("rounded-lg border px-3 py-1.5 font-mono text-sm font-semibold", accent.chip)}>
+                  {countdown}
+                </span>
+              )}
+              <span className="truncate text-sm font-medium text-slate-500 transition-colors group-hover:text-slate-400">
+                {formatTimelineMeta(item, todayIso)}
+              </span>
+            </div>
           </Link>
         ) : isLoading ? (
-          <div role="status" aria-live="polite" className="animate-pulse rounded-lg border border-white/10 bg-white/[0.03] p-5 text-center">
+          <div role="status" aria-live="polite" className="mt-4 animate-pulse rounded-xl border border-white/[0.07] bg-white/[0.03] p-6">
             <p className="text-lg font-semibold text-slate-400">Laden…</p>
-            <p className="mt-2 text-sm text-slate-600">Rooster en agenda worden opgehaald.</p>
+            <p className="mt-1 text-sm text-slate-600">Rooster en agenda worden opgehaald.</p>
           </div>
         ) : (
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-5 text-center">
-            <p className="text-lg font-semibold text-white">Geen directe planning</p>
-            <p className="mt-2 text-sm text-slate-500">Je rooster en agenda hebben nu geen eerstvolgende item.</p>
+          <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.03] p-6">
+            <p className="text-2xl font-bold text-white">Vrij moment</p>
+            <p className="mt-1 text-sm text-slate-500">Geen dienst of afspraak in de komende dagen.</p>
           </div>
         )}
       </div>
@@ -192,52 +292,127 @@ function NowPanel({ item, todayIso, isLoading }: { item: FocusTimelineItem | nul
   );
 }
 
-function TimelinePanel({ items, todayIso, isLoading }: { items: FocusTimelineItem[]; todayIso?: string; isLoading?: boolean }) {
-  const visible = items.slice(0, 9);
+/* ─── Tijdlijn: dag-gegroepeerd, zonder hero-duplicaat ───────────────────── */
+
+function relativeDayLabel(date: string, todayIso?: string) {
+  if (!todayIso) return date.slice(5);
+  // Zelfde register als dashboard/habits: met hoofdletter (low).
+  if (date === todayIso) return "Vandaag";
+  if (date === addDaysIso(todayIso, 1)) return "Morgen";
+  if (date === addDaysIso(todayIso, 2)) return "Overmorgen";
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date.slice(5);
+  return parsed.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+}
+
+function TimelinePanel({
+  items,
+  heroId,
+  todayIso,
+  isLoading,
+}: {
+  items: FocusTimelineItem[];
+  heroId?: string;
+  todayIso?: string;
+  isLoading?: boolean;
+}) {
+  // De hero toont het eerste item al groot — hier niet nogmaals (dedupe).
+  const visible = items.filter((item) => item.id !== heroId).slice(0, 8);
+  const groups = useMemo(() => {
+    const out: Array<{ label: string; items: FocusTimelineItem[] }> = [];
+    for (const item of visible) {
+      const label = relativeDayLabel(item.date, todayIso);
+      const last = out[out.length - 1];
+      if (last && last.label === label) last.items.push(item);
+      else out.push({ label, items: [item] });
+    }
+    return out;
+  }, [visible, todayIso]);
+
   return (
-    <section className={`${PANEL} flex h-full min-h-[240px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
-      <PanelHeader icon="calendarDays" label="Vandaag en straks" value={isLoading && visible.length === 0 ? "Laden" : `${visible.length} items`} />
-      <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+    <section className={`${PANEL} flex min-h-[240px] flex-1 flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
+      <PanelHeader
+        icon="calendarDays"
+        label="Vandaag en straks"
+        value={isLoading && visible.length === 0 ? "Laden…" : visible.length === 0 ? "Leeg" : `${visible.length} komend`}
+      />
+      <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {isLoading && visible.length === 0 ? (
           <SkeletonLines rows={4} />
         ) : visible.length > 0 ? (
-          visible.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              className={`grid min-h-16 grid-cols-[74px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border px-3 py-2 transition-colors hover:bg-white/[0.06] ${toneClasses(item.status === "now" ? "green" : item.tone)}`}
-            >
-              <div className="font-mono text-sm font-semibold">{item.timeLabel}</div>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-white">{item.title}</p>
-                <p className="mt-0.5 truncate text-xs text-slate-400">{item.subtitle}</p>
+          groups.map((group) => (
+            <div key={group.label}>
+              <div className="mb-1.5 flex items-center gap-3">
+                <p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{group.label}</p>
+                <div className="h-px flex-1 bg-white/[0.06]" />
               </div>
-              <div className="hidden text-right text-xs font-medium text-slate-500 sm:block">
-                {formatRelativeCompact(item.date, todayIso)}
+              <div className="space-y-1.5">
+                {group.items.map((item) => {
+                  const accent = accentFor(item);
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      className={cn(
+                        "grid min-h-[52px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-white/[0.02] px-3 py-2 transition-colors hover:bg-white/[0.055]",
+                        item.status === "now" ? "border-emerald-400/30" : "border-white/[0.06]",
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span aria-hidden className={cn("h-8 w-1 shrink-0 rounded-full", accent.rail)} />
+                        <span className="w-[86px] font-mono text-[13px] font-semibold leading-tight text-slate-200">
+                          {item.timeLabel}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-[15px] font-semibold text-white">{item.title}</p>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">{item.subtitle}</p>
+                      </div>
+                      <span
+                        className={cn(
+                          "hidden shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold sm:inline-block",
+                          item.status === "now" ? ACCENTS.now.chip : "border-transparent text-slate-500",
+                        )}
+                      >
+                        {item.status === "now" ? "Nu" : item.kind === "dienst" ? "Dienst" : "Afspraak"}
+                      </span>
+                    </Link>
+                  );
+                })}
               </div>
-            </Link>
+            </div>
           ))
         ) : (
-          <EmptyLine title="Geen agenda-items" detail="Er staat niets in de komende dagen." />
+          <EmptyLine title="Verder niets gepland" detail="Na het huidige item is de komende dagen leeg." />
         )}
       </div>
     </section>
   );
 }
 
+/* ─── Aandacht ───────────────────────────────────────────────────────────── */
+
 function AttentionPanel({ items, isLoading }: { items: FocusAttention[]; isLoading?: boolean }) {
   return (
-    <section className={`${PANEL} flex h-full min-h-[240px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
-      <PanelHeader icon="warning" label="Aandacht nodig" value={isLoading && items.length === 0 ? "Laden" : items.length === 0 ? "Rustig" : `${items.length}`} />
-      <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+    <section className={`${PANEL} flex min-h-[220px] flex-1 flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
+      <PanelHeader
+        icon="warning"
+        label="Aandacht nodig"
+        value={isLoading && items.length === 0 ? "Laden…" : items.length === 0 ? "Rustig" : `${items.length}`}
+      />
+      <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {isLoading && items.length === 0 ? (
           <SkeletonLines rows={3} />
         ) : items.length > 0 ? (
           items.map((item) => {
             const content = (
-              <div className={`rounded-lg border px-3 py-3 ${severityClasses(item.severity)}`}>
+              <div className={`rounded-xl border px-3.5 py-3 ${severityClasses(item.severity)}`}>
                 <div className="flex items-start gap-3">
-                  <AppIcon name={item.severity === "high" ? "warning" : "info"} size="sm" iconClassName="mt-0.5 shrink-0" />
+                  <AppIcon
+                    name={item.severity === "high" ? "warning" : "info"}
+                    size="sm"
+                    iconClassName={cn("mt-0.5 shrink-0", severityIconTone(item.severity))}
+                  />
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-white">{item.title}</p>
                     <p className="mt-1 text-xs leading-5 text-slate-300">{item.detail}</p>
@@ -246,7 +421,7 @@ function AttentionPanel({ items, isLoading }: { items: FocusAttention[]; isLoadi
               </div>
             );
             return item.href ? (
-              <Link key={item.id} href={item.href} className="block transition-opacity hover:opacity-90">
+              <Link key={item.id} href={item.href} className="block transition-opacity hover:opacity-85">
                 {content}
               </Link>
             ) : (
@@ -260,6 +435,8 @@ function AttentionPanel({ items, isLoading }: { items: FocusAttention[]; isLoadi
     </section>
   );
 }
+
+/* ─── Systeem: status-strip + lichten + geld ─────────────────────────────── */
 
 function SystemPanel({
   devices,
@@ -275,45 +452,77 @@ function SystemPanel({
   nextAppointment: string;
 }) {
   const syncFallback = summaryError ? "fout" : "laden";
-  const syncValue = [sync?.schedule.status ?? syncFallback, sync?.gmail.status ?? syncFallback].join(" / ");
+  // Backend-statussen zijn Engelse enums ("success"/"failed"/…) — vertaal ze
+  // naar het NL-register van de rest van de kiosk.
+  const syncWord = (status?: string) => {
+    switch (status) {
+      case "success": return "ok";
+      case "failed": return "fout";
+      case "pending": return "wacht";
+      case undefined: return syncFallback;
+      default: return status;
+    }
+  };
+  const syncOk = sync ? sync.schedule.status === "success" && sync.gmail.status === "success" : !summaryError;
+  const syncValue = [syncWord(sync?.schedule.status), syncWord(sync?.gmail.status)].join(" · ");
   return (
-    <section className={`${PANEL} h-full min-h-[250px] p-4 xl:min-h-0`}>
-      <PanelHeader icon="shield" label="Systeemlijn" value={devices.bridgeOnline ? "Live" : "Aandacht"} />
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <Metric label="Lampen aan" value={`${devices.on}`} tone="amber" />
-        <Metric label="Online" value={`${devices.online}/${devices.total}`} tone="green" />
-        <Metric label="Bridge" value={devices.bridgeOnline ? "Live" : "Offline"} tone={devices.bridgeOnline ? "green" : "rose"} />
-      </div>
-      <FocusLightControls />
-      <div className="mt-3 space-y-2">
-        <InfoRow
-          label="Netto"
-          value={finance.value}
-          meta={finance.hidden ? "Privacy actief" : finance.meta}
-          action={
-            // F5: dezelfde "finance"-privacyscope als de eye-toggles op de
-            // andere pagina's — maskeren/tonen kan nu ook vanaf de kiosk.
-            <button
-              type="button"
-              onClick={finance.togglePrivacy}
-              aria-pressed={finance.hidden}
-              aria-label={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
-              title={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
-              className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors",
-                finance.hidden
-                  ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                  : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200",
-              )}
-            >
-              <AppIcon name={finance.hidden ? "hide" : "show"} size="xs" />
-            </button>
-          }
-        />
-        <InfoRow label="Afspraak" value={nextAppointment} />
-        <InfoRow label="Sync" value={syncValue} tone={summaryError ? "rose" : undefined} />
+    <section className={`${PANEL} flex min-h-0 flex-1 flex-col overflow-hidden p-4`}>
+      <PanelHeader icon="shield" label="Systeem" value={devices.bridgeOnline ? "Actief" : "Aandacht"} />
+      <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-0.5">
+        {/* Eén statusregel i.p.v. drie losse metric-dozen. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* "X aan" is informatie, geen waarschuwing — 0 lampen aan overdag is normaal. */}
+          <StatusChip ok label={`${devices.on} aan`} />
+          <StatusChip ok={devices.online === devices.total && devices.total > 0} label={`${devices.online}/${devices.total} online`} />
+          <StatusChip ok={devices.bridgeOnline} label={devices.bridgeOnline ? "Bridge live" : "Bridge offline"} />
+          <StatusChip ok={syncOk && !summaryError} label={`Sync ${syncValue}`} />
+        </div>
+
+        <FocusLightControls />
+
+        <div className="space-y-1.5">
+          <InfoRow
+            label="Netto"
+            value={finance.value}
+            meta={finance.hidden ? "Privacy actief" : finance.meta}
+            action={
+              // F5: dezelfde "finance"-privacyscope als de eye-toggles op de
+              // andere pagina's — maskeren/tonen kan nu ook vanaf de kiosk.
+              <button
+                type="button"
+                onClick={finance.togglePrivacy}
+                aria-pressed={finance.hidden}
+                aria-label={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
+                title={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
+                className={cn(
+                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                  finance.hidden
+                    ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
+                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200",
+                )}
+              >
+                <AppIcon name={finance.hidden ? "hide" : "show"} size="xs" />
+              </button>
+            }
+          />
+          <InfoRow label="Volgende afspraak" value={nextAppointment} />
+        </div>
       </div>
     </section>
+  );
+}
+
+function StatusChip({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold",
+        ok ? "border-white/[0.08] bg-white/[0.03] text-slate-300" : "border-amber-400/30 bg-amber-500/10 text-amber-200",
+      )}
+    >
+      <span aria-hidden className={cn("h-1.5 w-1.5 rounded-full", ok ? "bg-emerald-400" : "bg-amber-400")} />
+      {label}
+    </span>
   );
 }
 
@@ -355,14 +564,14 @@ function FocusLightControls() {
   };
 
   return (
-    <div className="mt-3 rounded-lg border border-white/8 bg-black/15 p-2.5">
+    <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2.5">
           <AppIcon name="lights" size="sm" tone="amber" framed />
           <div className="min-w-0">
             <p className="truncate text-sm font-bold text-white">Lichten</p>
             <p className="truncate text-xs text-slate-500">
-              {isLoading ? "Laden" : `${onlineDevices.length} online · ${onDevices.length} aan`}
+              {isLoading ? "Laden…" : `${onlineDevices.length} online · ${onDevices.length} aan`}
             </p>
           </div>
         </div>
@@ -371,10 +580,10 @@ function FocusLightControls() {
           onClick={() => applyCommand(toggleLabel, allOff ? { on: true, brightness: 70 } : { on: false })}
           disabled={!canSend || isPending}
           className={cn(
-            "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+            "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
             allOff
               ? "border-amber-400/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15"
-              : "border-slate-400/20 bg-slate-500/10 text-slate-200 hover:bg-slate-500/15",
+              : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]",
           )}
         >
           <AppIcon name="power" size="xs" />
@@ -382,7 +591,7 @@ function FocusLightControls() {
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5 xl:grid-cols-2 2xl:grid-cols-5">
         {quickScenes.map((scene) => {
           const active = activeScene === scene.id;
           return (
@@ -393,13 +602,16 @@ function FocusLightControls() {
               disabled={!canSend || isPending}
               aria-pressed={active}
               className={cn(
-                "flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45",
-                active ? "bg-white/[0.08]" : "bg-white/[0.025] hover:bg-white/[0.06]",
+                "flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border px-2 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+                active ? "bg-white/[0.09]" : "bg-white/[0.02] hover:bg-white/[0.06]",
               )}
-              style={{ borderColor: active ? scene.color : `${scene.color}33` }}
+              style={{
+                borderColor: active ? scene.color : "rgba(255,255,255,0.07)",
+                boxShadow: active ? `0 0 18px -6px ${scene.color}` : undefined,
+              }}
             >
-              <span className="min-w-0 truncate text-xs font-bold text-white">{scene.label}</span>
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: scene.color }} />
+              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: scene.color }} />
+              <span className="max-w-full truncate text-[11px] font-bold text-white">{scene.label}</span>
             </button>
           );
         })}
@@ -407,6 +619,8 @@ function FocusLightControls() {
     </div>
   );
 }
+
+/* ─── Habits + notities ──────────────────────────────────────────────────── */
 
 function HabitNotePanel({
   habits,
@@ -419,129 +633,150 @@ function HabitNotePanel({
   notes: Array<{ id: string; title: string; meta: string; priority: string; href: string }>;
   isLoading?: boolean;
 }) {
+  const visibleNotes = notes.slice(0, 4);
   return (
-    <section className={`${PANEL} flex h-full min-h-[280px] flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0`}>
-      <PanelHeader icon="habit" label="Persoonlijk systeem" value={isLoading && habits.length === 0 ? "Laden" : `${habitProgress.completed}/${habitProgress.due} habits`} />
-      <div className="mt-4 grid min-h-0 flex-1 gap-4 sm:grid-cols-2">
-        <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
-          <p className="text-xs font-semibold uppercase text-slate-500">Habits vandaag</p>
-          {isLoading && habits.length === 0 ? (
-            <SkeletonLines rows={3} />
-          ) : habits.length > 0 ? (
-            habits.map((habit) => (
-              <div key={habit.id} className="flex min-h-12 items-center gap-3 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
-                <AppIcon name={habit.done ? "statusOk" : "statusActive"} size="sm" iconClassName={habit.done ? "text-emerald-300" : "text-slate-500"} />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{habit.title}</p>
-                  <p className="truncate text-xs text-slate-500">{habit.meta}</p>
+    <section className={`${PANEL} flex min-h-[220px] flex-1 flex-col overflow-hidden p-4 sm:p-5 xl:min-h-0 xl:flex-[1.15]`}>
+      <PanelHeader
+        icon="habit"
+        label="Persoonlijk"
+        value={isLoading && habits.length === 0 ? "Laden…" : `${habitProgress.completed}/${habitProgress.due} vandaag`}
+      />
+      <div className="mt-3 grid min-h-0 flex-1 gap-4 sm:grid-cols-2">
+        <div className="flex min-h-0 flex-col">
+          <p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Habits</p>
+          <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+            {isLoading && habits.length === 0 ? (
+              <SkeletonLines rows={3} />
+            ) : habits.length > 0 ? (
+              habits.map((habit) => (
+                <div
+                  key={habit.id}
+                  className={cn(
+                    "flex min-h-11 items-center gap-3 rounded-xl border border-white/[0.06] px-3 py-2",
+                    habit.done ? "bg-emerald-500/[0.05]" : "bg-white/[0.02]",
+                  )}
+                >
+                  <AppIcon
+                    name={habit.done ? "statusOk" : "statusActive"}
+                    size="sm"
+                    iconClassName={habit.done ? "text-emerald-300" : "text-slate-500"}
+                  />
+                  <div className="min-w-0">
+                    <p className={cn("truncate text-sm font-semibold", habit.done ? "text-slate-400" : "text-white")}>{habit.title}</p>
+                    <p className="truncate text-xs text-slate-500">{habit.meta}</p>
+                  </div>
                 </div>
-              </div>
-            ))
-          ) : (
-            <EmptyLine title="Geen habits gepland" detail="Vandaag heeft geen actieve habit-items." />
-          )}
+              ))
+            ) : (
+              <EmptyLine title="Geen habits gepland" detail="Vandaag heeft geen actieve habit-items." />
+            )}
+          </div>
         </div>
-        <div className="min-h-0 space-y-2 overflow-y-auto pr-1">
-          <p className="text-xs font-semibold uppercase text-slate-500">Notitie focus</p>
-          {isLoading && notes.length === 0 ? (
-            <SkeletonLines rows={3} />
-          ) : notes.length > 0 ? (
-            notes.map((note) => (
-              <Link key={note.id} href={note.href} className="block min-h-12 rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2 transition-colors hover:bg-white/[0.06]">
-                <p className="truncate text-sm font-semibold text-white">{note.title}</p>
-                <p className="mt-0.5 truncate text-xs text-slate-500">{note.meta}</p>
-              </Link>
-            ))
-          ) : (
-            <EmptyLine title="Geen notitie-focus" detail="Geen pinned, deadline of triage notities." />
-          )}
+        <div className="flex min-h-0 flex-col">
+          <p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Notities</p>
+          <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+            {isLoading && visibleNotes.length === 0 ? (
+              <SkeletonLines rows={3} />
+            ) : visibleNotes.length > 0 ? (
+              visibleNotes.map((note) => (
+                <Link
+                  key={note.id}
+                  href={note.href}
+                  className="flex min-h-11 items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 transition-colors hover:bg-white/[0.055]"
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "h-1.5 w-1.5 shrink-0 rounded-full",
+                      note.priority === "hoog" ? "bg-rose-400" : note.priority === "laag" ? "bg-slate-500" : "bg-sky-400",
+                    )}
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{note.title}</p>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">{note.meta}</p>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <EmptyLine title="Geen notitie-focus" detail="Geen pinned, deadline of triage notities." />
+            )}
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
+/* ─── LaventeCare ────────────────────────────────────────────────────────── */
+
 function BusinessPanel({ business, summaryError }: { business?: FocusBusinessStatus; summaryError?: boolean }) {
-  const headerValue = business ? `${business.activeProjects} projecten` : summaryError ? "Fout" : "Laden";
+  const headerValue = business ? `${business.activeProjects} projecten` : summaryError ? "Fout" : "Laden…";
   // F3 parity (R3-17): while the summary hasn't loaded, unknown ≠ zero — show
   // "—" for every metric (matching the outstandingCents treatment) instead of a
   // misleading row of 0's.
   const metric = (value?: number) => (business ? `${value ?? 0}` : "—");
+  const overdue = (business?.overdueActions ?? 0) > 0;
   return (
-    <section className={`${PANEL} h-full min-h-[230px] p-4 xl:min-h-0 xl:p-3.5`}>
+    <section className={`${PANEL} shrink-0 p-4`}>
       <PanelHeader icon="business" label="LaventeCare" value={headerValue} />
-      <div className="mt-4 grid grid-cols-2 gap-2 xl:mt-3 xl:grid-cols-4 xl:gap-1.5">
-        <Metric label="Opdrachten" value={metric(business?.activeWorkstreams)} tone="blue" />
-        <Metric label="Acties" value={metric(business?.openActions)} tone={(business?.overdueActions ?? 0) > 0 ? "rose" : "green"} />
-        <Metric label="Offertes" value={metric(business?.openQuotes)} tone="amber" />
-        <Metric label="Open" value={formatEuroCents(business?.outstandingCents)} tone={(business?.openInvoices ?? 0) > 0 ? "amber" : "green"} />
+      <div className="mt-3 grid grid-cols-4 gap-1.5">
+        <Metric label="Opdrachten" value={metric(business?.activeWorkstreams)} />
+        <Metric label="Acties" value={metric(business?.openActions)} tone={overdue ? "rose" : undefined} />
+        <Metric label="Offertes" value={metric(business?.openQuotes)} />
+        <Metric label="Open" value={formatEuroCents(business?.outstandingCents)} tone={(business?.openInvoices ?? 0) > 0 ? "amber" : undefined} />
       </div>
     </section>
   );
 }
 
+/* ─── Primitives ─────────────────────────────────────────────────────────── */
+
 function PanelHeader({ icon, label, value }: { icon: Parameters<typeof AppIcon>[0]["name"]; label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.045]">
-          <AppIcon name={icon} size="sm" iconClassName="text-amber-200" />
-        </div>
-        <p className="min-w-0 truncate text-xs font-semibold uppercase text-slate-500">{label}</p>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <AppIcon name={icon} size="xs" iconClassName="text-amber-200/80" />
+        <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
       </div>
-      <span className="shrink-0 rounded-md border border-white/10 bg-black/20 px-2 py-1 text-xs font-semibold text-slate-300">{value}</span>
+      <span className="shrink-0 rounded-lg border border-white/[0.08] bg-black/25 px-2.5 py-1 text-[11px] font-semibold text-slate-300">
+        {value}
+      </span>
     </div>
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone: "amber" | "blue" | "green" | "rose" }) {
-  const color =
-    tone === "green"
-      ? "text-emerald-200"
-      : tone === "rose"
-        ? "text-rose-200"
-        : tone === "blue"
-          ? "text-sky-200"
-          : "text-amber-200";
+function Metric({ label, value, tone }: { label: string; value: string; tone?: "amber" | "rose" }) {
+  const color = tone === "rose" ? "text-rose-300" : tone === "amber" ? "text-amber-200" : "text-slate-100";
   return (
-    <div className="min-h-14 rounded-lg border border-white/8 bg-white/[0.025] p-2.5">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className={`mt-2 truncate text-lg font-bold ${color}`}>{value}</p>
+    <div className="min-h-[52px] rounded-xl border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
+      <p className="truncate text-[11px] text-slate-500">{label}</p>
+      <p className={`mt-1 truncate text-lg font-bold leading-tight ${color}`}>{value}</p>
     </div>
   );
 }
 
 function InfoRow({ label, value, meta, tone, action }: { label: string; value: string; meta?: string; tone?: "rose"; action?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-white/8 bg-white/[0.025] px-3 py-2">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-        <p className="shrink-0 text-xs text-slate-500">{label}</p>
-        <div className="flex min-w-0 items-center gap-2 sm:justify-end">
-          <p className={`min-w-0 truncate text-sm font-semibold sm:text-right ${tone === "rose" ? "text-rose-300" : "text-white"}`}>{value}</p>
-          {action}
+    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] text-slate-500">{label}</p>
+          <p className={cn("mt-0.5 truncate text-sm font-semibold", tone === "rose" ? "text-rose-300" : "text-white")}>{value}</p>
+          {meta && <p className="mt-0.5 truncate text-[11px] text-slate-600">{meta}</p>}
         </div>
+        {action}
       </div>
-      {meta && <p className="mt-1 truncate text-xs text-slate-600 sm:text-right">{meta}</p>}
     </div>
   );
 }
 
 function EmptyLine({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-4">
+    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.015] px-3 py-4">
       <p className="text-sm font-semibold text-slate-300">{title}</p>
       <p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p>
     </div>
   );
-}
-
-function formatRelativeCompact(date: string, todayIso?: string) {
-  if (!todayIso) return date.slice(5);
-  // Zelfde register als dashboard/habits: met hoofdletter (low).
-  if (date === todayIso) return "Vandaag";
-  if (date === addDaysIso(todayIso, 1)) return "Morgen";
-  if (date === addDaysIso(todayIso, 2)) return "Overmorgen";
-  return date.slice(5).split("-").reverse().join("-");
 }
 
 function addDaysIso(iso: string, days: number) {
@@ -550,6 +785,8 @@ function addDaysIso(iso: string, days: number) {
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
 }
+
+/* ─── Pagina ─────────────────────────────────────────────────────────────── */
 
 // De focus-summary refresht elke 30s; ~2 gemiste intervallen betekent dat de
 // kiosk verouderde data toont (F4).
@@ -579,8 +816,11 @@ export default function FocusPage() {
 
   return (
     <div
-      className="min-h-dvh overflow-y-auto bg-[#07090f] text-slate-100 xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden"
+      className="min-h-dvh overflow-y-auto text-slate-100 xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden"
       style={{
+        // Gelaagde achtergrond: vlak zwart → nachtblauw met twee zachte glows.
+        background:
+          "radial-gradient(1100px 480px at 82% -12%, rgba(245,158,11,0.055), transparent 65%), radial-gradient(900px 520px at -8% 112%, rgba(99,102,241,0.05), transparent 60%), #05070c",
         filter: nightDim ? "brightness(0.6)" : "none",
         transition: "filter 2s ease",
       }}
@@ -596,20 +836,15 @@ export default function FocusPage() {
         jitter={clockJitter}
       />
 
-      <main className="grid gap-3 p-3 sm:p-4 lg:grid-cols-2 xl:min-h-0 xl:flex-1 xl:overflow-hidden xl:grid-cols-[minmax(280px,0.9fr)_minmax(400px,1.28fr)_minmax(280px,0.92fr)] xl:grid-rows-[minmax(210px,0.9fr)_minmax(160px,0.72fr)_minmax(200px,0.58fr)]">
-        <div className="order-1 xl:col-start-1 xl:row-start-1 xl:min-h-0">
-          <NowPanel item={focus.nextItem} todayIso={todayIso} isLoading={focus.isLoading} />
-        </div>
-
-        <div className="order-2 xl:col-start-3 xl:row-span-2 xl:row-start-1 xl:min-h-0">
-          <AttentionPanel items={focus.attention} isLoading={focus.isLoading} />
-        </div>
-
-        <div className="order-3 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:min-h-0">
-          <TimelinePanel items={focus.timeline} todayIso={todayIso} isLoading={focus.isLoading} />
-        </div>
-
-        <div className="order-4 xl:col-start-1 xl:row-span-2 xl:row-start-2 xl:min-h-0">
+      {/*
+       * xl: drie kolommen van flex-cols met min-h-0 — panelen krimpen/scrollen
+       * intern en kunnen nooit meer buiten de viewport geknipt worden (het oude
+       * grid met vaste row-fracties kapte het Netto-paneel en de onderste rij af).
+       * Onder xl stapelt alles in prioriteitsvolgorde en scrollt de pagina.
+       */}
+      <main className="grid gap-3 p-3 sm:p-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(310px,0.98fr)_minmax(430px,1.35fr)_minmax(310px,0.98fr)]">
+        <div className="order-1 flex min-h-0 flex-col gap-3 xl:order-none">
+          <HeroPanel item={focus.nextItem} todayIso={todayIso} clock={focus.clock} isLoading={focus.isLoading} />
           <SystemPanel
             devices={focus.devices}
             finance={focus.finance}
@@ -619,7 +854,8 @@ export default function FocusPage() {
           />
         </div>
 
-        <div className="order-5 xl:col-start-2 xl:row-start-3 xl:min-h-0">
+        <div className="order-3 flex min-h-0 flex-col gap-3 xl:order-none">
+          <TimelinePanel items={focus.timeline} heroId={focus.nextItem?.id} todayIso={todayIso} isLoading={focus.isLoading} />
           <HabitNotePanel
             habits={focus.habitItems}
             habitProgress={{ due: focus.habits.due, completed: focus.habits.completed }}
@@ -628,7 +864,8 @@ export default function FocusPage() {
           />
         </div>
 
-        <div className="order-6 xl:col-start-3 xl:row-start-3 xl:min-h-0">
+        <div className="order-2 flex min-h-0 flex-col gap-3 xl:order-none">
+          <AttentionPanel items={focus.attention} isLoading={focus.isLoading} />
           <BusinessPanel business={focus.business} summaryError={focus.summaryError} />
         </div>
       </main>
