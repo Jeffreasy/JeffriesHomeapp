@@ -463,6 +463,11 @@ export function NoteEditor({
   const [symbolTouched, setSymbolTouched] = useState(false);
   const [activePanel, setActivePanel] = useState<EditorPanel>("details");
   const [showTemplates, setShowTemplates] = useState(false);
+  // True while the iOS soft keyboard is open on a phone-width screen. When set,
+  // the editor collapses its chrome (grab handle, header meta, footer safe-area
+  // padding + secondary actions) so the narrow band above the keyboard is spent
+  // on the fields being typed into instead of on buttons.
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const [linkSearch, setLinkSearch] = useState("");
   const [linkActive, setLinkActive] = useState(false);
@@ -727,7 +732,8 @@ export function NoteEditor({
     if (!vv || !overlay) return;
 
     const sync = () => {
-      if (window.innerWidth < 640) {
+      const mobile = window.innerWidth < 640;
+      if (mobile) {
         overlay.style.top = `${vv.offsetTop}px`;
         overlay.style.left = `${vv.offsetLeft}px`;
         overlay.style.width = `${vv.width}px`;
@@ -743,6 +749,10 @@ export function NoteEditor({
         overlay.style.right = "";
         overlay.style.bottom = "";
       }
+      // The layout viewport (innerHeight) stays full-height when the iOS keyboard
+      // opens; only the visual viewport shrinks. A large gap ⇒ keyboard is up.
+      // Same value re-set is a no-op (React bails), so firing on vv.scroll is fine.
+      setKeyboardOpen(mobile && window.innerHeight - vv.height > 150);
     };
 
     vv.addEventListener("resize", sync);
@@ -1329,21 +1339,25 @@ export function NoteEditor({
             : "var(--color-surface)",
         }}
       >
-        <div className="flex justify-center pb-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:hidden">
-          <div className="h-1 w-10 rounded-full bg-white/20" />
-        </div>
+        {!keyboardOpen && (
+          <div className="flex justify-center pb-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:hidden">
+            <div className="h-1 w-10 rounded-full bg-white/20" />
+          </div>
+        )}
 
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:px-6">
+        <header className={`flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 sm:px-6 ${keyboardOpen ? "py-2" : "py-3"}`}>
           <div className="flex min-w-0 items-center gap-3">
             <AppIcon name={symbol} tone="amber" size="md" framed active />
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase text-[var(--color-text-subtle)]">
-                {note ? "Notitie bewerken" : "Nieuwe notitie"}
-              </p>
+              {!keyboardOpen && (
+                <p className="text-[11px] font-semibold uppercase text-[var(--color-text-subtle)]">
+                  {note ? "Notitie bewerken" : "Nieuwe notitie"}
+                </p>
+              )}
               <h2 id={titleId} className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg">
                 {titel.trim() || note?.titel || "Naamloze notitie"}
               </h2>
-              {primaryContext && (
+              {primaryContext && !keyboardOpen && (
                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                   <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
                     <AppIcon name={primaryContext.noteSymbol} tone="cyan" size="xs" />
@@ -1891,7 +1905,7 @@ export function NoteEditor({
           </div>
         </div>
 
-        <footer className="relative z-10 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:px-6">
+        <footer className={`relative z-10 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 sm:px-6 ${keyboardOpen ? "py-2" : "py-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"}`}>
           {/* H2 (R3): 409 recovery — load newest (draft stays in the restore
               banner) or overwrite with the refreshed token. No more dead-end. */}
           {conflict.open && (
@@ -1935,12 +1949,13 @@ export function NoteEditor({
               {saveError}
             </p>
           )}
-          {note && onToggleComplete && isDirty && (
+          {note && onToggleComplete && isDirty && !keyboardOpen && (
             <p className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 sm:hidden">
               Sla je wijzigingen eerst op om deze notitie af te ronden.
             </p>
           )}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {!keyboardOpen && (
             <div className={`grid gap-2 sm:flex sm:w-auto ${note ? "grid-cols-3" : "grid-cols-2"}`}>
               {isDirty && (
                 <button
@@ -2001,6 +2016,7 @@ export function NoteEditor({
                 </button>
               )}
             </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
               <button
