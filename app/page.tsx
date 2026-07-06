@@ -32,6 +32,14 @@ import { AppIcon } from "@/components/ui/AppIcon";
 
 export default function DashboardPage() {
   const [dateInfo, setDateInfo] = useState<DashboardDateInfo | null>(null);
+  // `dateInfo` is null on the server and the first client paint, then set in the
+  // effect below — so we reuse it as a "mounted" signal. The devices query is the
+  // only dashboard source persisted to IndexedDB (the rest are on
+  // PERSIST_DENY_PREFIXES), so its cache is already present on the client's first
+  // paint but never during SSR; gating the device-derived UI on `mounted` keeps
+  // the server and hydration renders identical (otherwise the lamp cell + the
+  // "alles aan" toggle hydration-mismatch).
+  const mounted = dateInfo !== null;
 
   useEffect(() => {
     const updateDateInfo = () => setDateInfo(getDashboardDateInfo());
@@ -47,6 +55,8 @@ export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { data: devices = [], isLoading: devicesLoading, error: devicesError } = useDevices();
   const { sendBatch } = useLampCommand();
+  // Empty until mounted so SSR and the first client paint match (see `mounted`).
+  const dashboardDevices = useMemo(() => (mounted ? devices : []), [mounted, devices]);
   const {
     diensten,
     nextDienst,
@@ -76,7 +86,7 @@ export default function DashboardPage() {
   const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const onlineDevices = useMemo(() => devices.filter((d) => d.status === "online"), [devices]);
+  const onlineDevices = useMemo(() => dashboardDevices.filter((d) => d.status === "online"), [dashboardDevices]);
   const onDevices = useMemo(() => onlineDevices.filter((d) => d.current_state?.on), [onlineDevices]);
   // allOn reflects ONLINE devices only — the toggle-all action also acts only on
   // online devices, so counting offline ones made the label contradict the action.
@@ -232,7 +242,7 @@ export default function DashboardPage() {
             nettoValue={nettoDisplay}
             nettoSub={nettoSub}
             lampsOn={onDevices.length}
-            lampsTotal={devices.length}
+            lampsTotal={dashboardDevices.length}
             devicesOnline={onlineDevices.length}
             conflicts={actionableConflicts}
             hardConflicts={hardConflicts}
@@ -241,7 +251,7 @@ export default function DashboardPage() {
             appointmentsFailed={Boolean(eventsError)}
             scheduleLoading={scheduleLoading}
             scheduleFailed={Boolean(scheduleError)}
-            devicesLoading={devicesLoading}
+            devicesLoading={!mounted || devicesLoading}
             devicesFailed={Boolean(devicesError)}
             financeLoading={financeLoading}
             financeFailed={financeFailed}
