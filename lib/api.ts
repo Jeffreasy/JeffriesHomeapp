@@ -1985,4 +1985,38 @@ export const contactenApi = {
     apiFetch<{ status: string }>(`/contacts/${contactId}/facts/${factId}?userId=${encodeURIComponent(userId)}`, {
       method: "DELETE",
     }),
+  whatsappImport: (
+    userId: string,
+    contactId: string,
+    data: { chat_name?: string; source_filename?: string; is_group?: boolean; text: string },
+  ) =>
+    apiFetch<{ conversation: WhatsAppConversation; summary: WhatsAppSummary; participants: string[]; imported: number }>(
+      `/contacts/${contactId}/whatsapp/import?userId=${encodeURIComponent(userId)}`,
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+  whatsappList: (userId: string, contactId: string) =>
+    apiFetch<{ conversations: WhatsAppConversation[]; summaries: WhatsAppSummary[] }>(
+      `/contacts/${contactId}/whatsapp?userId=${encodeURIComponent(userId)}`,
+    ),
 };
+
+export interface WhatsAppConversation {
+  id: string;
+  contact_id: string | null;
+  chat_name: string;
+  is_group: boolean;
+  message_count: number;
+  first_message_at: string | null;
+  last_message_at: string | null;
+  source_filename: string | null;
+  imported_at: string;
+}
+
+export interface WhatsAppSummary {
+  id: string;
+  contact_id: string | null;
+  conversation_id: string | null;
+  summary: string;
+  message_count: number;
+  generated_at: string;
+}
