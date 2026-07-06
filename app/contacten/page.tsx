@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
@@ -103,6 +103,24 @@ export default function ContactenPage() {
     setVisibleCount(60);
   }
 
+  // Drop label-filter ids whose label was deleted or merged away (else the filter
+  // silently matches zero contacts with no visible chip to clear).
+  if (labels.length > 0 && labelFilter.some((id) => !labels.some((l) => l.id === id))) {
+    setLabelFilter((cur) => cur.filter((id) => labels.some((l) => l.id === id)));
+  }
+
+  // Bulk actions only ever touch contacts currently in view — a narrowed filter
+  // must not silently (un)tag now-hidden contacts the user selected earlier.
+  const filteredIds = useMemo(() => new Set(filtered.map((c) => c.id)), [filtered]);
+  const effectiveSelected = useMemo(
+    () => [...selected].filter((id) => filteredIds.has(id)),
+    [selected, filteredIds],
+  );
+
+  // Stable identity so the sentinel's IntersectionObserver isn't town down and
+  // re-created (re-firing on the still-visible sentinel) on every render.
+  const loadMore = useCallback(() => setVisibleCount((c) => c + 60), []);
+
   const toggleLabelFilter = (id: string) =>
     setLabelFilter((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
 
@@ -120,9 +138,9 @@ export default function ContactenPage() {
   };
 
   const applyBulkLabel = async (labelId: string, remove: boolean) => {
-    if (selected.size === 0) return;
+    if (effectiveSelected.length === 0) return;
     try {
-      await bulkLabel.mutateAsync({ labelId, contactIds: [...selected], remove });
+      await bulkLabel.mutateAsync({ labelId, contactIds: effectiveSelected, remove });
       success(remove ? "Label verwijderd van selectie" : "Label toegevoegd aan selectie");
       exitSelectMode();
     } catch {
@@ -381,13 +399,18 @@ export default function ContactenPage() {
                 />
               ))}
             </div>
-            {hasMore && <LoadMoreSentinel onVisible={() => setVisibleCount((c) => c + 60)} />}
+            {hasMore && <LoadMoreSentinel onVisible={loadMore} />}
           </>
         )}
       </main>
 
-      {selectMode && selected.size > 0 && (
-        <BulkBar count={selected.size} labels={labels} onApply={applyBulkLabel} onClear={() => setSelected(new Set())} />
+      {selectMode && effectiveSelected.length > 0 && (
+        <BulkBar
+          count={effectiveSelected.length}
+          labels={labels}
+          onApply={applyBulkLabel}
+          onClear={() => setSelected(new Set())}
+        />
       )}
 
       {formOpen && (
@@ -1182,6 +1205,7 @@ function LabelsEditor({
     try {
       await assignLabel.mutateAsync({ contactId: contact.id, data: { label_id: labelId } });
       setQuery("");
+      setOpen(false);
     } catch {
       toastError("Label toevoegen mislukt.");
     }
@@ -1192,8 +1216,24 @@ function LabelsEditor({
     try {
       await assignLabel.mutateAsync({ contactId: contact.id, data: { name } });
       setQuery("");
+      setOpen(false);
     } catch {
       toastError("Label toevoegen mislukt.");
+    }
+  };
+  // On Enter, resolve the EXACT catalog match explicitly — never fall back to the
+  // first substring suggestion (typing "werk" must not assign "Netwerk").
+  const submitQuery = () => {
+    if (q === "") return;
+    const exact = labels.find((l) => l.name.toLowerCase() === q);
+    if (exact) {
+      if (!assignedIds.has(exact.id)) void assignExisting(exact.id);
+      else {
+        setQuery("");
+        setOpen(false);
+      }
+    } else {
+      void createAndAssign();
     }
   };
   const detach = async (labelId: string) => {
@@ -1241,8 +1281,7 @@ function LabelsEditor({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              if (!exactExists) void createAndAssign();
-              else if (suggestions[0]) void assignExisting(suggestions[0].id);
+              submitQuery();
             }
           }}
           placeholder="Label toevoegen of maken…"
@@ -1294,7 +1333,12 @@ function ChannelsSection({
   const [kind, setKind] = useState("email");
   const [value, setValue] = useState("");
   const [label, setLabel] = useState("");
-  const channels = contact.channels ?? [];
+  // Hide extra channels whose value duplicates the primary email/phone already
+  // shown above, so the same address doesn't appear twice.
+  const primaries = new Set(
+    [contact.email, contact.phone].filter(Boolean).map((v) => v!.trim().toLowerCase()),
+  );
+  const channels = (contact.channels ?? []).filter((ch) => !primaries.has(ch.value.trim().toLowerCase()));
 
   const submit = async () => {
     if (!value.trim()) return;
@@ -1515,9 +1559,11 @@ function ColorDot({ color, onClick }: { color: string; onClick: () => void }) {
   );
 }
 
+// Rendered in-flow (below its row) rather than absolutely positioned, so the
+// lower swatches are never clipped by the modal's overflow-y-auto scroll box.
 function PalettePicker({ onPick }: { onPick: (c: string) => void }) {
   return (
-    <div className="absolute left-0 top-8 z-30 grid w-44 grid-cols-5 gap-1.5 rounded-lg border border-[var(--color-border)] bg-[#0d0d14] p-2 shadow-xl">
+    <div className="mt-1.5 flex flex-wrap gap-1.5 rounded-lg border border-[var(--color-border)] bg-white/[0.03] p-2">
       {LABEL_COLOR_KEYS.map((c) => (
         <button
           key={c}
@@ -1550,13 +1596,18 @@ function LabelManagerModal({ onClose }: { onClose: () => void }) {
       toastError("Label maken mislukt.");
     }
   };
-  const rename = async (l: ContactLabel, name: string) => {
+  // Returns false when the rename was rejected (e.g. 409 name-taken) so the caller
+  // can restore the input, which is uncontrolled and would otherwise keep the
+  // rejected text while the chips/DB show the real name.
+  const rename = async (l: ContactLabel, name: string): Promise<boolean> => {
     const trimmed = name.trim();
-    if (!trimmed || trimmed === l.name) return;
+    if (!trimmed || trimmed === l.name) return true;
     try {
       await updateLabel.mutateAsync({ labelId: l.id, data: { name: trimmed } });
+      return true;
     } catch {
       toastError("Hernoemen mislukt (bestaat de naam al?).");
+      return false;
     }
   };
   const recolor = async (l: ContactLabel, color: string) => {
@@ -1609,38 +1660,38 @@ function LabelManagerModal({ onClose }: { onClose: () => void }) {
   return (
     <ModalShell title="Labels beheren" onClose={onClose}>
       <div className="space-y-4">
-        <div className="relative flex flex-wrap items-center gap-1.5">
-          <div className="relative">
+        <div>
+          <div className="flex flex-wrap items-center gap-1.5">
             <ColorDot color={newColor} onClick={() => setColorEditId(colorEditId === "__new" ? null : "__new")} />
-            {colorEditId === "__new" && (
-              <PalettePicker
-                onPick={(c) => {
-                  setNewColor(c);
-                  setColorEditId(null);
-                }}
-              />
-            )}
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void create();
+                }
+              }}
+              placeholder="Nieuw label…"
+              aria-label="Nieuw label"
+              className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base text-white outline-none placeholder:text-slate-600 focus:border-amber-500/50 sm:text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => void create()}
+              className="min-h-[38px] rounded-lg bg-amber-500 px-3 text-sm font-bold text-[var(--color-primary-foreground)] hover:bg-amber-400"
+            >
+              Maak
+            </button>
           </div>
-          <input
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void create();
-              }
-            }}
-            placeholder="Nieuw label…"
-            aria-label="Nieuw label"
-            className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base text-white outline-none placeholder:text-slate-600 focus:border-amber-500/50 sm:text-sm"
-          />
-          <button
-            type="button"
-            onClick={() => void create()}
-            className="min-h-[38px] rounded-lg bg-amber-500 px-3 text-sm font-bold text-[var(--color-primary-foreground)] hover:bg-amber-400"
-          >
-            Maak
-          </button>
+          {colorEditId === "__new" && (
+            <PalettePicker
+              onPick={(c) => {
+                setNewColor(c);
+                setColorEditId(null);
+              }}
+            />
+          )}
         </div>
 
         {mergeFrom && (
@@ -1661,53 +1712,56 @@ function LabelManagerModal({ onClose }: { onClose: () => void }) {
             {labels.map((l) => (
               <div
                 key={l.id}
-                className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-2.5 py-2"
+                className="rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-2.5 py-2"
               >
-                <div className="relative">
+                <div className="flex items-center gap-2">
                   <ColorDot color={l.color} onClick={() => setColorEditId(colorEditId === l.id ? null : l.id)} />
-                  {colorEditId === l.id && <PalettePicker onPick={(c) => void recolor(l, c)} />}
+                  <input
+                    key={`${l.id}:${l.name}`}
+                    defaultValue={l.name}
+                    onBlur={async (e) => {
+                      const el = e.target;
+                      if (!(await rename(l, el.value))) el.value = l.name;
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    }}
+                    aria-label="Labelnaam"
+                    className="min-h-[34px] min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 text-sm text-slate-100 outline-none hover:border-[var(--color-border)] focus:border-amber-500/40"
+                  />
+                  <span className="shrink-0 text-[11px] text-slate-600">{l.contact_count ?? 0}</span>
+                  {mergeFrom ? (
+                    mergeFrom.id !== l.id && (
+                      <button
+                        type="button"
+                        onClick={() => void doMerge(l)}
+                        className="shrink-0 rounded-md border border-amber-500/25 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/10"
+                      >
+                        → hierheen
+                      </button>
+                    )
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setMergeFrom(l)}
+                        aria-label="Samenvoegen met…"
+                        className="shrink-0 rounded-md p-1 text-slate-500 hover:text-amber-300"
+                      >
+                        <GitMerge size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void del(l)}
+                        aria-label="Label verwijderen"
+                        className="shrink-0 rounded-md p-1 text-slate-500 hover:text-red-300"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </>
+                  )}
                 </div>
-                <input
-                  key={`${l.id}:${l.name}`}
-                  defaultValue={l.name}
-                  onBlur={(e) => void rename(l, e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                  }}
-                  aria-label="Labelnaam"
-                  className="min-h-[34px] min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 text-sm text-slate-100 outline-none hover:border-[var(--color-border)] focus:border-amber-500/40"
-                />
-                <span className="shrink-0 text-[11px] text-slate-600">{l.contact_count ?? 0}</span>
-                {mergeFrom ? (
-                  mergeFrom.id !== l.id && (
-                    <button
-                      type="button"
-                      onClick={() => void doMerge(l)}
-                      className="shrink-0 rounded-md border border-amber-500/25 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500/10"
-                    >
-                      → hierheen
-                    </button>
-                  )
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setMergeFrom(l)}
-                      aria-label="Samenvoegen met…"
-                      className="shrink-0 rounded-md p-1 text-slate-500 hover:text-amber-300"
-                    >
-                      <GitMerge size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void del(l)}
-                      aria-label="Label verwijderen"
-                      className="shrink-0 rounded-md p-1 text-slate-500 hover:text-red-300"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </>
-                )}
+                {colorEditId === l.id && <PalettePicker onPick={(c) => void recolor(l, c)} />}
               </div>
             ))}
           </div>
