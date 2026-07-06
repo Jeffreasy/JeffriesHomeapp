@@ -433,6 +433,7 @@ export function NoteEditor({
   const textRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   // Tags the user explicitly removed (lower-cased) — auto-context-merge must not
   // re-add them, otherwise removing a context tag is impossible.
   const removedTagsRef = useRef<Set<string>>(new Set());
@@ -710,23 +711,48 @@ export function NoteEditor({
     };
   }, []);
 
+  // Keyboard-aware sizing (iOS): the layout viewport does NOT shrink when the
+  // soft keyboard opens, so a `fixed inset-0` overlay keeps its bottom — and
+  // therefore the bottom-anchored editor's footer/save button and the textarea
+  // caret — hidden BEHIND the keyboard. The old handler only shrank the modal's
+  // max-height while it stayed bottom-pinned to the full-screen overlay, which
+  // pushed the footer further under the keyboard. Instead, drive the OVERLAY's
+  // geometry from the visual viewport: top/left/size follow the visible band, so
+  // `items-end` lands the footer right above the keyboard and every field (title
+  // + body) stays reachable. `vv.scroll` keeps it locked while iOS pans, killing
+  // the "modal jumps around" effect.
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
+    const overlay = overlayRef.current;
+    if (!vv || !overlay) return;
 
-    const onResize = () => {
-      const modal = scrollRef.current?.parentElement;
-      if (modal) {
-        modal.style.maxHeight = window.innerWidth < 640 ? `${vv.height}px` : `${vv.height - 16}px`;
+    const sync = () => {
+      if (window.innerWidth < 640) {
+        overlay.style.top = `${vv.offsetTop}px`;
+        overlay.style.left = `${vv.offsetLeft}px`;
+        overlay.style.width = `${vv.width}px`;
+        overlay.style.height = `${vv.height}px`;
+        overlay.style.right = "auto";
+        overlay.style.bottom = "auto";
+      } else {
+        // Desktop: hand control back to the `sm:` centered layout.
+        overlay.style.top = "";
+        overlay.style.left = "";
+        overlay.style.width = "";
+        overlay.style.height = "";
+        overlay.style.right = "";
+        overlay.style.bottom = "";
       }
     };
 
-    vv.addEventListener("resize", onResize);
-    vv.addEventListener("scroll", onResize);
-    onResize();
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    window.addEventListener("orientationchange", sync);
+    sync();
     return () => {
-      vv.removeEventListener("resize", onResize);
-      vv.removeEventListener("scroll", onResize);
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+      window.removeEventListener("orientationchange", sync);
     };
   }, []);
 
@@ -1273,6 +1299,7 @@ export function NoteEditor({
 
   const editorModal = (
     <motion.div
+      ref={overlayRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -1295,9 +1322,8 @@ export function NoteEditor({
         aria-modal="true"
         aria-labelledby={titleId}
         data-app-modal="note-editor"
-        className="relative flex h-[100dvh] w-full flex-col overflow-hidden rounded-none border-0 border-[var(--color-border)] shadow-2xl shadow-black/40 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-5xl sm:rounded-2xl sm:border"
+        className="relative flex h-full max-h-full w-full flex-col overflow-hidden rounded-none border-0 border-[var(--color-border)] shadow-2xl shadow-black/40 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-5xl sm:rounded-2xl sm:border"
         style={{
-          maxHeight: "100dvh",
           background: kleur
             ? `linear-gradient(145deg, ${kleur}12 0%, var(--color-surface) 48%)`
             : "var(--color-surface)",
@@ -1578,7 +1604,7 @@ export function NoteEditor({
                           aria-label="Deadline"
                           value={formatDeadlineForInput(deadline)}
                           onChange={(event) => setDeadline(event.target.value ? localDateTimeToIso(event.target.value) : "")}
-                          className="min-h-[44px] min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text)] outline-none [color-scheme:dark]"
+                          className="min-h-[44px] min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-base text-[var(--color-text)] outline-none [color-scheme:dark] sm:text-sm"
                         />
                         <button
                           type="button"
@@ -1735,7 +1761,7 @@ export function NoteEditor({
                                 addTag();
                               }
                             }}
-                            className="min-w-0 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)]"
+                            className="min-w-0 bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] sm:text-sm"
                           />
                         </div>
                         <button
