@@ -60,6 +60,39 @@ export function useContacten(opts?: { includeArchived?: boolean }) {
     onSuccess: invalidate,
   });
 
+  const assignLabel = useMutation({
+    mutationFn: (vars: { contactId: string; data: Parameters<typeof contactenApi.assignLabel>[2] }) =>
+      contactenApi.assignLabel(userId, vars.contactId, vars.data),
+    onSuccess: invalidate,
+  });
+  const removeLabel = useMutation({
+    mutationFn: (vars: { contactId: string; labelId: string }) =>
+      contactenApi.removeLabel(userId, vars.contactId, vars.labelId),
+    onSuccess: invalidate,
+  });
+
+  const addChannel = useMutation({
+    mutationFn: (vars: { contactId: string; data: Parameters<typeof contactenApi.addChannel>[2] }) =>
+      contactenApi.addChannel(userId, vars.contactId, vars.data),
+    onSuccess: invalidate,
+  });
+  const deleteChannel = useMutation({
+    mutationFn: (vars: { contactId: string; channelId: string }) =>
+      contactenApi.deleteChannel(userId, vars.contactId, vars.channelId),
+    onSuccess: invalidate,
+  });
+
+  const addInteraction = useMutation({
+    mutationFn: (vars: { contactId: string; data: Parameters<typeof contactenApi.addInteraction>[2] }) =>
+      contactenApi.addInteraction(userId, vars.contactId, vars.data),
+    onSuccess: invalidate,
+  });
+  const deleteInteraction = useMutation({
+    mutationFn: (vars: { contactId: string; interactionId: string }) =>
+      contactenApi.deleteInteraction(userId, vars.contactId, vars.interactionId),
+    onSuccess: invalidate,
+  });
+
   return {
     userId,
     contacts: listQuery.data ?? [],
@@ -73,6 +106,62 @@ export function useContacten(opts?: { includeArchived?: boolean }) {
     deleteDate,
     addFact,
     deleteFact,
+    assignLabel,
+    removeLabel,
+    addChannel,
+    deleteChannel,
+    addInteraction,
+    deleteInteraction,
+  };
+}
+
+/** The per-user label catalog + management mutations. */
+export function useLabels() {
+  const { user } = useUser();
+  const userId = user?.id ?? "";
+  const queryClient = useQueryClient();
+
+  const listQuery = useQuery({
+    queryKey: [KEY, "labels"],
+    queryFn: () => contactenApi.labelsList(userId),
+    enabled: !!userId,
+    staleTime: 30_000,
+  });
+
+  // Label edits change chips across many contacts, so invalidate the whole module.
+  const invalidateAll = () => queryClient.invalidateQueries({ queryKey: [KEY] });
+
+  const createLabel = useMutation({
+    mutationFn: (data: { name: string; color?: string }) => contactenApi.labelCreate(userId, data),
+    onSuccess: invalidateAll,
+  });
+  const updateLabel = useMutation({
+    mutationFn: (vars: { labelId: string; data: { name?: string; color?: string } }) =>
+      contactenApi.labelUpdate(userId, vars.labelId, vars.data),
+    onSuccess: invalidateAll,
+  });
+  const deleteLabel = useMutation({
+    mutationFn: (labelId: string) => contactenApi.labelDelete(userId, labelId),
+    onSuccess: invalidateAll,
+  });
+  const mergeLabel = useMutation({
+    mutationFn: (vars: { labelId: string; into: string }) => contactenApi.labelMerge(userId, vars.labelId, vars.into),
+    onSuccess: invalidateAll,
+  });
+  const bulkLabel = useMutation({
+    mutationFn: (vars: { labelId: string; contactIds: string[]; remove?: boolean }) =>
+      contactenApi.labelBulk(userId, vars.labelId, { contact_ids: vars.contactIds, remove: vars.remove }),
+    onSuccess: invalidateAll,
+  });
+
+  return {
+    labels: listQuery.data ?? [],
+    isLoading: listQuery.isLoading,
+    createLabel,
+    updateLabel,
+    deleteLabel,
+    mergeLabel,
+    bulkLabel,
   };
 }
 

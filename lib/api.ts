@@ -1923,6 +1923,40 @@ export interface Contact {
   updated_at: string;
   important_dates?: ContactImportantDate[];
   facts?: ContactFact[];
+  labels?: ContactLabel[];
+  channels?: ContactChannel[];
+  interactions?: ContactInteraction[];
+}
+
+export interface ContactLabel {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string; // palette key: slate | amber | sky | emerald | rose | violet | orange | teal | blue | pink | lime | cyan | red | indigo | fuchsia
+  created_at: string;
+  updated_at: string;
+  contact_count?: number; // only from the catalog list
+}
+
+export interface ContactChannel {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  kind: string; // email | phone | other
+  value: string;
+  label: string | null;
+  is_primary: boolean;
+  created_at: string;
+}
+
+export interface ContactInteraction {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  kind: string; // call | meeting | message | email | note | other
+  summary: string | null;
+  occurred_at: string;
+  created_at: string;
 }
 
 export interface ContactCreate {
@@ -1998,6 +2032,86 @@ export const contactenApi = {
   whatsappList: (userId: string, contactId: string) =>
     apiFetch<{ conversations: WhatsAppConversation[]; summaries: WhatsAppSummary[] }>(
       `/contacts/${contactId}/whatsapp?userId=${encodeURIComponent(userId)}`,
+    ),
+
+  // ── Label catalog ──
+  labelsList: (userId: string) =>
+    apiFetch<ContactLabel[]>(`/contacts/labels?userId=${encodeURIComponent(userId)}`),
+  labelCreate: (userId: string, data: { name: string; color?: string }) =>
+    apiFetch<ContactLabel>(`/contacts/labels?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  labelUpdate: (userId: string, labelId: string, data: { name?: string; color?: string }) =>
+    apiFetch<ContactLabel>(`/contacts/labels/${labelId}?userId=${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  labelDelete: (userId: string, labelId: string) =>
+    apiFetch<{ status: string }>(`/contacts/labels/${labelId}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }),
+  labelMerge: (userId: string, labelId: string, into: string) =>
+    apiFetch<{ status: string }>(`/contacts/labels/${labelId}/merge?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify({ into }),
+    }),
+  labelBulk: (userId: string, labelId: string, data: { contact_ids: string[]; remove?: boolean }) =>
+    apiFetch<{ status: string; affected: number }>(`/contacts/labels/${labelId}/bulk?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  // ── Per-contact label assignment ──
+  assignLabel: (userId: string, contactId: string, data: { label_id?: string; name?: string; color?: string }) =>
+    apiFetch<ContactLabel | { status: string }>(`/contacts/${contactId}/labels?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  removeLabel: (userId: string, contactId: string, labelId: string) =>
+    apiFetch<{ status: string }>(`/contacts/${contactId}/labels/${labelId}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }),
+  setLabels: (userId: string, contactId: string, labelIds: string[]) =>
+    apiFetch<{ status: string }>(`/contacts/${contactId}/labels?userId=${encodeURIComponent(userId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ label_ids: labelIds }),
+    }),
+
+  // ── Channels (extra emails/phones) ──
+  addChannel: (
+    userId: string,
+    contactId: string,
+    data: { kind: string; value: string; label?: string | null; is_primary?: boolean },
+  ) =>
+    apiFetch<ContactChannel>(`/contacts/${contactId}/channels?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteChannel: (userId: string, contactId: string, channelId: string) =>
+    apiFetch<{ status: string }>(`/contacts/${contactId}/channels/${channelId}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }),
+
+  // ── Interactions (touchpoint timeline) ──
+  interactionsList: (userId: string, contactId: string, limit?: number) => {
+    const params = new URLSearchParams({ userId });
+    if (limit) params.set("limit", String(limit));
+    return apiFetch<ContactInteraction[]>(`/contacts/${contactId}/interactions?${params.toString()}`);
+  },
+  addInteraction: (
+    userId: string,
+    contactId: string,
+    data: { kind: string; summary?: string | null; occurred_at?: string },
+  ) =>
+    apiFetch<ContactInteraction>(`/contacts/${contactId}/interactions?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteInteraction: (userId: string, contactId: string, interactionId: string) =>
+    apiFetch<{ status: string }>(
+      `/contacts/${contactId}/interactions/${interactionId}?userId=${encodeURIComponent(userId)}`,
+      { method: "DELETE" },
     ),
 };
 
