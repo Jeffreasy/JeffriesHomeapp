@@ -532,10 +532,13 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   </div>
                 </div>
 
-                {/* Tijd (alleen bij niet-hele-dag) */}
+                {/* Tijd (alleen bij niet-hele-dag). Mobile stacks Van/Tot: iOS
+                    `<input type=time>` ignores width:100% + min-width:0 and keeps
+                    its (wide) intrinsic width, so a 2-column row clipped the second
+                    field — full-width stacked fields are always wider than that. */}
                 {!heledag && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }} className="grid grid-cols-2 gap-3 overflow-hidden">
+                    exit={{ opacity: 0, height: 0 }} className="grid grid-cols-1 gap-3 overflow-hidden sm:grid-cols-2">
                     <div className="min-w-0">
                       <label htmlFor="agenda-event-start-tijd" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                         <AppIcon name="time" tone="slate" size="xs" /> Van
