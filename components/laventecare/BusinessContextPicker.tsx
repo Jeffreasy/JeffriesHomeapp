@@ -5,6 +5,7 @@ import { BriefcaseBusiness, ChevronDown } from "lucide-react";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { normalizeBusinessContext, type BusinessContextValue } from "@/lib/workspace-context";
 import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
+import { useContacten } from "@/hooks/useContacten";
 import {
   fallbackBusinessContextOption,
   getBusinessContextOptionKey,
@@ -28,7 +29,23 @@ export function BusinessContextPicker({
   label = "Zakelijke context",
   compact = false,
 }: BusinessContextPickerProps) {
-  const { options, isError } = useLaventeCareBusinessContextOptions();
+  const { options: lcOptions, isError } = useLaventeCareBusinessContextOptions();
+  // Relaties uit de globale Contacten-module worden als extra koppelbare groep
+  // naast de zakelijke LaventeCare-opties aangeboden (waarde: {type:"contact"}).
+  const { contacts } = useContacten();
+  const contactOptions = useMemo<LaventeCareContextOption[]>(
+    () =>
+      contacts.map((c) => ({
+        key: `contact:${c.id}`,
+        label: c.display_name,
+        meta: c.relationship_types.join(", ") || "Contact",
+        value: { type: "contact", id: c.id, title: c.display_name },
+        aliases: [],
+        rank: 2,
+      })),
+    [contacts],
+  );
+  const options = useMemo(() => [...lcOptions, ...contactOptions], [lcOptions, contactOptions]);
   const normalized = normalizeBusinessContext(value);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -79,6 +96,7 @@ export function BusinessContextPicker({
         { label: "Leads", items: filteredOptions.filter((option) => option.key.startsWith("lead:")) },
         { label: "Projecten", items: filteredOptions.filter((option) => option.key.startsWith("project:")) },
         { label: "Opdrachten", items: filteredOptions.filter((option) => option.key.startsWith("workstream:")) },
+        { label: "Relaties", items: filteredOptions.filter((option) => option.key.startsWith("contact:")) },
       ].filter((group) => group.items.length > 0),
     [filteredOptions],
   );

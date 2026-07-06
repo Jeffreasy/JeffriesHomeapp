@@ -1,6 +1,6 @@
 import type { AppIconName } from "@/lib/symbols";
 
-export type NavigationSectionId = "start" | "planning" | "persoonlijk" | "bedrijf" | "systeem";
+export type NavigationSectionId = "start" | "planning" | "persoonlijk" | "relaties" | "bedrijf" | "systeem";
 
 export interface NavigationItem {
   href: string;
@@ -16,6 +16,7 @@ export const NAVIGATION_SECTIONS: Array<{ id: NavigationSectionId; label: string
   { id: "start", label: "Start" },
   { id: "planning", label: "Planning" },
   { id: "persoonlijk", label: "Persoonlijk" },
+  { id: "relaties", label: "Relaties" },
   { id: "bedrijf", label: "Bedrijf" },
   { id: "systeem", label: "Systeem" },
 ];
@@ -91,6 +92,15 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     description: "Gewoontes, streaks en XP",
     icon: "habit",
     section: "persoonlijk",
+    mobile: "more",
+  },
+  {
+    href: "/contacten",
+    label: "Contacten",
+    shortLabel: "Relaties",
+    description: "Familie, vrienden, collega's en zakelijk",
+    icon: "relations",
+    section: "relaties",
     mobile: "more",
   },
   {
