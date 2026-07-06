@@ -510,15 +510,19 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   </button>
                 </div>
 
-                {/* Datum */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Datum. Like the time fields, a date is fixed-length content, so a
+                    half-width grid box left it looking like a wide empty bar. Let each
+                    box size to its content (dates vary in length, so a fixed width
+                    would either clip long dates or pad short ones) and lay them out
+                    with flex-wrap so they hug the value and only stack when too narrow. */}
+                <div className="flex flex-wrap gap-x-4 gap-y-3">
                   <div className="min-w-0">
                     <label htmlFor="agenda-event-start-datum" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                       <AppIcon name="calendar" tone="slate" size="xs" /> Start
                     </label>
                     <input id="agenda-event-start-datum" type="date" value={startDatum}
                       onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
-                      className="w-full min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                   <div className="min-w-0">
@@ -527,7 +531,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     </label>
                     <input id="agenda-event-eind-datum" type="date" value={eindDatum} min={startDatum}
                       onChange={e => setEindDatum(e.target.value)}
-                      className="w-full min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                 </div>
