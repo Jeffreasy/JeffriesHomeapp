@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import {
   Building2,
   CalendarHeart,
+  Check,
   Clock,
   GitMerge,
   Mail,
@@ -46,13 +47,21 @@ function relationshipLabel(value: string) {
   return RELATIONSHIP_LABEL[value] ?? value;
 }
 
+type SortKey = "name" | "recent" | "added";
+
 export default function ContactenPage() {
   const contacten = useContacten();
   const { contacts, isLoading, isError, refetch, create, update } = contacten;
-  const { labels } = useLabels();
+  const { labels, bulkLabel } = useLabels();
+  const { success, error: toastError } = useToast();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [labelFilter, setLabelFilter] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<SortKey>("name");
+  const [groupByLabel, setGroupByLabel] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [visibleCount, setVisibleCount] = useState(60);
   const [formOpen, setFormOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -77,8 +86,73 @@ export default function ContactenPage() {
     });
   }, [contacts, search, typeFilter, labelFilter]);
 
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    if (sortBy === "name") arr.sort((a, b) => a.display_name.localeCompare(b.display_name, "nl"));
+    else if (sortBy === "recent") arr.sort((a, b) => (b.last_contacted_at ?? "").localeCompare(a.last_contacted_at ?? ""));
+    else arr.sort((a, b) => b.created_at.localeCompare(a.created_at));
+    return arr;
+  }, [filtered, sortBy]);
+
+  // Reset the render window whenever the visible set changes (adjust-during-render;
+  // no effect, so no set-state-in-effect lint).
+  const windowSig = `${search}|${typeFilter}|${labelFilter.join(",")}|${sortBy}|${groupByLabel}`;
+  const [prevWindowSig, setPrevWindowSig] = useState(windowSig);
+  if (windowSig !== prevWindowSig) {
+    setPrevWindowSig(windowSig);
+    setVisibleCount(60);
+  }
+
   const toggleLabelFilter = (id: string) =>
     setLabelFilter((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+
+  const toggleSelected = (id: string) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelected(new Set());
+  };
+
+  const applyBulkLabel = async (labelId: string, remove: boolean) => {
+    if (selected.size === 0) return;
+    try {
+      await bulkLabel.mutateAsync({ labelId, contactIds: [...selected], remove });
+      success(remove ? "Label verwijderd van selectie" : "Label toegevoegd aan selectie");
+      exitSelectMode();
+    } catch {
+      toastError("Bulk-actie mislukt.");
+    }
+  };
+
+  // Group by label for the grouped view (a contact appears under each of its labels).
+  const grouped = useMemo(() => {
+    if (!groupByLabel) return null;
+    const byLabel = new Map<string, { label: ContactLabel | null; items: Contact[] }>();
+    const noLabel: Contact[] = [];
+    for (const c of sorted) {
+      if ((c.labels?.length ?? 0) === 0) {
+        noLabel.push(c);
+        continue;
+      }
+      for (const l of c.labels!) {
+        const bucket = byLabel.get(l.id) ?? { label: l, items: [] };
+        bucket.items.push(c);
+        byLabel.set(l.id, bucket);
+      }
+    }
+    const groups = [...byLabel.values()].sort((a, b) => (a.label?.name ?? "").localeCompare(b.label?.name ?? "", "nl"));
+    if (noLabel.length > 0) groups.push({ label: null, items: noLabel });
+    return groups;
+  }, [groupByLabel, sorted]);
+
+  const visible = groupByLabel ? sorted : sorted.slice(0, visibleCount);
+  const hasMore = !groupByLabel && sorted.length > visibleCount;
 
   const openNew = () => {
     setEditContact(null);
@@ -181,7 +255,52 @@ export default function ContactenPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-5 sm:px-6">
+      <main className="mx-auto max-w-5xl px-4 py-5 pb-24 sm:px-6">
+        {!isError && !isLoading && contacts.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="hidden sm:inline">Sorteer</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
+                aria-label="Sorteren"
+                className="min-h-[34px] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-slate-200 outline-none [color-scheme:dark]"
+              >
+                <option value="name">Naam (A-Z)</option>
+                <option value="recent">Laatst gesproken</option>
+                <option value="added">Recent toegevoegd</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => setGroupByLabel((v) => !v)}
+              aria-pressed={groupByLabel}
+              className={`min-h-[34px] rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
+                groupByLabel
+                  ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
+                  : "border-[var(--color-border)] text-slate-400 hover:bg-[var(--color-surface-hover)]"
+              }`}
+            >
+              Groepeer op label
+            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs text-slate-600">{sorted.length}</span>
+              <button
+                type="button"
+                onClick={selectMode ? exitSelectMode : () => setSelectMode(true)}
+                aria-pressed={selectMode}
+                className={`min-h-[34px] rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
+                  selectMode
+                    ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
+                    : "border-[var(--color-border)] text-slate-300 hover:bg-[var(--color-surface-hover)]"
+                }`}
+              >
+                {selectMode ? "Klaar" : "Selecteren"}
+              </button>
+            </div>
+          </div>
+        )}
+
         {isError ? (
           <EmptyBox
             title="Contacten konden niet worden geladen"
@@ -218,14 +337,58 @@ export default function ContactenPage() {
               ) : undefined
             }
           />
-        ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {filtered.map((c) => (
-              <ContactCard key={c.id} contact={c} onClick={() => setDetailId(c.id)} />
+        ) : groupByLabel && grouped ? (
+          <div className="space-y-5">
+            {grouped.map((g) => (
+              <div key={g.label?.id ?? "__none"}>
+                <div className="mb-2 flex items-center gap-2">
+                  {g.label ? (
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${labelChipClasses(g.label.color)}`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${labelDotClasses(g.label.color)}`} />
+                      {g.label.name}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Zonder label</span>
+                  )}
+                  <span className="text-[11px] text-slate-600">{g.items.length}</span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {g.items.map((c) => (
+                    <ContactCard
+                      key={c.id}
+                      contact={c}
+                      selectMode={selectMode}
+                      selected={selected.has(c.id)}
+                      onClick={() => (selectMode ? toggleSelected(c.id) : setDetailId(c.id))}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
+        ) : (
+          <>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {visible.map((c) => (
+                <ContactCard
+                  key={c.id}
+                  contact={c}
+                  selectMode={selectMode}
+                  selected={selected.has(c.id)}
+                  onClick={() => (selectMode ? toggleSelected(c.id) : setDetailId(c.id))}
+                />
+              ))}
+            </div>
+            {hasMore && <LoadMoreSentinel onVisible={() => setVisibleCount((c) => c + 60)} />}
+          </>
         )}
       </main>
+
+      {selectMode && selected.size > 0 && (
+        <BulkBar count={selected.size} labels={labels} onApply={applyBulkLabel} onClear={() => setSelected(new Set())} />
+      )}
 
       {formOpen && (
         <ContactFormModal
@@ -277,16 +440,116 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
   );
 }
 
-function ContactCard({ contact, onClick }: { contact: Contact; onClick: () => void }) {
+// Auto-loads the next window when scrolled near the bottom (dependency-free
+// virtualization-lite; the parent only mounts the first N cards).
+function LoadMoreSentinel({ onVisible }: { onVisible: () => void }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) onVisible();
+      },
+      { rootMargin: "300px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [onVisible]);
+  return <div ref={ref} className="h-8" aria-hidden />;
+}
+
+function BulkBar({
+  count,
+  labels,
+  onApply,
+  onClear,
+}: {
+  count: number;
+  labels: ContactLabel[];
+  onApply: (labelId: string, remove: boolean) => void;
+  onClear: () => void;
+}) {
+  const [labelId, setLabelId] = useState("");
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[90] border-t border-[var(--color-border)] bg-[#0a0a0f]/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
+        <span className="text-sm font-semibold text-white">{count} geselecteerd</span>
+        <select
+          value={labelId}
+          onChange={(e) => setLabelId(e.target.value)}
+          aria-label="Label kiezen"
+          className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-slate-200 outline-none [color-scheme:dark] sm:max-w-xs"
+        >
+          <option value="">Kies label…</option>
+          {labels.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={!labelId}
+          onClick={() => labelId && onApply(labelId, false)}
+          className="min-h-[38px] rounded-lg border border-amber-500/25 bg-amber-500/12 px-3 text-xs font-semibold text-amber-300 hover:bg-amber-500/18 disabled:opacity-40"
+        >
+          Toevoegen
+        </button>
+        <button
+          type="button"
+          disabled={!labelId}
+          onClick={() => labelId && onApply(labelId, true)}
+          className="min-h-[38px] rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold text-slate-300 hover:bg-[var(--color-surface-hover)] disabled:opacity-40"
+        >
+          Verwijderen
+        </button>
+        <button
+          type="button"
+          onClick={onClear}
+          className="min-h-[38px] rounded-lg px-3 text-xs font-semibold text-slate-500 hover:text-slate-300"
+        >
+          Wis
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ContactCard({
+  contact,
+  onClick,
+  selectMode = false,
+  selected = false,
+}: {
+  contact: Contact;
+  onClick: () => void;
+  selectMode?: boolean;
+  selected?: boolean;
+}) {
   const sub = contact.email || contact.phone || (contact.notes ? contact.notes.split("\n")[0] : "");
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[64px] items-center gap-3 rounded-xl border border-[var(--color-border)] bg-white/[0.02] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]"
+      aria-pressed={selectMode ? selected : undefined}
+      className={`flex min-h-[64px] items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
+        selected
+          ? "border-amber-500/50 bg-amber-500/[0.07]"
+          : "border-[var(--color-border)] bg-white/[0.02] hover:bg-white/[0.04]"
+      }`}
     >
       <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-sm font-bold uppercase text-amber-200">
         {contact.display_name.trim().charAt(0) || "?"}
+        {selectMode && (
+          <span
+            className={`absolute -left-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border ${
+              selected ? "border-amber-400 bg-amber-500 text-black" : "border-slate-500 bg-[#0a0a0f] text-transparent"
+            }`}
+          >
+            <Check size={10} strokeWidth={3} />
+          </span>
+        )}
         {contact.source === "laventecare" && (
           <span
             title="Beheerd in LaventeCare"
