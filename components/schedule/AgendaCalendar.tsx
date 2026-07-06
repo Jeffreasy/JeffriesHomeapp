@@ -7,6 +7,7 @@ import {
   CalendarRange,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock3,
   List,
   MapPin,
@@ -116,20 +117,47 @@ export function AgendaCalendar({
 
   // Phones (< sm) get an agenda list instead of the cramped month grid.
   const [mobileView, setMobileView] = useState<"agenda" | "maand">("agenda");
-  const agendaSections = useMemo(
+  // F7 (herzien): de telefoon-agenda opende op dag 1 van de maand en moest naar
+  // vandaag scrollen — een effect dat met de async data-load racete, waardoor je
+  // alsnog bovenaan de maand belandde. Nu bouwen we de hele maand, maar tonen we
+  // standaard alleen vandaag→einde maand: vandaag is simpelweg de eerste sectie,
+  // geen scroll-hack meer nodig. Voorbije dagen mét items blijven bereikbaar via
+  // een "Toon eerder deze maand"-knop, zodat er niets stilletjes verdwijnt.
+  const cursorMonth = cursorDate.slice(0, 7);
+  const isCurrentMonth = cursorMonth === todayIso.slice(0, 7);
+  const [showPastDays, setShowPastDays] = useState(false);
+  // Reset de "toon eerder"-onthulling naar de vandaag-first-default zodra de
+  // zichtbare maand wijzigt. State bijstellen tijdens render (met een prev-value
+  // tracker) i.p.v. in een effect — geen extra commit, geen cascading-render.
+  const [prevCursorMonth, setPrevCursorMonth] = useState(cursorMonth);
+  if (prevCursorMonth !== cursorMonth) {
+    setPrevCursorMonth(cursorMonth);
+    setShowPastDays(false);
+  }
+  const listFrom =
+    showPastDays || !isCurrentMonth
+      ? `${cursorMonth}-01`
+      : // Een bewust getapte voorbije dag in deze maand ankert de lijst dáár;
+        // anders begint hij op vandaag.
+        selectedDate.slice(0, 7) === cursorMonth && selectedDate < todayIso
+        ? selectedDate
+        : todayIso;
+  const fullMonthSections = useMemo(
     () => buildAgendaList(cursorDate, selectedDate, todayIso, events, notesByDate),
     [cursorDate, selectedDate, todayIso, events, notesByDate],
   );
+  const agendaSections = useMemo(
+    () => fullMonthSections.filter((section) => section.date >= listFrom),
+    [fullMonthSections, listFrom],
+  );
+  const hiddenPastCount = fullMonthSections.length - agendaSections.length;
 
-  // Maand→Agenda-tap: na het wisselen van weergave naar de getapte dag
-  // scrollen zodat de tap zichtbaar landt (audit M17). Ref i.p.v. state zodat
-  // het effect geen cascade-render veroorzaakt; het draait na elke commit en
-  // scrollt zodra de dagsectie gerenderd is.
-  // Initieel op vandaag geankerd (audit F7): de mobiele agendalijst begint
-  // anders op dag 1 van de maand. De geselecteerde dag (= vandaag) krijgt
-  // altijd een sectie, dus het anker bestaat vanaf de eerste render; op
-  // desktop is de lijst display:none en is scrollIntoView een no-op.
-  const pendingScrollDateRef = useRef<string | null>(todayIso);
+  // Maand→Agenda-tap: na het wisselen van weergave naar de getapte dag scrollen
+  // zodat de tap zichtbaar landt (audit M17). Ref i.p.v. state zodat het effect
+  // geen cascade-render veroorzaakt; het draait na elke commit. De agenda opent
+  // nu standaard óp vandaag (eerste sectie), dus er is geen initiële auto-scroll
+  // meer nodig — alleen expliciete taps zetten een doel.
+  const pendingScrollDateRef = useRef<string | null>(null);
   useEffect(() => {
     const target = pendingScrollDateRef.current;
     if (mobileView !== "agenda" || !target) return;
@@ -347,7 +375,21 @@ export function AgendaCalendar({
       {/* ── Mobile (< sm): agenda list or month-dots overview ─────────────── */}
       <div className="sm:hidden">
         {mobileView === "agenda" ? (
-          agendaSections.length > 0 ? (
+          <>
+            {!showPastDays && hiddenPastCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPastDays(true);
+                  pendingScrollDateRef.current = fullMonthSections[0]?.date ?? null;
+                }}
+                className="flex w-full items-center justify-center gap-1.5 border-b border-[var(--color-border)] bg-white/[0.02] px-3 py-2 text-[11px] font-semibold text-slate-400 transition-colors hover:bg-white/[0.04] hover:text-slate-200"
+              >
+                <ChevronUp size={13} />
+                Toon eerder deze maand ({hiddenPastCount})
+              </button>
+            )}
+            {agendaSections.length > 0 ? (
             <div className="divide-y divide-[var(--color-border)]">
               {agendaSections.map((section) => {
                 const standaloneNotes = section.notes.filter((note) => !getLinkedEventId(note));
@@ -439,7 +481,8 @@ export function AgendaCalendar({
                 <Plus size={14} /> Afspraak maken
               </button>
             </div>
-          )
+            )}
+          </>
         ) : (
           <div>
             <div className="grid grid-cols-7 border-b border-[var(--color-border)] bg-black/10">

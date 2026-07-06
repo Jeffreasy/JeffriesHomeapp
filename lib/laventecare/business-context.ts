@@ -146,6 +146,7 @@ export function getBusinessContextOptionKey(value?: BusinessContextValue | null)
   if (context.type === "laventecare_workstream" && context.id) return `workstream:${context.id}`;
   if (context.type === "laventecare_project" && context.id) return `project:${context.id}`;
   if (context.type === "laventecare") return "laventecare";
+  if (context.type === "contact" && context.id) return `contact:${context.id}`;
   return "custom";
 }
 
