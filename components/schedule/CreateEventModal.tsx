@@ -518,7 +518,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     </label>
                     <input id="agenda-event-start-datum" type="date" value={startDatum}
                       onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="w-full min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                   <div className="min-w-0">
@@ -527,7 +527,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     </label>
                     <input id="agenda-event-eind-datum" type="date" value={eindDatum} min={startDatum}
                       onChange={e => setEindDatum(e.target.value)}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="w-full min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                 </div>
@@ -541,7 +541,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                         <AppIcon name="time" tone="slate" size="xs" /> Van
                       </label>
                       <input id="agenda-event-start-tijd" type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
-                        className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-full min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                     <div className="min-w-0">
@@ -549,7 +549,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                         <AppIcon name="time" tone="slate" size="xs" /> Tot
                       </label>
                       <input id="agenda-event-eind-tijd" type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
-                        className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-full min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                   </motion.div>
