@@ -1881,3 +1881,108 @@ export const notesApi = {
   delete: (id: string) =>
     apiFetch<{ status: string }>(`/notes/${id}`, { method: "DELETE" }),
 };
+
+// ─── Contacts / Relationships (unified module) ───────────────────────────────
+
+export interface ContactImportantDate {
+  id: string;
+  contact_id: string;
+  kind: string;
+  label: string | null;
+  month: number;
+  day: number;
+  year: number | null;
+  recurring: boolean;
+  created_at: string;
+}
+
+export interface ContactFact {
+  id: string;
+  contact_id: string;
+  fact: string;
+  source: string;
+  occurred_at: string | null;
+  created_at: string;
+}
+
+export interface Contact {
+  id: string;
+  user_id: string;
+  display_name: string;
+  relationship_types: string[];
+  notes: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  organization_id: string | null;
+  business_role: string | null;
+  last_contacted_at: string | null;
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+  important_dates?: ContactImportantDate[];
+  facts?: ContactFact[];
+}
+
+export interface ContactCreate {
+  display_name: string;
+  relationship_types?: string[];
+  notes?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  organization_id?: string | null;
+  business_role?: string | null;
+}
+
+export interface ContactUpdate extends Partial<ContactCreate> {
+  archived?: boolean;
+  touch_last_contact?: boolean;
+}
+
+export const contactenApi = {
+  list: (userId: string, opts?: { q?: string; type?: string; includeArchived?: boolean; limit?: number }) => {
+    const params = new URLSearchParams({ userId });
+    if (opts?.q) params.set("q", opts.q);
+    if (opts?.type) params.set("type", opts.type);
+    if (opts?.includeArchived) params.set("includeArchived", "true");
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    return apiFetch<Contact[]>(`/contacts?${params.toString()}`);
+  },
+  get: (userId: string, id: string) =>
+    apiFetch<Contact>(`/contacts/${id}?userId=${encodeURIComponent(userId)}`),
+  create: (userId: string, data: ContactCreate) =>
+    apiFetch<Contact>(`/contacts?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  update: (userId: string, id: string, data: ContactUpdate) =>
+    apiFetch<Contact>(`/contacts/${id}?userId=${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  remove: (userId: string, id: string) =>
+    apiFetch<{ status: string }>(`/contacts/${id}?userId=${encodeURIComponent(userId)}`, { method: "DELETE" }),
+  addDate: (
+    userId: string,
+    contactId: string,
+    data: { kind: string; label?: string | null; month: number; day: number; year?: number | null; recurring?: boolean },
+  ) =>
+    apiFetch<ContactImportantDate>(`/contacts/${contactId}/dates?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteDate: (userId: string, contactId: string, dateId: string) =>
+    apiFetch<{ status: string }>(`/contacts/${contactId}/dates/${dateId}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }),
+  addFact: (userId: string, contactId: string, data: { fact: string; source?: string }) =>
+    apiFetch<ContactFact>(`/contacts/${contactId}/facts?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  deleteFact: (userId: string, contactId: string, factId: string) =>
+    apiFetch<{ status: string }>(`/contacts/${contactId}/facts/${factId}?userId=${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    }),
+};
