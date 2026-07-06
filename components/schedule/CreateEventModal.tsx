@@ -532,19 +532,20 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   </div>
                 </div>
 
-                {/* Tijd (alleen bij niet-hele-dag). Mobile stacks Van/Tot: iOS
-                    `<input type=time>` ignores width:100% + min-width:0 and keeps
-                    its (wide) intrinsic width, so a 2-column row clipped the second
-                    field — full-width stacked fields are always wider than that. */}
+                {/* Tijd (alleen bij niet-hele-dag). A time value (HH:MM) is short,
+                    and the iOS time control left-aligns it, so a full-width box left
+                    a big empty "bar". Give each field a compact fixed width that hugs
+                    the value; flex-wrap keeps Van/Tot side by side and only stacks
+                    them on very narrow phones. */}
                 {!heledag && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }} className="grid grid-cols-1 gap-3 overflow-hidden sm:grid-cols-2">
+                    exit={{ opacity: 0, height: 0 }} className="flex flex-wrap gap-x-4 gap-y-3 overflow-hidden">
                     <div className="min-w-0">
                       <label htmlFor="agenda-event-start-tijd" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                         <AppIcon name="time" tone="slate" size="xs" /> Van
                       </label>
                       <input id="agenda-event-start-tijd" type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
-                        className="w-full min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-36 max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                     <div className="min-w-0">
@@ -552,7 +553,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                         <AppIcon name="time" tone="slate" size="xs" /> Tot
                       </label>
                       <input id="agenda-event-eind-tijd" type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
-                        className="w-full min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-36 max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                   </motion.div>
