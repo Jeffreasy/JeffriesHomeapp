@@ -74,7 +74,7 @@ function contextSections(
     {
       marker: "Dossier 01",
       title: context.title,
-      intro: `${getLaventeCarePdfDossierKindLabel(context.kind)}context voor dit document. Deze laag maakt het PDF-document bruikbaar als klantdossier in plaats van alleen als generiek template.`,
+      intro: `${getLaventeCarePdfDossierKindLabel(context.kind)}gegevens voor dit document. Hierdoor kun je de PDF gebruiken als klantdossier, en niet alleen als standaardsjabloon.`,
       blocks: [
         ...(facts.length
           ? [
@@ -124,60 +124,60 @@ function proposalSections(document: LaventeCareDocument): LaventeCarePdfStructur
   return [
     {
       marker: "Voorstel 01",
-      title: "Single source of truth",
+      title: "Alles op één plek",
       intro:
-        "Een voorstel is geen losse prijsopgave. Het is de formele vertaling van discovery, scope, investering en besluitvorming.",
+        "Een voorstel is geen losse prijsopgave. Het zet het onderzoek (Discovery), de afspraak, de investering en de beslissing netjes op papier.",
       blocks: [
         {
           type: "detail",
-          label: "Blueprint leidend",
+          label: "Bouwplan is leidend",
           text:
-            "Scope, technische keuzes en acceptatiecriteria horen in de blueprint of scopebijlage te staan. Het voorstel verwijst daarnaar en maakt de investering besluitbaar.",
+            "De afspraak, de technische keuzes en de voorwaarden voor akkoord horen in het bouwplan (Blueprint) of de bijlage te staan. Het voorstel verwijst daarnaar en maakt de investering klaar om over te beslissen.",
           tone: "primary",
         },
         {
           type: "list",
           tone: "default",
           items: [
-            "Probleem, impact en gewenste uitkomst staan bovenaan.",
-            "Discovery, realisatie en beheer blijven zichtbaar gescheiden.",
-            "Meerwerk wordt pas uitgevoerd na expliciete scope- of change-acceptatie.",
+            "Het probleem, de gevolgen en het gewenste resultaat staan bovenaan.",
+            "Onderzoek, bouwen en beheer blijven duidelijk uit elkaar.",
+            "Extra werk doen we pas na een duidelijk akkoord op de afspraak of de wijziging.",
           ],
         },
       ],
     },
     {
       marker: "Voorstel 02",
-      title: "Fasen, investering en acceptatie",
+      title: "Fasen, investering en akkoord",
       blocks: [
         {
           type: "metric_grid",
           items: [
-            { label: "Discovery", value: "Betaald", detail: "Analyse, risico's en blueprint-input", tone: "primary" },
-            { label: "Realisatie", value: "Mijlpaal", detail: "Gefaseerd bouwen en accepteren", tone: "success" },
+            { label: "Discovery", value: "Betaald", detail: "Onderzoek, risico's en input voor het bouwplan", tone: "primary" },
+            { label: "Realisatie", value: "Mijlpaal", detail: "Stap voor stap bouwen en goedkeuren", tone: "success" },
             { label: "Beheer", value: "Optioneel", detail: "SLA, onderhoud en doorontwikkeling", tone: "muted" },
-            { label: "Meerwerk", value: "Change", detail: "Alleen na akkoord op impact", tone: "warning" },
+            { label: "Meerwerk", value: "Wijziging", detail: "Alleen na akkoord op de gevolgen", tone: "warning" },
           ],
         },
         {
           type: "progress_bars",
           items: [
             {
-              label: "Besluitrijpheid",
+              label: "Klaar om te beslissen",
               value: document.visibility === "internal" ? 70 : 55,
               max: 100,
               displayValue: document.visibility === "internal" ? "70%" : "55%",
-              detail: "Sterker zodra lead, eigenaar, budget en scope gekoppeld zijn.",
+              detail: "Sterker zodra lead, eigenaar, budget en de afspraak gekoppeld zijn.",
               benchmark: "Doel: 80% voor verzending",
               tone: "warning",
             },
             {
-              label: "Contractuele borging",
+              label: "Vastgelegde afspraken",
               value: document.funnelStage === "proposal" ? 75 : 50,
               max: 100,
               displayValue: document.funnelStage === "proposal" ? "75%" : "50%",
-              detail: "Voorwaarden, SLA, DPA en scope moeten in dezelfde dossierlijn zitten.",
-              benchmark: "Doel: geen voorstel zonder scopebron",
+              detail: "Voorwaarden, SLA, DPA (afspraak over gegevens) en de afspraak horen bij hetzelfde dossier.",
+              benchmark: "Doel: geen voorstel zonder onderliggende afspraak",
               tone: "primary",
             },
           ],
@@ -186,22 +186,22 @@ function proposalSections(document: LaventeCareDocument): LaventeCarePdfStructur
     },
     {
       marker: "Voorstel 03",
-      title: "Vervolg en no-fit guardrail",
+      title: "Vervolg en grens bij niet passen",
       blocks: [
         {
           type: "journey_flow",
           items: [
-            { label: "Fit-check", detail: "Past de vraag bij LaventeCare als systeempartner?", tone: "primary" },
-            { label: "Discovery", detail: "Onderzoek proces, data, risico's en waarde.", tone: "warning" },
-            { label: "Blueprint", detail: "Maak scope en technische route besluitbaar.", tone: "success" },
+            { label: "Past het?", detail: "Past de vraag bij LaventeCare als partner die systemen bouwt?", tone: "primary" },
+            { label: "Discovery", detail: "Onderzoek het proces, de gegevens, de risico's en de waarde.", tone: "warning" },
+            { label: "Blueprint", detail: "Maak de afspraak en de technische route klaar om over te beslissen.", tone: "success" },
             { label: "Voorstel", detail: "Leg investering, planning en voorwaarden vast.", tone: "success" },
           ],
         },
         {
           type: "detail",
-          label: "Professionele grens",
+          label: "Waar we de grens trekken",
           text:
-            "Wanneer de klant alleen een losse website, onduidelijke wens of onrealistisch budget heeft, hoort LaventeCare eerst terug te schakelen naar advies of discovery.",
+            "Wil de klant alleen een losse website, is de wens onduidelijk of is het budget niet realistisch? Dan gaat LaventeCare eerst terug naar advies of onderzoek (Discovery).",
           tone: "critical",
         },
       ],
@@ -215,22 +215,22 @@ function discoverySections(): LaventeCarePdfStructuredSection[] {
       marker: "Discovery 01",
       title: "Niet zomaar bouwen",
       intro:
-        "Discovery voorkomt dat er gebouwd wordt op aannames. Eerst wordt zichtbaar hoe processen, data en beslissingen echt lopen.",
+        "Discovery (het onderzoek) voorkomt dat je bouwt op aannames. Eerst wordt zichtbaar hoe processen, gegevens en beslissingen echt lopen.",
       blocks: [
         {
           type: "list",
           tone: "default",
           items: [
-            "Aanvragen, leads, klanten en interne opvolging worden in kaart gebracht.",
+            "Aanvragen, leads, klanten en de interne opvolging worden in kaart gebracht.",
             "Handmatig werk, dubbel werk en verlies van overzicht worden benoemd.",
-            "Datastromen, systemen en eigenaarschap worden gecontroleerd.",
+            "We controleren hoe gegevens lopen, welke systemen er zijn en wie waarvan eigenaar is.",
           ],
         },
         {
           type: "detail",
-          label: "Output",
+          label: "Resultaat",
           text:
-            "Het resultaat is een analyseverslag met systeemvoorstel, risico's, prioriteiten en een concreet besluitmoment voor de volgende fase.",
+            "Je krijgt een verslag met een voorstel voor het systeem, de risico's, de prioriteiten en een duidelijk moment om te beslissen over de volgende fase.",
           tone: "success",
         },
       ],
@@ -243,8 +243,8 @@ function discoverySections(): LaventeCarePdfStructuredSection[] {
           type: "metric_grid",
           items: [
             { label: "Instroom", value: "Leads", detail: "Hoe komt werk binnen en wie volgt op?", tone: "primary" },
-            { label: "Proces", value: "Flow", detail: "Waar ontstaat vertraging of dubbel werk?", tone: "warning" },
-            { label: "Data", value: "Bronnen", detail: "Waar staat informatie en wie is eigenaar?", tone: "critical" },
+            { label: "Proces", value: "Verloop", detail: "Waar ontstaat vertraging of dubbel werk?", tone: "warning" },
+            { label: "Gegevens", value: "Bronnen", detail: "Waar staat informatie en wie is eigenaar?", tone: "critical" },
             { label: "Groei", value: "Kansen", detail: "Waar kan automatisering echt waarde leveren?", tone: "success" },
           ],
         },
@@ -252,21 +252,21 @@ function discoverySections(): LaventeCarePdfStructuredSection[] {
           type: "progress_bars",
           items: [
             {
-              label: "Proceszicht",
+              label: "Zicht op het proces",
               value: 65,
               max: 100,
               displayValue: "65%",
-              detail: "Voldoende voor richting, nog niet altijd genoeg voor een vaste bouwscope.",
-              benchmark: "Doel: volledige workflowkaart",
+              detail: "Genoeg voor richting, nog niet altijd genoeg om vast te leggen wat er precies gebouwd wordt.",
+              benchmark: "Doel: het hele werkproces in kaart",
               tone: "primary",
             },
             {
-              label: "Risicohelderheid",
+              label: "Zicht op de risico's",
               value: 45,
               max: 100,
               displayValue: "45%",
-              detail: "Security, privacy en afhankelijkheden moeten expliciet worden gemaakt.",
-              benchmark: "Doel: risico's per systeemlaag",
+              detail: "Beveiliging, privacy en waar dingen van elkaar afhangen moeten duidelijk worden benoemd.",
+              benchmark: "Doel: risico's per onderdeel van het systeem",
               tone: "warning",
             },
           ],
@@ -281,9 +281,9 @@ function discoverySections(): LaventeCarePdfStructuredSection[] {
           type: "journey_flow",
           items: [
             { label: "Context", detail: "Bedrijf, team, klanten en doelen begrijpen.", tone: "primary" },
-            { label: "Observatie", detail: "Huidige workflow en bottlenecks vastleggen.", tone: "warning" },
-            { label: "Analyse", detail: "Impact, risico's en verbeterkansen bepalen.", tone: "primary" },
-            { label: "Advies", detail: "Blueprint-ready vervolg met duidelijke keuzes.", tone: "success" },
+            { label: "Observatie", detail: "Het huidige werkproces en de knelpunten vastleggen.", tone: "warning" },
+            { label: "Analyse", detail: "Gevolgen, risico's en verbeterkansen bepalen.", tone: "primary" },
+            { label: "Advies", detail: "Vervolg dat klaar is voor het bouwplan, met duidelijke keuzes.", tone: "success" },
           ],
         },
       ],
@@ -297,17 +297,17 @@ function legalSections(document: LaventeCareDocument): LaventeCarePdfStructuredS
   return [
     {
       marker: isSla ? "SLA 01" : "Legal 01",
-      title: isSla ? "Service levels en incidenten" : "Documenthierarchie",
+      title: isSla ? "Serviceafspraken en storingen" : "Volgorde van documenten",
       intro: isSla
-        ? "Een SLA maakt support, prioriteit, responstijd en verantwoordelijkheden meetbaar."
-        : "Governance-documenten beschermen de uitvoering door de volgorde en verantwoordelijkheden expliciet te maken.",
+        ? "Een SLA (serviceafspraak) maakt support, prioriteit, reactietijd en taken meetbaar."
+        : "Documenten over afspraken en beheer beschermen het werk. Ze maken duidelijk welke volgorde geldt en wie waarvoor zorgt.",
       blocks: [
         {
           type: "detail",
-          label: isSla ? "Best effort tenzij hard afgesproken" : "Rangorde",
+          label: isSla ? "We doen ons best, tenzij hard afgesproken" : "Volgorde",
           text: isSla
-            ? "Richtwaarden gelden als inspanningsverplichting, tenzij het pakket of contract expliciet een harde SLA noemt."
-            : "Blueprint gaat boven voorstel, daarna DPA, SLA, scope en algemene voorwaarden, tenzij schriftelijk anders overeengekomen.",
+            ? "Richtwaarden zijn een inspanning: we doen ons uiterste best, maar het is geen harde garantie, tenzij het pakket of contract wel een harde SLA noemt."
+            : "Het bouwplan (Blueprint) gaat boven het voorstel. Daarna komen de DPA (afspraak over gegevens), de SLA (serviceafspraak), de afspraak zelf en de algemene voorwaarden. Tenzij je schriftelijk iets anders afspreekt.",
           tone: "primary",
         },
         {
@@ -315,49 +315,49 @@ function legalSections(document: LaventeCareDocument): LaventeCarePdfStructuredS
           tone: "default",
           items: isSla
             ? [
-                "P1 is volledige uitval of bedrijfskritieke stagnatie.",
-                "P2 is zware degradatie met workaround.",
-                "P3/P4 zijn beperkte of cosmetische problemen.",
+                "P1 is volledige uitval of stilstand die het bedrijf raakt.",
+                "P2 is een grote storing waar wel een tijdelijke oplossing voor is.",
+                "P3/P4 zijn kleine problemen of alleen iets in de vormgeving.",
               ]
             : [
-                "Afspraken moeten herleidbaar zijn naar versie en dossier.",
-                "AVG, beveiliging en dataverwerking worden niet als bijlage achteraf behandeld.",
-                "Wijzigingen buiten scope lopen via een change-flow.",
+                "Afspraken moeten terug te vinden zijn per versie en dossier.",
+                "AVG (privacywet), beveiliging en het verwerken van gegevens zijn geen bijlage achteraf.",
+                "Wijzigingen buiten de afspraak lopen via een vast proces voor wijzigingen.",
               ],
         },
       ],
     },
     {
       marker: isSla ? "SLA 02" : "Legal 02",
-      title: "Security-first uitvoering",
+      title: "Werken met veiligheid voorop",
       blocks: [
         {
           type: "metric_grid",
           items: [
-            { label: "Toegang", value: "Least privilege", detail: "Alleen toegang waar nodig", tone: "success" },
-            { label: "Data", value: "AVG", detail: "Doel, grondslag en bewaartermijn", tone: "warning" },
-            { label: "Logging", value: "Audit trail", detail: "Besluiten en incidenten herleidbaar", tone: "primary" },
-            { label: "Continuiteit", value: "SLA", detail: "Support en onderhoud expliciet", tone: "critical" },
+            { label: "Toegang", value: "Zo min mogelijk", detail: "Alleen toegang waar het nodig is", tone: "success" },
+            { label: "Gegevens", value: "AVG", detail: "Doel, reden en hoe lang je bewaart", tone: "warning" },
+            { label: "Logboek", value: "Vastgelegd", detail: "Besluiten en storingen terug te vinden", tone: "primary" },
+            { label: "Doorlopend", value: "SLA", detail: "Support en onderhoud duidelijk afgesproken", tone: "critical" },
           ],
         },
         {
           type: "progress_bars",
           items: [
             {
-              label: "Contractuele helderheid",
+              label: "Duidelijke afspraken",
               value: isSla ? 85 : 70,
               max: 100,
               displayValue: isSla ? "85%" : "70%",
-              detail: "Wordt sterker wanneer pakket, responstijd en escalatiekanaal zijn ingevuld.",
-              benchmark: "Doel: geen impliciete supportafspraken",
+              detail: "Wordt sterker als het pakket, de reactietijd en het kanaal om op te schalen zijn ingevuld.",
+              benchmark: "Doel: geen onuitgesproken supportafspraken",
               tone: "success",
             },
             {
-              label: "Privacy-impact",
+              label: "Gevolgen voor privacy",
               value: 60,
               max: 100,
               displayValue: "60%",
-              detail: "DPA, subprocessors en dataclassificatie blijven per klantdossier nodig.",
+              detail: "De DPA (afspraak over gegevens), de andere partijen die meewerken en het soort gegevens blijven per klantdossier nodig.",
               benchmark: "Doel: per project vastleggen",
               tone: "warning",
             },
@@ -367,15 +367,15 @@ function legalSections(document: LaventeCareDocument): LaventeCarePdfStructuredS
     },
     {
       marker: isSla ? "SLA 03" : "Legal 03",
-      title: "Wijziging, audit en besluitvorming",
+      title: "Wijziging, vastleggen en beslissen",
       blocks: [
         {
           type: "journey_flow",
           items: [
             { label: "Signaal", detail: "Vraag, risico of wijziging wordt vastgelegd.", tone: "primary" },
-            { label: "Impact", detail: "Scope, planning, security en kosten worden beoordeeld.", tone: "warning" },
+            { label: "Gevolgen", detail: "De afspraak, planning, beveiliging en kosten worden bekeken.", tone: "warning" },
             { label: "Akkoord", detail: "Besluit, versie en eigenaar worden opgeslagen.", tone: "success" },
-            { label: "Audit", detail: "Wijziging blijft herleidbaar in het dossier.", tone: "muted" },
+            { label: "Vastgelegd", detail: "De wijziging blijft terug te vinden in het dossier.", tone: "muted" },
           ],
         },
       ],
@@ -387,39 +387,39 @@ function operationsSections(): LaventeCarePdfStructuredSection[] {
   return [
     {
       marker: "Ops 01",
-      title: "Signalen naar acties",
+      title: "Van signaal naar actie",
       intro:
-        "Operations-documenten verbinden dagelijkse signalen met besluiten, changes, incidenten en roadmapkeuzes.",
+        "Deze documenten over de dagelijkse gang van zaken verbinden losse signalen met besluiten, wijzigingen, storingen en keuzes voor de planning op langere termijn.",
       blocks: [
         {
           type: "list",
           tone: "default",
           items: [
             "Signalen kunnen uit mail, notities, agenda, Telegram of klantgesprekken komen.",
-            "Elke actie heeft een eigenaar, status, deadline en context.",
-            "Besluiten worden apart gelogd zodat de reden niet verdwijnt.",
+            "Elke actie heeft een eigenaar, status, deadline en achtergrond.",
+            "Besluiten leg je apart vast, zodat de reden niet verdwijnt.",
           ],
         },
         {
           type: "detail",
-          label: "Dossierdiscipline",
+          label: "Netjes bijhouden",
           text:
-            "Het doel is niet meer administratie, maar minder ruis: elke operationele gebeurtenis moet later terug te vinden zijn.",
+            "Het doel is niet meer administratie, maar minder ruis: elke gebeurtenis in de uitvoering moet je later kunnen terugvinden.",
           tone: "success",
         },
       ],
     },
     {
       marker: "Ops 02",
-      title: "Roadmap en incidentritme",
+      title: "Planning en ritme bij storingen",
       blocks: [
         {
           type: "metric_grid",
           items: [
-            { label: "Incident", value: "Prioriteit", detail: "P1 t/m P4 met impact", tone: "critical" },
-            { label: "Change", value: "Scope", detail: "Planning en prijsimpact", tone: "warning" },
-            { label: "Besluit", value: "Log", detail: "Waarom deze route?", tone: "primary" },
-            { label: "Roadmap", value: "Cyclus", detail: "Verbetering per periode", tone: "success" },
+            { label: "Storing", value: "Prioriteit", detail: "P1 t/m P4 met de gevolgen", tone: "critical" },
+            { label: "Wijziging", value: "Afspraak", detail: "Gevolgen voor planning en prijs", tone: "warning" },
+            { label: "Besluit", value: "Vastgelegd", detail: "Waarom deze keuze?", tone: "primary" },
+            { label: "Planning", value: "Rondes", detail: "Verbetering per periode", tone: "success" },
           ],
         },
       ],
@@ -431,10 +431,10 @@ function operationsSections(): LaventeCarePdfStructuredSection[] {
         {
           type: "journey_flow",
           items: [
-            { label: "Capture", detail: "Maak het signaal zichtbaar.", tone: "primary" },
-            { label: "Classificeer", detail: "Incident, change, besluit of roadmap-item.", tone: "warning" },
-            { label: "Actie", detail: "Wijs eigenaar en deadline toe.", tone: "success" },
-            { label: "Review", detail: "Gebruik het patroon voor structurele verbetering.", tone: "success" },
+            { label: "Vastleggen", detail: "Maak het signaal zichtbaar.", tone: "primary" },
+            { label: "Indelen", detail: "Storing, wijziging, besluit of iets voor de planning.", tone: "warning" },
+            { label: "Actie", detail: "Wijs een eigenaar en een deadline toe.", tone: "success" },
+            { label: "Terugkijken", detail: "Gebruik het patroon om dingen echt beter te maken.", tone: "success" },
           ],
         },
       ],
@@ -448,24 +448,24 @@ function serviceSections(document: LaventeCareDocument): LaventeCarePdfStructure
   return [
     {
       marker: "Service 01",
-      title: "LaventeCare als systeempartner",
+      title: "LaventeCare als partner voor je systemen",
       intro:
-        "Service-documenten leggen uit wat LaventeCare doet, maar vooral waarom dit procesmatig en zakelijk waarde heeft.",
+        "Deze documenten leggen uit wat LaventeCare doet. En vooral waarom dat waarde heeft voor je proces en je bedrijf.",
       blocks: [
         {
           type: "detail",
           label: "Focus",
           text:
-            "Niet een losse tool of pagina, maar een systeemlaag die werk, data, opvolging en groei beter laat samenwerken.",
+            "Niet een losse tool of pagina, maar een laag die werk, gegevens, opvolging en groei beter laat samenwerken.",
           tone: "primary",
         },
         {
           type: "list",
           tone: "default",
           items: [
-            "Positioneer de dienst op businessimpact, niet op losse techniek.",
-            "Maak zichtbaar welke workflow wordt verbeterd.",
-            "Gebruik fit/no-fit om te voorkomen dat elk verzoek een project wordt.",
+            "Leg de nadruk op wat het je bedrijf oplevert, niet op losse techniek.",
+            "Maak zichtbaar welk werkproces beter wordt.",
+            "Gebruik de vraag 'past het wel of niet' om te voorkomen dat elk verzoek een project wordt.",
           ],
         },
       ],
@@ -478,21 +478,21 @@ function serviceSections(document: LaventeCareDocument): LaventeCarePdfStructure
           type: "metric_grid",
           items: [
             { label: "Waarde", value: "Rust", detail: "Minder handmatig en dubbel werk", tone: "success" },
-            { label: "Proces", value: "Flow", detail: "Betere opvolging en overzicht", tone: "primary" },
-            { label: "Data", value: "Grip", detail: "Duidelijke bron en eigenaar", tone: "warning" },
-            { label: "Groei", value: "Schaal", detail: "Meer verwerken zonder chaos", tone: "success" },
+            { label: "Proces", value: "Verloop", detail: "Betere opvolging en overzicht", tone: "primary" },
+            { label: "Gegevens", value: "Grip", detail: "Duidelijke bron en eigenaar", tone: "warning" },
+            { label: "Groei", value: "Meegroeien", detail: "Meer verwerken zonder chaos", tone: "success" },
           ],
         },
         {
           type: "progress_bars",
           items: [
             {
-              label: "Klantfit",
+              label: "Past het bij de klant?",
               value: document.funnelStage === "awareness" ? 50 : 68,
               max: 100,
               displayValue: document.funnelStage === "awareness" ? "50%" : "68%",
-              detail: "Wordt duidelijker na intake, procesvragen en budgetindicatie.",
-              benchmark: "Doel: fit-check voor voorstel",
+              detail: "Wordt duidelijker na het kennismakingsgesprek, vragen over het proces en een idee van het budget.",
+              benchmark: "Doel: check of het past voor het voorstel",
               tone: "primary",
             },
           ],
@@ -506,10 +506,10 @@ function serviceSections(document: LaventeCareDocument): LaventeCarePdfStructure
         {
           type: "journey_flow",
           items: [
-            { label: "Introductie", detail: "Leg waarde en doelgroep helder uit.", tone: "primary" },
-            { label: "Fit", detail: "Kwalificeer vraag, urgentie en budget.", tone: "warning" },
+            { label: "Introductie", detail: "Leg de waarde en de doelgroep helder uit.", tone: "primary" },
+            { label: "Past het?", detail: "Toets de vraag, hoe urgent het is en het budget.", tone: "warning" },
             { label: "Discovery", detail: "Onderzoek wat er echt nodig is.", tone: "success" },
-            { label: "Project", detail: "Vertaal naar blueprint, voorstel en delivery.", tone: "success" },
+            { label: "Project", detail: "Zet het om in een bouwplan, een voorstel en de oplevering.", tone: "success" },
           ],
         },
       ],
