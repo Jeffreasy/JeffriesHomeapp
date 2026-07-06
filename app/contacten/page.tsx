@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { CalendarHeart, Plus, Search, Trash2, X } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useUser } from "@clerk/nextjs";
+import { CalendarHeart, MessageCircle, Plus, Search, Trash2, X } from "lucide-react";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useContacten, useContact } from "@/hooks/useContacten";
-import type { Contact } from "@/lib/api";
+import { contactenApi, type Contact } from "@/lib/api";
 
 const RELATIONSHIP_TYPES = [
   { value: "family", label: "Familie" },
@@ -681,6 +683,8 @@ function ContactDetailModal({
             </div>
           </div>
 
+          <WhatsAppSection contactId={contact.id} />
+
           <div className="flex gap-2 border-t border-[var(--color-border)] pt-4">
             <button
               type="button"
@@ -705,4 +709,85 @@ function ContactDetailModal({
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{children}</p>;
+}
+
+// ─── WhatsApp import ─────────────────────────────────────────────────────────
+
+function WhatsAppSection({ contactId }: { contactId: string }) {
+  const { user } = useUser();
+  const userId = user?.id ?? "";
+  const queryClient = useQueryClient();
+  const { success, error: toastError } = useToast();
+  const [importing, setImporting] = useState(false);
+
+  const listQuery = useQuery({
+    queryKey: ["contacten", "whatsapp", contactId],
+    queryFn: () => contactenApi.whatsappList(userId, contactId),
+    enabled: !!userId,
+    staleTime: 15_000,
+  });
+
+  const conversations = listQuery.data?.conversations ?? [];
+  const summaries = listQuery.data?.summaries ?? [];
+  const summaryFor = (conversationId: string) => summaries.find((s) => s.conversation_id === conversationId)?.summary;
+
+  const importFile = async (file: File) => {
+    if (!userId) return;
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const chatName = file.name.replace(/\.txt$/i, "").replace(/^whatsapp[- ]?chat[- ]?(met[- ])?/i, "").trim();
+      await contactenApi.whatsappImport(userId, contactId, {
+        chat_name: chatName || undefined,
+        source_filename: file.name,
+        text,
+      });
+      success("WhatsApp-gesprek geïmporteerd");
+      queryClient.invalidateQueries({ queryKey: ["contacten", "whatsapp", contactId] });
+      queryClient.invalidateQueries({ queryKey: ["contacten", "detail", contactId] });
+    } catch {
+      toastError("Import mislukt — is dit een geëxporteerd .txt-chatbestand?");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div>
+      <SectionLabel>WhatsApp</SectionLabel>
+      {conversations.length > 0 && (
+        <div className="space-y-1.5">
+          {conversations.map((c) => (
+            <div key={c.id} className="rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-3 py-2">
+              <div className="flex items-center gap-2">
+                <MessageCircle size={13} className="shrink-0 text-emerald-400/70" />
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-200">{c.chat_name}</span>
+                <span className="shrink-0 text-[11px] text-slate-500">{c.message_count} berichten</span>
+              </div>
+              {summaryFor(c.id) && <p className="mt-1 text-xs leading-relaxed text-slate-400">{summaryFor(c.id)}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+      <label className="mt-2 inline-flex min-h-[38px] cursor-pointer items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/15">
+        <input
+          type="file"
+          accept=".txt,text/plain"
+          className="hidden"
+          disabled={importing}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void importFile(file);
+            e.target.value = "";
+          }}
+        />
+        <MessageCircle size={13} />
+        {importing ? "Importeren…" : "Importeer WhatsApp-export (.txt)"}
+      </label>
+      <p className="mt-1 text-[10px] leading-4 text-slate-600">
+        Exporteer een chat in WhatsApp (zonder media) en kies het .txt-bestand. Alleen een samenvatting gaat naar de AI; de
+        berichten blijven lokaal.
+      </p>
+    </div>
+  );
 }
