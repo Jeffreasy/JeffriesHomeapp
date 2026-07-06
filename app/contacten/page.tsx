@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
-import { CalendarHeart, MessageCircle, Plus, Search, Trash2, X } from "lucide-react";
+import { Building2, CalendarHeart, MessageCircle, Plus, Search, Trash2, X } from "lucide-react";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -218,8 +218,16 @@ function ContactCard({ contact, onClick }: { contact: Contact; onClick: () => vo
       onClick={onClick}
       className="flex min-h-[64px] items-center gap-3 rounded-xl border border-[var(--color-border)] bg-white/[0.02] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]"
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-sm font-bold uppercase text-amber-200">
+      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-sm font-bold uppercase text-amber-200">
         {contact.display_name.trim().charAt(0) || "?"}
+        {contact.source === "laventecare" && (
+          <span
+            title="Beheerd in LaventeCare"
+            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-[#0a0a0f] bg-sky-500/90 text-white"
+          >
+            <Building2 size={9} />
+          </span>
+        )}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-white">{contact.display_name}</span>
@@ -685,21 +693,33 @@ function ContactDetailModal({
 
           <WhatsAppSection contactId={contact.id} />
 
-          <div className="flex gap-2 border-t border-[var(--color-border)] pt-4">
-            <button
-              type="button"
-              onClick={() => void handleDelete()}
-              className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-red-500/20 px-3 text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/10"
-            >
-              <Trash2 size={16} /> Verwijderen
-            </button>
-            <button
-              type="button"
-              onClick={() => onEdit(contact)}
-              className="min-h-[44px] flex-1 rounded-xl bg-amber-500 text-sm font-bold text-[var(--color-primary-foreground)] transition-colors hover:bg-amber-400"
-            >
-              Bewerken
-            </button>
+          <div className="border-t border-[var(--color-border)] pt-4">
+            {contact.source === "laventecare" ? (
+              <div className="flex items-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2.5 text-xs leading-relaxed text-sky-200/90">
+                <Building2 size={15} className="mt-0.5 shrink-0 text-sky-300/80" />
+                <span>
+                  Dit contact komt uit <span className="font-semibold">LaventeCare</span>. Kerngegevens (naam, e-mail,
+                  telefoon) beheer je daar — datums, feiten en WhatsApp voeg je hier lokaal toe.
+                </span>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-red-500/20 px-3 text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/10"
+                >
+                  <Trash2 size={16} /> Verwijderen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEdit(contact)}
+                  className="min-h-[44px] flex-1 rounded-xl bg-amber-500 text-sm font-bold text-[var(--color-primary-foreground)] transition-colors hover:bg-amber-400"
+                >
+                  Bewerken
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1918,6 +1918,7 @@ export interface Contact {
   business_role: string | null;
   last_contacted_at: string | null;
   archived: boolean;
+  source: string; // "manual" | "laventecare" — laventecare rows are mirrored & managed in LaventeCare
   created_at: string;
   updated_at: string;
   important_dates?: ContactImportantDate[];
