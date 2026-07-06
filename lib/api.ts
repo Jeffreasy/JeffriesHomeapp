@@ -1926,6 +1926,18 @@ export interface Contact {
   labels?: ContactLabel[];
   channels?: ContactChannel[];
   interactions?: ContactInteraction[];
+  organizations?: ContactOrganization[];
+}
+
+export interface ContactOrganization {
+  id: string;
+  user_id: string;
+  contact_id: string;
+  organization_id: string | null;
+  organization_name: string | null;
+  role: string | null;
+  source: string;
+  created_at: string;
 }
 
 export interface ContactLabel {

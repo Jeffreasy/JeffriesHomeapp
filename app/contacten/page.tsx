@@ -528,6 +528,13 @@ function ContactCard({
   selected?: boolean;
 }) {
   const sub = contact.email || contact.phone || (contact.notes ? contact.notes.split("\n")[0] : "");
+  const orgNames = (contact.organizations ?? [])
+    .map((o) => o.organization_name)
+    .filter((n): n is string => !!n);
+  const orgLine =
+    orgNames.length > 0
+      ? orgNames.slice(0, 2).join(", ") + (orgNames.length > 2 ? ` +${orgNames.length - 2}` : "")
+      : "";
   return (
     <button
       type="button"
@@ -562,6 +569,12 @@ function ContactCard({
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-white">{contact.display_name}</span>
         {sub && <span className="mt-0.5 block truncate text-xs text-slate-500">{sub}</span>}
+        {orgLine && (
+          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-sky-300/70">
+            <Building2 size={10} className="shrink-0" />
+            <span className="truncate">{orgLine}</span>
+          </span>
+        )}
         {(contact.labels?.length ?? 0) > 0 && (
           <span className="mt-1 flex flex-wrap gap-1">
             {contact.labels!.slice(0, 3).map((l) => (
@@ -897,6 +910,26 @@ function ContactDetailModal({
               {contact.email && <p className="truncate">{contact.email}</p>}
               {contact.phone && <p className="truncate">{contact.phone}</p>}
               {contact.address && <p className="truncate text-slate-400">{contact.address}</p>}
+            </div>
+          )}
+
+          {(contact.organizations?.length ?? 0) > 0 && (
+            <div>
+              <SectionLabel>Bedrijven</SectionLabel>
+              <div className="space-y-1.5">
+                {contact.organizations!.map((o) => (
+                  <div
+                    key={o.id}
+                    className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-3 py-2"
+                  >
+                    <Building2 size={13} className="shrink-0 text-sky-300/70" />
+                    <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
+                      {o.organization_name || "Onbekend bedrijf"}
+                    </span>
+                    {o.role && <span className="shrink-0 text-[11px] text-slate-500">{o.role}</span>}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
