@@ -8,16 +8,16 @@ export const LAVENTECARE_PROFILE = {
   location: "Dronten, Nederland",
   kvk: "88162710",
   btwId: "NL004553268B57",
-  rol: "B2B systeempartner voor mkb-organisaties die digitale groei, automatisering en maatwerksoftware professioneel willen neerzetten.",
+  rol: "B2B systeempartner voor mkb-organisaties die digitale groei, automatisering en software op maat goed en betrouwbaar willen regelen.",
   kernbelofte:
-    "Van losse tools en handmatig werk naar een schaalbaar digitaal systeem: intake, analyse, blueprint, realisatie, beheer en doorontwikkeling.",
+    "Van losse tools en handwerk naar een digitaal systeem dat met je meegroeit: intake, analyse, blueprint (het plan), bouwen, beheer en verder verbeteren.",
   doelgroep:
-    "Mkb, dienstverleners en operationele teams met terugkerende processen, klantcontact, administratie, planning, reporting of digitale groei-vraagstukken.",
+    "Mkb, dienstverleners en operationele teams met werk dat steeds terugkomt: klantcontact, administratie, planning, rapportages of vragen rond digitale groei.",
   positie:
-    "Geen losse websitebouwer of eenmalige freelancer, maar een structurele partner die bedrijfsprocessen vertaalt naar werkende systemen.",
+    "Geen losse websitebouwer of eenmalige freelancer, maar een vaste partner die je bedrijfsprocessen omzet in software die het werk uit handen neemt.",
   tagline: "Van idee tot werkend systeem",
   summary:
-    "LaventeCare bouwt systemen die bedrijven efficienter maken, fouten voorkomen en groei versnellen: AI, IoT, maatwerkplatformen, lead generation en security-first systemen.",
+    "LaventeCare bouwt systemen die je werk efficienter maken, fouten voorkomen en groei versnellen: AI, IoT, platformen op maat, leadgeneratie en systemen waarbij veiligheid vooropstaat.",
   branding: {
     primaryColor: "#0D7C5F",
     accentColor: "#0891B2",
