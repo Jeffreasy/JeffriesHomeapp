@@ -755,14 +755,27 @@ export function NoteEditor({
       setKeyboardOpen(mobile && window.innerHeight - vv.height > 150);
     };
 
-    vv.addEventListener("resize", sync);
-    vv.addEventListener("scroll", sync);
-    window.addEventListener("orientationchange", sync);
+    // `vv.scroll` can fire many times per frame during iOS keyboard panning /
+    // momentum. Coalesce bursts into a single style write per frame so the very
+    // path we're smoothing doesn't thrash layout.
+    let rafId = 0;
+    const schedule = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        sync();
+      });
+    };
+
+    vv.addEventListener("resize", schedule);
+    vv.addEventListener("scroll", schedule);
+    window.addEventListener("orientationchange", schedule);
     sync();
     return () => {
-      vv.removeEventListener("resize", sync);
-      vv.removeEventListener("scroll", sync);
-      window.removeEventListener("orientationchange", sync);
+      vv.removeEventListener("resize", schedule);
+      vv.removeEventListener("scroll", schedule);
+      window.removeEventListener("orientationchange", schedule);
+      if (rafId) window.cancelAnimationFrame(rafId);
     };
   }, []);
 
