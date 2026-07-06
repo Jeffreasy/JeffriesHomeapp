@@ -464,7 +464,12 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+                {/* overflow-x-hidden: a scroll box with overflow-y:auto computes
+                    overflow-x to `auto` too, so any over-wide child (e.g. the
+                    native date/time inputs below) produced a horizontal scroll on
+                    mobile. Clip the x-axis; min-w-0 on the grid items keeps the
+                    inputs from overflowing in the first place. */}
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-5 py-4">
 
                 {/* Titel */}
                 <div>
@@ -505,46 +510,54 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   </button>
                 </div>
 
-                {/* Datum */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
+                {/* Datum. Like the time fields, a date is fixed-length content, so a
+                    half-width grid box left it looking like a wide empty bar. Let each
+                    box size to its content (dates vary in length, so a fixed width
+                    would either clip long dates or pad short ones) and lay them out
+                    with flex-wrap so they hug the value and only stack when too narrow. */}
+                <div className="flex flex-wrap gap-x-4 gap-y-3">
+                  <div className="min-w-0">
                     <label htmlFor="agenda-event-start-datum" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                       <AppIcon name="calendar" tone="slate" size="xs" /> Start
                     </label>
                     <input id="agenda-event-start-datum" type="date" value={startDatum}
                       onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <label htmlFor="agenda-event-eind-datum" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                       <AppIcon name="calendar" tone="slate" size="xs" /> Eind
                     </label>
                     <input id="agenda-event-eind-datum" type="date" value={eindDatum} min={startDatum}
                       onChange={e => setEindDatum(e.target.value)}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                      className="max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                     />
                   </div>
                 </div>
 
-                {/* Tijd (alleen bij niet-hele-dag) */}
+                {/* Tijd (alleen bij niet-hele-dag). A time value (HH:MM) is short,
+                    and the iOS time control left-aligns it, so a full-width box left
+                    a big empty "bar". Give each field a compact fixed width that hugs
+                    the value; flex-wrap keeps Van/Tot side by side and only stacks
+                    them on very narrow phones. */}
                 {!heledag && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }} className="grid grid-cols-2 gap-3 overflow-hidden">
-                    <div>
+                    exit={{ opacity: 0, height: 0 }} className="flex flex-wrap gap-x-4 gap-y-3 overflow-hidden">
+                    <div className="min-w-0">
                       <label htmlFor="agenda-event-start-tijd" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                         <AppIcon name="time" tone="slate" size="xs" /> Van
                       </label>
                       <input id="agenda-event-start-tijd" type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
-                        className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-36 max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label htmlFor="agenda-event-eind-tijd" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
                         <AppIcon name="time" tone="slate" size="xs" /> Tot
                       </label>
                       <input id="agenda-event-eind-tijd" type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
-                        className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
+                        className="w-36 max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
                       />
                     </div>
                   </motion.div>
@@ -584,14 +597,14 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                         key={id}
                         type="button"
                         onClick={() => handleCategoryChange(id)}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border cursor-pointer ${
+                        className={`flex min-w-0 items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border cursor-pointer ${
                           categorie === id
                             ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
                             : "bg-[var(--color-surface)] text-slate-500 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] hover:text-slate-300"
                         }`}
                       >
-                        <AppIcon name={icon} tone={categorie === id ? "indigo" : "slate"} size="xs" />
-                        {label}
+                        <AppIcon name={icon} tone={categorie === id ? "indigo" : "slate"} size="xs" className="shrink-0" />
+                        <span className="truncate">{label}</span>
                       </button>
                     ))}
                   </div>
