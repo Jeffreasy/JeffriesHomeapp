@@ -5,43 +5,43 @@ export const LAVENTECARE_PROCESS_STAGES: LaventeCareProcessStage[] = [
     key: "intake",
     title: "Intake",
     summary:
-      "Kwalificeren of er een echte businesscase is: probleem, urgentie, impact, eigenaarschap en budgetrichting.",
-    output: "Heldere fit/no-fit, eerste scope en vervolgstap.",
+      "Samen kijken of er een echte zaak ligt: wat is het probleem, hoe dringend is het, wat levert het op, wie beslist en welk budget is er ongeveer.",
+    output: "Duidelijk of het past of niet, een eerste afspraak en de vervolgstap.",
   },
   {
     key: "discovery",
     title: "Discovery",
     summary:
-      "Huidige situatie, systemen, workflows, knelpunten, risico's en kansen in kaart brengen.",
-    output: "Systeemanalyse met proceskaart, prioriteiten en requirements.",
+      "We brengen in kaart hoe het nu werkt: je systemen, werkwijzen, knelpunten, risico's en kansen.",
+    output: "Een analyse met een overzicht van je processen, prioriteiten en eisen.",
   },
   {
     key: "blueprint",
     title: "Blueprint",
     summary:
-      "Oplossingsrichting vertalen naar architectuur, fasering, deliverables, planning en beslispunten.",
-    output: "Blueprint als leidend projectdocument.",
+      "We zetten de oplossing om in een technisch ontwerp, de stappen, wat je krijgt, de planning en de punten waarop je beslist.",
+    output: "Een blueprint: het plan dat het hele project stuurt.",
   },
   {
     key: "realisatie",
     title: "Realisatie",
     summary:
-      "Bouwen, testen, opleveren en overdraagbaar maken met gecontroleerde scope en changelog.",
-    output: "Werkend systeem met documentatie en acceptatie.",
+      "Bouwen, testen en opleveren, zodat je het kunt overnemen. We houden ons aan de afspraak en leggen alle wijzigingen vast.",
+    output: "Een werkend systeem met uitleg, dat je hebt goedgekeurd.",
   },
   {
     key: "sla",
     title: "SLA en beheer",
     summary:
-      "Support, monitoring, incidenten, wijzigingsverzoeken en continuiteit professioneel borgen.",
-    output: "Afspraken over responstijden, onderhoud en opvolging.",
+      "We regelen support, houden je systeem in de gaten, lossen storingen op, voeren wijzigingen door en zorgen dat alles blijft draaien.",
+    output: "Afspraken over hoe snel we reageren, onderhoud en opvolging.",
   },
   {
     key: "evolution",
     title: "Doorontwikkeling",
     summary:
-      "Periodiek verbeteren op basis van data, feedback, nieuwe processen en groeidoelen.",
-    output: "Roadmap, optimalisaties en nieuwe iteraties.",
+      "We verbeteren je systeem regelmatig op basis van cijfers, feedback, nieuwe werkwijzen en je groeidoelen.",
+    output: "Een plan voor de toekomst, verbeteringen en nieuwe versies.",
   },
 ];
 

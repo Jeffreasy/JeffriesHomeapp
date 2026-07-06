@@ -433,6 +433,7 @@ export function NoteEditor({
   const textRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   // Tags the user explicitly removed (lower-cased) — auto-context-merge must not
   // re-add them, otherwise removing a context tag is impossible.
   const removedTagsRef = useRef<Set<string>>(new Set());
@@ -462,6 +463,11 @@ export function NoteEditor({
   const [symbolTouched, setSymbolTouched] = useState(false);
   const [activePanel, setActivePanel] = useState<EditorPanel>("details");
   const [showTemplates, setShowTemplates] = useState(false);
+  // True while the iOS soft keyboard is open on a phone-width screen. When set,
+  // the editor collapses its chrome (grab handle, header meta, footer safe-area
+  // padding + secondary actions) so the narrow band above the keyboard is spent
+  // on the fields being typed into instead of on buttons.
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   const [linkSearch, setLinkSearch] = useState("");
   const [linkActive, setLinkActive] = useState(false);
@@ -710,23 +716,66 @@ export function NoteEditor({
     };
   }, []);
 
+  // Keyboard-aware sizing (iOS): the layout viewport does NOT shrink when the
+  // soft keyboard opens, so a `fixed inset-0` overlay keeps its bottom — and
+  // therefore the bottom-anchored editor's footer/save button and the textarea
+  // caret — hidden BEHIND the keyboard. The old handler only shrank the modal's
+  // max-height while it stayed bottom-pinned to the full-screen overlay, which
+  // pushed the footer further under the keyboard. Instead, drive the OVERLAY's
+  // geometry from the visual viewport: top/left/size follow the visible band, so
+  // `items-end` lands the footer right above the keyboard and every field (title
+  // + body) stays reachable. `vv.scroll` keeps it locked while iOS pans, killing
+  // the "modal jumps around" effect.
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
+    const overlay = overlayRef.current;
+    if (!vv || !overlay) return;
 
-    const onResize = () => {
-      const modal = scrollRef.current?.parentElement;
-      if (modal) {
-        modal.style.maxHeight = window.innerWidth < 640 ? `${vv.height}px` : `${vv.height - 16}px`;
+    const sync = () => {
+      const mobile = window.innerWidth < 640;
+      if (mobile) {
+        overlay.style.top = `${vv.offsetTop}px`;
+        overlay.style.left = `${vv.offsetLeft}px`;
+        overlay.style.width = `${vv.width}px`;
+        overlay.style.height = `${vv.height}px`;
+        overlay.style.right = "auto";
+        overlay.style.bottom = "auto";
+      } else {
+        // Desktop: hand control back to the `sm:` centered layout.
+        overlay.style.top = "";
+        overlay.style.left = "";
+        overlay.style.width = "";
+        overlay.style.height = "";
+        overlay.style.right = "";
+        overlay.style.bottom = "";
       }
+      // The layout viewport (innerHeight) stays full-height when the iOS keyboard
+      // opens; only the visual viewport shrinks. A large gap ⇒ keyboard is up.
+      // Same value re-set is a no-op (React bails), so firing on vv.scroll is fine.
+      setKeyboardOpen(mobile && window.innerHeight - vv.height > 150);
     };
 
-    vv.addEventListener("resize", onResize);
-    vv.addEventListener("scroll", onResize);
-    onResize();
+    // `vv.scroll` can fire many times per frame during iOS keyboard panning /
+    // momentum. Coalesce bursts into a single style write per frame so the very
+    // path we're smoothing doesn't thrash layout.
+    let rafId = 0;
+    const schedule = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        sync();
+      });
+    };
+
+    vv.addEventListener("resize", schedule);
+    vv.addEventListener("scroll", schedule);
+    window.addEventListener("orientationchange", schedule);
+    sync();
     return () => {
-      vv.removeEventListener("resize", onResize);
-      vv.removeEventListener("scroll", onResize);
+      vv.removeEventListener("resize", schedule);
+      vv.removeEventListener("scroll", schedule);
+      window.removeEventListener("orientationchange", schedule);
+      if (rafId) window.cancelAnimationFrame(rafId);
     };
   }, []);
 
@@ -1273,6 +1322,7 @@ export function NoteEditor({
 
   const editorModal = (
     <motion.div
+      ref={overlayRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -1295,29 +1345,32 @@ export function NoteEditor({
         aria-modal="true"
         aria-labelledby={titleId}
         data-app-modal="note-editor"
-        className="relative flex h-[100dvh] w-full flex-col overflow-hidden rounded-none border-0 border-[var(--color-border)] shadow-2xl shadow-black/40 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-5xl sm:rounded-2xl sm:border"
+        className="relative flex h-full max-h-full w-full flex-col overflow-hidden rounded-none border-0 border-[var(--color-border)] shadow-2xl shadow-black/40 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-5xl sm:rounded-2xl sm:border"
         style={{
-          maxHeight: "100dvh",
           background: kleur
             ? `linear-gradient(145deg, ${kleur}12 0%, var(--color-surface) 48%)`
             : "var(--color-surface)",
         }}
       >
-        <div className="flex justify-center pb-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:hidden">
-          <div className="h-1 w-10 rounded-full bg-white/20" />
-        </div>
+        {!keyboardOpen && (
+          <div className="flex justify-center pb-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:hidden">
+            <div className="h-1 w-10 rounded-full bg-white/20" />
+          </div>
+        )}
 
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:px-6">
+        <header className={`flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 sm:px-6 ${keyboardOpen ? "py-2" : "py-3"}`}>
           <div className="flex min-w-0 items-center gap-3">
             <AppIcon name={symbol} tone="amber" size="md" framed active />
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase text-[var(--color-text-subtle)]">
-                {note ? "Notitie bewerken" : "Nieuwe notitie"}
-              </p>
+              {!keyboardOpen && (
+                <p className="text-[11px] font-semibold uppercase text-[var(--color-text-subtle)]">
+                  {note ? "Notitie bewerken" : "Nieuwe notitie"}
+                </p>
+              )}
               <h2 id={titleId} className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg">
                 {titel.trim() || note?.titel || "Naamloze notitie"}
               </h2>
-              {primaryContext && (
+              {primaryContext && !keyboardOpen && (
                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                   <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
                     <AppIcon name={primaryContext.noteSymbol} tone="cyan" size="xs" />
@@ -1578,7 +1631,7 @@ export function NoteEditor({
                           aria-label="Deadline"
                           value={formatDeadlineForInput(deadline)}
                           onChange={(event) => setDeadline(event.target.value ? localDateTimeToIso(event.target.value) : "")}
-                          className="min-h-[44px] min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-sm text-[var(--color-text)] outline-none [color-scheme:dark]"
+                          className="min-h-[44px] min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-base text-[var(--color-text)] outline-none [color-scheme:dark] sm:text-sm"
                         />
                         <button
                           type="button"
@@ -1735,7 +1788,7 @@ export function NoteEditor({
                                 addTag();
                               }
                             }}
-                            className="min-w-0 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)]"
+                            className="min-w-0 bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] sm:text-sm"
                           />
                         </div>
                         <button
@@ -1865,7 +1918,7 @@ export function NoteEditor({
           </div>
         </div>
 
-        <footer className="relative z-10 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] sm:px-6">
+        <footer className={`relative z-10 shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 sm:px-6 ${keyboardOpen ? "py-2" : "py-3 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"}`}>
           {/* H2 (R3): 409 recovery — load newest (draft stays in the restore
               banner) or overwrite with the refreshed token. No more dead-end. */}
           {conflict.open && (
@@ -1909,12 +1962,13 @@ export function NoteEditor({
               {saveError}
             </p>
           )}
-          {note && onToggleComplete && isDirty && (
+          {note && onToggleComplete && isDirty && !keyboardOpen && (
             <p className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 sm:hidden">
               Sla je wijzigingen eerst op om deze notitie af te ronden.
             </p>
           )}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {!keyboardOpen && (
             <div className={`grid gap-2 sm:flex sm:w-auto ${note ? "grid-cols-3" : "grid-cols-2"}`}>
               {isDirty && (
                 <button
@@ -1975,6 +2029,7 @@ export function NoteEditor({
                 </button>
               )}
             </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
               <button
