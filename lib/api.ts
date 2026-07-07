@@ -42,10 +42,12 @@ const API_BASE = "/api/backend";
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  body?: unknown; // the parsed error response body, when available
+  constructor(message: string, status: number, body?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -118,7 +120,7 @@ export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): P
       throw new ApiError("Je sessie is verlopen — log opnieuw in om verder te gaan.", 401);
     }
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(error.detail ?? `API error ${res.status}`, res.status);
+    throw new ApiError(error.detail ?? error.message ?? `API error ${res.status}`, res.status, error);
   }
 
 
@@ -1980,11 +1982,22 @@ export interface ContactCreate {
   address?: string | null;
   organization_id?: string | null;
   business_role?: string | null;
+  force?: boolean; // create even if a possible duplicate exists
 }
 
 export interface ContactUpdate extends Partial<ContactCreate> {
   archived?: boolean;
   touch_last_contact?: boolean;
+}
+
+// Thrown by contactenApi.create when the backend reports a possible duplicate (409).
+export class DuplicateContactError extends Error {
+  duplicate: Contact;
+  constructor(duplicate: Contact) {
+    super("possible_duplicate");
+    this.name = "DuplicateContactError";
+    this.duplicate = duplicate;
+  }
 }
 
 export const contactenApi = {
@@ -1998,11 +2011,20 @@ export const contactenApi = {
   },
   get: (userId: string, id: string) =>
     apiFetch<Contact>(`/contacts/${id}?userId=${encodeURIComponent(userId)}`),
-  create: (userId: string, data: ContactCreate) =>
-    apiFetch<Contact>(`/contacts?userId=${encodeURIComponent(userId)}`, {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+  create: async (userId: string, data: ContactCreate) => {
+    try {
+      return await apiFetch<Contact>(`/contacts?userId=${encodeURIComponent(userId)}`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    } catch (e) {
+      const body = e instanceof ApiError ? (e.body as { error?: string; possible_duplicate?: Contact } | undefined) : undefined;
+      if (e instanceof ApiError && e.status === 409 && body?.error === "possible_duplicate" && body.possible_duplicate) {
+        throw new DuplicateContactError(body.possible_duplicate);
+      }
+      throw e;
+    }
+  },
   update: (userId: string, id: string, data: ContactUpdate) =>
     apiFetch<Contact>(`/contacts/${id}?userId=${encodeURIComponent(userId)}`, {
       method: "PATCH",
@@ -2010,6 +2032,31 @@ export const contactenApi = {
     }),
   remove: (userId: string, id: string) =>
     apiFetch<{ status: string }>(`/contacts/${id}?userId=${encodeURIComponent(userId)}`, { method: "DELETE" }),
+  merge: (userId: string, id: string, into: string) =>
+    apiFetch<Contact>(`/contacts/${id}/merge?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify({ into }),
+    }),
+  addOrganization: (userId: string, contactId: string, data: { organization_id?: string | null; role?: string }) =>
+    apiFetch<ContactOrganization>(`/contacts/${contactId}/organizations?userId=${encodeURIComponent(userId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  removeOrganization: (userId: string, contactId: string, orgId: string) =>
+    apiFetch<{ status: string }>(
+      `/contacts/${contactId}/organizations/${orgId}?userId=${encodeURIComponent(userId)}`,
+      { method: "DELETE" },
+    ),
+  updateChannel: (
+    userId: string,
+    contactId: string,
+    channelId: string,
+    data: { kind?: string; value?: string; label?: string | null; is_primary?: boolean },
+  ) =>
+    apiFetch<ContactChannel>(`/contacts/${contactId}/channels/${channelId}?userId=${encodeURIComponent(userId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
   addDate: (
     userId: string,
     contactId: string,
