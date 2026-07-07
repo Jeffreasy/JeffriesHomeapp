@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import {
+  Archive,
   Building2,
   CalendarHeart,
   Check,
@@ -15,6 +16,7 @@ import {
   Phone,
   Plus,
   Search,
+  Star,
   Tag,
   Trash2,
   X,
@@ -23,7 +25,7 @@ import { AppIcon } from "@/components/ui/AppIcon";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useContacten, useContact, useLabels } from "@/hooks/useContacten";
-import { contactenApi, type Contact, type ContactLabel } from "@/lib/api";
+import { contactenApi, laventecareApi, DuplicateContactError, type Contact, type ContactLabel } from "@/lib/api";
 import { LABEL_COLOR_KEYS, labelChipClasses, labelDotClasses } from "@/lib/contacten/labelColors";
 
 const RELATIONSHIP_TYPES = [
@@ -50,13 +52,16 @@ function relationshipLabel(value: string) {
 type SortKey = "name" | "recent" | "added";
 
 export default function ContactenPage() {
-  const contacten = useContacten();
+  const [showArchived, setShowArchived] = useState(false);
+  const contacten = useContacten({ includeArchived: showArchived });
   const { contacts, isLoading, isError, refetch, create, update } = contacten;
   const { labels, bulkLabel } = useLabels();
   const { success, error: toastError } = useToast();
+  const { openConfirm } = useConfirm();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [labelFilter, setLabelFilter] = useState<string[]>([]);
+  const [labelMatchAll, setLabelMatchAll] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("name");
   const [groupByLabel, setGroupByLabel] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -73,8 +78,8 @@ export default function ContactenPage() {
       if (typeFilter && !c.relationship_types.includes(typeFilter)) return false;
       if (labelFilter.length > 0) {
         const ids = new Set((c.labels ?? []).map((l) => l.id));
-        // match-any: contact must carry at least one of the selected labels
-        if (!labelFilter.some((id) => ids.has(id))) return false;
+        const ok = labelMatchAll ? labelFilter.every((id) => ids.has(id)) : labelFilter.some((id) => ids.has(id));
+        if (!ok) return false;
       }
       if (!q) return true;
       return (
@@ -84,7 +89,7 @@ export default function ContactenPage() {
         (c.labels ?? []).some((l) => l.name.toLowerCase().includes(q))
       );
     });
-  }, [contacts, search, typeFilter, labelFilter]);
+  }, [contacts, search, typeFilter, labelFilter, labelMatchAll]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -96,7 +101,7 @@ export default function ContactenPage() {
 
   // Reset the render window whenever the visible set changes (adjust-during-render;
   // no effect, so no set-state-in-effect lint).
-  const windowSig = `${search}|${typeFilter}|${labelFilter.join(",")}|${sortBy}|${groupByLabel}`;
+  const windowSig = `${search}|${typeFilter}|${labelFilter.join(",")}|${labelMatchAll}|${sortBy}|${groupByLabel}|${showArchived}`;
   const [prevWindowSig, setPrevWindowSig] = useState(windowSig);
   if (windowSig !== prevWindowSig) {
     setPrevWindowSig(windowSig);
@@ -259,6 +264,17 @@ export default function ContactenPage() {
                   </button>
                 );
               })}
+              {labelFilter.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setLabelMatchAll((v) => !v)}
+                  aria-pressed={labelMatchAll}
+                  title={labelMatchAll ? "Alle geselecteerde labels" : "Een van de geselecteerde labels"}
+                  className="rounded-full border border-[var(--color-border)] px-2 py-1 text-[11px] font-semibold text-slate-300 hover:bg-[var(--color-surface-hover)]"
+                >
+                  {labelMatchAll ? "alle labels" : "een van"}
+                </button>
+              )}
               {labelFilter.length > 0 && (
                 <button
                   type="button"
@@ -300,6 +316,18 @@ export default function ContactenPage() {
               }`}
             >
               Groepeer op label
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowArchived((v) => !v)}
+              aria-pressed={showArchived}
+              className={`min-h-[34px] rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
+                showArchived
+                  ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
+                  : "border-[var(--color-border)] text-slate-400 hover:bg-[var(--color-surface-hover)]"
+              }`}
+            >
+              Gearchiveerd
             </button>
             <div className="ml-auto flex items-center gap-2">
               <span className="text-xs text-slate-600">{sorted.length}</span>
@@ -420,10 +448,30 @@ export default function ContactenPage() {
           onSubmit={async (data) => {
             if (editContact) {
               await update.mutateAsync({ id: editContact.id, data });
-            } else {
-              await create.mutateAsync(data);
+              setFormOpen(false);
+              return;
             }
-            setFormOpen(false);
+            try {
+              await create.mutateAsync(data);
+              setFormOpen(false);
+            } catch (e) {
+              if (e instanceof DuplicateContactError) {
+                const forceCreate = await openConfirm({
+                  title: "Mogelijk dubbel contact",
+                  message: `Er bestaat al "${e.duplicate.display_name}". Wil je dit contact toch aanmaken? Kies "Annuleren" om het bestaande te openen.`,
+                  confirmLabel: "Toch aanmaken",
+                });
+                if (forceCreate) {
+                  await create.mutateAsync({ ...data, force: true });
+                  setFormOpen(false);
+                } else {
+                  setFormOpen(false);
+                  setDetailId(e.duplicate.id);
+                }
+                return;
+              }
+              throw e;
+            }
           }}
         />
       )}
@@ -863,6 +911,7 @@ function ContactDetailModal({
   const [dateDay, setDateDay] = useState("");
   const [dateMonth, setDateMonth] = useState("");
   const [dateYear, setDateYear] = useState("");
+  const [mergeOpen, setMergeOpen] = useState(false);
 
   const managed = contact?.source === "laventecare";
 
@@ -915,6 +964,27 @@ function ContactDetailModal({
     }
   };
 
+  const handleArchive = async () => {
+    if (!contact) return;
+    try {
+      await mutations.update.mutateAsync({ id: contact.id, data: { archived: !contact.archived } });
+      success(contact.archived ? "Contact hersteld" : "Contact gearchiveerd");
+    } catch {
+      toastError("Bijwerken mislukt.");
+    }
+  };
+
+  const doMerge = async (fromId: string) => {
+    if (!contact) return;
+    try {
+      await mutations.merge.mutateAsync({ fromId, into: contact.id });
+      success("Contacten samengevoegd");
+      setMergeOpen(false);
+    } catch {
+      toastError("Samenvoegen mislukt.");
+    }
+  };
+
   return (
     <ModalShell title={contact?.display_name ?? "Contact"} onClose={onClose}>
       {isLoading || !contact ? (
@@ -936,27 +1006,18 @@ function ContactDetailModal({
             </div>
           )}
 
-          {(contact.organizations?.length ?? 0) > 0 && (
-            <div>
-              <SectionLabel>Bedrijven</SectionLabel>
-              <div className="space-y-1.5">
-                {contact.organizations!.map((o) => (
-                  <div
-                    key={o.id}
-                    className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-3 py-2"
-                  >
-                    <Building2 size={13} className="shrink-0 text-sky-300/70" />
-                    <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
-                      {o.organization_name || "Onbekend bedrijf"}
-                    </span>
-                    {o.role && <span className="shrink-0 text-[11px] text-slate-500">{o.role}</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <OrganizationsEditor
+            contact={contact}
+            addOrganization={mutations.addOrganization}
+            removeOrganization={mutations.removeOrganization}
+          />
 
-          <ChannelsSection contact={contact} addChannel={mutations.addChannel} deleteChannel={mutations.deleteChannel} />
+          <ChannelsSection
+            contact={contact}
+            addChannel={mutations.addChannel}
+            deleteChannel={mutations.deleteChannel}
+            updateChannel={mutations.updateChannel}
+          />
 
           <InteractionsSection contact={contact} addInteraction={mutations.addInteraction} deleteInteraction={mutations.deleteInteraction} />
 
@@ -1088,7 +1149,23 @@ function ContactDetailModal({
 
           <WhatsAppSection contactId={contact.id} />
 
-          <div className="border-t border-[var(--color-border)] pt-4">
+          <div className="space-y-2 border-t border-[var(--color-border)] pt-4">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMergeOpen(true)}
+                className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
+              >
+                <GitMerge size={15} /> Samenvoegen
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleArchive()}
+                className="flex min-h-[40px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-[var(--color-border)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
+              >
+                <Archive size={15} /> {contact.archived ? "Herstellen" : "Archiveren"}
+              </button>
+            </div>
             {managed ? (
               <div className="flex items-start gap-2 rounded-xl border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2.5 text-xs leading-relaxed text-sky-200/90">
                 <Building2 size={15} className="mt-0.5 shrink-0 text-sky-300/80" />
@@ -1117,6 +1194,10 @@ function ContactDetailModal({
               </div>
             )}
           </div>
+
+          {mergeOpen && (
+            <MergeContactPicker currentId={contact.id} onClose={() => setMergeOpen(false)} onPick={(id) => void doMerge(id)} />
+          )}
         </div>
       )}
     </ModalShell>
@@ -1320,14 +1401,235 @@ function LabelsEditor({
   );
 }
 
+function OrganizationsEditor({
+  contact,
+  addOrganization,
+  removeOrganization,
+}: {
+  contact: Contact;
+  addOrganization: ContactMutations["addOrganization"];
+  removeOrganization: ContactMutations["removeOrganization"];
+}) {
+  const { error: toastError } = useToast();
+  const [adding, setAdding] = useState(false);
+  const [companyQuery, setCompanyQuery] = useState("");
+  const [selected, setSelected] = useState<{ id: string; naam: string } | null>(null);
+  const [role, setRole] = useState("");
+  const orgs = contact.organizations ?? [];
+
+  const companiesQuery = useQuery({
+    queryKey: ["laventecare", "companies", "picker", companyQuery],
+    queryFn: () => laventecareApi.listCompanies({ q: companyQuery || undefined, limit: 8 }),
+    enabled: adding,
+    staleTime: 30_000,
+  });
+  const companies = companiesQuery.data ?? [];
+
+  const add = async () => {
+    if (!selected) return;
+    try {
+      await addOrganization.mutateAsync({
+        contactId: contact.id,
+        data: { organization_id: selected.id, role: role.trim() || undefined },
+      });
+      setSelected(null);
+      setCompanyQuery("");
+      setRole("");
+      setAdding(false);
+    } catch {
+      toastError("Bedrijf koppelen mislukt.");
+    }
+  };
+  const detach = async (orgId: string) => {
+    try {
+      await removeOrganization.mutateAsync({ contactId: contact.id, orgId });
+    } catch {
+      toastError("Ontkoppelen mislukt.");
+    }
+  };
+
+  return (
+    <div>
+      <SectionLabel>Bedrijven</SectionLabel>
+      {orgs.length > 0 && (
+        <div className="space-y-1.5">
+          {orgs.map((o) => (
+            <div
+              key={o.id}
+              className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-3 py-2"
+            >
+              <Building2 size={13} className="shrink-0 text-sky-300/70" />
+              <span className="min-w-0 flex-1 truncate text-sm text-slate-200">
+                {o.organization_name || "Onbekend bedrijf"}
+              </span>
+              {o.role && <span className="shrink-0 text-[11px] text-slate-500">{o.role}</span>}
+              {o.source === "manual" ? (
+                <button
+                  type="button"
+                  onClick={() => void detach(o.id)}
+                  aria-label="Bedrijf ontkoppelen"
+                  className="shrink-0 rounded-md p-1 text-slate-500 hover:text-red-300"
+                >
+                  <Trash2 size={13} />
+                </button>
+              ) : (
+                <span className="shrink-0 text-[10px] font-semibold text-sky-300/60" title="Beheerd in LaventeCare">
+                  LC
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {adding ? (
+        <div className="mt-2 space-y-1.5">
+          <div className="relative">
+            <input
+              type="text"
+              value={selected ? selected.naam : companyQuery}
+              onChange={(e) => {
+                setSelected(null);
+                setCompanyQuery(e.target.value);
+              }}
+              placeholder="Zoek bedrijf…"
+              aria-label="Bedrijf zoeken"
+              className="min-h-[38px] w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base text-white outline-none placeholder:text-slate-600 focus:border-amber-500/50 sm:text-sm"
+            />
+            {!selected && companyQuery.trim() !== "" && companies.length > 0 && (
+              <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[#0d0d14] p-1 shadow-xl">
+                {companies.map((co) => (
+                  <button
+                    key={co.id}
+                    type="button"
+                    onClick={() => setSelected({ id: co.id, naam: co.naam })}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-slate-200 hover:bg-white/5"
+                  >
+                    <Building2 size={12} className="text-sky-300/60" />
+                    <span className="truncate">{co.naam}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder="rol (optioneel)"
+              aria-label="Rol"
+              className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base text-white outline-none placeholder:text-slate-600 sm:text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => void add()}
+              disabled={!selected}
+              className="min-h-[38px] rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-xs font-semibold text-amber-300 hover:bg-amber-500/15 disabled:opacity-40"
+            >
+              Koppel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(false);
+                setSelected(null);
+                setCompanyQuery("");
+              }}
+              className="min-h-[38px] rounded-lg px-2 text-xs font-semibold text-slate-500 hover:text-slate-300"
+            >
+              Annuleren
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="mt-2 inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold text-slate-300 hover:bg-[var(--color-surface-hover)]"
+        >
+          <Plus size={13} /> Bedrijf koppelen
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MergeContactPicker({
+  currentId,
+  onClose,
+  onPick,
+}: {
+  currentId: string;
+  onClose: () => void;
+  onPick: (id: string) => void;
+}) {
+  const { contacts } = useContacten({ includeArchived: true });
+  const { openConfirm } = useConfirm();
+  const [q, setQ] = useState("");
+  const query = q.trim().toLowerCase();
+  const results = contacts
+    .filter(
+      (c) =>
+        c.id !== currentId &&
+        (query === "" ||
+          c.display_name.toLowerCase().includes(query) ||
+          (c.email ?? "").toLowerCase().includes(query)),
+    )
+    .slice(0, 30);
+
+  const pick = async (c: Contact) => {
+    const ok = await openConfirm({
+      title: "Contacten samenvoegen?",
+      message: `"${c.display_name}" wordt samengevoegd in dit contact en verdwijnt als los contact. Labels, datums, feiten, kanalen, interacties en bedrijfskoppelingen gaan mee.`,
+      confirmLabel: "Samenvoegen",
+    });
+    if (ok) onPick(c.id);
+  };
+
+  return (
+    <ModalShell title="Samenvoegen met…" onClose={onClose}>
+      <div className="space-y-2">
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Zoek het contact om samen te voegen…"
+          aria-label="Zoek contact"
+          autoFocus
+          className="min-h-[40px] w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base text-white outline-none placeholder:text-slate-600 focus:border-amber-500/50 sm:text-sm"
+        />
+        <div className="max-h-80 space-y-1 overflow-y-auto">
+          {results.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => void pick(c)}
+              className="flex w-full items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-3 py-2 text-left hover:bg-white/[0.05]"
+            >
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-amber-500/20 bg-amber-500/10 text-xs font-bold uppercase text-amber-200">
+                {c.display_name.trim().charAt(0) || "?"}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-slate-200">{c.display_name}</span>
+              {c.source === "laventecare" && <Building2 size={12} className="shrink-0 text-sky-300/60" />}
+            </button>
+          ))}
+          {results.length === 0 && <p className="px-1 py-2 text-xs text-slate-500">Geen contacten gevonden.</p>}
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
 function ChannelsSection({
   contact,
   addChannel,
   deleteChannel,
+  updateChannel,
 }: {
   contact: Contact;
   addChannel: ContactMutations["addChannel"];
   deleteChannel: ContactMutations["deleteChannel"];
+  updateChannel: ContactMutations["updateChannel"];
 }) {
   const { error: toastError } = useToast();
   const [kind, setKind] = useState("email");
@@ -1360,6 +1662,13 @@ function ChannelsSection({
       toastError("Kanaal verwijderen mislukt.");
     }
   };
+  const makePrimary = async (channelId: string) => {
+    try {
+      await updateChannel.mutateAsync({ contactId: contact.id, channelId, data: { is_primary: true } });
+    } catch {
+      toastError("Primair maken mislukt.");
+    }
+  };
 
   return (
     <div>
@@ -1380,6 +1689,16 @@ function ChannelsSection({
               )}
               <span className="min-w-0 flex-1 truncate text-sm text-slate-200">{ch.value}</span>
               {ch.label && <span className="shrink-0 text-[11px] text-slate-500">{ch.label}</span>}
+              <button
+                type="button"
+                onClick={() => void makePrimary(ch.id)}
+                aria-label={ch.is_primary ? "Primair kanaal" : "Maak primair"}
+                title={ch.is_primary ? "Primair kanaal" : "Maak primair"}
+                disabled={ch.is_primary}
+                className={`shrink-0 rounded-md p-1 ${ch.is_primary ? "text-amber-400" : "text-slate-500 hover:text-amber-300"}`}
+              >
+                <Star size={13} fill={ch.is_primary ? "currentColor" : "none"} />
+              </button>
               <button
                 type="button"
                 onClick={() => void remove(ch.id)}

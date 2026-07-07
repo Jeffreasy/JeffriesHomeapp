@@ -93,6 +93,26 @@ export function useContacten(opts?: { includeArchived?: boolean }) {
     onSuccess: invalidate,
   });
 
+  const merge = useMutation({
+    mutationFn: (vars: { fromId: string; into: string }) => contactenApi.merge(userId, vars.fromId, vars.into),
+    onSuccess: invalidate,
+  });
+  const addOrganization = useMutation({
+    mutationFn: (vars: { contactId: string; data: Parameters<typeof contactenApi.addOrganization>[2] }) =>
+      contactenApi.addOrganization(userId, vars.contactId, vars.data),
+    onSuccess: invalidate,
+  });
+  const removeOrganization = useMutation({
+    mutationFn: (vars: { contactId: string; orgId: string }) =>
+      contactenApi.removeOrganization(userId, vars.contactId, vars.orgId),
+    onSuccess: invalidate,
+  });
+  const updateChannel = useMutation({
+    mutationFn: (vars: { contactId: string; channelId: string; data: Parameters<typeof contactenApi.updateChannel>[3] }) =>
+      contactenApi.updateChannel(userId, vars.contactId, vars.channelId, vars.data),
+    onSuccess: invalidate,
+  });
+
   return {
     userId,
     contacts: listQuery.data ?? [],
@@ -112,6 +132,10 @@ export function useContacten(opts?: { includeArchived?: boolean }) {
     deleteChannel,
     addInteraction,
     deleteInteraction,
+    merge,
+    addOrganization,
+    removeOrganization,
+    updateChannel,
   };
 }
 
