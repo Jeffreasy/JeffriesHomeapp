@@ -25,6 +25,11 @@ export function useContacten(opts?: { includeArchived?: boolean }) {
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [KEY] });
+  const invalidateContactLifecycle = () => {
+    void invalidate();
+    void queryClient.invalidateQueries({ queryKey: ["/notes"] });
+    void queryClient.invalidateQueries({ queryKey: ["notes", "context", "contact"] });
+  };
 
   const create = useMutation({
     mutationFn: (data: ContactCreate) => contactenApi.create(userId, data),
@@ -32,11 +37,11 @@ export function useContacten(opts?: { includeArchived?: boolean }) {
   });
   const update = useMutation({
     mutationFn: ({ id, data }: { id: string; data: ContactUpdate }) => contactenApi.update(userId, id, data),
-    onSuccess: invalidate,
+    onSuccess: invalidateContactLifecycle,
   });
   const remove = useMutation({
     mutationFn: (id: string) => contactenApi.remove(userId, id),
-    onSuccess: invalidate,
+    onSuccess: invalidateContactLifecycle,
   });
 
   const addDate = useMutation({
@@ -95,7 +100,7 @@ export function useContacten(opts?: { includeArchived?: boolean }) {
 
   const merge = useMutation({
     mutationFn: (vars: { fromId: string; into: string }) => contactenApi.merge(userId, vars.fromId, vars.into),
-    onSuccess: invalidate,
+    onSuccess: invalidateContactLifecycle,
   });
   const addOrganization = useMutation({
     mutationFn: (vars: { contactId: string; data: Parameters<typeof contactenApi.addOrganization>[2] }) =>

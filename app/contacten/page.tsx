@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -9,14 +10,17 @@ import {
   Building2,
   CalendarHeart,
   Check,
+  ChevronRight,
   Clock,
   GitMerge,
   Mail,
   MessageCircle,
   Phone,
   Plus,
+  RefreshCw,
   Search,
   Star,
+  StickyNote,
   Tag,
   Trash2,
   X,
@@ -25,6 +29,9 @@ import { AppIcon } from "@/components/ui/AppIcon";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useContacten, useContact, useLabels } from "@/hooks/useContacten";
+import { useContactNotes } from "@/hooks/useContactNotes";
+import type { NoteRecord } from "@/hooks/useNotes";
+import { usePrivacy } from "@/hooks/usePrivacy";
 import { contactenApi, laventecareApi, DuplicateContactError, type Contact, type ContactLabel } from "@/lib/api";
 import { LABEL_COLOR_KEYS, labelChipClasses, labelDotClasses } from "@/lib/contacten/labelColors";
 
@@ -72,10 +79,33 @@ export default function ContactenPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
 
+  // Contextbadges uit Notities landen op /contacten?contact=<id>. Client-side
+  // lezen houdt deze interactieve pagina build-safe zonder extra Suspense-laag.
+  useEffect(() => {
+    const syncDetailFromUrl = () => {
+      const contactId = new URLSearchParams(window.location.search).get("contact")?.trim() || null;
+      setDetailId(contactId);
+    };
+    const timer = window.setTimeout(syncDetailFromUrl, 0);
+    window.addEventListener("popstate", syncDetailFromUrl);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("popstate", syncDetailFromUrl);
+    };
+  }, []);
+
+  const closeDetail = useCallback(() => {
+    setDetailId(null);
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("contact")) return;
+    url.searchParams.delete("contact");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return contacts.filter((c) => {
-      if (typeFilter && !c.relationship_types.includes(typeFilter)) return false;
+      if (typeFilter && !(c.relationship_types ?? []).includes(typeFilter)) return false;
       if (labelFilter.length > 0) {
         const ids = new Set((c.labels ?? []).map((l) => l.id));
         const ok = labelMatchAll ? labelFilter.every((id) => ids.has(id)) : labelFilter.some((id) => ids.has(id));
@@ -481,9 +511,9 @@ export default function ContactenPage() {
           id={detailId}
           mutations={contacten}
           labels={labels}
-          onClose={() => setDetailId(null)}
+          onClose={closeDetail}
           onEdit={(c) => {
-            setDetailId(null);
+            closeDetail();
             openEdit(c);
           }}
         />
@@ -664,7 +694,7 @@ function ContactCard({
         )}
       </span>
       <span className="flex shrink-0 flex-wrap justify-end gap-1">
-        {contact.relationship_types.slice(0, 2).map((t) => (
+        {(contact.relationship_types ?? []).slice(0, 2).map((t) => (
           <span key={t} className="rounded-md border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
             {relationshipLabel(t)}
           </span>
@@ -861,12 +891,12 @@ function ContactFormModal({
           />
         </Field>
 
-        <Field label="Notities">
+        <Field label="Profielachtergrond">
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
-            placeholder="Wat is belangrijk om te onthouden?"
+            placeholder="Vaste achtergrondinformatie over dit contact"
             className="w-full resize-none rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-base text-white outline-none placeholder:text-slate-600 focus:border-amber-500/50 sm:text-sm"
           />
         </Field>
@@ -901,9 +931,16 @@ function ContactDetailModal({
   onClose: () => void;
   onEdit: (c: Contact) => void;
 }) {
-  const { data: contact, isLoading } = useContact(id);
+  const { data: contact, isLoading, isError: contactError, refetch: refetchContact } = useContact(id);
+  const {
+    notes: linkedNotes,
+    isLoading: linkedNotesLoading,
+    isError: linkedNotesError,
+    refetch: refetchLinkedNotes,
+  } = useContactNotes(id);
   const { success, error: toastError } = useToast();
   const { openConfirm } = useConfirm();
+  const { hidden: notesPrivacyOn } = usePrivacy("notes");
   const { remove, addDate, deleteDate, addFact, deleteFact } = mutations;
 
   const [newFact, setNewFact] = useState("");
@@ -919,7 +956,7 @@ function ContactDetailModal({
     if (!contact) return;
     const ok = await openConfirm({
       title: "Contact verwijderen?",
-      message: `${contact.display_name} en de bijbehorende datums en feiten worden permanent verwijderd.`,
+      message: `${contact.display_name} en de bijbehorende datums en feiten worden permanent verwijderd. Notities uit de Notities-module blijven behouden, maar worden van dit contact ontkoppeld.`,
       confirmLabel: "Verwijderen",
       variant: "danger",
     });
@@ -978,6 +1015,7 @@ function ContactDetailModal({
     if (!contact) return;
     try {
       await mutations.merge.mutateAsync({ fromId, into: contact.id });
+      await refetchLinkedNotes();
       success("Contacten samengevoegd");
       setMergeOpen(false);
     } catch {
@@ -987,7 +1025,18 @@ function ContactDetailModal({
 
   return (
     <ModalShell title={contact?.display_name ?? "Contact"} onClose={onClose}>
-      {isLoading || !contact ? (
+      {contactError ? (
+        <div role="alert" className="rounded-xl border border-rose-500/20 bg-rose-500/[0.06] p-4 text-center">
+          <p className="text-sm font-semibold text-slate-200">Contact kon niet geladen worden</p>
+          <button
+            type="button"
+            onClick={() => void refetchContact()}
+            className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold text-slate-300 hover:bg-[var(--color-surface-hover)]"
+          >
+            <RefreshCw size={13} aria-hidden="true" /> Opnieuw proberen
+          </button>
+        </div>
+      ) : isLoading || !contact ? (
         <div className="space-y-3">
           <div className="h-6 w-40 animate-pulse rounded bg-white/5" />
           <div className="h-20 animate-pulse rounded-lg bg-white/[0.03]" />
@@ -1023,12 +1072,22 @@ function ContactDetailModal({
 
           {contact.notes && (
             <div>
-              <SectionLabel>Notities</SectionLabel>
+              <SectionLabel>Profielachtergrond</SectionLabel>
               <p className="whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-white/[0.02] px-3 py-2 text-sm text-slate-300">
                 {contact.notes}
               </p>
             </div>
           )}
+
+          <LinkedNotesSection
+            contact={contact}
+            notes={linkedNotes}
+            isLoading={linkedNotesLoading}
+            isError={linkedNotesError}
+            onRetry={() => void refetchLinkedNotes()}
+            onNavigate={onClose}
+            masked={notesPrivacyOn}
+          />
 
           {/* Important dates */}
           <div>
@@ -1204,6 +1263,105 @@ function ContactDetailModal({
   );
 }
 
+function LinkedNotesSection({
+  contact,
+  notes,
+  isLoading,
+  isError,
+  onRetry,
+  onNavigate,
+  masked,
+}: {
+  contact: Contact;
+  notes: NoteRecord[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+  onNavigate: () => void;
+  masked: boolean;
+}) {
+  const sortedNotes = [...notes].sort((a, b) => b.gewijzigd.localeCompare(a.gewijzigd));
+  const newNoteHref = {
+    pathname: "/notities",
+    query: {
+      new: "1",
+      contextType: "contact",
+      contextId: contact.id,
+      contextTitle: contact.display_name,
+    },
+  };
+
+  return (
+    <section aria-labelledby="linked-contact-notes-title">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p id="linked-contact-notes-title" className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+          Gekoppelde notities {isLoading ? "" : `(${notes.length})`}
+        </p>
+        <Link
+          href={newNoteHref}
+          onClick={onNavigate}
+          className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-violet-500/20 bg-violet-500/10 px-2.5 text-xs font-semibold text-violet-200 transition-colors hover:bg-violet-500/15"
+        >
+          <Plus size={13} aria-hidden="true" /> Nieuwe notitie
+        </Link>
+      </div>
+
+      {isLoading ? (
+        <div role="status" aria-label="Gekoppelde notities laden" className="space-y-1.5">
+          {[0, 1].map((item) => (
+            <div key={item} className="h-12 animate-pulse rounded-lg border border-[var(--color-border)] bg-white/[0.025]" />
+          ))}
+        </div>
+      ) : isError ? (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2">
+          <p className="text-xs text-amber-200">Notities konden niet geladen worden.</p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-300 hover:bg-white/[0.05]"
+          >
+            <RefreshCw size={12} aria-hidden="true" /> Opnieuw
+          </button>
+        </div>
+      ) : sortedNotes.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-white/[0.015] px-3 py-3 text-center">
+          <StickyNote size={17} className="mx-auto text-slate-600" aria-hidden="true" />
+          <p className="mt-1 text-xs text-slate-500">Nog geen notities aan dit contact gekoppeld.</p>
+        </div>
+      ) : (
+        <div className="max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
+          {sortedNotes.map((note) => {
+            const title = masked ? "••••••" : note.titel || note.inhoud.split("\n")[0]?.slice(0, 70) || "Zonder titel";
+            const status = note.isArchived || note.is_archived
+              ? "Archief"
+              : note.isCompleted || note.is_completed
+                ? "Afgerond"
+                : null;
+            return (
+              <Link
+                key={note.id}
+                href={`/notities?note=${encodeURIComponent(note.id)}`}
+                onClick={onNavigate}
+                aria-label={masked ? "Gekoppelde notitie openen" : `Gekoppelde notitie openen: ${title}`}
+                className="group flex min-h-12 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.02] px-3 py-2 transition-colors hover:border-violet-500/25 hover:bg-violet-500/[0.05]"
+              >
+                <StickyNote size={14} className="shrink-0 text-violet-300/70" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-slate-200 group-hover:text-white">{title}</span>
+                  <span className="block text-[10px] text-slate-500">
+                    Gewijzigd {formatRelative(note.gewijzigd)}{status ? ` · ${status}` : ""}
+                  </span>
+                </span>
+                <ChevronRight size={14} className="shrink-0 text-slate-600 group-hover:text-violet-300" aria-hidden="true" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{children}</p>;
 }
@@ -1226,8 +1384,9 @@ function formatRelative(iso: string): string {
 function RelationshipTypeEditor({ contact, update }: { contact: Contact; update: ContactMutations["update"] }) {
   const { error: toastError } = useToast();
   const toggle = async (value: string) => {
-    const has = contact.relationship_types.includes(value);
-    const next = has ? contact.relationship_types.filter((t) => t !== value) : [...contact.relationship_types, value];
+    const relationshipTypes = contact.relationship_types ?? [];
+    const has = relationshipTypes.includes(value);
+    const next = has ? relationshipTypes.filter((t) => t !== value) : [...relationshipTypes, value];
     try {
       await update.mutateAsync({ id: contact.id, data: { relationship_types: next } });
     } catch {
@@ -1239,7 +1398,7 @@ function RelationshipTypeEditor({ contact, update }: { contact: Contact; update:
       <SectionLabel>Relatie-type</SectionLabel>
       <div className="flex flex-wrap gap-1.5">
         {RELATIONSHIP_TYPES.map((t) => {
-          const active = contact.relationship_types.includes(t.value);
+          const active = (contact.relationship_types ?? []).includes(t.value);
           return (
             <button
               key={t.value}
@@ -1755,7 +1914,7 @@ const INTERACTION_KINDS = [
   { value: "meeting", label: "Afspraak" },
   { value: "message", label: "Bericht" },
   { value: "email", label: "E-mail" },
-  { value: "note", label: "Notitie" },
+  { value: "note", label: "Memo" },
 ] as const;
 
 function interactionKindLabel(v: string) {
@@ -1811,7 +1970,7 @@ function InteractionsSection({
                 {interactionKindLabel(it.kind)}
               </span>
               <span className="min-w-0 flex-1 text-sm text-slate-200">
-                {it.summary || <span className="text-slate-500">geen notitie</span>}
+                {it.summary || <span className="text-slate-500">geen memo</span>}
                 <span className="ml-1.5 text-[11px] text-slate-600">{formatRelative(it.occurred_at)}</span>
               </span>
               <button
@@ -1849,8 +2008,8 @@ function InteractionsSection({
               void submit();
             }
           }}
-          placeholder="korte notitie (optioneel)"
-          aria-label="Notitie"
+          placeholder="korte memo (optioneel)"
+          aria-label="Memo"
           className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-base text-white outline-none placeholder:text-slate-600 sm:text-sm"
         />
         <button

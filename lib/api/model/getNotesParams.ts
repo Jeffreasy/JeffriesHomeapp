@@ -8,6 +8,26 @@
 
 export type GetNotesParams = {
 /**
+ * Specific owned business-context UUID
+ */
+contextId?: string;
+/**
+ * Business-context type (for example contact)
+ */
+contextType?: string;
+/**
+ * Set to 'summary' to omit inhoud
+ */
+fields?: string;
+/**
+ * Max number of notes (default unlimited)
+ */
+limit?: number;
+/**
+ * Offset for pagination
+ */
+offset?: number;
+/**
  * User ID
  */
 userId: string;

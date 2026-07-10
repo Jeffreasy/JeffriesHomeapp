@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useUser } from "@clerk/nextjs";
-import { ArrowUpRight, Plus, StickyNote } from "lucide-react";
+import { ArrowUpRight, Plus, StickyNote, UserRound, X } from "lucide-react";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
+import { useContacten } from "@/hooks/useContacten";
 import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
 import { formatDateRange, getTimeLabel, usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { usePrivacy } from "@/hooks/usePrivacy";
@@ -22,6 +23,7 @@ import {
   getScopeCounts,
   isAttentionNote,
   noteMatchesScope,
+  noteHasAnyLink,
 } from "@/components/notes/NotesUtils";
 import { NotesHeader, type NotesTab } from "@/components/notes/NotesHeader";
 import { NotesFilters } from "@/components/notes/NotesFilters";
@@ -31,12 +33,23 @@ import { WeekJournal, getMonday, amsterdamToday } from "@/components/notes/WeekJ
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
-import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
+import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags, type BusinessContextValue } from "@/lib/workspace-context";
 import { ApiError } from "@/lib/api";
 import { NoteConflictError } from "@/components/notes/NoteEditor";
+import {
+  ContactMentionMenu,
+  useContactMention,
+} from "@/components/notes/ContactMentionMenu";
+import type { Contact } from "@/lib/api";
+
+type EditorSeed = {
+  titel: string;
+  tags: string[];
+  businessContext?: BusinessContextValue | null;
+};
 
 export default function NotitiesPage() {
-  const { user } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const {
     active,
     archived,
@@ -62,6 +75,12 @@ export default function NotitiesPage() {
   const { openConfirm } = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
   const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
+  const {
+    contacts: allContacts,
+    isLoading: contactsLoading,
+    isError: contactsError,
+  } = useContacten({ includeArchived: true });
+  const quickContacts = useMemo(() => allContacts.filter((contact) => !contact.archived), [allContacts]);
 
   // ── Tab state ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<NotesTab>("collection");
@@ -91,8 +110,11 @@ export default function NotitiesPage() {
   const [editNote, setEditNote] = useState<NoteRecord | null>(null);
   const [quickText, setQuickText] = useState("");
   const [quickSaving, setQuickSaving] = useState(false);
+  const [quickContact, setQuickContact] = useState<Contact | null>(null);
+  const [editorSeed, setEditorSeed] = useState<EditorSeed | null>(null);
 
   const searchRef = useRef<HTMLInputElement>(null);
+  const deepLinkHandledRef = useRef<string | null>(null);
 
   // ── Keyboard shortcuts ─────────────────────────────────────
   useEffect(() => {
@@ -117,6 +139,7 @@ export default function NotitiesPage() {
         if (document.querySelector('[role="dialog"], [aria-modal="true"]')) return;
         event.preventDefault();
         setEditNote(null);
+        setEditorSeed(null);
         setEditorOpen(true);
       }
 
@@ -136,12 +159,69 @@ export default function NotitiesPage() {
   // A non-empty search retrieves across ALL buckets (active+completed+archived)
   // so a note that's since been completed/archived stays findable; clearing the
   // search returns to the scoped view. (Privacy mode disables search entirely.)
+  const allNotes = useMemo(() => [...active, ...completed, ...archived], [active, archived, completed]);
+
+  useEffect(() => {
+    if (!userLoaded || !user?.id) return;
+    const url = new URL(window.location.href);
+    const noteId = url.searchParams.get("note")?.trim() ?? "";
+    const createNew = url.searchParams.get("new") === "1";
+    if (!noteId && !createNew) return;
+
+    const contextType = url.searchParams.get("contextType")?.trim() ?? "";
+    const contextId = url.searchParams.get("contextId")?.trim() ?? "";
+    const contextTitle = url.searchParams.get("contextTitle")?.trim().slice(0, 200) ?? "";
+    const signature = `${noteId}|${createNew}|${contextType}|${contextId}`;
+    if (deepLinkHandledRef.current === signature) return;
+
+    if (noteId) {
+      if (isLoading) return;
+      deepLinkHandledRef.current = signature;
+      const target = allNotes.find((note) => note.id === noteId);
+      if (target) {
+        setActiveTab("collection");
+        setEditNote(target);
+        setEditorSeed(null);
+        setEditorOpen(true);
+      } else {
+        toastError("Deze notitie bestaat niet meer of is niet toegankelijk.");
+      }
+      clearNotesDeepLink(url);
+      return;
+    }
+
+    let businessContext: BusinessContextValue | null = null;
+    if (contextType === "contact") {
+      if (contactsLoading) return;
+      const contact = allContacts.find((item) => item.id === contextId);
+      if (contact) {
+        businessContext = businessContextFromContact(contact);
+      } else if (contactsError && contextId) {
+        // De URL komt uit het contactdetail. Bij een tijdelijke lijstfout houden
+        // we die intentie vast; de backend resolveert naam/eigenaarschap bij save.
+        businessContext = { type: "contact", id: contextId, title: contextTitle || "Contact" };
+        toastError("Contacten konden niet gecontroleerd worden; de koppeling wordt bij opslaan gevalideerd.");
+      } else {
+        toastError("Dit contact bestaat niet meer of is niet toegankelijk.");
+      }
+    } else if (contextType) {
+      toastError("Deze koppeling wordt niet ondersteund.");
+    }
+
+    deepLinkHandledRef.current = signature;
+    setActiveTab("collection");
+    setEditNote(null);
+    setEditorSeed({ titel: "", tags: [], businessContext });
+    setEditorOpen(true);
+    clearNotesDeepLink(url);
+  }, [allContacts, allNotes, contactsError, contactsLoading, isLoading, toastError, user?.id, userLoaded]);
+
   const sourceNotes = useMemo(
     () =>
       !privacyOn && search.trim()
-        ? [...active, ...completed, ...archived]
+        ? allNotes
         : viewMode === "active" ? active : viewMode === "completed" ? completed : archived,
-    [privacyOn, search, viewMode, active, completed, archived],
+    [privacyOn, search, viewMode, active, completed, archived, allNotes],
   );
   const scopeCounts = useMemo(() => getScopeCounts(sourceNotes), [sourceNotes]);
 
@@ -172,7 +252,8 @@ export default function NotitiesPage() {
     const query = privacyOn ? "" : search.trim().toLowerCase();
     if (query) {
       list = list.filter((note) => {
-        const haystack = `${note.titel ?? ""} ${note.inhoud} ${(note.tags ?? []).join(" ")}`.toLowerCase();
+        const contextTitle = note.businessContextTitle ?? note.business_context_title ?? "";
+        const haystack = `${note.titel ?? ""} ${note.inhoud} ${(note.tags ?? []).join(" ")} ${contextTitle}`.toLowerCase();
         return haystack.includes(query);
       });
     }
@@ -216,7 +297,7 @@ export default function NotitiesPage() {
       checklistDone += checklist.done;
       checklistTotal += checklist.total;
 
-      if (note.linkedEventId || note.linked_event_id) linkedCount += 1;
+      if (noteHasAnyLink(note)) linkedCount += 1;
       if (isAttentionNote(note)) attentionCount += 1;
 
       const deadline = getDeadlineState(note.deadline);
@@ -257,8 +338,8 @@ export default function NotitiesPage() {
     [agendaEvents, dienstEventOptions],
   );
   const backlinksById = useMemo(
-    () => buildBacklinksById([...active, ...completed, ...archived]),
-    [active, completed, archived],
+    () => buildBacklinksById(allNotes),
+    [allNotes],
   );
   const eventLabelById = useMemo(() => {
     const map = new Map<string, string>();
@@ -274,10 +355,6 @@ export default function NotitiesPage() {
     setEditorOpen(true);
   };
 
-  // R3-12: "Open in editor" carries the captured text + parsed #tags into the
-  // editor instead of opening it empty (which silently orphaned the typed line).
-  const [editorSeed, setEditorSeed] = useState<{ titel: string; tags: string[] } | null>(null);
-
   const handleNew = () => {
     setEditNote(null);
     setEditorSeed(null);
@@ -286,8 +363,15 @@ export default function NotitiesPage() {
 
   const handleOpenInEditor = () => {
     const { cleanText, extractedTags } = parseHashTags(quickText);
+    const matchedBusinessContext = quickContact
+      ? businessContextFromContact(quickContact)
+      : resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
     setEditNote(null);
-    setEditorSeed(cleanText ? { titel: cleanText, tags: extractedTags } : null);
+    setEditorSeed(
+      cleanText || matchedBusinessContext
+        ? { titel: cleanText, tags: extractedTags, businessContext: matchedBusinessContext }
+        : null,
+    );
     setEditorOpen(true);
   };
 
@@ -298,7 +382,9 @@ export default function NotitiesPage() {
 
     setQuickSaving(true);
     try {
-      const matchedBusinessContext = resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
+      const matchedBusinessContext = quickContact
+        ? businessContextFromContact(quickContact)
+        : resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
       const enriched = enrichNoteDraft({ title: cleanText, content: cleanText, tags: extractedTags, businessContext: matchedBusinessContext });
       // Code-point-safe truncation so a title can't split an emoji surrogate pair.
       const titleChars = Array.from(cleanText);
@@ -312,6 +398,7 @@ export default function NotitiesPage() {
         businessContextTitle: enriched.businessContext?.title ?? undefined,
       });
       setQuickText("");
+      setQuickContact(null);
     } catch {
       // N3: useNotes' create-mutatie toast de fout al ("Kon notitie niet
       // opslaan.") — de catch blijft alleen om een unhandled rejection te
@@ -333,6 +420,7 @@ export default function NotitiesPage() {
       // that seeded this editor (and drop the seed).
       if (editorSeed) {
         setQuickText("");
+        setQuickContact(null);
         setEditorSeed(null);
       }
       return;
@@ -524,6 +612,7 @@ export default function NotitiesPage() {
             onToggleComplete={toggleComplete}
             isLoading={isLoading}
             isError={isError}
+            masked={privacyOn}
           />
         )}
 
@@ -536,6 +625,12 @@ export default function NotitiesPage() {
               onChange={setQuickText}
               onSave={handleQuickCreate}
               onOpenEditor={handleOpenInEditor}
+              contacts={quickContacts}
+              contactsLoading={contactsLoading}
+              contactsError={contactsError}
+              selectedContact={quickContact}
+              onSelectContact={setQuickContact}
+              onClearContact={() => setQuickContact(null)}
             />
 
             <NotesMetricsRow
@@ -613,15 +708,17 @@ export default function NotitiesPage() {
       <AnimatePresence>
         {editorOpen && (
           <NoteEditor
-            key={editNote?.id ?? "new-note"}
+            key={editNote?.id ?? `new-note:${editorSeed?.businessContext?.type ?? "none"}:${editorSeed?.businessContext?.id ?? "none"}`}
             note={editNote}
             userId={user?.id}
             initialTitle={!editNote ? editorSeed?.titel : undefined}
             initialTags={!editNote ? editorSeed?.tags : undefined}
+            initialBusinessContext={!editNote ? editorSeed?.businessContext : undefined}
             onSave={handleSave}
             onClose={() => {
               setEditorOpen(false);
               setEditNote(null);
+              setEditorSeed(null);
             }}
             onDelete={remove}
             onArchive={archive}
@@ -731,19 +828,39 @@ function NotesCaptureCard({
   onChange,
   onSave,
   onOpenEditor,
+  contacts,
+  contactsLoading,
+  contactsError,
+  selectedContact,
+  onSelectContact,
+  onClearContact,
 }: {
   value: string;
   saving: boolean;
   onChange: (value: string) => void;
   onSave: () => void | Promise<void>;
   onOpenEditor: () => void;
+  contacts: Contact[];
+  contactsLoading: boolean;
+  contactsError: boolean;
+  selectedContact: Contact | null;
+  onSelectContact: (contact: Contact) => void;
+  onClearContact: () => void;
 }) {
   const parsed = parseHashTags(value);
   const quickContext = getPrimaryWorkspaceContext(value, parsed.extractedTags);
   const canSave = Boolean(parsed.cleanText);
+  const mentionListId = "notes-capture-contact-list";
+  const mention = useContactMention({
+    value,
+    contacts,
+    selectedContact,
+    onChange,
+    onSelect: onSelectContact,
+  });
 
   return (
-    <section className="glass border-amber-500/20 bg-amber-500/[0.045] p-2">
+    <section className="glass relative border-amber-500/20 bg-amber-500/[0.045] p-2">
       <div className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 focus-within:border-amber-500/45">
         <StickyNote size={16} className="shrink-0 text-amber-300/80" />
         <input
@@ -751,14 +868,20 @@ function NotesCaptureCard({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
+            if (mention.handleKeyDown(event)) return;
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               void onSave();
             }
           }}
-          placeholder="Snel noteren... #tag voor labels"
+          placeholder="Snel noteren... #tag of @contact"
           disabled={saving}
           aria-label="Snel noteren"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={mention.isOpen}
+          aria-controls={mentionListId}
+          aria-activedescendant={mention.isOpen && mention.suggestions[mention.activeIndex] ? `${mentionListId}-${mention.suggestions[mention.activeIndex].id}` : undefined}
           className="min-w-0 flex-1 bg-transparent text-base text-slate-100 outline-none placeholder:text-slate-600 disabled:opacity-50 sm:text-sm"
         />
         <button
@@ -781,7 +904,18 @@ function NotesCaptureCard({
         </button>
       </div>
 
-      {(parsed.extractedTags.length > 0 || quickContext) && (
+      <ContactMentionMenu
+        id={mentionListId}
+        isOpen={mention.isOpen}
+        query={mention.query}
+        suggestions={mention.suggestions}
+        activeIndex={mention.activeIndex}
+        isLoading={contactsLoading}
+        isError={contactsError}
+        onSelect={mention.pick}
+      />
+
+      {(parsed.extractedTags.length > 0 || quickContext || selectedContact) && (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {parsed.extractedTags.map((tag) => (
             <span key={tag} className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200">
@@ -794,8 +928,33 @@ function NotesCaptureCard({
               <span className="text-cyan-300/70">#{quickContext.tag}</span>
             </span>
           )}
+          {selectedContact && (
+            <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-violet-500/20 bg-violet-500/10 px-2 py-1 text-xs font-semibold text-violet-200">
+              <UserRound size={11} className="shrink-0" aria-hidden="true" />
+              <span className="truncate">{selectedContact.display_name}</span>
+              <button
+                type="button"
+                onClick={onClearContact}
+                aria-label={`Koppeling met ${selectedContact.display_name} verwijderen`}
+                className="-mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded text-violet-300/70 hover:bg-violet-500/20 hover:text-violet-100"
+              >
+                <X size={11} aria-hidden="true" />
+              </button>
+            </span>
+          )}
         </div>
       )}
     </section>
   );
+}
+
+function businessContextFromContact(contact: Contact): BusinessContextValue {
+  return { type: "contact", id: contact.id, title: contact.display_name };
+}
+
+function clearNotesDeepLink(url: URL) {
+  for (const key of ["note", "new", "contextType", "contextId", "contextTitle"]) {
+    url.searchParams.delete(key);
+  }
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }

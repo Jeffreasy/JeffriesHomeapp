@@ -114,6 +114,7 @@ export type NoteUpdateData = {
 // Optimistic create inserts a placeholder note with a "temp-" id until the server
 // responds. Quick-actions against it would 404, so they are no-ops until it lands.
 const isTempId = (id: string) => id.startsWith("temp-");
+const CONTACT_NOTES_QUERY_KEY = ["notes", "context", "contact"] as const;
 
 type NotesCache = {
   data?: ModelNote[];
@@ -322,6 +323,7 @@ export function useNotes() {
       onSettled: () => {
         queryClient.invalidateQueries({ queryKey });
         queryClient.invalidateQueries({ queryKey: tagsQueryKey });
+        queryClient.invalidateQueries({ queryKey: CONTACT_NOTES_QUERY_KEY });
       },
     }
   });
@@ -384,6 +386,7 @@ export function useNotes() {
       onSettled: () => {
         queryClient.invalidateQueries({ queryKey });
         queryClient.invalidateQueries({ queryKey: tagsQueryKey });
+        queryClient.invalidateQueries({ queryKey: CONTACT_NOTES_QUERY_KEY });
       },
     }
   });
@@ -413,6 +416,7 @@ export function useNotes() {
       onSettled: () => {
         queryClient.invalidateQueries({ queryKey });
         queryClient.invalidateQueries({ queryKey: tagsQueryKey });
+        queryClient.invalidateQueries({ queryKey: CONTACT_NOTES_QUERY_KEY });
       },
     }
   });
@@ -479,6 +483,7 @@ export function useNotes() {
       });
       queryClient.invalidateQueries({ queryKey });
       queryClient.invalidateQueries({ queryKey: tagsQueryKey });
+      queryClient.invalidateQueries({ queryKey: CONTACT_NOTES_QUERY_KEY });
       return restored;
     },
     remove: async (id: string) => {

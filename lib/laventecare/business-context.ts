@@ -67,7 +67,7 @@ export function buildLaventeCareContextOptions({
   }
 
   return [
-    { key: "none", label: "Geen zakelijke context", meta: "Persoonlijk of algemeen", value: null, aliases: [], rank: 0 },
+    { key: "none", label: "Geen koppeling", meta: "Persoonlijk of algemeen", value: null, aliases: [], rank: 0 },
     {
       key: "laventecare",
       label: "LaventeCare algemeen",

@@ -322,7 +322,7 @@ export function businessContextTags(value?: BusinessContextValue | null) {
 
 export function businessContextLabel(value?: BusinessContextValue | null) {
   const context = normalizeBusinessContext(value);
-  if (!context?.type) return "Geen zakelijke context";
+  if (!context?.type) return "Geen koppeling";
   return context.title || context.type;
 }
 

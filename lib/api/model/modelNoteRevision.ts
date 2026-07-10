@@ -8,6 +8,9 @@
 
 export interface ModelNoteRevision {
   aangemaakt?: string;
+  business_context_id?: string;
+  business_context_title?: string;
+  business_context_type?: string;
   deadline?: string;
   id?: string;
   inhoud?: string;

@@ -320,6 +320,7 @@ type NoteDraft = {
   tags?: string[];
   deadline?: string;
   kleur?: string;
+  businessContext?: BusinessContextValue | null;
 };
 
 const DRAFT_KEY_PREFIX = "note-editor-draft:";
@@ -328,6 +329,9 @@ const DRAFT_KEY_PREFIX = "note-editor-draft:";
 // shared across accounts/sessions on a shared device (an existing note already
 // has a unique id).
 function draftStorageKey(noteId?: string | null, userId?: string | null) {
+  // Eén herstelbak per gebruiker voor een nieuwe notitie. De context zelf zit
+  // in de draft, zodat een contactconcept na een PWA-kill ook via de gewone
+  // 'Nieuwe notitie'-knop teruggevonden kan worden.
   const scope = noteId ?? `new-note:${userId ?? "anon"}`;
   return `${DRAFT_KEY_PREFIX}${scope}`;
 }
@@ -339,6 +343,14 @@ function readDraft(key: string): NoteDraft | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<NoteDraft>;
     if (typeof parsed.inhoud !== "string" || typeof parsed.savedAt !== "number") return null;
+    const hasParsedContext = Object.prototype.hasOwnProperty.call(parsed, "businessContext");
+    const parsedContext = parsed.businessContext && typeof parsed.businessContext === "object"
+      ? normalizeBusinessContext({
+          type: typeof parsed.businessContext.type === "string" ? parsed.businessContext.type : null,
+          id: typeof parsed.businessContext.id === "string" ? parsed.businessContext.id : null,
+          title: typeof parsed.businessContext.title === "string" ? parsed.businessContext.title : null,
+        })
+      : null;
     return {
       titel: typeof parsed.titel === "string" ? parsed.titel : "",
       inhoud: parsed.inhoud,
@@ -346,6 +358,7 @@ function readDraft(key: string): NoteDraft | null {
       tags: Array.isArray(parsed.tags) ? parsed.tags.filter((t): t is string => typeof t === "string") : undefined,
       deadline: typeof parsed.deadline === "string" ? parsed.deadline : undefined,
       kleur: typeof parsed.kleur === "string" ? parsed.kleur : undefined,
+      ...(hasParsedContext ? { businessContext: parsedContext } : {}),
     };
   } catch {
     return null;
@@ -493,11 +506,34 @@ export function NoteEditor({
   // editor already shows.
   const draftKey = draftStorageKey(note?.id, userId);
   const [pendingDraft, setPendingDraft] = useState<NoteDraft | null>(() => {
-    const draft = readDraft(draftStorageKey(note?.id));
+    const draft = readDraft(draftStorageKey(note?.id, userId));
     if (!draft) return null;
-    const baseTitel = note?.titel ?? initialTitle ?? "";
-    const baseInhoud = note?.inhoud ?? "";
-    if (draft.titel === baseTitel && draft.inhoud === baseInhoud) return null;
+    const initialSnapshot = buildInitialSnapshot(note, {
+      initialDeadline,
+      initialLinkedEventId,
+      initialTags,
+      initialTitle,
+      initialBusinessContext,
+    });
+    const draftContext = draft.businessContext === undefined
+      ? normalizeBusinessContext({
+          type: initialSnapshot.businessContextType,
+          id: initialSnapshot.businessContextId,
+          title: initialSnapshot.businessContextTitle,
+        })
+      : normalizeBusinessContext(draft.businessContext);
+    const draftSnapshot = normalizeEditorSnapshot({
+      ...initialSnapshot,
+      titel: draft.titel,
+      inhoud: draft.inhoud,
+      tags: draft.tags ?? initialSnapshot.tags,
+      deadline: draft.deadline ?? initialSnapshot.deadline,
+      kleur: draft.kleur ?? initialSnapshot.kleur,
+      businessContextType: draftContext?.type ?? "",
+      businessContextId: draftContext?.id ?? "",
+      businessContextTitle: draftContext?.title ?? "",
+    });
+    if (sameEditorSnapshot(draftSnapshot, initialSnapshot)) return null;
     if (note?.gewijzigd && draft.savedAt <= new Date(note.gewijzigd).getTime()) return null;
     return draft;
   });
@@ -973,12 +1009,13 @@ export function NoteEditor({
           tags,
           deadline: deadline || undefined,
           kleur: kleur || undefined,
+          businessContext: normalizeBusinessContext(businessContext),
         };
         window.localStorage.setItem(draftKey, JSON.stringify(draft));
       } catch {}
     }, 1000);
     return () => window.clearTimeout(timer);
-  }, [deadline, draftKey, inhoud, isDirty, kleur, tags, titel]);
+  }, [businessContext, deadline, draftKey, inhoud, isDirty, kleur, tags, titel]);
 
   // FH9b: push a history entry when the editor opens and intercept popstate so
   // the Android/browser back button routes through the dirty-confirm instead of
@@ -1038,6 +1075,10 @@ export function NoteEditor({
     if (pendingDraft.tags) setTags(normalizeTags(pendingDraft.tags));
     if (pendingDraft.deadline !== undefined) setDeadline(pendingDraft.deadline);
     if (pendingDraft.kleur !== undefined) setKleur(pendingDraft.kleur);
+    if (pendingDraft.businessContext !== undefined) {
+      setBusinessContext(normalizeBusinessContext(pendingDraft.businessContext));
+      setBusinessContextTouched(true);
+    }
     setPendingDraft(null);
     requestAnimationFrame(() => {
       textRef.current?.focus();
@@ -1671,13 +1712,14 @@ export function NoteEditor({
                       </div>
                     </PanelSection>
 
-                    <PanelSection title="Zakelijk">
+                    <PanelSection title="Koppeling">
                       <BusinessContextPicker
                         value={businessContext}
                         onChange={(value) => {
                           setBusinessContextTouched(true);
                           setBusinessContext(value);
                         }}
+                        label="Contact of dossier"
                         compact
                       />
                     </PanelSection>

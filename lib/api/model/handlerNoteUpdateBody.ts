@@ -7,7 +7,11 @@
  */
 
 export interface HandlerNoteUpdateBody {
+  businessContextId?: string;
+  businessContextTitle?: string;
+  businessContextType?: string;
   deadline?: string;
+  expectedGewijzigd?: string;
   inhoud?: string;
   isArchived?: boolean;
   isCompleted?: boolean;

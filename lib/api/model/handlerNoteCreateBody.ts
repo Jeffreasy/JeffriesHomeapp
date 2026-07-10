@@ -7,6 +7,9 @@
  */
 
 export interface HandlerNoteCreateBody {
+  businessContextId?: string;
+  businessContextTitle?: string;
+  businessContextType?: string;
   deadline?: string;
   inhoud?: string;
   kleur?: string;

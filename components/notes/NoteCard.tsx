@@ -7,6 +7,7 @@ import type { NoteRecord } from "@/hooks/useNotes";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { resolveAppIconName } from "@/lib/symbols";
 import { CHECKLIST_ITEM, CHECKLIST_DONE, getChecklistInfo, amsterdamDayDiff } from "./NotesUtils";
+import { NoteContextBadge } from "./NoteContextBadge";
 
 export type NoteBacklink = {
   id: string;
@@ -232,6 +233,13 @@ export function NoteCard({
             <span className="truncate">{linkedEventLabel ?? "Gekoppeld"}</span>
           </div>
         )}
+
+        <NoteContextBadge
+          note={note}
+          masked={masked}
+          compact={compact}
+          className="mb-2 ml-1 align-top"
+        />
 
         {/* Content preview with checklist + wiki-link support */}
         <div className={`mb-2 break-words text-xs leading-relaxed text-slate-400 ${compact ? "line-clamp-3" : "line-clamp-4"}`}>

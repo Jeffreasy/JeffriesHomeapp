@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BriefcaseBusiness, ChevronDown } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { BriefcaseBusiness, ChevronDown, LoaderCircle, UserRound } from "lucide-react";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { normalizeBusinessContext, type BusinessContextValue } from "@/lib/workspace-context";
 import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
@@ -26,27 +26,31 @@ type BusinessContextPickerProps = {
 export function BusinessContextPicker({
   value,
   onChange,
-  label = "Zakelijke context",
+  label = "Koppeling",
   compact = false,
 }: BusinessContextPickerProps) {
-  const { options: lcOptions, isError } = useLaventeCareBusinessContextOptions();
+  const { options: lcOptions, isError: laventeCareError } = useLaventeCareBusinessContextOptions();
   // Relaties uit de globale Contacten-module worden als extra koppelbare groep
   // naast de zakelijke LaventeCare-opties aangeboden (waarde: {type:"contact"}).
-  const { contacts } = useContacten();
+  const { contacts, isLoading: contactsLoading, isError: contactsError } = useContacten();
   const contactOptions = useMemo<LaventeCareContextOption[]>(
     () =>
       contacts.map((c) => ({
         key: `contact:${c.id}`,
         label: c.display_name,
-        meta: c.relationship_types.join(", ") || "Contact",
+        meta: (c.relationship_types ?? []).map(contactRelationshipLabel).join(" · ") || "Contact",
         value: { type: "contact", id: c.id, title: c.display_name },
-        aliases: [],
+        aliases: [
+          ...(c.labels ?? []).map((item) => item.name),
+          ...(c.organizations ?? []).map((item) => item.organization_name ?? ""),
+        ].filter(Boolean),
         rank: 2,
       })),
     [contacts],
   );
   const options = useMemo(() => [...lcOptions, ...contactOptions], [lcOptions, contactOptions]);
   const normalized = normalizeBusinessContext(value);
+  const listboxId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   // L12-a11y: sluit de dropdown op Escape en bij een klik buiten de picker.
@@ -96,7 +100,7 @@ export function BusinessContextPicker({
         { label: "Leads", items: filteredOptions.filter((option) => option.key.startsWith("lead:")) },
         { label: "Projecten", items: filteredOptions.filter((option) => option.key.startsWith("project:")) },
         { label: "Opdrachten", items: filteredOptions.filter((option) => option.key.startsWith("workstream:")) },
-        { label: "Relaties", items: filteredOptions.filter((option) => option.key.startsWith("contact:")) },
+        { label: "Contacten", items: filteredOptions.filter((option) => option.key.startsWith("contact:")) },
       ].filter((group) => group.items.length > 0),
     [filteredOptions],
   );
@@ -110,7 +114,7 @@ export function BusinessContextPicker({
   return (
     <div className={compact ? "space-y-1.5" : "space-y-2"}>
       <label className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-        <BriefcaseBusiness size={12} />
+        {normalized?.type === "contact" ? <UserRound size={12} /> : <BriefcaseBusiness size={12} />}
         {label}
       </label>
       <div ref={containerRef} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2">
@@ -119,11 +123,17 @@ export function BusinessContextPicker({
           onClick={() => setOpen((current) => !current)}
           aria-expanded={open}
           aria-haspopup="listbox"
-          aria-controls="business-context-listbox"
+          aria-controls={listboxId}
           role="combobox"
           className="flex w-full min-w-0 items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-white/[0.04]"
         >
-          <AppIcon name="business" tone={normalized ? "cyan" : "slate"} size="xs" framed className="h-7 w-7 rounded-lg" />
+          {normalized?.type === "contact" ? (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-300">
+              <UserRound size={13} aria-hidden="true" />
+            </span>
+          ) : (
+            <AppIcon name="business" tone={normalized ? "cyan" : "slate"} size="xs" framed className="h-7 w-7 rounded-lg" />
+          )}
           <span className="min-w-0 flex-1">
             <span className="block truncate text-xs font-semibold text-slate-200">{selected.label}</span>
             <span className="block truncate text-[11px] text-slate-500">{selected.meta}</span>
@@ -138,15 +148,15 @@ export function BusinessContextPicker({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={`Zoek in ${options.length} contexten...`}
-              aria-label="Zoek zakelijke context"
+              placeholder={`Zoek in ${options.length} koppelingen...`}
+              aria-label="Koppeling zoeken"
               autoFocus
               className="min-h-[38px] w-full rounded-lg border border-[var(--color-border)] bg-[#0d0d15] px-3 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-cyan-500/50"
             />
             <div
-              id="business-context-listbox"
+              id={listboxId}
               role="listbox"
-              aria-label="Zakelijke context"
+              aria-label="Koppeling"
               className="max-h-56 space-y-2 overflow-y-auto pr-1"
             >
               {selectedKey === "custom" ? (
@@ -184,8 +194,11 @@ export function BusinessContextPicker({
                               : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
                           }`}
                         >
-                          <span className="block truncate text-xs font-bold">{option.label}</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-slate-500">{option.meta}</span>
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            {option.key.startsWith("contact:") ? <UserRound size={11} className="shrink-0 text-violet-300/80" aria-hidden="true" /> : null}
+                            <span className="block truncate text-xs font-bold">{option.label}</span>
+                          </span>
+                          <span className="mt-0.5 block truncate pl-[17px] text-[11px] text-slate-500">{option.meta}</span>
                         </button>
                       );
                     })}
@@ -200,12 +213,32 @@ export function BusinessContextPicker({
             </div>
           </div>
         ) : null}
-        {isError && (
+        {contactsLoading && (
+          <p role="status" className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500">
+            <LoaderCircle size={11} className="animate-spin" aria-hidden="true" /> Contacten laden…
+          </p>
+        )}
+        {laventeCareError && (
           <p className="mt-1.5 text-[11px] text-amber-500">
             Klantdossiers konden niet geladen worden — lijst kan onvolledig zijn.
+          </p>
+        )}
+        {contactsError && (
+          <p role="alert" className="mt-1.5 text-[11px] text-amber-500">
+            Contacten konden niet geladen worden — lijst kan onvolledig zijn.
           </p>
         )}
       </div>
     </div>
   );
+}
+
+function contactRelationshipLabel(value: string) {
+  const labels: Record<string, string> = {
+    family: "Familie",
+    friend: "Vriend",
+    colleague: "Collega",
+    business: "Zakelijk",
+  };
+  return labels[value] ?? value;
 }

@@ -9,6 +9,7 @@ import { type DienstRow, shiftTypeColor } from "@/lib/schedule";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { resolveAppIconName } from "@/lib/symbols";
 import { getChecklistInfo } from "./NotesUtils";
+import { NoteContextBadge } from "./NoteContextBadge";
 
 interface DayColumnProps {
   date: Date;
@@ -19,6 +20,7 @@ interface DayColumnProps {
   onEdit: (note: NoteRecord) => void;
   onCreate: (data: NoteCreateData) => Promise<void>;
   onToggleComplete: (id: string) => void | Promise<void>;
+  masked?: boolean;
 }
 
 function formatTime(iso: string): string {
@@ -28,7 +30,7 @@ function formatTime(iso: string): string {
 
 const DAG_NAMEN_LANG = ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"];
 
-export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = [], onEdit, onCreate, onToggleComplete }: DayColumnProps) {
+export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = [], onEdit, onCreate, onToggleComplete, masked = false }: DayColumnProps) {
   const [quickText, setQuickText] = useState("");
   const [saving, setSaving] = useState(false);
   const [pendingCompleteId, setPendingCompleteId] = useState<string | null>(null);
@@ -205,6 +207,7 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
               pending={pendingCompleteId === note.id}
               onEdit={onEdit}
               onToggleComplete={handleToggleComplete}
+              masked={masked}
             />
           ))}
         </AnimatePresence>
@@ -225,6 +228,7 @@ export function DayColumn({ date, isToday, notes, diensten = [], agendaEvents = 
                   pending={pendingCompleteId === note.id}
                   onEdit={onEdit}
                   onToggleComplete={handleToggleComplete}
+                  masked={masked}
                 />
               ))}
             </div>
@@ -270,6 +274,7 @@ function JournalNoteButton({
   columnDate,
   onEdit,
   onToggleComplete,
+  masked = false,
 }: {
   note: NoteRecord;
   completed?: boolean;
@@ -277,12 +282,14 @@ function JournalNoteButton({
   columnDate: Date;
   onEdit: (note: NoteRecord) => void;
   onToggleComplete: (note: NoteRecord) => void | Promise<void>;
+  masked?: boolean;
 }) {
   // When the note sits in this day because of its DEADLINE, show the deadline
   // time (not the creation time, which would be on a different day).
   const bucketedByDeadline = Boolean(note.deadline && isSameAmsterdamDay(note.deadline, columnDate));
   const checklist = getChecklistInfo(note.inhoud);
   const previewTitle = note.titel || note.inhoud.split("\n")[0].slice(0, 50) || "Zonder titel";
+  const displayTitle = masked ? "••••••" : previewTitle;
   const openNote = () => onEdit(note);
 
   return (
@@ -309,28 +316,29 @@ function JournalNoteButton({
           <button
             type="button"
             onClick={openNote}
-            aria-label={`Notitie openen: ${previewTitle}`}
+            aria-label={masked ? "Notitie openen" : `Notitie openen: ${previewTitle}`}
             className={`block w-full truncate rounded text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 ${completed ? "text-slate-500 line-through decoration-emerald-400/50" : "text-[var(--color-text)]"}`}
           >
-            {previewTitle}
+            {displayTitle}
           </button>
-          {note.titel && note.inhoud !== note.titel && (
+          {!masked && note.titel && note.inhoud !== note.titel && (
             <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
               {note.inhoud.split("\n")[0].slice(0, 60)}
             </p>
           )}
           <div className="mt-1 flex flex-wrap items-center gap-1">
-            {checklist.total > 0 && (
+            {!masked && checklist.total > 0 && (
               <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] text-sky-300">
                 <ListChecks size={9} />
                 {checklist.done}/{checklist.total}
               </span>
             )}
-            {(note.tags?.length ?? 0) > 0 && note.tags!.slice(0, 2).map((tag) => (
+            {!masked && (note.tags?.length ?? 0) > 0 && note.tags!.slice(0, 2).map((tag) => (
               <span key={tag} className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[10px] text-amber-400/70">
                 {tag}
               </span>
             ))}
+            <NoteContextBadge note={note} compact masked={masked} />
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">

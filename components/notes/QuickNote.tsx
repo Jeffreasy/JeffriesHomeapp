@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { StickyNote, Plus, ChevronRight, Pin, ListChecks } from "lucide-react";
+import { StickyNote, Plus, ChevronRight, Pin, ListChecks, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
 import { usePrivacy } from "@/hooks/usePrivacy";
@@ -11,14 +11,28 @@ import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusi
 import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
 import { resolveAppIconName } from "@/lib/symbols";
 import { businessContextLabel, enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags } from "@/lib/workspace-context";
+import { useContacten } from "@/hooks/useContacten";
+import type { Contact } from "@/lib/api";
+import { ContactMentionMenu, useContactMention } from "./ContactMentionMenu";
+import { NoteContextBadge } from "./NoteContextBadge";
 
 export function QuickNote() {
   const { notes, active, create, isLoading } = useNotes();
   // N5: het dashboard moet dezelfde notes-privacyscope respecteren als /notities.
   const { hidden: privacyOn } = usePrivacy("notes");
   const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
+  const { contacts, isLoading: contactsLoading, isError: contactsError } = useContacten();
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const mentionListId = "dashboard-quick-note-contact-list";
+  const mention = useContactMention({
+    value: text,
+    contacts,
+    selectedContact,
+    onChange: setText,
+    onSelect: setSelectedContact,
+  });
 
   // Parse #tags from the text input
   const handleQuickSave = async () => {
@@ -26,7 +40,9 @@ export function QuickNote() {
     setSaving(true);
     try {
       const { cleanText, extractedTags } = parseHashTags(text.trim());
-      const matchedBusinessContext = resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
+      const matchedBusinessContext = selectedContact
+        ? { type: "contact", id: selectedContact.id, title: selectedContact.display_name }
+        : resolveLaventeCareBusinessContextFromText(cleanText, laventeCareContextOptions);
       const enriched = enrichNoteDraft({ title: cleanText, content: cleanText, tags: extractedTags, businessContext: matchedBusinessContext });
       // Consistent met /notities (low): leid een titel af uit de eerste regel,
       // code-point-safe afgekapt zodat een emoji-surrogaatpaar niet splitst.
@@ -41,6 +57,7 @@ export function QuickNote() {
         businessContextTitle: enriched.businessContext?.title ?? undefined,
       });
       setText("");
+      setSelectedContact(null);
     } catch {
       // useNotes toast de fout al — deze catch voorkomt alleen een unhandled
       // rejection (N5).
@@ -57,7 +74,9 @@ export function QuickNote() {
   const totalPinned = notes.filter((n) => n.isPinned).length;
   const quickParsed = parseHashTags(text);
   const quickContext = getPrimaryWorkspaceContext(text, quickParsed.extractedTags);
-  const quickBusinessContext = resolveLaventeCareBusinessContextFromText(text, laventeCareContextOptions);
+  const quickBusinessContext = selectedContact
+    ? { type: "contact", id: selectedContact.id, title: selectedContact.display_name }
+    : resolveLaventeCareBusinessContextFromText(text, laventeCareContextOptions);
 
   return (
     <section>
@@ -84,16 +103,22 @@ export function QuickNote() {
       </div>
 
       {/* Quick capture */}
-      <div className="glass rounded-xl border border-[var(--color-border)] mb-3">
+      <div className="glass relative mb-3 rounded-xl border border-[var(--color-border)]">
         <div className="flex items-center gap-2 px-3 py-2">
           <StickyNote size={14} className="text-amber-400/50 shrink-0" />
           <input
             type="text"
-            placeholder="Snel noteren... (#tag voor labels)"
+            placeholder="Snel noteren... (#tag of @contact)"
             aria-label="Snel noteren"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={mention.isOpen}
+            aria-controls={mentionListId}
+            aria-activedescendant={mention.isOpen && mention.suggestions[mention.activeIndex] ? `${mentionListId}-${mention.suggestions[mention.activeIndex].id}` : undefined}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
+              if (mention.handleKeyDown(e)) return;
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleQuickSave();
@@ -115,6 +140,16 @@ export function QuickNote() {
             </motion.button>
           )}
         </div>
+        <ContactMentionMenu
+          id={mentionListId}
+          isOpen={mention.isOpen}
+          query={mention.query}
+          suggestions={mention.suggestions}
+          activeIndex={mention.activeIndex}
+          isLoading={contactsLoading}
+          isError={contactsError}
+          onSelect={mention.pick}
+        />
         {/* Show extracted tags preview */}
         {text.includes("#") && (
           <div className="px-3 pb-2 flex items-center gap-1">
@@ -137,8 +172,18 @@ export function QuickNote() {
         {quickBusinessContext && (
           <div className="px-3 pb-2">
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-200">
-              <AppIcon name="business" tone="emerald" size="xs" />
+              {quickBusinessContext.type === "contact" ? <UserRound size={11} aria-hidden="true" /> : <AppIcon name="business" tone="emerald" size="xs" />}
               {businessContextLabel(quickBusinessContext)}
+              {selectedContact ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedContact(null)}
+                  aria-label={`Koppeling met ${selectedContact.display_name} verwijderen`}
+                  className="-mr-1 flex h-5 w-5 items-center justify-center rounded hover:bg-emerald-500/20"
+                >
+                  <X size={10} aria-hidden="true" />
+                </button>
+              ) : null}
             </span>
           </div>
         )}
@@ -161,10 +206,14 @@ function RecentNoteRow({ note, masked = false }: { note: NoteRecord; masked?: bo
   const checklistInfo = masked ? null : getQuickChecklistInfo(note.inhoud);
 
   return (
-    <Link href="/notities">
-      <motion.div
-        whileHover={{ x: 2 }}
-        className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors group cursor-pointer"
+    <motion.div
+      whileHover={{ x: 2 }}
+      className="group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
+    >
+      <Link
+        href={`/notities?note=${encodeURIComponent(note.id)}`}
+        aria-label={masked ? "Notitie openen" : `Notitie openen: ${displayTitle}`}
+        className="flex min-w-0 flex-1 items-center gap-2.5 rounded outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
       >
         {note.isPinned && <Pin size={10} className="text-amber-400 fill-amber-400 shrink-0" />}
         <AppIcon
@@ -177,6 +226,8 @@ function RecentNoteRow({ note, masked = false }: { note: NoteRecord; masked?: bo
         <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate flex-1 min-w-0">
           {displayTitle}
         </span>
+      </Link>
+      <NoteContextBadge note={note} masked={masked} compact className="max-w-28" />
         {checklistInfo && (
           <span className="text-[10px] text-slate-600 shrink-0 tabular-nums">
             <ListChecks size={9} className="inline mr-0.5" />
@@ -186,8 +237,7 @@ function RecentNoteRow({ note, masked = false }: { note: NoteRecord; masked?: bo
         <span className="text-[10px] text-slate-600 shrink-0">
           {formatCompact(note.gewijzigd)}
         </span>
-      </motion.div>
-    </Link>
+    </motion.div>
   );
 }
 

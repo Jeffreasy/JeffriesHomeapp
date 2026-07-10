@@ -1855,6 +1855,10 @@ export interface NoteRow {
 export const notesApi = {
   list: (userId: string) =>
     apiFetch<NoteRow[]>(`/notes?userId=${userId}`),
+  listByContext: (userId: string, contextType: string, contextId: string) => {
+    const params = new URLSearchParams({ userId, contextType, contextId });
+    return apiFetch<NoteRow[]>(`/notes?${params.toString()}`);
+  },
   /**
    * Lichtgewicht lijst voor de focus-kiosk: `fields=summary` laat de backend
    * de volledige inhoud weg en `limit` begrenst het aantal rijen, zodat de

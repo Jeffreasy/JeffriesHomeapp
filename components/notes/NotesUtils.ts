@@ -11,14 +11,16 @@ import {
   ShieldAlert,
   CheckCircle2,
   StickyNote,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
+import { normalizeBusinessContext, type BusinessContextValue } from "@/lib/workspace-context";
 
 export type ViewMode = "active" | "completed" | "archived";
 export type BoardMode = "board" | "grid";
 export type SortMode = "recent" | "oldest" | "title" | "deadline";
-export type NoteScope = "all" | "pinned" | "attention" | "deadlines" | "checklists" | "linked" | "untagged";
+export type NoteScope = "all" | "pinned" | "attention" | "deadlines" | "checklists" | "linked" | "agenda" | "contacts" | "untagged";
 export type Tone = "amber" | "green" | "rose" | "sky" | "indigo" | "slate";
 
 export const SORT_OPTIONS: Array<{ id: SortMode; label: string; icon: LucideIcon }> = [
@@ -34,7 +36,9 @@ export const SCOPE_OPTIONS: Array<{ id: NoteScope; label: string; icon: LucideIc
   { id: "pinned", label: "Vastgezet", icon: Pin },
   { id: "deadlines", label: "Deadlines", icon: CalendarClock },
   { id: "checklists", label: "Checklists", icon: ListChecks },
-  { id: "linked", label: "Agenda", icon: Link2 },
+  { id: "linked", label: "Gekoppeld", icon: Link2 },
+  { id: "agenda", label: "Agenda", icon: CalendarClock },
+  { id: "contacts", label: "Contacten", icon: UserRound },
   { id: "untagged", label: "Zonder tag", icon: Hash },
 ];
 
@@ -119,6 +123,18 @@ export function getDisplayTitle(note: NoteRecord) {
   return note.titel || note.inhoud.slice(0, 50) || "Zonder titel";
 }
 
+export function getNoteBusinessContext(note: NoteRecord): BusinessContextValue | null {
+  return normalizeBusinessContext({
+    type: note.businessContextType ?? note.business_context_type,
+    id: note.businessContextId ?? note.business_context_id,
+    title: note.businessContextTitle ?? note.business_context_title,
+  });
+}
+
+export function noteHasAnyLink(note: NoteRecord) {
+  return Boolean(note.linkedEventId || note.linked_event_id || getNoteBusinessContext(note));
+}
+
 export function tagLabel(tag: string, index: number, masked: boolean) {
   return masked ? `Tag ${index + 1}` : tag;
 }
@@ -161,7 +177,11 @@ export function noteMatchesScope(note: NoteRecord, scope: NoteScope, now = new D
     case "checklists":
       return getChecklistInfo(note.inhoud).total > 0;
     case "linked":
+      return noteHasAnyLink(note);
+    case "agenda":
       return Boolean(note.linkedEventId || note.linked_event_id);
+    case "contacts":
+      return getNoteBusinessContext(note)?.type === "contact";
     case "untagged":
       return (note.tags ?? []).length === 0;
     default:
@@ -183,7 +203,8 @@ export function getScopeCounts(notes: NoteRecord[], now = new Date()): Record<No
     deadlines: notes.filter((note) => noteMatchesScope(note, "deadlines", now)).length,
     checklists: notes.filter((note) => noteMatchesScope(note, "checklists", now)).length,
     linked: notes.filter((note) => noteMatchesScope(note, "linked", now)).length,
+    agenda: notes.filter((note) => noteMatchesScope(note, "agenda", now)).length,
+    contacts: notes.filter((note) => noteMatchesScope(note, "contacts", now)).length,
     untagged: notes.filter((note) => noteMatchesScope(note, "untagged", now)).length,
   };
 }
-

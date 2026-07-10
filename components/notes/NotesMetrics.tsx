@@ -86,7 +86,7 @@ export function NotesMetricsRow({
         tone={deadlineOverdue > 0 ? "rose" : deadlineSoon > 0 ? "amber" : "slate"}
         {...scopeOf("deadlines")}
       />
-      <StatChip icon={Link2} label="Agenda" value={`${linkedCount}`} meta={tagsCount > 0 ? `${linkedCount} gekoppeld · ${tagsCount} tags` : "Geen agenda-koppelingen"} tone="indigo" {...scopeOf("linked")} />
+      <StatChip icon={Link2} label="Gekoppeld" value={`${linkedCount}`} meta={tagsCount > 0 ? `${linkedCount} gekoppeld · ${tagsCount} tags` : "Geen gekoppelde notities"} tone="indigo" {...scopeOf("linked")} />
     </section>
   );
 }

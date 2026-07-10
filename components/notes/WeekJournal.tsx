@@ -20,6 +20,7 @@ interface WeekJournalProps {
   agendaEvents?: PersonalEvent[];
   isLoading?: boolean;
   isError?: boolean;
+  masked?: boolean;
 }
 
 function isoDate(d: Date): string {
@@ -51,7 +52,7 @@ function getWeekNumber(d: Date): number {
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
-export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart, onWeekChange, onEdit, onCreate, onToggleComplete, isLoading = false, isError = false }: WeekJournalProps) {
+export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart, onWeekChange, onEdit, onCreate, onToggleComplete, isLoading = false, isError = false, masked = false }: WeekJournalProps) {
   // "Vandaag" ververst op visibilitychange + minuutinterval (zelfde familie als
   // de habits-pagefix): een PWA die over middernacht open blijft markeert de
   // juiste kolom als vandaag.
@@ -246,6 +247,7 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
               onEdit={onEdit}
               onCreate={onCreate}
               onToggleComplete={onToggleComplete}
+              masked={masked}
             />
           );
         })}
