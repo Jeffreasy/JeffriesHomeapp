@@ -5,6 +5,7 @@ import {
   Activity,
   AlertTriangle,
   Lightbulb,
+  Loader2,
   Power,
   RefreshCw,
   Settings,
@@ -25,7 +26,6 @@ import { type Device } from "@/lib/api";
 
 import {
   buildRoomGroups,
-  getAverageBrightness,
   matchesFilter,
   type FilterMode,
 } from "@/components/lamp/LampUtils";
@@ -41,12 +41,20 @@ import {
 import { LampCommandCenter } from "@/components/lamp/LampCommandCenter";
 import { LampToolbar } from "@/components/lamp/LampToolbar";
 import { LampOverviewSidebar } from "@/components/lamp/LampOverviewSidebar";
+import { BridgeStatusNotice } from "@/components/lamp/BridgeStatusNotice";
+import { getLightingSummary } from "@/lib/lighting";
 
 export default function LampenPage() {
   const { data: devices = [], isLoading: loadingDevices, isFetching: fetchingDevices, error: devicesError } = useDevices();
   const { data: rooms = [], isLoading: loadingRooms, error: roomsError } = useRooms();
-  const { sendBatch } = useLampCommand();
-  const { bridge, bridgeOffline } = useBridgeStatus();
+  const { sendBatch, isPending: lightingPending } = useLampCommand();
+  const {
+    bridge,
+    isOffline: bridgeOffline,
+    isLoading: bridgeStatusLoading,
+    isError: bridgeStatusError,
+    isStatusKnown: isBridgeStatusKnown,
+  } = useBridgeStatus();
   const queryClient = useQueryClient();
 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -54,20 +62,24 @@ export default function LampenPage() {
   const [filter, setFilter] = useState<FilterMode>("all");
 
   const roomById = useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
-  const onlineDevices = useMemo(() => devices.filter((device) => device.status === "online"), [devices]);
-  const offlineDevices = useMemo(() => devices.filter((device) => device.status !== "online"), [devices]);
-  const onDevices = useMemo(() => devices.filter((device) => device.current_state?.on), [devices]);
-  const allOnlineOn =
-    onlineDevices.length > 0 && onlineDevices.every((device) => device.current_state?.on);
-  const avgBrightness = getAverageBrightness(devices);
+  const lightingSummary = useMemo(() => getLightingSummary(devices), [devices]);
+  const {
+    onlineDevices,
+    offlineDevices,
+    onDevices,
+    allOnlineOn,
+    averageBrightness: avgBrightness,
+  } = lightingSummary;
   const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? null;
-  const isLoading = loadingDevices || loadingRooms;
+  const isInitialDeviceLoading = loadingDevices && devices.length === 0;
+  const roomMetadataLoading = loadingRooms && rooms.length === 0;
+  const statusLoading = loadingDevices || loadingRooms;
 
   const filteredDevices = useMemo(() => {
     const query = search.trim().toLowerCase();
 
     return devices.filter((device) => {
-      const roomName = device.room_id ? roomById.get(device.room_id)?.name ?? device.room_id : "";
+      const roomName = device.room_id ? roomById.get(device.room_id)?.name ?? (roomMetadataLoading ? "" : device.room_id) : "";
       const matchesSearch =
         query.length === 0 ||
         device.name.toLowerCase().includes(query) ||
@@ -76,20 +88,29 @@ export default function LampenPage() {
 
       return matchesSearch && matchesFilter(device, filter);
     });
-  }, [devices, filter, roomById, search]);
+  }, [devices, filter, roomById, roomMetadataLoading, search]);
 
-  const roomGroups = useMemo(() => buildRoomGroups(filteredDevices, rooms), [filteredDevices, rooms]);
-  const unassignedDevices = useMemo(
-    () => filteredDevices.filter((device) => !device.room_id),
-    [filteredDevices]
+  const roomGroups = useMemo(
+    () => buildRoomGroups(filteredDevices, rooms, { metadataLoading: roomMetadataLoading }),
+    [filteredDevices, roomMetadataLoading, rooms],
   );
-  const allRoomGroups = useMemo(() => buildRoomGroups(devices, rooms), [devices, rooms]);
+  const unassignedDevices = useMemo(
+    () => roomMetadataLoading ? [] : filteredDevices.filter((device) => !device.room_id),
+    [filteredDevices, roomMetadataLoading],
+  );
+  const allRoomGroups = useMemo(
+    () => buildRoomGroups(devices, rooms, { metadataLoading: roomMetadataLoading }),
+    [devices, roomMetadataLoading, rooms],
+  );
+  const unassignedCount = roomMetadataLoading
+    ? 0
+    : devices.filter((device) => !device.room_id).length;
   const hasAnyResults = filteredDevices.length > 0;
-  const hasNoDevices = !isLoading && devices.length === 0 && !devicesError;
+  const hasNoDevices = !loadingDevices && devices.length === 0 && !devicesError;
 
   const toggleAll = () => {
-    // Batch: één invalidate aan het eind i.p.v. een refetch-storm per lamp.
-    sendBatch(onlineDevices, { on: !allOnlineOn });
+    if (lightingPending) return;
+    void sendBatch(onlineDevices, { on: !allOnlineOn });
   };
 
   const refreshDevices = () => {
@@ -100,7 +121,12 @@ export default function LampenPage() {
     setSelectedDeviceId((previous) => (previous === device.id ? null : device.id));
   };
 
-  useGlobalShortcuts({ devices: onlineDevices, allOn: allOnlineOn, sendBatch });
+  useGlobalShortcuts({
+    devices: onlineDevices,
+    allOn: allOnlineOn,
+    sendBatch,
+    disabled: lightingPending,
+  });
 
   return (
     <div className="text-slate-100">
@@ -117,7 +143,9 @@ export default function LampenPage() {
                 </p>
                 <h1 className="mt-1 truncate text-2xl font-bold text-white">Verlichting</h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  {onlineDevices.length}/{devices.length} online · {onDevices.length} aan
+                  {isInitialDeviceLoading
+                    ? "Lampen laden…"
+                    : `${onlineDevices.length}/${devices.length} online · ${onDevices.length} aan`}
                 </p>
               </div>
             </div>
@@ -127,8 +155,8 @@ export default function LampenPage() {
                 type="button"
                 onClick={refreshDevices}
                 disabled={fetchingDevices}
-                aria-label="Lampstatus verversen"
-                title="Haal de actuele lampstatus op"
+                aria-label="Serverstatus van lampen verversen"
+                title="Haal de laatst bekende serverstatus opnieuw op"
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-wait disabled:opacity-60"
               >
                 <RefreshCw size={16} className={fetchingDevices ? "animate-spin" : ""} aria-hidden="true" />
@@ -136,6 +164,7 @@ export default function LampenPage() {
               </button>
               <Link
                 href="/settings"
+                aria-label="Instellingen openen"
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
               >
                 <Settings size={16} />
@@ -144,65 +173,34 @@ export default function LampenPage() {
               <button
                 type="button"
                 onClick={toggleAll}
-                disabled={onlineDevices.length === 0}
+                disabled={onlineDevices.length === 0 || lightingPending}
+                aria-busy={lightingPending}
                 title="Alle online lampen aan/uit"
                 className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface)] disabled:text-slate-600"
               >
-                <Power size={16} />
-                <span>{allOnlineOn ? "Alles uit" : "Alles aan"}</span>
+                {lightingPending ? (
+                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Power size={16} aria-hidden="true" />
+                )}
+                <span>{lightingPending ? "Bezig…" : allOnlineOn ? "Alles uit" : "Alles aan"}</span>
               </button>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
-          {/* N7: in queue-modus bevestigt de backend commando's vóór uitvoering —
-              bij een offline bridge is de getoonde staat dus mogelijk nep. */}
-          {bridgeOffline && (
-            <div
-              role="status"
-              className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4"
-            >
-              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" aria-hidden="true" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-amber-200">
-                  Bridge offline — lampcommando&apos;s worden uitgesteld en de getoonde status kan verouderd zijn.
-                </p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">
-                  {bridge?.lastSeenAt
-                    ? `Laatste heartbeat: ${new Date(bridge.lastSeenAt).toLocaleString("nl-NL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}.`
-                    : "Nog geen heartbeat ontvangen."}
-                  {(bridge?.commandsPending ?? 0) > 0 && ` ${bridge?.commandsPending} commando('s) in de wachtrij.`}
-                </p>
-              </div>
-            </div>
-          )}
+        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
+          <BridgeStatusNotice
+            bridge={bridge}
+            isOffline={bridgeOffline}
+            isLoading={bridgeStatusLoading}
+            isError={bridgeStatusError}
+            isStatusKnown={isBridgeStatusKnown}
+          />
 
-          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_420px]">
-            <LampCommandCenter
-              devices={devices.length}
-              online={onlineDevices.length}
-              offline={offlineDevices.length}
-              on={onDevices.length}
-              avgBrightness={avgBrightness}
-              allOn={allOnlineOn}
-              onToggleAll={toggleAll}
-            />
-
-            <Panel>
-              <SectionHeader
-                icon={Sparkles}
-                label="Scènes"
-                title="Snelle sfeer"
-                sub={`${onlineDevices.length} online beschikbaar`}
-              />
-              <SceneBar />
-            </Panel>
-          </section>
-
-          {(devicesError || roomsError) && (
+          {((devicesError && devices.length > 0) || roomsError) && (
             <div className="grid gap-3 lg:grid-cols-2">
-              {devicesError && (
+              {devicesError && devices.length > 0 && (
                 <WarningPanel
                   title="Deviceverbinding mislukt"
                   text={
@@ -221,7 +219,7 @@ export default function LampenPage() {
             </div>
           )}
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section aria-label="Individuele lampbediening" className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 space-y-5">
               <LampToolbar
                 search={search}
@@ -233,7 +231,7 @@ export default function LampenPage() {
                 onFilterChange={setFilter}
               />
 
-              {isLoading ? (
+              {isInitialDeviceLoading ? (
                 <LoadingGrid />
               ) : devicesError && devices.length === 0 ? (
                 // Failed ≠ empty: bij een device-fetch-fout géén "Filters resetten"
@@ -291,13 +289,13 @@ export default function LampenPage() {
             </div>
 
             <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
-              <LampOverviewSidebar groups={allRoomGroups} unassignedCount={devices.filter((device) => !device.room_id).length} />
+              <LampOverviewSidebar groups={allRoomGroups} unassignedCount={unassignedCount} />
               <Panel>
                 <SectionHeader
                   icon={Activity}
                   label="Systeem"
                   title="Live status"
-                  sub={isLoading ? "laden" : "ververst elke 10s"}
+                  sub={statusLoading ? "laden" : "ververst elke 10s"}
                 />
                 {/* N7: eerlijk over de grens van "live" — de fysieke lampstatus
                     reconvergeert in queue-modus pas bij de bridge-poll. */}
@@ -327,6 +325,28 @@ export default function LampenPage() {
               </Panel>
             </aside>
           </section>
+
+          <section aria-label="Woningoverzicht en scènes" className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_420px]">
+            <LampCommandCenter
+              devices={devices.length}
+              online={onlineDevices.length}
+              offline={offlineDevices.length}
+              on={onDevices.length}
+              avgBrightness={avgBrightness}
+              loading={isInitialDeviceLoading}
+            />
+
+            <Panel>
+              <SectionHeader
+                icon={Sparkles}
+                label="Scènes"
+                title="Snelle sfeer"
+                sub={`${onlineDevices.length} online beschikbaar`}
+              />
+              <SceneBar />
+            </Panel>
+          </section>
+
         </main>
       </div>
 

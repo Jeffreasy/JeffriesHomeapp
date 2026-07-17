@@ -1,9 +1,10 @@
 "use client";
 
 import { Power, Lightbulb, Loader2, Wifi, WifiOff } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { type Device } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn, kelvinToHex, rgbToHex } from "@/lib/utils";
 import { LampControl } from "./LampControl";
 import { BottomSheet } from "@/components/ui/BottomSheet";
@@ -14,25 +15,10 @@ interface LampCardProps {
   onSelect?: (device: Device) => void;
 }
 
-/** Returns true on mobile viewports (< 768px) — evaluated client-side only. */
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window === "undefined" ? false : window.matchMedia("(max-width: 767px)").matches
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
-
 export function LampCard({ device, onSelect }: LampCardProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
-  const { mutate: sendCommand, isPending } = useLampCommand();
-  const isMobile = useIsMobile();
+  const { mutate: sendCommand, isPending } = useLampCommand(device.id);
+  const isMobile = useMediaQuery("(max-width: 767px)");
 
   const isOn = device.current_state?.on ?? false;
   const isOnline = device.status === "online";
@@ -136,6 +122,7 @@ export function LampCard({ device, onSelect }: LampCardProps) {
 
           {/* Power toggle */}
           <button
+            type="button"
             onClick={togglePower}
             disabled={!isOnline || isPending}
             aria-label={isOn ? `${device.name} uitschakelen` : `${device.name} aanzetten`}
@@ -209,6 +196,7 @@ export function LampCard({ device, onSelect }: LampCardProps) {
                   </span>
                 </div>
                 <button
+                  type="button"
                   onClick={togglePower}
                   disabled={isPending}
                   aria-label={isOn ? `${device.name} uitschakelen` : `${device.name} aanzetten`}

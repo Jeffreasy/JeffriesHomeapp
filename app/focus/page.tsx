@@ -596,23 +596,24 @@ function FocusLightControls() {
   const allOff = onDevices.length === 0;
   const toggleLabel = allOff ? "Alles aan" : "Alles uit";
 
-  const applyCommand = (label: string, cmd: DeviceCommand) => {
+  const applyCommand = async (label: string, cmd: DeviceCommand) => {
+    if (isPending) return;
+
     if (!canSend) {
       error("Geen online lampen beschikbaar");
       return;
     }
 
-    // R3-16: use the shared sendBatch path (like home/lampen) — one optimistic
-    // patch + one bundled error toast, instead of N invalidate-refetches and up
-    // to N error toasts from forEach(sendCommand). The toast reports what was
-    // SENT (the real outcome surfaces via sendBatch's bundled failure toast),
-    // not a premature success claim.
-    sendBatch(onlineDevices, cmd);
-    success(`${label} verstuurd naar ${onlineDevices.length} lampen`);
+    // sendBatch meldt partial/total failures zelf als één gebundelde fout. Een
+    // succesmelding is daarom uitsluitend juist als elk uniek doel slaagde.
+    const result = await sendBatch(onlineDevices, cmd);
+    if (result.total > 0 && result.failed.length === 0) {
+      success(`${label} verstuurd naar ${result.succeeded} lampen`);
+    }
   };
 
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+    <div aria-busy={isPending} className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <AppIcon name="lights" size="sm" tone="amber" framed />
@@ -625,7 +626,7 @@ function FocusLightControls() {
         </div>
         <button
           type="button"
-          onClick={() => applyCommand(toggleLabel, allOff ? { on: true, brightness: 70 } : { on: false })}
+          onClick={() => void applyCommand(toggleLabel, allOff ? { on: true, brightness: 70 } : { on: false })}
           disabled={!canSend || isPending}
           className={cn(
             "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
@@ -646,7 +647,7 @@ function FocusLightControls() {
             <button
               key={scene.id}
               type="button"
-              onClick={() => applyCommand(scene.label, scene.command)}
+              onClick={() => void applyCommand(scene.label, scene.command)}
               disabled={!canSend || isPending}
               aria-pressed={active}
               className={cn(

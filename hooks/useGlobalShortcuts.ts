@@ -7,8 +7,8 @@ import { type DeviceCommand } from "@/lib/api";
 interface ShortcutOptions {
   devices: Device[];
   allOn: boolean;
-  /** Batch-sender uit useLampCommand — één invalidate i.p.v. N refetches. */
-  sendBatch: (targets: Device[], cmd: DeviceCommand) => void;
+  sendBatch: (targets: readonly Device[], cmd: DeviceCommand) => Promise<unknown>;
+  disabled?: boolean;
 }
 
 /**
@@ -17,12 +17,17 @@ interface ShortcutOptions {
  * Shortcuts:
  *   - Spatiebalk → toggle alle lampen aan/uit
  */
-export function useGlobalShortcuts({ devices, allOn, sendBatch }: ShortcutOptions) {
+export function useGlobalShortcuts({
+  devices,
+  allOn,
+  sendBatch,
+  disabled = false,
+}: ShortcutOptions) {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       // Spatie ingedrukt houden vuurt key-repeat events — zonder deze guard
       // stuurt elke repeat een volledige toggle-batch (strobe/command-storm).
-      if (e.repeat) return;
+      if (e.repeat || disabled) return;
 
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
@@ -37,11 +42,11 @@ export function useGlobalShortcuts({ devices, allOn, sendBatch }: ShortcutOption
 
       if (e.code === "Space") {
         e.preventDefault();
-        sendBatch(devices, { on: !allOn });
+        void sendBatch(devices, { on: !allOn });
       }
     };
 
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [devices, allOn, sendBatch]);
+  }, [allOn, devices, disabled, sendBatch]);
 }

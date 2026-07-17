@@ -1,15 +1,16 @@
 "use client";
 
 import { HexColorPicker } from "react-colorful";
-import { useState, useEffect, useRef, useId } from "react";
+import { useState, useEffect, useRef, useId, useCallback } from "react";
 import { Thermometer, Sun, Palette, RefreshCw } from "lucide-react";
-import { type Device, type DeviceCommand } from "@/lib/api";
+import { devicesApi, type Device, type DeviceCommand } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { useToast } from "@/components/ui/Toast";
 import { cn, hexToRgb, rgbToHex } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { devicesApi } from "@/lib/api";
+import { mergeRefreshedDevice } from "@/lib/lampCommandJournal";
+import { runWithAbortTimeout } from "@/lib/lampCommandTransport";
 
 interface LampControlProps {
   device: Device;
@@ -28,8 +29,15 @@ const COLOR_PRESETS = [
   { hex: "#ff69b4", label: "Roze" },
 ];
 
+const DEVICE_REFRESH_TIMEOUT_MS = 15_000;
+
 export function LampControl({ device }: LampControlProps) {
-  const { mutate: sendCommand } = useLampCommand();
+  const {
+    mutateAsync: sendCommand,
+    isPending,
+    subscribeToBarriers,
+    hasPendingCommands,
+  } = useLampCommand(device.id);
   const queryClient = useQueryClient();
   const { error: toastError } = useToast();
   const [refreshing, setRefreshing] = useState(false);
@@ -43,6 +51,26 @@ export function LampControl({ device }: LampControlProps) {
   // Grace-window dat het gat dekt tussen de laatste lokale edit en het moment
   // dat de gedebouncete send daadwerkelijk vertrekt (max 200ms debounce).
   const localEditUntilRef = useRef(0);
+  const failedSyncPendingRef = useRef(false);
+  const [syncRevision, setSyncRevision] = useState(0);
+
+  const requestLocalSync = useCallback(() => {
+    setSyncRevision((revision) => revision + 1);
+  }, []);
+
+  const flushDeferredSync = useCallback(() => {
+    if (
+      !failedSyncPendingRef.current ||
+      activePointersRef.current > 0 ||
+      inFlightSendsRef.current > 0
+    ) {
+      return false;
+    }
+    failedSyncPendingRef.current = false;
+    localEditUntilRef.current = 0;
+    requestLocalSync();
+    return true;
+  }, [requestLocalSync]);
 
   // R12: increment op het element, maar decrement op window-niveau — een
   // pointerup die buiten het element landt (of verloren gaat door alt-tab)
@@ -53,10 +81,18 @@ export function LampControl({ device }: LampControlProps) {
 
   useEffect(() => {
     const releasePointer = () => {
+      const wasActive = activePointersRef.current > 0;
       activePointersRef.current = Math.max(0, activePointersRef.current - 1);
+      if (wasActive && activePointersRef.current === 0 && !flushDeferredSync()) {
+        requestLocalSync();
+      }
     };
     // Tab-switch mid-drag: er komt nooit meer een pointerup — teller resetten.
-    const resetPointers = () => { activePointersRef.current = 0; };
+    const resetPointers = () => {
+      const wasActive = activePointersRef.current > 0;
+      activePointersRef.current = 0;
+      if (wasActive && !flushDeferredSync()) requestLocalSync();
+    };
     window.addEventListener("pointerup", releasePointer);
     window.addEventListener("pointercancel", releasePointer);
     document.addEventListener("visibilitychange", resetPointers);
@@ -65,27 +101,60 @@ export function LampControl({ device }: LampControlProps) {
       window.removeEventListener("pointercancel", releasePointer);
       document.removeEventListener("visibilitychange", resetPointers);
     };
-  }, []);
+  }, [flushDeferredSync, requestLocalSync]);
 
   const isOn = state?.on ?? false;
 
-  const trackedSend = (cmd: DeviceCommand) => {
+  const trackedSend = (
+    cmd: DeviceCommand,
+    continuousKey?: "brightness" | "color-temperature" | "color",
+  ) => {
     // M7: bediening op een uitgeschakelde lamp zet hem ook aan — de backend
     // impliceert geen on:true bij brightness/kleur (zie lib/deviceCommands).
-    const effective: DeviceCommand = !isOn && cmd.on === undefined ? { ...cmd, on: true } : cmd;
+    const effective: DeviceCommand =
+      cmd.on === undefined && (continuousKey !== undefined || !isOn)
+        ? { ...cmd, on: true }
+        : cmd;
     inFlightSendsRef.current += 1;
-    sendCommand(
-      { id: device.id, cmd: effective },
-      { onSettled: () => { inFlightSendsRef.current = Math.max(0, inFlightSendsRef.current - 1); } }
-    );
+    void sendCommand({ id: device.id, cmd: effective, continuousKey })
+      .catch(() => {
+        // React Query has already rolled the failed optimistic operation back.
+        // This includes intentionally superseded drafts: defer a local sync
+        // until every newer send and active pointer interaction has finished.
+        localEditUntilRef.current = 0;
+        failedSyncPendingRef.current = true;
+      })
+      .finally(() => {
+        inFlightSendsRef.current = Math.max(0, inFlightSendsRef.current - 1);
+        if (inFlightSendsRef.current === 0 && !flushDeferredSync()) {
+          requestLocalSync();
+        }
+      });
   };
 
   const refresh = async () => {
+    const stateAtRequestStart = queryClient
+      .getQueryData<Device[]>(["devices"])
+      ?.find((cachedDevice) => cachedDevice.id === device.id)
+      ?.current_state;
     setRefreshing(true);
     try {
-      const fresh = await devicesApi.get(device.id);
+      const fresh = await runWithAbortTimeout(
+        (signal) => devicesApi.get(device.id, signal),
+        DEVICE_REFRESH_TIMEOUT_MS,
+      );
       queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
-        old?.map((d) => (d.id === device.id ? fresh : d))
+        old?.map((current) => {
+          if (current.id !== device.id) return current;
+          const stateChangedSinceStart =
+            stateAtRequestStart !== undefined &&
+            current.current_state !== stateAtRequestStart;
+          return mergeRefreshedDevice(
+            current,
+            fresh,
+            hasPendingCommands() || stateChangedSinceStart,
+          );
+        }),
       );
     } catch {
       // Dit haalt de laatst bekende serverstaat op (DB-rij), niet de lamp zelf —
@@ -113,12 +182,17 @@ export function LampControl({ device }: LampControlProps) {
   useEffect(() => {
     // Niet syncen terwijl de gebruiker sleept of een send onderweg is — anders
     // springt de slider terug naar de (nog niet bijgewerkte) serverwaarde.
-    if (
-      activePointersRef.current > 0 ||
-      inFlightSendsRef.current > 0 ||
-      Date.now() < localEditUntilRef.current
-    ) {
+    if (activePointersRef.current > 0 || inFlightSendsRef.current > 0) {
       return;
+    }
+
+    const graceRemaining = localEditUntilRef.current - Date.now();
+    if (graceRemaining > 0) {
+      const timer = window.setTimeout(
+        requestLocalSync,
+        graceRemaining + 1,
+      );
+      return () => window.clearTimeout(timer);
     }
 
     setLocalBrightness(state?.brightness ?? 100);
@@ -134,22 +208,57 @@ export function LampControl({ device }: LampControlProps) {
     } else {
       setMode("white");
     }
-  }, [state?.brightness, state?.color_temp, state?.r, state?.g, state?.b]);
+  }, [
+    requestLocalSync,
+    state?.on,
+    state?.brightness,
+    state?.color_temp,
+    state?.r,
+    state?.g,
+    state?.b,
+    syncRevision,
+  ]);
 
   // ─── Debounced API callers (200ms) ─────────────────────────────────────────
 
   const sendBrightness = useDebouncedCallback((v: number) => {
-    trackedSend({ brightness: v });
-  }, 200);
+    trackedSend({ brightness: v }, "brightness");
+  }, 200, { flushOnUnmount: false });
 
   const sendColorTemp = useDebouncedCallback((mireds: number) => {
-    trackedSend({ color_temp_mireds: mireds });
-  }, 200);
+    trackedSend({ color_temp_mireds: mireds }, "color-temperature");
+  }, 200, { flushOnUnmount: false });
 
   const sendColor = useDebouncedCallback((hex: string) => {
     const { r, g, b } = hexToRgb(hex);
-    trackedSend({ r, g, b });
-  }, 120);
+    trackedSend({ r, g, b }, "color");
+  }, 120, { flushOnUnmount: false });
+
+  // Barriers can originate in this panel, a LampCard, a room/global toggle or
+  // a scene. Cancel drafts synchronously when the transport reserves one so a
+  // near-expired debounce can never re-enable a lamp after power-off.
+  useEffect(
+    () =>
+      subscribeToBarriers(() => {
+        sendBrightness.cancel();
+        sendColorTemp.cancel();
+        sendColor.cancel();
+        localEditUntilRef.current = 0;
+        failedSyncPendingRef.current = true;
+      }),
+    [sendBrightness, sendColor, sendColorTemp, subscribeToBarriers],
+  );
+
+  useEffect(() => {
+    if (!isPending) flushDeferredSync();
+  }, [flushDeferredSync, isPending]);
+
+  useEffect(() => {
+    if (isOn) return;
+    sendBrightness.cancel();
+    sendColorTemp.cancel();
+    sendColor.cancel();
+  }, [isOn, sendBrightness, sendColor, sendColorTemp]);
 
   // ─── Handlers (local state + debounced API) ────────────────────────────────
 
@@ -176,8 +285,11 @@ export function LampControl({ device }: LampControlProps) {
   // volgt. Alleen als de lamp aan is — een tabwissel op een uitgeschakelde
   // lamp mag hem niet onverwacht aanzetten.
   const handleModeSwitch = (m: Mode) => {
-    if (m === mode) return;
+    if (m === mode || isPending) return;
     setMode(m);
+    sendBrightness.cancel();
+    sendColorTemp.cancel();
+    sendColor.cancel();
     if (!isOn) return;
     localEditUntilRef.current = Date.now() + 400;
     if (m === "white") {
@@ -225,8 +337,9 @@ export function LampControl({ device }: LampControlProps) {
           <div className="flex items-center gap-2">
             <span className="text-xs text-amber-400 font-mono">{localBrightness}%</span>
             <button
+              type="button"
               onClick={refresh}
-              disabled={refreshing}
+              disabled={refreshing || isPending}
               aria-label="Serverstatus ophalen"
               title="Haal de laatst bekende serverstatus op"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white/5 hover:text-slate-400"
@@ -254,9 +367,11 @@ export function LampControl({ device }: LampControlProps) {
         {(["white", "color"] as Mode[]).map((m) => (
           <button
             key={m}
+            type="button"
             onClick={() => handleModeSwitch(m)}
+            disabled={isPending}
             aria-pressed={mode === m}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg transition-all ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg transition-all disabled:cursor-wait disabled:opacity-50 ${
               mode === m
                 ? "bg-[rgba(255,255,255,0.1)] text-white font-medium"
                 : "text-slate-500 hover:text-slate-300"
@@ -285,6 +400,7 @@ export function LampControl({ device }: LampControlProps) {
             value={localMireds}
             onChange={(e) => handleColorTemp(+e.target.value)}
             aria-label="Kleurtemperatuur"
+            aria-valuetext={`${kelvin} Kelvin`}
             {...interactionProps}
             style={{
               // Mireds schaal: laag = koel (6500K), hoog = warm (2200K)
@@ -307,6 +423,7 @@ export function LampControl({ device }: LampControlProps) {
             {COLOR_PRESETS.map(({ hex, label }) => (
               <button
                 key={hex}
+                type="button"
                 onClick={() => handleColor(hex)}
                 aria-label={label}
                 title={label}

@@ -31,7 +31,16 @@ npm run test:unit gebruikt playwright.unit.config.ts, start geen webserver en te
 - request-generationguards;
 - CSV- en domeinhelpers;
 - salarykalibratie en transactiestatsscope;
-- exacte dossierdocumentlookup.
+- exacte dossierdocumentlookup;
+- canonieke online/on/helderheidselectors voor verlichting;
+- immutable devicecommandsimulatie;
+- per-device optimistic journals bij overlappende successen en fouten;
+- per-device requestserialisatie met parallelisme tussen verschillende lampen;
+- coalescing, commandbarrières en totale abort-deadlines vanaf de
+  gebruikersinteractie voor fysieke bediening;
+- behoud van optimistic state én versere metadata bij een late refresh;
+- kamerfallbacks, filters en consistente online/on-tellingen.
+
 
 ### E2E
 
@@ -85,5 +94,10 @@ Automatische tests vervangen geen visuele controle. Controleer minimaal:
 - offlinefallback zonder private data in Cache Storage;
 - PDF-viewer zonder dubbele appchrome;
 - sign-out en 401-purge van QueryClient, IndexedDB en runtimecaches.
+- individuele lampkaarten vóór globale metrics en scènes;
+- één device-toggle die uitsluitend het bedoelde device-id verstuurt;
+- offline lampen die geen commando versturen;
+- gerichte rollback van uitsluitend de mislukte lampoperatie;
+- de gedeelde bridgestatus voor controleren, onbekend en offline queue-modus;
 
 Playwright maakt lokaal playwright-report en test-results aan. Deze directories zijn gegenereerd, ignored en mogen na inspectie worden verwijderd.

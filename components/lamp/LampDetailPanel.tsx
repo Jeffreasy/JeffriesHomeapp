@@ -6,6 +6,7 @@ import { X, Lightbulb, Loader2, Power, Wifi, WifiOff } from "lucide-react";
 import { type Device } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { LampControl } from "./LampControl";
 import { kelvinToHex, rgbToHex, cn } from "@/lib/utils";
 
@@ -20,18 +21,21 @@ interface LampDetailPanelProps {
  * Mobile uses BottomSheet instead (handled in LampCard).
  */
 export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
-  const { mutate: sendCommand, isPending } = useLampCommand();
+  const { mutate: sendCommand, isPending } = useLampCommand(device?.id);
   const titleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
+  const deviceId = device?.id;
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const panelOpen = Boolean(device && isDesktop);
 
   // Focus trap (ronde-1 M22): Tab/Shift+Tab blijven binnen het paneel en de
   // focus keert terug naar de trigger bij sluiten — zelfde hook als
   // BottomSheet/AutomationForm.
-  useFocusTrap(!!device, panelRef);
+  useFocusTrap(panelOpen, panelRef);
 
   useEffect(() => {
-    if (!device) return;
+    if (!deviceId || !isDesktop) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const timer = window.setTimeout(() => closeButtonRef.current?.focus(), 120);
@@ -39,16 +43,16 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
       window.clearTimeout(timer);
       document.body.style.overflow = previousOverflow;
     };
-  }, [device]);
+  }, [deviceId, isDesktop]);
 
   useEffect(() => {
-    if (!device) return;
+    if (!deviceId || !isDesktop) return;
     const handler = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [device, onClose]);
+  }, [deviceId, isDesktop, onClose]);
 
   const isOn = device?.current_state?.on ?? false;
   const isOnline = device?.status === "online";
@@ -68,7 +72,7 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
 
   return (
     <AnimatePresence>
-      {device && (
+      {device && isDesktop && (
         <>
           <motion.button
             type="button"
@@ -147,6 +151,7 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
 
               {/* Power button */}
               <button
+                type="button"
                 onClick={togglePower}
                 disabled={!isOnline || isPending}
                 aria-label={isOn ? `${device.name} uitschakelen` : `${device.name} aanzetten`}
@@ -169,6 +174,7 @@ export function LampDetailPanel({ device, onClose }: LampDetailPanelProps) {
 
               {/* Close */}
               <button
+                type="button"
                 ref={closeButtonRef}
                 onClick={onClose}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"

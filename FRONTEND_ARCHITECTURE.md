@@ -150,6 +150,44 @@ In de huidige source staat geen query met meta.persist === true. De persistencep
 
 De providerboom blijft stabiel: PersistQueryClientProvider wordt niet na mount verwisseld voor een ander providertype. Dit voorkomt de oude volledige remount/hydration-flash.
 
+### Smart-home state en bediening
+
+Dashboard en /lampen gebruiken één TanStack Query-cache met key ["devices"] en
+dezelfde useLampCommand-mutatie. Er is geen tweede dashboardstore, gegenereerde
+devicehook of aparte scènebron voor deze flow.
+
+- lib/lighting.ts is de canonieke projectie voor online, offline, actief,
+  all-online-on en gemiddelde helderheid. Een offline last-known-on-status telt
+  nergens als actief.
+- lib/lampCommandJournal.ts bewaart per QueryClient en per device de volgorde van
+  overlappende optimistic commands. Alleen de mislukte operatie wordt verwijderd;
+  succesvolle commando's op dezelfde of andere lampen blijven geprojecteerd en
+  een projectie overschrijft geen versere device-metadata.
+- lib/lampCommandTransport.ts laat per device maximaal één request tegelijk toe,
+  terwijl verschillende devices parallel blijven. Opeenvolgende slider- en
+  kleurupdates worden per control tot de laatste nog niet verstuurde waarde
+  samengevoegd. Power-, modus- en scènecommando's zijn volgordebarrières en ieder
+  bedieningscommando heeft een totale abort-deadline van 15 seconden vanaf de
+  gebruikersinteractie, inclusief optimistic preflight, offline toestand en
+  wachttijd in de per-device queue.
+- Devicepolling, focus-refetch en reconnect-refetch pauzeren zolang een
+  lampmutatie loopt. Na de laatste settlement volgt één gedeelde reconciliatie-
+  read; de backend schrijft de nieuwe device-state vóór zijn 204-response.
+- components/dashboard/DashboardLampPanel.tsx composeert de bestaande LampCard,
+  mobiele BottomSheet en desktop LampDetailPanel. Het introduceert geen eigen
+  query- of commandlogica.
+- De PWA blijft op / starten. Individuele lampbediening staat daar mobiel als
+  eerste dashboardmodule; op /lampen staat de devicebrowser vóór metrics en
+  scènes. Desktop behoudt het bredere overzicht.
+- BridgeStatusNotice onderscheidt op beide routes controleren, onbekend en
+  offline. Een queue-acceptatie wordt dus nooit stil als fysiek uitgevoerd
+  gepresenteerd wanneer de afleverstatus niet betrouwbaar is.
+
+De transportcoördinator borgt request- en enqueuevolgorde vanuit de Homeapp. In
+queue-modus blijft de uiteindelijke uitvoervolgorde daarnaast afhankelijk van
+het claim-/workercontract van JeffriesBackend; de frontend mag daar geen FIFO-
+garantie voor suggereren die de backend niet expliciet afdwingt.
+
 ### Serviceworkerbeleid
 
 app/sw.ts plaatst dezelfde-origin requests voor de volgende categorieën vóór Serwist defaultCache in NetworkOnly:

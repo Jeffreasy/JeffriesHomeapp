@@ -1,6 +1,17 @@
 "use client";
 
-import { Eye, EyeOff, Home, Power } from "lucide-react";
+import { Eye, EyeOff, Home, Loader2, Power } from "lucide-react";
+
+interface DashboardHeaderProps {
+  greeting: string;
+  today: string;
+  privacyOn: boolean;
+  togglePrivacy: () => void;
+  allOn: boolean;
+  onlineDevicesCount: number;
+  lightingPending: boolean;
+  toggleAll: () => void;
+}
 
 export function DashboardHeader({
   greeting,
@@ -9,16 +20,9 @@ export function DashboardHeader({
   togglePrivacy,
   allOn,
   onlineDevicesCount,
+  lightingPending,
   toggleAll,
-}: {
-  greeting: string;
-  today: string;
-  privacyOn: boolean;
-  togglePrivacy: () => void;
-  allOn: boolean;
-  onlineDevicesCount: number;
-  toggleAll: () => void;
-}) {
+}: DashboardHeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#0a0a0f]/90 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
@@ -49,12 +53,17 @@ export function DashboardHeader({
           <button
             type="button"
             onClick={toggleAll}
-            disabled={onlineDevicesCount === 0}
+            disabled={onlineDevicesCount === 0 || lightingPending}
+            aria-busy={lightingPending}
             title={allOn ? "Alle online lampen uitzetten" : "Alle online lampen aanzetten"}
             className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[rgba(255,255,255,0.03)] disabled:text-slate-600"
           >
-            <Power size={16} />
-            <span>{allOn ? "Alles uit" : "Alles aan"}</span>
+            {lightingPending ? (
+              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Power size={16} aria-hidden="true" />
+            )}
+            <span>{lightingPending ? "Bezig…" : allOn ? "Alles uit" : "Alles aan"}</span>
           </button>
         </div>
       </div>

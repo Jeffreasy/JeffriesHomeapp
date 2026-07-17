@@ -29,9 +29,7 @@ const SCENE_ICONS: Record<string, React.ElementType> = {
 function ColorPill({ devices }: { devices: Device[] }) {
   const [open, setOpen] = useState(false);
   const [hex, setHex]   = useState("#ff8800");
-  // sendBatch patcht de cache optimistic per lamp (applyCommandToDevice in
-  // lib/deviceCommands) en invalideert één keer aan het eind.
-  const { sendBatch } = useLampCommand();
+  const { sendBatch, isPending } = useLampCommand();
   const { success } = useToast();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,12 +59,15 @@ function ColorPill({ devices }: { devices: Device[] }) {
     };
   }, [open]);
 
-  const apply = () => {
+  const apply = async () => {
+    if (devices.length === 0 || isPending) return;
     const { r, g, b } = hexToRgb(hex);
-    // sendBatch meldt zelf welke lampen niet reageerden; hier alleen bevestigen
-    // dat het commando de deur uit is, niet dat het al is aangekomen.
-    sendBatch(devices, { r, g, b, on: true });
-    success("Kleur verstuurd naar alle lampen");
+    const result = await sendBatch(devices, { r, g, b, on: true });
+    if (result.failed.length === 0) {
+      success("Kleur verstuurd naar alle lampen");
+    } else if (result.succeeded > 0) {
+      success(`Kleur verstuurd naar ${result.succeeded} van ${result.total} lampen`);
+    }
     setOpen(false);
   };
 
@@ -75,9 +76,11 @@ function ColorPill({ devices }: { devices: Device[] }) {
       <motion.button
         ref={triggerRef}
         whileTap={{ scale: 0.93 }}
+        type="button"
         onClick={() => setOpen((v) => !v)}
+        disabled={devices.length === 0 || isPending}
         className={cn(
-          "flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all min-h-[44px]",
+          "flex min-h-[44px] items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-40",
           open
             ? "bg-[var(--color-surface-hover)] text-white border-[var(--color-border-hover)]"
             : "bg-[var(--color-surface)] text-slate-400 border-[var(--color-border)] hover:text-slate-200 hover:border-[var(--color-border-hover)]"
@@ -109,6 +112,7 @@ function ColorPill({ devices }: { devices: Device[] }) {
                 ref={closeBtnRef}
                 onClick={() => setOpen(false)}
                 className="text-slate-500 hover:text-slate-300 transition-colors"
+                type="button"
                 aria-label="Sluiten"
               >
                 <X size={13} />
@@ -121,8 +125,10 @@ function ColorPill({ devices }: { devices: Device[] }) {
             />
             <p className="text-center text-[10px] font-mono text-slate-500 mt-1">{hex.toUpperCase()}</p>
             <button
-              onClick={apply}
-              className="w-full mt-3 flex items-center justify-center gap-2 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-medium hover:bg-amber-500/25 transition-colors"
+              type="button"
+              onClick={() => void apply()}
+              disabled={devices.length === 0 || isPending}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 py-2 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send size={12} />
               Toepassen op {devices.length} lampen
@@ -138,20 +144,21 @@ function ColorPill({ devices }: { devices: Device[] }) {
 
 export function SceneBar() {
   const { data: devices = [] } = useDevices();
-  const { sendBatch } = useLampCommand();
+  const { sendBatch, isPending } = useLampCommand();
   const { success } = useToast();
   const [showWiz, setShowWiz] = useState(false);
 
   const onlineDevices = devices.filter((d) => d.status === "online");
   const activeScene = detectActiveScene(devices);
 
-  const applyScene = (scene: ScenePreset) => {
-    // sendBatch doet de optimistic cache-patch per lamp (instant feedback)
-    // en invalideert de devices-query één keer aan het eind.
-    sendBatch(onlineDevices, scene.command);
-    // "Verstuurd" i.p.v. "toegepast": sendBatch is fire-and-forget en meldt
-    // zelf welke lampen niet reageerden — geen valse succesbelofte vooraf.
-    success(`Scène "${scene.label}" verstuurd`);
+  const applyScene = async (scene: ScenePreset) => {
+    if (onlineDevices.length === 0 || isPending) return;
+    const result = await sendBatch(onlineDevices, scene.command);
+    if (result.failed.length === 0) {
+      success(`Scène "${scene.label}" verstuurd`);
+    } else if (result.succeeded > 0) {
+      success(`Scène "${scene.label}" verstuurd naar ${result.succeeded} van ${result.total} lampen`);
+    }
     setShowWiz(false);
   };
 
@@ -164,11 +171,13 @@ export function SceneBar() {
       <motion.button
         key={scene.id}
         whileTap={{ scale: 0.93 }}
-        onClick={() => applyScene(scene)}
+        onClick={() => void applyScene(scene)}
+        disabled={onlineDevices.length === 0 || isPending}
         aria-pressed={active}
+        type="button"
         aria-label={`Scène ${scene.label} toepassen`}
         className={cn(
-          "flex items-center gap-1.5 rounded-xl border font-medium flex-shrink-0 transition-[background,border-color,box-shadow] duration-200 hover:brightness-110",
+          "flex flex-shrink-0 items-center gap-1.5 rounded-xl border font-medium transition-[background,border-color,box-shadow] duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40",
           small ? "px-2.5 py-1.5 text-[11px] min-h-[36px]" : "px-3 py-2 text-xs min-h-[44px]",
           active && "ring-1"
         )}

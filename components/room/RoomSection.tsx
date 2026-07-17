@@ -9,6 +9,7 @@ import { LampCard } from "@/components/lamp/LampCard";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import { CUSTOM_SCENES, WIZ_SCENES, type ScenePreset } from "@/lib/scenes";
+import { getLightingSummary } from "@/lib/lighting";
 
 const ROOM_SCENE_LIST = [...CUSTOM_SCENES, ...WIZ_SCENES];
 
@@ -19,34 +20,30 @@ interface RoomSectionProps {
 }
 
 export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
-  // sendBatch: optimistic cache-patch per lamp (zelfde simulatie als SceneBar,
-  // via lib/deviceCommands) + één invalidate aan het eind i.p.v. N refetches.
-  const { sendBatch } = useLampCommand();
+  const { sendBatch, isPending } = useLampCommand();
   const { success } = useToast();
   const [showScenes, setShowScenes] = useState(false);
 
-  const onlineDevices = devices.filter((device) => device.status === "online");
-  const onlineCount = onlineDevices.length;
-  const onCount = onlineDevices.filter((device) => device.current_state?.on).length;
-  const allOn = onlineDevices.length > 0 && onlineDevices.every((device) => device.current_state?.on);
-  const avgBrightness =
-    onCount > 0
-      ? Math.round(
-          onlineDevices
-            .filter((device) => device.current_state?.on)
-            .reduce((total, device) => total + (device.current_state?.brightness ?? 0), 0) / onCount
-        )
-      : 0;
+  const summary = getLightingSummary(devices);
+  const { onlineDevices } = summary;
+  const onlineCount = summary.online;
+  const onCount = summary.on;
+  const allOn = summary.allOnlineOn;
+  const avgBrightness = summary.averageBrightness;
 
   const toggleAll = () => {
-    sendBatch(onlineDevices, { on: !allOn });
+    if (isPending) return;
+    void sendBatch(onlineDevices, { on: !allOn });
   };
 
-  const applyScene = (scene: ScenePreset) => {
-    sendBatch(onlineDevices, scene.command);
-    // "Verstuurd": sendBatch meldt zelf welke lampen niet reageerden — geen
-    // valse "toegepast"-belofte vóór de batch-uitkomst bekend is.
-    success(`${scene.label} verstuurd naar ${room.name}`);
+  const applyScene = async (scene: ScenePreset) => {
+    if (isPending) return;
+    const result = await sendBatch(onlineDevices, scene.command);
+    if (result.failed.length === 0) {
+      success(`${scene.label} verstuurd naar ${room.name}`);
+    } else if (result.succeeded > 0) {
+      success(`${scene.label} verstuurd naar ${result.succeeded} van ${result.total} lampen in ${room.name}`);
+    }
     setShowScenes(false);
   };
 
@@ -56,6 +53,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
   return (
     <section
       aria-label={`Kamer ${room.name}`}
+      aria-busy={isPending}
       className="glass min-w-0 p-4 sm:p-5"
     >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -79,7 +77,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
                     ? "bg-emerald-400"
                     : onlineCount > 0
                       ? "bg-amber-400"
-                      : "bg-rose-400"
+                      : "bg-rose-400",
                 )}
                 aria-hidden="true"
               />
@@ -99,7 +97,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
           <button
             type="button"
             onClick={() => setShowScenes((value) => !value)}
-            disabled={!hasOnlineDevices}
+            disabled={!hasOnlineDevices || isPending}
             aria-expanded={showScenes}
             aria-controls={scenePanelId}
             aria-label={`Scènes voor ${room.name}`}
@@ -108,7 +106,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
               showScenes
                 ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
                 : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200",
-              !hasOnlineDevices && "cursor-not-allowed opacity-40"
+              (!hasOnlineDevices || isPending) && "cursor-not-allowed opacity-40",
             )}
           >
             <Sparkles size={14} aria-hidden="true" />
@@ -122,17 +120,21 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
 
           <motion.button
             type="button"
-            whileTap={{ scale: hasOnlineDevices ? 0.94 : 1 }}
+            whileTap={{ scale: hasOnlineDevices && !isPending ? 0.94 : 1 }}
             onClick={toggleAll}
-            disabled={!hasOnlineDevices}
-            aria-label={allOn ? `Alle lampen in ${room.name} uitschakelen` : `Alle lampen in ${room.name} aanzetten`}
+            disabled={!hasOnlineDevices || isPending}
+            aria-label={
+              allOn
+                ? `Alle lampen in ${room.name} uitschakelen`
+                : `Alle lampen in ${room.name} aanzetten`
+            }
             aria-pressed={allOn}
             className={cn(
               "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
               allOn
                 ? "border-slate-500/30 bg-slate-500/15 text-slate-200 hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300"
                 : "border-amber-500/25 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15",
-              !hasOnlineDevices && "cursor-not-allowed opacity-40"
+              (!hasOnlineDevices || isPending) && "cursor-not-allowed opacity-40",
             )}
           >
             <Power size={14} aria-hidden="true" />
@@ -159,8 +161,8 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
                 <button
                   key={scene.id}
                   type="button"
-                  onClick={() => applyScene(scene)}
-                  disabled={!hasOnlineDevices}
+                  onClick={() => void applyScene(scene)}
+                  disabled={!hasOnlineDevices || isPending}
                   aria-label={`${scene.label} scène toepassen in ${room.name}`}
                   className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-[background,border-color] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{

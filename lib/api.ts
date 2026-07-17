@@ -162,11 +162,13 @@ export const roomsApi = {
 
 export const devicesApi = {
   list: () => apiFetch<Device[]>("/devices"),
-  get: (id: string) => apiFetch<Device>(`/devices/${id}`),
-  command: (id: string, cmd: DeviceCommand) =>
+  get: (id: string, signal?: AbortSignal) =>
+    apiFetch<Device>(`/devices/${id}`, { signal }),
+  command: (id: string, cmd: DeviceCommand, signal?: AbortSignal) =>
     apiFetch<void>(`/devices/${id}/command`, {
       method: "POST",
       body: JSON.stringify(cmd),
+      signal,
     }),
   register: (data: { ip_address: string; name: string; room_id?: string }) =>
     apiFetch<Device>("/devices/register", {

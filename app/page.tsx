@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
+import { useBridgeStatus } from "@/hooks/useDevices";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useSalary } from "@/hooks/useSalary";
 import { useLoonstroken } from "@/hooks/useLoonstroken";
 import { useHabits } from "@/hooks/useHabits";
 import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { usePrivacy } from "@/hooks/usePrivacy";
-import { type ScenePreset } from "@/lib/scenes";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
 import { CreateEventModal } from "@/components/schedule/CreateEventModal";
@@ -27,18 +27,16 @@ import { calculateScheduleSalaryForecast } from "@/lib/salaryForecast";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { EmptyState, ErrorState, Panel, RouteTile, SectionHeader, StatusRow } from "@/components/dashboard/DashboardPrimitives";
 import { OverviewPanel } from "@/components/dashboard/DashboardOverviewPanel";
-import { CommandPanel } from "@/components/dashboard/DashboardCommandPanel";
+import { DashboardLampPanel } from "@/components/dashboard/DashboardLampPanel";
+import { BridgeStatusNotice } from "@/components/lamp/BridgeStatusNotice";
+import { getLightingSummary } from "@/lib/lighting";
 import { AppIcon } from "@/components/ui/AppIcon";
 
 export default function DashboardPage() {
   const [dateInfo, setDateInfo] = useState<DashboardDateInfo | null>(null);
   // `dateInfo` is null on the server and the first client paint, then set in the
-  // effect below — so we reuse it as a "mounted" signal. The devices query is the
-  // only dashboard source persisted to IndexedDB (the rest are on
-  // PERSIST_DENY_PREFIXES), so its cache is already present on the client's first
-  // paint but never during SSR; gating the device-derived UI on `mounted` keeps
-  // the server and hydration renders identical (otherwise the lamp cell + the
-  // "alles aan" toggle hydration-mismatch).
+  // effect below — so we reuse it as a mounted signal. Device persistence is
+  // opt-in and currently disabled; this also keeps future hydration changes safe.
   const mounted = dateInfo !== null;
 
   useEffect(() => {
@@ -54,7 +52,14 @@ export default function DashboardPage() {
 
   const queryClient = useQueryClient();
   const { data: devices = [], isLoading: devicesLoading, error: devicesError } = useDevices();
-  const { sendBatch } = useLampCommand();
+  const { sendBatch, isPending: lightingPending } = useLampCommand();
+  const {
+    bridge,
+    isOffline: bridgeOffline,
+    isLoading: bridgeStatusLoading,
+    isError: bridgeStatusError,
+    isStatusKnown: isBridgeStatusKnown,
+  } = useBridgeStatus();
   // Empty until mounted so SSR and the first client paint match (see `mounted`).
   const dashboardDevices = useMemo(() => (mounted ? devices : []), [mounted, devices]);
   const {
@@ -86,11 +91,11 @@ export default function DashboardPage() {
   const [editEvent, setEditEvent] = useState<PersonalEvent | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
-  const onlineDevices = useMemo(() => dashboardDevices.filter((d) => d.status === "online"), [dashboardDevices]);
-  const onDevices = useMemo(() => onlineDevices.filter((d) => d.current_state?.on), [onlineDevices]);
-  // allOn reflects ONLINE devices only — the toggle-all action also acts only on
-  // online devices, so counting offline ones made the label contradict the action.
-  const allOn = onlineDevices.length > 0 && onDevices.length === onlineDevices.length;
+  const lightingSummary = useMemo(
+    () => getLightingSummary(dashboardDevices),
+    [dashboardDevices],
+  );
+  const { onlineDevices, onDevices, allOnlineOn: allOn } = lightingSummary;
   
   const todayIso = dateInfo?.todayIso;
   const personalUpcomingEvents = useMemo(
@@ -180,14 +185,9 @@ export default function DashboardPage() {
     if (habitsError) retryHabits();
   };
 
-  // DEEL 2 #4: één gebundelde batch-call (zelfde pad als de lampen-pagina)
-  // i.p.v. N losse mutates → één refetch en één gebundelde fout-toast.
   const toggleAll = () => {
-    sendBatch(onlineDevices, { on: !allOn });
-  };
-
-  const applyScene = (scene: ScenePreset) => {
-    sendBatch(onlineDevices, scene.command);
+    if (lightingPending) return;
+    void sendBatch(onlineDevices, { on: !allOn });
   };
 
   const openNewEvent = () => {
@@ -204,6 +204,7 @@ export default function DashboardPage() {
         togglePrivacy={togglePrivacy}
         allOn={allOn}
         onlineDevicesCount={onlineDevices.length}
+        lightingPending={lightingPending}
         toggleAll={toggleAll}
       />
 
@@ -234,49 +235,46 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.8fr)]">
-          <OverviewPanel
-            nextDienst={nextDienst}
-            nextEvent={nextEvent}
-            nettoLabel={nettoLabel}
-            nettoValue={nettoDisplay}
-            nettoSub={nettoSub}
-            lampsOn={onDevices.length}
-            lampsTotal={dashboardDevices.length}
-            devicesOnline={onlineDevices.length}
-            conflicts={actionableConflicts}
-            hardConflicts={hardConflicts}
-            todayIso={todayIso}
-            appointmentsLoading={eventsLoading}
-            appointmentsFailed={Boolean(eventsError)}
-            scheduleLoading={scheduleLoading}
-            scheduleFailed={Boolean(scheduleError)}
-            devicesLoading={!mounted || devicesLoading}
-            devicesFailed={Boolean(devicesError)}
-            financeLoading={financeLoading}
-            financeFailed={financeFailed}
+        <BridgeStatusNotice
+          bridge={bridge}
+          isOffline={bridgeOffline}
+          isLoading={bridgeStatusLoading}
+          isError={bridgeStatusError}
+          isStatusKnown={isBridgeStatusKnown}
+        />
+
+        <section className="grid gap-4 xl:grid-cols-[minmax(360px,0.8fr)_minmax(0,1.45fr)]">
+          <DashboardLampPanel
+            className="min-w-0"
+            devices={dashboardDevices}
+            loading={!mounted || devicesLoading}
+            failed={Boolean(devicesError)}
+            onRetry={() => queryClient.invalidateQueries({ queryKey: ["devices"] })}
           />
 
-          {devicesError ? (
-            <Panel>
-              <SectionHeader icon="lights" label="Direct bedienen" title="Licht en sfeer" compact />
-              <ErrorState
-                title="Lampen konden niet geladen worden"
-                text="De devicelijst is niet opgehaald — bediening is tijdelijk niet mogelijk."
-                onRetry={() => queryClient.invalidateQueries({ queryKey: ["devices"] })}
-              />
-            </Panel>
-          ) : (
-            <CommandPanel
-              allOn={allOn}
-              onlineCount={onlineDevices.length}
-              totalCount={devices.length}
-              onCount={onDevices.length}
-              loading={devicesLoading}
-              onToggleAll={toggleAll}
-              onApplyScene={applyScene}
+          <div className="min-w-0">
+            <OverviewPanel
+              nextDienst={nextDienst}
+              nextEvent={nextEvent}
+              nettoLabel={nettoLabel}
+              nettoValue={nettoDisplay}
+              nettoSub={nettoSub}
+              lampsOn={onDevices.length}
+              lampsTotal={dashboardDevices.length}
+              devicesOnline={onlineDevices.length}
+              conflicts={actionableConflicts}
+              hardConflicts={hardConflicts}
+              todayIso={todayIso}
+              appointmentsLoading={eventsLoading}
+              appointmentsFailed={Boolean(eventsError)}
+              scheduleLoading={scheduleLoading}
+              scheduleFailed={Boolean(scheduleError)}
+              devicesLoading={!mounted || devicesLoading}
+              devicesFailed={Boolean(devicesError)}
+              financeLoading={financeLoading}
+              financeFailed={financeFailed}
             />
-          )}
+          </div>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
