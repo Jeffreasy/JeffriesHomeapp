@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import { MetricCard } from "./FinanceCards";
 import { formatPercent, formatMonth, formatShortDate } from "./FinanceUtils";
-import type { TransactionFilter } from "@/hooks/useTransactions";
+import type { TransactionFilter, TransactionFullStats } from "@/hooks/useTransactions";
+import type { LoonstrookRecord } from "@/hooks/useLoonstroken";
 
 export function FinanceMetricsGrid({
   stats,
@@ -26,12 +27,12 @@ export function FinanceMetricsGrid({
   formatPrivateEuro,
   formatPrivateSignedEuro,
 }: {
-  stats: any;
+  stats: TransactionFullStats;
   saldoTrend: number | null;
   momDelta: { inkomstenDelta: number; uitgavenDelta: number } | null;
   savingsRate: number | null;
-  salarisStat: { latest: any; delta: number; gemNetto: number } | null;
-  topCategory: any;
+  salarisStat: { latest: LoonstrookRecord; delta: number; gemNetto: number } | null;
+  topCategory: TransactionFullStats["uitPerCategorie"][number] | null;
   selectedFilterCount: number;
   filters: TransactionFilter;
   zoekterm: string;

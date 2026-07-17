@@ -12,7 +12,7 @@ import {
 import { InsightRow, SectionTitle } from "./FinanceCards";
 import { CategoryCard } from "./CategoryCard";
 import { getDeltaTone } from "./FinanceUtils";
-import type { TransactionFilter, TransactionRow } from "@/hooks/useTransactions";
+import type { TransactionFilter, TransactionFullStats, TransactionRow } from "@/hooks/useTransactions";
 
 // ─── F3: lichte client-side recurring-detectie ────────────────────────────────
 // Zelfde tegenpartij in ≥3 verschillende maanden met een maandbedrag dat
@@ -22,6 +22,14 @@ import type { TransactionFilter, TransactionRow } from "@/hooks/useTransactions"
 // praktijk nooit ≥3 maanden zag en dus altijd leeg bleef.
 
 type RecurringItem = { naam: string; gemiddeld: number; maanden: number };
+
+type MonthlyCashflow = TransactionFullStats["inUitPerMaand"][number];
+type CategoryStat = TransactionFullStats["uitPerCategorie"][number];
+type MerchantStat = TransactionFullStats["topMerchants"][number];
+type RecurringSampleState = {
+  periodKey: string | undefined;
+  rows: TransactionRow[] | null;
+};
 
 const RECURRING_MIN_MONTHS = 3;
 const RECURRING_MAX_VARIANCE = 0.05;
@@ -75,12 +83,12 @@ export function FinanceInsights({
   formatPrivateEuroExact,
   formatPrivateSignedEuro,
 }: {
-  stats: any;
-  latestCashflow: any;
+  stats: TransactionFullStats;
+  latestCashflow: MonthlyCashflow | null;
   /** "YYYY-MM" van de lopende (onvolledige) maand — label de laatste-maand-kaart. */
   runningMonthKey?: string;
-  topCategory: any;
-  topMerchant: any;
+  topCategory: CategoryStat | null;
+  topMerchant: MerchantStat | null;
   /** Geladen transactielijst — fallback-bron voor de recurring-detectie (F3). */
   transactions?: TransactionRow[];
   /** F3: haalt een bredere periode-scoped steekproef op voor recurring-detectie. */
@@ -98,23 +106,22 @@ export function FinanceInsights({
   // F3: laad een bredere periode-scoped steekproef zodra de sectie mount (en
   // opnieuw als de periode wijzigt). Zolang die er nog niet is, valt de
   // detectie terug op de al geladen lijstrijen.
-  const [sample, setSample] = useState<TransactionRow[] | null>(null);
+  const [sampleState, setSampleState] = useState<RecurringSampleState | null>(null);
+  const sample = sampleState && sampleState.periodKey === periodKey ? sampleState.rows : null;
   useEffect(() => {
     if (!fetchRecurringSample) return;
     let cancelled = false;
-    setSample(null);
     fetchRecurringSample()
       .then((rows) => {
-        if (!cancelled) setSample(rows);
+        if (!cancelled) setSampleState({ periodKey, rows });
       })
       .catch(() => {
-        if (!cancelled) setSample(null);
+        if (!cancelled) setSampleState({ periodKey, rows: null });
       });
     return () => {
       cancelled = true;
     };
   }, [fetchRecurringSample, periodKey]);
-
   const recurring = useMemo(
     () => detectRecurring(sample ?? transactions),
     [sample, transactions]
@@ -130,14 +137,14 @@ export function FinanceInsights({
             subtitle={`${stats.aantalCategorieen} categorieën - ${formatPrivateEuro(stats.totaalUit)} totaal`}
           />
           <div className="category-grid mt-5">
-            {stats.uitPerCategorie.map((cat: any) => (
+            {stats.uitPerCategorie.map((cat) => (
               <CategoryCard
                 key={cat.categorie}
                 categorie={cat.categorie}
                 bedrag={cat.bedrag}
                 amountLabel={formatPrivateEuro(cat.bedrag)}
                 count={cat.count}
-                percentage={cat.percentage}
+                percentage={cat.percentage ?? 0}
                 onClick={() => toggleCategoryFilter(cat.categorie)}
                 isActive={filters.categorieFilter === cat.categorie}
               />
@@ -150,7 +157,7 @@ export function FinanceInsights({
           <div className="mt-4">
             {stats.topMerchants?.length ? (
               <div className="space-y-1">
-                {stats.topMerchants.map((merchant: any, index: any) => {
+                {stats.topMerchants.map((merchant, index) => {
                   const isActive = zoekterm === merchant.naam;
                   return (
                   <button

@@ -1,9 +1,10 @@
 import type { LoonstrookRecord } from "@/hooks/useLoonstroken";
 import type { SalarisRecord } from "@/hooks/useSalary";
 import type { DienstRow } from "@/lib/schedule";
+import { DEFAULT_CONTRACT_HOURS_PER_WEEK, contractHoursForCalendarMonth } from "@/lib/contract";
 
 const SALARY_CONFIG = {
-  contractUrenPerWeek: 16,
+  contractUrenPerWeek: DEFAULT_CONTRACT_HOURS_PER_WEEK,
   deeltijdFactor: 0.4444,
   reisafstandKmEnkel: 33,
   tarieven: [
@@ -214,11 +215,6 @@ function getMonthRows(diensten: DienstRow[], periode: string) {
   ));
 }
 
-function contractHoursForMonth(jaar: number, maand: number, contractUrenPerWeek: number) {
-  const days = new Date(jaar, maand, 0).getDate();
-  return roundHours((days / 7) * contractUrenPerWeek);
-}
-
 function findLoonstrookForPeriod(records: LoonstrookRecord[] | undefined, periode: string) {
   return records?.find((record) => record.periodeLabel === periode);
 }
@@ -227,9 +223,9 @@ function findSalaryForPeriod(records: SalarisRecord[] | undefined, periode: stri
   return records?.find((record) => record.periode === periode);
 }
 
-function findLatestLoonstrook(records: LoonstrookRecord[] | undefined, periode: string) {
+export function findLatestLoonstrook(records: LoonstrookRecord[] | undefined, periode: string) {
   const sorted = [...(records ?? [])].sort((a, b) => a.periodeLabel.localeCompare(b.periodeLabel));
-  return [...sorted].reverse().find((record) => record.periodeLabel <= periode && record.uurloon) ?? sorted[sorted.length - 1];
+  return [...sorted].reverse().find((record) => record.periodeLabel <= periode && record.uurloon);
 }
 
 function effectiveTaxPct(loonstrook?: LoonstrookRecord) {
@@ -284,7 +280,7 @@ export function calculateScheduleSalaryRecord(
   if (monthRows.length === 0) return null;
 
   const contractUrenPerWeek = options.contractUrenPerWeek ?? SALARY_CONFIG.contractUrenPerWeek;
-  const contractUren = contractHoursForMonth(jaar, maand, contractUrenPerWeek);
+  const contractUren = contractHoursForCalendarMonth(periode, contractUrenPerWeek);
   const calibration = getCalibration(jaar, maand, options);
 
   const ortHours: Partial<Record<OrtKey, number>> = {};

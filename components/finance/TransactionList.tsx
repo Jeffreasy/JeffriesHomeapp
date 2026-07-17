@@ -29,6 +29,13 @@ function CategorieEditor({
     if (returnFocus) triggerRef.current?.focus();
   }, []);
 
+  const toggle = () => {
+    if (!open) {
+      const rect = editorRef.current?.getBoundingClientRect();
+      setFlipLeft(Boolean(rect && rect.left - 160 + rect.width < 0));
+    }
+    setOpen((current) => !current);
+  };
   // Close on outside click / Escape, and move focus into the menu on open.
   useEffect(() => {
     if (!open) return;
@@ -75,10 +82,6 @@ function CategorieEditor({
     document.addEventListener("touchstart", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
 
-    // Reposition if the right-anchored dropdown would overflow the viewport edge.
-    const rect = editorRef.current?.getBoundingClientRect();
-    if (rect && rect.left - 160 + rect.width < 0) setFlipLeft(true);
-
     // Move focus into the menu for keyboard / screen-reader users.
     const firstItem = menuRef.current?.querySelector<HTMLButtonElement>(".cat-option");
     firstItem?.focus();
@@ -98,7 +101,7 @@ function CategorieEditor({
         ref={triggerRef}
         type="button"
         className="tx-categorie"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         title="Categorie aanpassen"
         aria-haspopup="menu"
         aria-expanded={open}

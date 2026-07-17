@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Filter, X, ChevronDown, ChevronUp,
@@ -85,19 +85,16 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
   // Lokale tekst-state voor de bedragvelden: zo kan de gebruiker vrij typen
   // ("1.234,56") terwijl het geparste getal naar de filters gaat. Extern
   // resetten (chips/Reset-knop) synct de tekst terug.
-  const [minText, setMinText] = useState(() => amountToInput(filters.minBedrag));
-  const [maxText, setMaxText] = useState(() => amountToInput(filters.maxBedrag));
-  useEffect(() => {
-    setMinText((current) =>
-      parseAmountInput(current) === filters.minBedrag ? current : amountToInput(filters.minBedrag)
-    );
-  }, [filters.minBedrag]);
-  useEffect(() => {
-    setMaxText((current) =>
-      parseAmountInput(current) === filters.maxBedrag ? current : amountToInput(filters.maxBedrag)
-    );
-  }, [filters.maxBedrag]);
-
+  type AmountDraft = { text: string; parsed: number | undefined };
+  const [minDraft, setMinDraft] = useState<AmountDraft | null>(null);
+  const [maxDraft, setMaxDraft] = useState<AmountDraft | null>(null);
+  // Een eigen draft blijft zichtbaar zolang de ouder exact dezelfde geparste
+  // waarde teruggeeft. Een externe reset/filterchip wint direct, zonder een
+  // prop-naar-state synchronisatie-effect of verlies van Nederlandse invoer.
+  const minText =
+    minDraft && minDraft.parsed === filters.minBedrag ? minDraft.text : amountToInput(filters.minBedrag);
+  const maxText =
+    maxDraft && maxDraft.parsed === filters.maxBedrag ? maxDraft.text : amountToInput(filters.maxBedrag);
   const activeCount = [
     filters.categorieFilter,
     filters.richting,
@@ -215,7 +212,7 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
                   placeholder="0,00"
                   value={minText}
                   onChange={(e) => {
-                    setMinText(e.target.value);
+                    setMinDraft({ text: e.target.value, parsed: parseAmountInput(e.target.value) });
                     onChange({ minBedrag: parseAmountInput(e.target.value) });
                   }}
                 />
@@ -231,7 +228,7 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
                   placeholder="∞"
                   value={maxText}
                   onChange={(e) => {
-                    setMaxText(e.target.value);
+                    setMaxDraft({ text: e.target.value, parsed: parseAmountInput(e.target.value) });
                     onChange({ maxBedrag: parseAmountInput(e.target.value) });
                   }}
                   aria-invalid={filters.minBedrag != null && filters.maxBedrag != null && filters.minBedrag > filters.maxBedrag}

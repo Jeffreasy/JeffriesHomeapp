@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Calendar, CalendarClock, CalendarDays, CheckCircle2, ChevronDown, Clock3, FileSpreadsheet, History, List, Zap } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
 
 import type { DienstRow } from "@/lib/schedule";
 import type { UnifiedWeek } from "@/lib/unified";
@@ -37,7 +37,7 @@ export function OverviewPanel({
   shifts: Record<string, number>;
   teams: Record<string, number>;
 }) {
-  const containerVariants: any = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -48,7 +48,7 @@ export function OverviewPanel({
     }
   };
 
-  const itemVariants: any = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 10 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };

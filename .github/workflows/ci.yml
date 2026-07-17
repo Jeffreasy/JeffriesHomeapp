@@ -5,7 +5,24 @@ on:
     branches: [master, main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.12"
+      - name: Install Gitleaks
+        run: go install github.com/zricethezav/gitleaks/v8@v8.28.0
+      - name: Scan tracked frontend tree for secrets (redacted)
+        working-directory: ${{ github.workspace }}
+        run: gitleaks dir . --redact --no-banner --verbose
+
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -16,7 +33,37 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Type-check
-        run: npx tsc --noEmit
+        run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Validate CI configuration
+        shell: bash
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+        run: |
+          test -n "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" || { echo "Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY secret"; exit 1; }
+          test -n "$CLERK_SECRET_KEY" || { echo "Missing CLERK_SECRET_KEY secret"; exit 1; }
+      - name: Production build
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          BACKEND_API_URL: http://127.0.0.1:18080/api/v1
+          BACKEND_API_KEY: ci-only-not-a-real-secret
+          HOMEAPP_OWNER_USER_ID: user_ci_owner
+        run: npm run build
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Security E2E
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          BACKEND_API_URL: http://127.0.0.1:18080/api/v1
+          BACKEND_API_KEY: ci-only-not-a-real-secret
+          HOMEAPP_OWNER_USER_ID: user_ci_owner
+        run: npm run test:e2e

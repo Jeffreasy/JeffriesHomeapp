@@ -1,4 +1,5 @@
 import { del } from "idb-keyval";
+import { fetchAllPages } from "@/lib/pagination";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1776,9 +1777,38 @@ export interface PendingAIActionResult {
   error?: string | null;
 }
 
+export interface SettingsOverviewDevices {
+  total: number;
+  online: number;
+  offline: number;
+  on: number;
+}
+
+export interface SettingsOverview {
+  account?: { name?: string; email?: string };
+  devices: SettingsOverviewDevices;
+  rooms: { total: number; unassignedDevices: number };
+  integrations: Record<string, boolean | string | undefined>;
+  automations: { active: number; total: number };
+  commands: { pending: number; processing: number; failed: number };
+  bridge?: {
+    online: boolean;
+    status: string;
+    lastSeenAt?: string | null;
+    commandsPending?: number;
+    commandsProcessing?: number;
+    commandsFailed?: number;
+    lastError?: string | null;
+  };
+  schedule: { total: number; upcoming: number; importedAt?: string | null };
+  personalEvents?: { upcoming: number };
+  email: { total: number; unread: number; lastFullSync?: string | null };
+  data: { activeHabits: number; notes: number };
+}
+
 export const settingsApi = {
-	overview: () => apiFetch<any>("/settings/overview"),
-	telegramStatus: () => apiFetch<any>("/settings/telegram/status"),
+	overview: () => apiFetch<SettingsOverview>("/settings/overview"),
+	telegramStatus: () => apiFetch<Record<string, unknown>>("/settings/telegram/status"),
 	aiDiagnostics: () => apiFetch<unknown>("/settings/ai/diagnostics"),
 	pendingActions: (userId: string) =>
 		apiFetch<PendingAIAction[]>(`/ai/pending?userId=${encodeURIComponent(userId)}`),
@@ -1792,7 +1822,7 @@ export const settingsApi = {
 		}),
 	// Backup returns a Blob, so we can't use apiFetch which assumes JSON if it's not a download.
 	// But apiFetch doesn't handle Blobs yet. For now, we will handle download separately in component or just get JSON.
-	backup: (userId: string) => apiFetch<any>(`/settings/backup?userId=${userId}`),
+	backup: (userId: string) => apiFetch<Record<string, unknown>>(`/settings/backup?userId=${userId}`),
 };
 
 export const syncApi = {
@@ -2004,15 +2034,32 @@ export class DuplicateContactError extends Error {
   }
 }
 
+export type ContactListOptions = {
+  q?: string;
+  type?: string;
+  includeArchived?: boolean;
+  limit?: number;
+  offset?: number;
+  signal?: AbortSignal;
+};
+
+function listContactPage(userId: string, opts?: ContactListOptions) {
+  const params = new URLSearchParams({ userId });
+  if (opts?.q) params.set("q", opts.q);
+  if (opts?.type) params.set("type", opts.type);
+  if (opts?.includeArchived) params.set("includeArchived", "true");
+  if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts?.offset !== undefined) params.set("offset", String(opts.offset));
+  return apiFetch<Contact[]>(`/contacts?${params.toString()}`, { signal: opts?.signal });
+}
+
 export const contactenApi = {
-  list: (userId: string, opts?: { q?: string; type?: string; includeArchived?: boolean; limit?: number }) => {
-    const params = new URLSearchParams({ userId });
-    if (opts?.q) params.set("q", opts.q);
-    if (opts?.type) params.set("type", opts.type);
-    if (opts?.includeArchived) params.set("includeArchived", "true");
-    if (opts?.limit) params.set("limit", String(opts.limit));
-    return apiFetch<Contact[]>(`/contacts?${params.toString()}`);
-  },
+  list: listContactPage,
+  listAll: (userId: string, opts?: Omit<ContactListOptions, "limit" | "offset">) =>
+    fetchAllPages(
+      (limit, offset) => listContactPage(userId, { ...opts, limit, offset }),
+      { pageSize: 200, maxPages: 100, getKey: (contact) => contact.id },
+    ),
   get: (userId: string, id: string) =>
     apiFetch<Contact>(`/contacts/${id}?userId=${encodeURIComponent(userId)}`),
   create: async (userId: string, data: ContactCreate) => {

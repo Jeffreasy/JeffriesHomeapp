@@ -142,7 +142,7 @@ export default function SettingsPage() {
   const [telegramStatus, setTelegramStatus] = useState<TelegramStatusResult | null>(null);
   const [telegramChecking, setTelegramChecking] = useState(false);
   const [backupRequested, setBackupRequested] = useState(false);
-  const [backupData, setBackupData] = useState<any>(null);
+  const [backupData, setBackupData] = useState<Record<string, unknown> | null>(null);
 
   const handleBackupExport = async () => {
     if (!user?.id) return;
@@ -150,7 +150,7 @@ export default function SettingsPage() {
     try {
       const data = await settingsApi.backup(user.id);
       setBackupData(data);
-    } catch (err) {
+    } catch {
       toastError("Backup export mislukt");
       setBackupRequested(false);
     }

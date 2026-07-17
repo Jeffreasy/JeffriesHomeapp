@@ -4,11 +4,12 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
 import { analyzeContract, getCurrentWeekBalance } from "@/lib/schedule";
+import { DEFAULT_CONTRACT_HOURS_PER_WEEK } from "@/lib/contract";
 import { Target, TrendingDown, TrendingUp, CheckCircle2 } from "lucide-react";
 import { hoursValue } from "./RoosterUtils";
 import { formatWeekLabel } from "./scheduleUtils";
 
-export function ContractWidget({ contractUren = 16 }: { contractUren?: number } = {}) {
+export function ContractWidget({ contractUren = DEFAULT_CONTRACT_HOURS_PER_WEEK }: { contractUren?: number } = {}) {
   // Eigen useSchedule-mount naast de pagina + MonthBalanceChart. Acceptabel:
   // react-query dedupt de /schedule-fetch (één netwerkcall, gedeelde cache), en
   // de afgeleiden zijn nu gememoized in de hook (audit DEEL 2 #14).

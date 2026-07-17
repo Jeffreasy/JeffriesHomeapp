@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { roomsApi, type Room } from "@/lib/api";
+import { sortedCopy } from "@/lib/collections";
 
 export function useRooms() {
   const { data, isLoading, error } = useQuery<Room[]>({
@@ -9,7 +10,7 @@ export function useRooms() {
     queryFn: () => roomsApi.list(),
   });
 
-  const rooms = (data ?? []).sort((a, b) =>
+  const rooms = sortedCopy(data ?? [], (a, b) =>
     a.floor_number === b.floor_number
       ? a.name.localeCompare(b.name)
       : a.floor_number - b.floor_number

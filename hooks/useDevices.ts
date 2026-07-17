@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { devicesApi, settingsApi, type Device, type DeviceCommand } from "@/lib/api";
 import { applyCommandToDevice } from "@/lib/deviceCommands";
 import { useToast } from "@/components/ui/Toast";
+import { sortedCopy } from "@/lib/collections";
 
 // ─── Devices (Go API — proxies to Convex + WiZ UDP) ──────────────────────────
 
@@ -18,7 +19,7 @@ export function useDevices() {
     refetchIntervalInBackground: false,
   });
 
-  const devices = (data ?? []).sort((a, b) =>
+  const devices = sortedCopy(data ?? [], (a, b) =>
     (a.commissioned_at ?? "").localeCompare(b.commissioned_at ?? "")
   );
 
@@ -138,7 +139,7 @@ export function useLampCommand() {
         }
       });
     },
-    [mutateAsync, queryClient, toastError]
+    [mutateAsync, toastError]
   );
 
   return {

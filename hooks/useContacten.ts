@@ -19,7 +19,7 @@ export function useContacten(opts?: { includeArchived?: boolean }) {
 
   const listQuery = useQuery({
     queryKey: [KEY, "list", { includeArchived }],
-    queryFn: () => contactenApi.list(userId, { includeArchived, limit: 500 }),
+    queryFn: ({ signal }) => contactenApi.listAll(userId, { includeArchived, signal }),
     enabled: !!userId,
     staleTime: 15_000,
   });

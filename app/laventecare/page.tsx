@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
-import { RotateCcw, TriangleAlert } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
@@ -31,6 +30,12 @@ import {
   emptyWorkstreamForm,
 } from "@/components/laventecare/LaventeCareTypes";
 import { label, optional } from "@/components/laventecare/LaventeCareUtils";
+import { RefreshFailedBanner } from "@/components/laventecare/RefreshFailedBanner";
+import {
+  normalizeCompanyRelation,
+  normalizeCompanyStatus,
+  parseTagInput,
+} from "@/lib/laventecare/form-normalization";
 
 import { LaventeCareHeader } from "@/components/laventecare/LaventeCareHeader";
 import {
@@ -1929,6 +1934,7 @@ export default function LaventeCarePage() {
         />
 
         <LaventeCareCustomerDossier
+          key={selectedCompany?._id ?? selectedCompany?.id ?? "closed"}
           isOpen={!!selectedCompany}
           company={selectedCompany}
           contacts={contacts}
@@ -2117,6 +2123,7 @@ export default function LaventeCarePage() {
 
             {activeView === "commerce" && (!billingError || billing) ? (
               <LaventeCareBillingView
+                key={commercePrefillCompanyId ?? "billing"}
                 billing={billing}
                 billingLoading={billingLoading}
                 companies={companies}
@@ -2249,60 +2256,4 @@ export default function LaventeCarePage() {
       </main>
     </div>
   );
-}
-
-// R7: kleine persistente banner voor "data staat er, maar de laatste refresh
-// faalde" — in plaats van de werkende view te vervangen door een foutscherm.
-function RefreshFailedBanner({
-  text,
-  onRetry,
-}: {
-  text: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div
-      role="status"
-      className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.08] px-4 py-3"
-    >
-      <TriangleAlert size={16} className="shrink-0 text-amber-300" />
-      <p className="min-w-0 flex-1 text-sm leading-5 text-amber-100">{text}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 text-xs font-bold text-amber-100 transition hover:bg-amber-400/20"
-      >
-        <RotateCcw size={13} />
-        Opnieuw laden
-      </button>
-    </div>
-  );
-}
-
-function parseTagInput(value: string) {
-  return value
-    .split(/[,\n]/)
-    .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
-    .filter((tag, index, all) => tag && all.indexOf(tag) === index);
-}
-
-function normalizeCompanyStatus(value?: string | null): CompanyForm["status"] {
-  if (value === "actief" || value === "prospect" || value === "inactief")
-    return value;
-  return "actief";
-}
-
-function normalizeCompanyRelation(
-  value?: string | null,
-): CompanyForm["relatieType"] {
-  if (
-    value === "prospect" ||
-    value === "klant" ||
-    value === "partner" ||
-    value === "leverancier" ||
-    value === "intern" ||
-    value === "eigen_project"
-  )
-    return value;
-  return "prospect";
 }

@@ -2,7 +2,7 @@
 
 import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import { MotionConfig } from "framer-motion";
-import { defaultShouldDehydrateQuery, QueryClient, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { defaultShouldDehydrateQuery, QueryClient, useQueryClient } from "@tanstack/react-query";
 
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
@@ -13,36 +13,13 @@ import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { PwaRegistry } from "@/components/pwa/PwaRegistry";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { registerQueryClient, registerSessionExpiredHandler } from "@/lib/api";
-
-const PERSIST_DENY_PREFIXES = [
-  "/notes",
-  "/personal-events",
-  "/schedule",
-  "/sync",
-  "sync-status",
-  // Orval-generated salary/payslip keys are ["/loonstroken", …] / ["/salary", …].
-  "/loonstroken",
-  "/salary",
-  // LaventeCare hooks use plain ["laventecare", …] keys (no slash) — the old
-  // "/laventecare" entry never matched, so client dossiers/invoices/mail
-  // bodies ended up in IndexedDB anyway (R6, privacy-sensitive).
-  "laventecare",
-  // Finance/habits are maskable scopes in the privacy-center, yet their orval
-  // query-keys (["/transactions", …] / ["/habits", …]) were persisted to
-  // IndexedDB unencrypted (R3). Keep them out of the offline cache.
-  "/transactions",
-  "/habits",
-];
+import { shouldPersistQuery } from "@/lib/query-persistence";
 
 // Invalidate the persisted cache whenever the deployed build changes, so a
 // fresh deploy never hydrates stale query shapes into new code (L4).
 const PERSIST_BUSTER = process.env.NEXT_PUBLIC_BUILD_ID ?? "jeffries-2026-07-01";
 
 
-function shouldPersistQuery(queryKey: QueryKey) {
-  const first = queryKey[0];
-  return typeof first !== "string" || !PERSIST_DENY_PREFIXES.some((prefix) => first.startsWith(prefix));
-}
 
 function AuthCachePurger() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -184,7 +161,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
           maxAge: 1000 * 60 * 60 * 24,
           dehydrateOptions: {
             shouldDehydrateQuery: (query) =>
-              defaultShouldDehydrateQuery(query) && shouldPersistQuery(query.queryKey),
+              defaultShouldDehydrateQuery(query) &&
+              shouldPersistQuery(query.queryKey, query.meta),
           },
         }}
       >

@@ -11,6 +11,12 @@ import {
   parseLaventeCarePdfDossierContext,
   type LaventeCarePdfTheme,
 } from "@/lib/laventecare";
+import { getBackendApiKey, getBackendBaseUrl } from "@/lib/server/backend-config";
+import {
+  createDossierDocumentLookupUrl,
+  selectExactDossierDocument,
+} from "@/lib/laventecare/dossier-document-lookup";
+import { isOwnerUserId } from "@/lib/server/owner-config";
 
 type PageProps = {
   params: Promise<{
@@ -62,19 +68,7 @@ type ViewerData =
       context: ReturnType<typeof parseLaventeCarePdfDossierContext>;
     };
 
-const DEFAULT_BACKEND_API_URL = "https://jeffriesbackend.onrender.com/api/v1";
 
-function backendBaseUrl() {
-  return (process.env.BACKEND_API_URL ?? DEFAULT_BACKEND_API_URL).replace(/\/+$/, "");
-}
-
-function backendApiKey() {
-  // Server-only names only — never NEXT_PUBLIC_* (would leak into the client bundle).
-  return process.env.BACKEND_API_KEY ?? process.env.APP_SECRET_KEY ?? "";
-}
-
-const OWNER_USER_ID =
-  process.env.HOMEAPP_OWNER_USER_ID ?? "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
 
 // This route renders with a file-extension documentKey (e.g. "foo.pdf"), which
 // the Clerk middleware matcher skips — so it can be reached without a session.
@@ -83,7 +77,7 @@ const OWNER_USER_ID =
 async function isOwner() {
   try {
     const { userId } = await auth();
-    return userId === OWNER_USER_ID;
+    return isOwnerUserId(userId);
   } catch {
     return false;
   }
@@ -108,19 +102,19 @@ function toUrlSearchParams(params: Record<string, string | string[] | undefined>
 }
 
 async function getDossierDocument(documentKey: string) {
-  const headers = new Headers({ "Content-Type": "application/json" });
-  const apiKey = backendApiKey();
-  if (apiKey) headers.set("X-API-Key", apiKey);
-
   try {
-    const response = await fetch(`${backendBaseUrl()}/laventecare/dossier-documents?limit=250`, {
-      cache: "no-store",
-      headers,
-    });
+    const headers = new Headers({ "Content-Type": "application/json" });
+    const apiKey = getBackendApiKey();
+    if (apiKey) headers.set("X-API-Key", apiKey);
+
+    const response = await fetch(
+      createDossierDocumentLookupUrl(getBackendBaseUrl(), documentKey),
+      { cache: "no-store", headers },
+    );
     if (!response.ok) return null;
 
     const documents = (await response.json()) as DossierDocument[];
-    return documents.find((document) => document.document_key === documentKey) ?? null;
+    return selectExactDossierDocument(documents, documentKey);
   } catch {
     return null;
   }

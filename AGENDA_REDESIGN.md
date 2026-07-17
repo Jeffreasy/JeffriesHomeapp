@@ -1,5 +1,10 @@
 # Agenda calendar redesign — research brief
 
+> **Status 2026-07-17: historisch en superseded als actuele backlog.** Dit bestand bewaart de oorspronkelijke point-in-time bevindingen, impact en voorgestelde fixes. Sinds deze audit zijn meerdere genoemde problemen gewijzigd of opgelost; oude regelnummers en present-tense claims beschrijven dus niet automatisch de huidige code.
+>
+> Gebruik FRONTEND_ARCHITECTURE.md voor de actuele frontendarchitectuur, docs/backend-api-overview.md voor de huidige trust boundaries en docs/testing.md voor uitvoerbare verificatie. Herverifieer een individuele finding tegen de working tree voordat je haar als open of opgelost rapporteert.
+
+
 _Multi-agent design research (4 directions + synthesis). See AGENDA_REVIEW.md for the audit._
 
 ## Recommended direction

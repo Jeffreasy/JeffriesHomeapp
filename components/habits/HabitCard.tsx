@@ -55,12 +55,6 @@ const ROOSTER_LABELS: Record<string, string> = {
 
 interface HabitCardProps {
   habit: HabitWithLog;
-  /**
-   * The Amsterdam YYYY-MM-DD this card writes to. When it changes (date
-   * navigation) any parked stepper commit is cancelled and the draft reset,
-   * so accumulated taps can never be misattributed to the newly-shown date.
-   */
-  datum?: string;
   onToggle: () => void;
   onIncrement: (stap: number) => void;
   onIncident: (trigger?: string, notitie?: string) => void;
@@ -85,7 +79,6 @@ interface HabitCardProps {
 
 export function HabitCard({
   habit,
-  datum,
   onToggle,
   onIncrement,
   onIncident,
@@ -204,20 +197,16 @@ export function HabitCard({
     }
   }, [pending, commitWaarde]);
 
-  // Cross-date guard (R3): when the shown date changes the card instance is
-  // kept (keyed by habit id), so any parked stepper commit for the previous
-  // date must be dropped — otherwise it would write to the new date. The card
-  // then falls back to the fresh server value for the new day.
-  const prevDatumRef = useRef(datum);
-  useEffect(() => {
-    if (prevDatumRef.current === datum) return;
-    prevDatumRef.current = datum;
-    debouncedCommit.cancel();
-    pendingCommitRef.current = null;
-    setDraftWaarde(null);
-    setWaardeInput(null);
-  }, [datum, debouncedCommit]);
-
+  // Datum staat in de React-key van alle interactieve HabitCard-callers.
+  // Een datumwissel remount daardoor de kaart; annuleer bij unmount nog een
+  // eventueel geparkeerde commit voor de oude datum.
+  useEffect(
+    () => () => {
+      debouncedCommit.cancel();
+      pendingCommitRef.current = null;
+    },
+    [debouncedCommit],
+  );
   const displayedWaarde = draftWaarde ?? currentWaarde;
   const doelWaarde = habit.doelWaarde ?? 0;
   const displayedCompleted = isQuantitative

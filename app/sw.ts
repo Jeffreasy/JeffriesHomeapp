@@ -1,6 +1,7 @@
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, RuntimeCaching, SerwistGlobalConfig } from "serwist";
 import { NetworkOnly, Serwist } from "serwist";
+import { mustUseNetworkOnly } from "@/lib/pwa-cache-policy";
 
 // This declares the value of `injectionPoint` to TypeScript.
 // `injectionPoint` is the string that points to where the precache manifest should be injected.
@@ -14,7 +15,15 @@ declare const self: WorkerGlobalScope & typeof globalThis;
 
 const runtimeCaching: RuntimeCaching[] = [
   {
-    matcher: ({ sameOrigin, url: { pathname } }) => sameOrigin && pathname.startsWith("/api/"),
+    matcher: ({ sameOrigin, request, url }) =>
+      mustUseNetworkOnly({
+        sameOrigin,
+        pathname: url.pathname,
+        mode: request.mode,
+        destination: request.destination,
+        hasRscQuery: url.searchParams.has("_rsc"),
+        isRscRequest: request.headers.get("RSC") === "1",
+      }),
     method: "GET",
     handler: new NetworkOnly(),
   },
@@ -46,8 +55,11 @@ const serwist = new Serwist({
 serwist.addEventListeners();
 
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "CLEAR_ALL_CACHES") {
-    (event as any).waitUntil(
+  const messageEvent = event as MessageEvent<{ type?: string }> & {
+    waitUntil(promise: Promise<unknown>): void;
+  };
+  if (messageEvent.data?.type === "CLEAR_ALL_CACHES") {
+    messageEvent.waitUntil(
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames

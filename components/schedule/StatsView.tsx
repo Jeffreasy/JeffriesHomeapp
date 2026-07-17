@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, Crosshair } from "lucide-react";
 import {
@@ -211,26 +211,19 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
   const [activeYear,  setActiveYear]  = useState<string>(() => years.at(-1)?.year ?? "");
   const [activeMonth, setActiveMonth] = useState<string | null>(null);
 
-  // Bij een koude mount is `years` nog leeg, dus activeYear blijft "" en er
-  // verschijnt geen hero terwijl de tabs al klaarstaan. Zodra de data binnen is
-  // (of de huidige selectie uit de lijst valt) pinnen we op het nieuwste jaar
-  // (audit StatsView empty-year hang).
-  useEffect(() => {
-    if (years.length === 0) return;
-    if (!years.some(y => y.year === activeYear)) {
-      setActiveYear(years.at(-1)!.year);
-      setActiveMonth(null);
-    }
-  }, [years, activeYear]);
-
-  const yearData  = years.find(y => y.year === activeYear);
+  // Houd een nog geldige gebruikersselectie vast; kies anders declaratief het
+  // nieuwste jaar. Binnenkomende querydata hoeft zo geen state-effect te starten.
+  const selectedYear = years.some((year) => year.year === activeYear)
+    ? activeYear
+    : years.at(-1)?.year ?? "";
+  const yearData  = years.find(y => y.year === selectedYear);
   const monthData = yearData?.months.find(m => m.month === activeMonth);
 
   const allMonths: MonthStats[] = useMemo(() => {
     if (!yearData) return [];
     const filled: MonthStats[] = [];
     for (let i = 1; i <= 12; i++) {
-      const key = `${activeYear}-${String(i).padStart(2, "0")}`;
+      const key = `${selectedYear}-${String(i).padStart(2, "0")}`;
       filled.push(
         yearData.months.find(m => m.month === key) ?? {
           // Echt maandlabel via de gedeelde formatter — anders rendert de
@@ -241,7 +234,7 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
       );
     }
     return filled;
-  }, [yearData, activeYear]);
+  }, [yearData, selectedYear]);
 
   if (!years.length) {
     return (
@@ -262,7 +255,7 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
             key={y.year}
             onClick={() => { setActiveYear(y.year); setActiveMonth(null); }}
             className={`shrink-0 rounded-lg border px-4 py-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-400/60 ${
-              y.year === activeYear
+              y.year === selectedYear
                 ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
                 : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:text-slate-200"
             }`}

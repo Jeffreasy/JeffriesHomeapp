@@ -1,6 +1,8 @@
 # JeffriesHomeapp — 100% Volledige Codebase Analyse
 
-> Current note for Codex: this older analysis still contains legacy Convex architecture details. For current Go/Render/Postgres API usage from the frontend, read `docs/backend-api-overview.md` and `docs/backend-api-map.json` first.
+> **Status 2026-07-17: gearchiveerde legacy-analyse.** Dit bestand bevat uitgebreide historische Convex-, versie- en implementatiedetails die niet meer als actuele architectuur mogen worden gebruikt. Het blijft bewaard als migratie- en AI-analysehistorie.
+>
+> Gebruik FRONTEND_ARCHITECTURE.md voor de actuele frontend, docs/backend-api-overview.md voor het huidige BFF/backendcontract en docs/testing.md voor verificatie. docs/backend-api-map.json is zelf eveneens een oudere snapshot; routes.go en Swagger in JeffriesBackend zijn de bron van waarheid.
 
 > **Doel:** Persoonlijke smart home dashboard voor Jeffrey — combineert lampsturing, werkrooster, financiën, agenda, email, habits/gamification en AI-gestuurde automatisering in één app.
 

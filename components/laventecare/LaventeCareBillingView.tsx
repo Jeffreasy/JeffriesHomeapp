@@ -193,13 +193,15 @@ export function LaventeCareBillingView({
   const { success, error: toastError } = useToast();
   const [mode, setMode] = useState<BillingMode>("uren");
   const [timeForm, setTimeForm] =
-    useState<BillingTimeForm>(emptyBillingTimeForm);
-  const [quoteForm, setQuoteForm] = useState<BillingQuoteForm>(
-    emptyBillingQuoteForm,
-  );
-  const [invoiceForm, setInvoiceForm] = useState<BillingInvoiceForm>(
-    emptyBillingInvoiceForm,
-  );
+    useState<BillingTimeForm>(() => ({ ...emptyBillingTimeForm, companyId: prefillCompanyId ?? "" }));
+  const [quoteForm, setQuoteForm] = useState<BillingQuoteForm>(() => ({
+    ...emptyBillingQuoteForm,
+    companyId: prefillCompanyId ?? "",
+  }));
+  const [invoiceForm, setInvoiceForm] = useState<BillingInvoiceForm>(() => ({
+    ...emptyBillingInvoiceForm,
+    companyId: prefillCompanyId ?? "",
+  }));
   // Inline veldfouten (M28): toast blijft, maar het schuldige veld kleurt rood
   // en krijgt focus.
   const [timeErrors, setTimeErrors] = useState<Record<string, string>>({});
@@ -210,22 +212,6 @@ export function LaventeCareBillingView({
   // M6: de inline urenregel-editor telt óók als niet-opgeslagen invoer voor de
   // tabwissel-dirty-guard.
   const [timeEntryEditing, setTimeEntryEditing] = useState(false);
-
-  // R3-maandafsluiting: dossier→Commercie-brug. Als er een klant is
-  // voorgeselecteerd, seed die in de drie formulieren (alleen als het veld nog
-  // leeg is, zodat we geen handmatige keuze overschrijven).
-  useEffect(() => {
-    if (!prefillCompanyId) return;
-    setTimeForm((current) =>
-      current.companyId ? current : { ...current, companyId: prefillCompanyId },
-    );
-    setQuoteForm((current) =>
-      current.companyId ? current : { ...current, companyId: prefillCompanyId },
-    );
-    setInvoiceForm((current) =>
-      current.companyId ? current : { ...current, companyId: prefillCompanyId },
-    );
-  }, [prefillCompanyId]);
 
   const focusField = (id: string) => {
     window.setTimeout(() => document.getElementById(id)?.focus(), 0);

@@ -1,5 +1,13 @@
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { getBackendProxyConfig } from "@/lib/server/backend-config";
+import {
+  enforceOptionalOwnerJsonBody,
+  enforceOwnerQuery,
+  isJsonRequestContentType,
+  shouldRejectProxyMutationBody,
+} from "@/lib/server/proxy-owner";
+import { isOwnerUserId } from "@/lib/server/owner-config";
 
 type RouteContext = {
   params: Promise<{ path?: string[] }>;
@@ -18,28 +26,8 @@ const HOP_BY_HOP_HEADERS = new Set([
   "upgrade",
 ]);
 
-const DEFAULT_BACKEND_API_URL = "https://jeffriesbackend.onrender.com/api/v1";
 
-// Single-tenant: the entire backend serves ONE owner's data (PII, care dossiers,
-// invoices, bunq payment requests). Enforce the owner identity IN CODE as a
-// second, independent layer — do not rely solely on the out-of-band Clerk
-// sign-up restriction. Any signed-in non-owner is rejected. Overridable via
-// HOMEAPP_OWNER_USER_ID; defaults to the known owner so it is fail-closed even
-// if the env var is never set.
-const OWNER_USER_ID =
-  process.env.HOMEAPP_OWNER_USER_ID ?? "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
-
-function backendBaseUrl() {
-  return (process.env.BACKEND_API_URL ?? DEFAULT_BACKEND_API_URL).replace(/\/+$/, "");
-}
-
-function backendApiKey() {
-  // Server-only names only. Never read NEXT_PUBLIC_* here — those are inlined
-  // into the client bundle and would publish the backend secret to every browser.
-  return process.env.BACKEND_API_KEY ?? process.env.APP_SECRET_KEY ?? "";
-}
-
-function copyRequestHeaders(request: NextRequest) {
+function copyRequestHeaders(request: NextRequest, apiKey: string) {
   const headers = new Headers();
   const contentType = request.headers.get("content-type");
   const accept = request.headers.get("accept");
@@ -47,7 +35,6 @@ function copyRequestHeaders(request: NextRequest) {
   if (contentType) headers.set("content-type", contentType);
   if (accept) headers.set("accept", accept);
 
-  const apiKey = backendApiKey();
   if (apiKey) headers.set("X-API-Key", apiKey);
 
   return headers;
@@ -76,24 +63,50 @@ async function proxyBackend(request: NextRequest, context: RouteContext) {
   }
   // Defense in depth: only the single owner may reach the backend, regardless of
   // who managed to obtain a valid Clerk session.
-  if (userId !== OWNER_USER_ID) {
+  if (!isOwnerUserId(userId)) {
     return Response.json({ detail: "Geen toegang." }, { status: 403 });
   }
 
-  const target = new URL(`${backendBaseUrl()}/${path}`);
+  let target: URL;
+  let requestHeaders: Headers;
+  try {
+    const { baseUrl, apiKey } = getBackendProxyConfig();
+    target = new URL(`${baseUrl}/${path}`);
+    requestHeaders = copyRequestHeaders(request, apiKey);
+  } catch {
+    return Response.json({ detail: "Backend proxy is niet geconfigureerd." }, { status: 503 });
+  }
   target.search = request.nextUrl.search;
   // Override/strip any client-supplied userId with the session userId.
-  target.searchParams.set("userId", userId);
+  enforceOwnerQuery(target.searchParams, userId);
 
   const method = request.method.toUpperCase();
   const init: RequestInit = {
     method,
-    headers: copyRequestHeaders(request),
+    headers: requestHeaders,
     cache: "no-store",
   };
 
   if (method !== "GET" && method !== "HEAD") {
-    init.body = await request.arrayBuffer();
+    const contentType = request.headers.get("content-type") ?? "";
+    if (isJsonRequestContentType(contentType)) {
+      try {
+        const ownedBody = enforceOptionalOwnerJsonBody(await request.text(), userId);
+        if (ownedBody !== undefined) init.body = ownedBody;
+      } catch {
+        return Response.json({ detail: "Ongeldige JSON-body." }, { status: 400 });
+      }
+    } else {
+      const body = await request.arrayBuffer();
+      // This proxy currently has no binary/form mutation contract. Reject any
+      // non-empty non-JSON body so identity fields can never bypass rewriting.
+      if (shouldRejectProxyMutationBody(contentType, body.byteLength)) {
+        return Response.json(
+          { detail: "Alleen JSON-bodies worden door deze proxy ondersteund." },
+          { status: 415 },
+        );
+      }
+    }
   }
 
   try {

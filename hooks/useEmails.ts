@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import { emailsApi, type EmailRow, type EmailStats } from "@/lib/api";
+import { appendUniqueBy } from "@/lib/collections";
+import { createRequestGenerationGate } from "@/lib/request-generation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,31 +75,42 @@ export function useEmails(options: UseEmailsOptions = {}) {
   const [stats, setStats] = useState<EmailStats>({ total: 0, unread: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreInFlightRef = useRef(false);
+  const requestGate = useMemo(createRequestGenerationGate, []);
 
   const fetchEmails = useCallback(async () => {
     if (!userId) return;
+    const generation = requestGate.begin();
     try {
       const [rows, emailStats] = await Promise.all([
         emailsApi.list(userId, limit, 0, categorie),
         emailsApi.stats(userId),
       ]);
+      if (!requestGate.isCurrent(generation)) return;
       setEmails(rows.map(fromRow));
       setStats(emailStats);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Emails laden mislukt");
+      if (requestGate.isCurrent(generation)) {
+        setError(err instanceof Error ? err.message : "Emails laden mislukt");
+      }
     } finally {
-      setLoading(false);
+      if (requestGate.isCurrent(generation)) setLoading(false);
     }
-  }, [userId, limit, categorie]);
+  }, [userId, limit, categorie, requestGate]);
 
   useEffect(() => {
     fetchEmails();
-    if (autoRefreshMs > 0) {
-      const interval = setInterval(fetchEmails, autoRefreshMs);
-      return () => clearInterval(interval);
-    }
-  }, [fetchEmails, autoRefreshMs]);
+    const interval = autoRefreshMs > 0
+      ? setInterval(fetchEmails, autoRefreshMs)
+      : undefined;
+
+    return () => {
+      if (interval !== undefined) clearInterval(interval);
+      requestGate.invalidate();
+    };
+  }, [fetchEmails, autoRefreshMs, requestGate]);
 
   const search = useCallback(async (query: string): Promise<Email[]> => {
     if (!userId || !query.trim()) return [];
@@ -125,15 +138,29 @@ export function useEmails(options: UseEmailsOptions = {}) {
   }, [userId]);
 
   const loadMore = useCallback(async () => {
-    if (!userId) return;
-    const rows = await emailsApi.list(userId, limit, emails.length, categorie);
-    setEmails(prev => [...prev, ...rows.map(fromRow)]);
-  }, [userId, limit, categorie, emails.length]);
-
+    if (!userId || loading || loadMoreInFlightRef.current) return;
+    loadMoreInFlightRef.current = true;
+    setLoadingMore(true);
+    const generation = requestGate.current();
+    try {
+      const rows = await emailsApi.list(userId, limit, emails.length, categorie);
+      if (!requestGate.isCurrent(generation)) return;
+      setEmails((previous) => appendUniqueBy(previous, rows.map(fromRow), (email) => email.gmailId));
+      setError(null);
+    } catch (err) {
+      if (requestGate.isCurrent(generation)) {
+        setError(err instanceof Error ? err.message : "Meer emails laden mislukt");
+      }
+    } finally {
+      loadMoreInFlightRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [userId, loading, limit, categorie, emails.length, requestGate]);
   return {
     emails,
     stats,
     loading,
+    loadingMore,
     error,
     search,
     markRead,

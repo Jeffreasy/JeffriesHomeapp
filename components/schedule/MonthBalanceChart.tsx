@@ -4,23 +4,8 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
 import { groupByMonth } from "@/lib/schedule";
+import { DEFAULT_CONTRACT_HOURS_PER_WEEK, contractHoursForCalendarMonth } from "@/lib/contract";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-
-const CONTRACT_HOURS_PER_WEEK = 16;
-
-/** Number of weeks in a given "YYYY-MM" month, counted as the number of Mondays
- *  that fall in the month. Yields a 4- or 5-week norm instead of a flat
- *  4.33-week average, so the per-month target reflects the real calendar. */
-function weeksInMonth(ym: string): number {
-  const [y, m] = ym.split("-").map(Number);
-  const days = new Date(y, m, 0).getDate(); // last day of month
-  let mondays = 0;
-  for (let d = 1; d <= days; d++) {
-    if (new Date(y, m - 1, d).getDay() === 1) mondays++;
-  }
-  // A month has 4 or 5 Mondays; use that directly as the week count.
-  return mondays;
-}
 
 export function MonthBalanceChart() {
   const { diensten } = useSchedule();
@@ -42,7 +27,7 @@ export function MonthBalanceChart() {
     return completed.slice(-12).map(m => {
       // Norm scales with the actual number of weeks in that month (4 or 5),
       // not a flat 69.3u average.
-      const expected = Math.round(weeksInMonth(m.month) * CONTRACT_HOURS_PER_WEEK * 10) / 10;
+      const expected = contractHoursForCalendarMonth(m.month);
       const delta = Math.round((m.totalHours - expected) * 10) / 10;
 
       return {
@@ -67,7 +52,7 @@ export function MonthBalanceChart() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="text-sm uppercase tracking-[0.2em] font-bold text-slate-300">Maandbalans</h3>
-          <p className="mt-1 text-xs text-slate-500">Afgesloten maanden tegenover 16u/week-norm</p>
+          <p className="mt-1 text-xs text-slate-500">Afgesloten maanden tegenover {DEFAULT_CONTRACT_HOURS_PER_WEEK}u/week-norm</p>
         </div>
       </div>
       
@@ -117,10 +102,16 @@ export function MonthBalanceChart() {
             <Bar
               dataKey="hours" 
               radius={[4, 4, 0, 0]}
-              shape={(props: any) => {
-                const { x, y, width, height, payload } = props;
+              shape={(props: unknown) => {
+                const { x = 0, y = 0, width = 0, height = 0, payload } = props as {
+                  x?: number;
+                  y?: number;
+                  width?: number;
+                  height?: number;
+                  payload?: { color?: string };
+                };
                 return (
-                  <rect x={x} y={y} width={width} height={height} fill={payload.color} rx={4} ry={4} opacity={0.8} />
+                  <rect x={x} y={y} width={width} height={height} fill={payload?.color ?? "#64748b"} rx={4} ry={4} opacity={0.8} />
                 );
               }}
             />

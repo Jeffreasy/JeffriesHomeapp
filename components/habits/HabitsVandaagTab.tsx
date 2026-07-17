@@ -99,9 +99,8 @@ export function HabitsVandaagTab({
           <div className="space-y-2">
             {todayHabits.map((habit) => (
               <HabitCard
-                key={habit._id}
+                key={habit._id + ":" + activeDate}
                 habit={habit}
-                datum={activeDate}
                 masked={privacyOn}
                 pending={pendingHabitIds.has(habit._id)}
                 onToggle={() => toggle(habit._id!)}

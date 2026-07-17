@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sun, Moon, Sunset, Popcorn, Zap, Coffee,
-  Power, ChevronDown, Sparkles, Palette, X, Send,
+  ChevronDown, Sparkles, Palette, X, Send,
 } from "lucide-react";
 import { HexColorPicker } from "react-colorful";
 import { useDevices, useLampCommand } from "@/hooks/useHomeapp";

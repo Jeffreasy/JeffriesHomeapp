@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Check, X, Plus, Loader2 } from "lucide-react";
 import {
@@ -80,7 +80,7 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
   const isDirty = snapshot !== initialSnapshot.current;
 
   // Sluiten via backdrop/Escape/X: bij ongesavede wijzigingen eerst bevestigen.
-  const requestClose = async () => {
+  const requestClose = useCallback(async () => {
     if (saving || confirmingRef.current) return;
     if (isDirty) {
       confirmingRef.current = true;
@@ -94,7 +94,7 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
       if (!discard) return;
     }
     onClose();
-  };
+  }, [isDirty, onClose, openConfirm, saving]);
 
   // Stel dezelfde dirty-guarded sluiting beschikbaar aan de parent (fix 7).
   useImperativeHandle(ref, () => ({ requestClose: () => void requestClose() }), [requestClose]);
@@ -106,8 +106,7 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-    // requestClose verandert elke render; de listener leest altijd de laatste via closure-vernieuwing.
-  });
+  }, [requestClose]);
 
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));

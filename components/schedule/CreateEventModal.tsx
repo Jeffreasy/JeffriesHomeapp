@@ -173,7 +173,6 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
     }
     // prefillEvent volgt editEvent/recoveryDraft; alleen bij een echte open/prefill-
     // wisseling opnieuw invullen.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, prefillEvent, reset]);
 
   useEffect(() => {

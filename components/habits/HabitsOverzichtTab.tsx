@@ -86,8 +86,7 @@ export function HabitsOverzichtTab({
                 const todayVersion = todayById.get(habit._id);
                 return (
                   <HabitCard
-                    key={habit._id}
-                    datum={activeDate}
+                    key={habit._id + ":" + activeDate}
                     habit={{
                       ...habit,
                       log: todayVersion?.log ?? null,

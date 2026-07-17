@@ -8,6 +8,7 @@ import {
 } from "@/lib/laventecare/pdf/registry";
 import { parseLaventeCarePdfDossierContext } from "@/lib/laventecare/pdf/context";
 import { isLaventeCarePdfTheme } from "@/lib/laventecare/pdf/theme";
+import { isOwnerUserId } from "@/lib/server/owner-config";
 import { auth } from "@clerk/nextjs/server";
 import {
   createLaventeCarePdfErrorResponse,
@@ -15,8 +16,6 @@ import {
   createLaventeCarePdfResponse,
 } from "@/lib/laventecare/pdf/responses";
 
-const OWNER_USER_ID =
-  process.env.HOMEAPP_OWNER_USER_ID ?? "user_3Ax561ZvuSkGtWpKFooeY65HNtY";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,7 +32,7 @@ export async function GET(request: Request, context: RouteContext) {
   if (!userId) {
     return createLaventeCarePdfErrorResponse("Niet ingelogd", 401, requestId);
   }
-  if (userId !== OWNER_USER_ID) {
+  if (!isOwnerUserId(userId)) {
     return createLaventeCarePdfErrorResponse("Geen toegang", 403, requestId);
   }
 

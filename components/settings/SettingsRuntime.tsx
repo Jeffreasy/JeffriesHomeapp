@@ -3,7 +3,7 @@
 import { Activity, AlertTriangle, CheckCircle2, Gauge, Hourglass, Lightbulb, Loader2, Network, PlugZap, RadioTower, Smartphone } from "lucide-react";
 import { EmptyState, Panel, SectionHeader, StatusMetric, StatusPill, StatusRow } from "./SettingsCards";
 import { formatDateTime } from "./SettingsUtils";
-import type { PendingAIAction } from "@/lib/api";
+import type { PendingAIAction, SettingsOverview, SettingsOverviewDevices } from "@/lib/api";
 
 const SENSITIVE_ARG_KEY_PATTERN = /token|secret|password|apikey|authorization/i;
 
@@ -32,8 +32,8 @@ export function SettingsRuntime({
   deviceHealth,
   localApiHost,
 }: {
-  overview: any;
-  overviewDevices: any;
+  overview: SettingsOverview | null | undefined;
+  overviewDevices: SettingsOverviewDevices;
   deviceHealth: number;
   localApiHost: string;
 }) {
@@ -154,7 +154,7 @@ export function SettingsPendingActions({
   );
 }
 
-export function SettingsBridge({ overview }: { overview: any }) {
+export function SettingsBridge({ overview }: { overview: SettingsOverview | null | undefined }) {
   return (
     <Panel>
       <SectionHeader

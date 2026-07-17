@@ -23,9 +23,14 @@ import { ChartTooltip, PieTooltip } from "./ChartTooltips";
 import { formatMonth } from "./FinanceUtils";
 import { cn } from "@/lib/utils";
 import { getCatColor, ibanLabel } from "@/lib/finance-constants";
-import type { TransactionFilter } from "@/hooks/useTransactions";
+import type { TransactionFilter, TransactionFullStats } from "@/hooks/useTransactions";
 
 type ChartView = "saldo" | "inuit";
+type PieSlice = TransactionFullStats["uitPerCategorie"][number] & {
+  isRest?: boolean;
+};
+type MonthlyCashflowWithSalary =
+  TransactionFullStats["inUitPerMaand"][number] & { salaris: number | null };
 
 // Aantal echte categorie-slices in de pie; de rest wordt samengevoegd in één
 // "Overige categorieën"-slice zodat pie, legenda en center-totaal kloppen.
@@ -60,12 +65,12 @@ export function FinanceCharts({
   formatPrivateEuro,
   formatPrivateEuroExact,
 }: {
-  stats: any;
+  stats: TransactionFullStats;
   chartView: ChartView;
   setChartView: (v: ChartView) => void;
   ibanFilter?: string;
   privacyOn: boolean;
-  inUitMetSalaris: any[];
+  inUitMetSalaris: MonthlyCashflowWithSalary[];
   loonstrokenCount: number;
   filters: TransactionFilter;
   toggleCategoryFilter: (cat: string) => void;
@@ -84,15 +89,15 @@ export function FinanceCharts({
   // Top-N categorieën + één geaggregeerde rest-slice, zodat de pie, de
   // legenda én het center-totaal exact dezelfde dataset beschrijven.
   const pieData = useMemo(() => {
-    const all: any[] = stats.uitPerCategorie ?? [];
+    const all: PieSlice[] = stats.uitPerCategorie ?? [];
     const top = all.slice(0, PIE_TOP_SLICES);
     const rest = all.slice(PIE_TOP_SLICES);
     if (rest.length === 0) return top;
     // C2: één overgebleven categorie niet wegaggregeren tot "Overige
     // categorieën" — toon hem gewoon als zichzelf (zelfde aantal slices).
     if (rest.length === 1) return [...top, ...rest];
-    const restBedrag = rest.reduce((sum: number, c: any) => sum + (c.bedrag ?? 0), 0);
-    const restCount = rest.reduce((sum: number, c: any) => sum + (c.count ?? 0), 0);
+    const restBedrag = rest.reduce((sum, category) => sum + category.bedrag, 0);
+    const restCount = rest.reduce((sum, category) => sum + category.count, 0);
     const restPct = stats.totaalUit > 0
       ? Math.round((restBedrag / stats.totaalUit) * 1000) / 10
       : 0;
@@ -227,7 +232,7 @@ export function FinanceCharts({
                 nameKey="categorie"
                 strokeWidth={0}
               >
-                {pieData.map((entry: any) => (
+                {pieData.map((entry) => (
                   <Cell
                     key={entry.categorie}
                     fill={entry.isRest ? PIE_REST_COLOR : getCatColor(entry.categorie)}
@@ -256,7 +261,7 @@ export function FinanceCharts({
           {/* Legenda toont exact dezelfde slices als de pie, inclusief de
               geaggregeerde rest-slice (die is niet klikbaar: het is geen
               echte categorie om op te filteren). */}
-          {pieData.map((entry: any) =>
+          {pieData.map((entry) =>
             entry.isRest ? (
               <div
                 key={entry.categorie}

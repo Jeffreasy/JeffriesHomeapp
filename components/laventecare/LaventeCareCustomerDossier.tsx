@@ -227,12 +227,6 @@ export function LaventeCareCustomerDossier({
     staleTime: 15_000,
   });
 
-  // Nooit een stale moment-draft van een ander/dezelfde klantdossier
-  // terug laten komen: reset zodra het dossier wisselt of sluit.
-  useEffect(() => {
-    setForm(emptyActivityForm);
-    setAccessFormDirty(false);
-  }, [companyId, isOpen]);
   const companyName = company?.naam ?? "";
 
   const companyContacts = useMemo(

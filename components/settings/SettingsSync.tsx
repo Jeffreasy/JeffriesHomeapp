@@ -4,6 +4,7 @@ import { Activity, CalendarClock, Cloud, Loader2, Mail, RefreshCw } from "lucide
 import { Panel, SectionHeader } from "./SettingsCards";
 import { formatDateTime, toneClasses, type SyncStatusView, type SyncTarget, type Tone } from "./SettingsUtils";
 import { cn } from "@/lib/utils";
+import type { SettingsOverview } from "@/lib/api";
 
 function syncTone(status?: SyncStatusView): Tone {
   if (!status) return "slate";
@@ -106,7 +107,7 @@ export function SettingsSync({
   handleAllSync,
 }: {
   syncing: SyncTarget | null;
-  overview: any;
+  overview: SettingsOverview | null | undefined;
   syncMap: Record<string, SyncStatusView | undefined>;
   handleCalendarSync: () => void;
   handleGmailSync: () => void;
