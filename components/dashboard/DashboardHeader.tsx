@@ -1,61 +1,75 @@
 "use client";
 
 import { Eye, EyeOff, Home, Power } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+
+interface DashboardHeaderProps {
+  greeting: string;
+  today: string;
+  privacyOn: boolean;
+  isPrivacyUnknown: boolean;
+  togglePrivacy: () => void;
+  allOn: boolean;
+  onlineDevicesCount: number;
+  lightingPending: boolean;
+  toggleAll: () => void;
+}
 
 export function DashboardHeader({
   greeting,
   today,
   privacyOn,
+  isPrivacyUnknown,
   togglePrivacy,
   allOn,
   onlineDevicesCount,
+  lightingPending,
   toggleAll,
-}: {
-  greeting: string;
-  today: string;
-  privacyOn: boolean;
-  togglePrivacy: () => void;
-  allOn: boolean;
-  onlineDevicesCount: number;
-  toggleAll: () => void;
-}) {
+}: DashboardHeaderProps) {
+  const allLightsLabel = allOn ? "Alle online lampen uitzetten" : "Alle online lampen aanzetten";
+
   return (
-    <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#0a0a0f]/90 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
-            <Home size={20} className="text-amber-300" />
+    <header className="app-topbar sticky top-0 z-[var(--layer-sticky)] border-b border-[var(--color-border)] bg-[var(--color-background)]/92 backdrop-blur-xl">
+      <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:px-6 lg:px-8">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <div
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)] min-[430px]:flex"
+            aria-hidden="true"
+          >
+            <Home size={17} />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Jeffries Homeapp
-            </p>
-            <h1 className="mt-1 truncate text-2xl font-bold text-white">{greeting}</h1>
-            <p className="mt-1 text-sm capitalize text-slate-500">{today}</p>
+            <h1 className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg">{greeting}</h1>
+            <p className="truncate text-xs capitalize text-[var(--color-text-muted)]">{today}</p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
+        <div className="flex shrink-0 items-center gap-2">
+          <IconButton
             onClick={togglePrivacy}
-            title={privacyOn ? "Privacy mode uitzetten" : "Privacy mode aanzetten"}
-            className="btn btn--ghost gap-2"
-          >
-            {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}
-            <span className="hidden sm:inline">{privacyOn ? "Privacy aan" : "Privacy uit"}</span>
-          </button>
+            label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Privacy mode uitzetten" : "Privacy mode aanzetten"}
+            icon={privacyOn ? <EyeOff size={17} /> : <Eye size={17} />}
+            variant="secondary"
+            loading={isPrivacyUnknown}
+            disabled={isPrivacyUnknown}
+            aria-busy={isPrivacyUnknown}
+            aria-pressed={privacyOn}
+          />
 
-          <button
-            type="button"
+          <Button
             onClick={toggleAll}
             disabled={onlineDevicesCount === 0}
-            title={allOn ? "Alle online lampen uitzetten" : "Alle online lampen aanzetten"}
-            className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[rgba(255,255,255,0.03)] disabled:text-slate-600"
+            loading={lightingPending}
+            loadingLabel="Bezig"
+            variant={allOn ? "warning" : "secondary"}
+            aria-label={allLightsLabel}
+            title={allLightsLabel}
+            size="sm"
           >
-            <Power size={16} />
+            <Power size={16} aria-hidden="true" />
             <span>{allOn ? "Alles uit" : "Alles aan"}</span>
-          </button>
+          </Button>
         </div>
       </div>
     </header>

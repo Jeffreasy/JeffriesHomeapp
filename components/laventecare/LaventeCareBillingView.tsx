@@ -1,6 +1,16 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { FormField } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { SearchField } from "@/components/ui/SearchField";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { FormEvent, useEffect, useId, useMemo, useState } from "react";
 import {
   Banknote,
   CheckCircle2,
@@ -13,12 +23,12 @@ import {
   RefreshCw,
   ReceiptText,
   RotateCcw,
-  Search,
   Send,
   ShieldCheck,
   Trash2,
   XCircle,
 } from "lucide-react";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import {
@@ -95,11 +105,6 @@ type InvoicePayload = {
     sort_order?: number;
   }>;
 };
-
-const inputClass =
-  "min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/10";
-
-const selectClass = inputClass;
 
 export function LaventeCareBillingView({
   billing,
@@ -193,13 +198,15 @@ export function LaventeCareBillingView({
   const { success, error: toastError } = useToast();
   const [mode, setMode] = useState<BillingMode>("uren");
   const [timeForm, setTimeForm] =
-    useState<BillingTimeForm>(emptyBillingTimeForm);
-  const [quoteForm, setQuoteForm] = useState<BillingQuoteForm>(
-    emptyBillingQuoteForm,
-  );
-  const [invoiceForm, setInvoiceForm] = useState<BillingInvoiceForm>(
-    emptyBillingInvoiceForm,
-  );
+    useState<BillingTimeForm>(() => ({ ...emptyBillingTimeForm, companyId: prefillCompanyId ?? "" }));
+  const [quoteForm, setQuoteForm] = useState<BillingQuoteForm>(() => ({
+    ...emptyBillingQuoteForm,
+    companyId: prefillCompanyId ?? "",
+  }));
+  const [invoiceForm, setInvoiceForm] = useState<BillingInvoiceForm>(() => ({
+    ...emptyBillingInvoiceForm,
+    companyId: prefillCompanyId ?? "",
+  }));
   // Inline veldfouten (M28): toast blijft, maar het schuldige veld kleurt rood
   // en krijgt focus.
   const [timeErrors, setTimeErrors] = useState<Record<string, string>>({});
@@ -210,22 +217,6 @@ export function LaventeCareBillingView({
   // M6: de inline urenregel-editor telt óók als niet-opgeslagen invoer voor de
   // tabwissel-dirty-guard.
   const [timeEntryEditing, setTimeEntryEditing] = useState(false);
-
-  // R3-maandafsluiting: dossier→Commercie-brug. Als er een klant is
-  // voorgeselecteerd, seed die in de drie formulieren (alleen als het veld nog
-  // leeg is, zodat we geen handmatige keuze overschrijven).
-  useEffect(() => {
-    if (!prefillCompanyId) return;
-    setTimeForm((current) =>
-      current.companyId ? current : { ...current, companyId: prefillCompanyId },
-    );
-    setQuoteForm((current) =>
-      current.companyId ? current : { ...current, companyId: prefillCompanyId },
-    );
-    setInvoiceForm((current) =>
-      current.companyId ? current : { ...current, companyId: prefillCompanyId },
-    );
-  }, [prefillCompanyId]);
 
   const focusField = (id: string) => {
     window.setTimeout(() => document.getElementById(id)?.focus(), 0);
@@ -430,7 +421,7 @@ export function LaventeCareBillingView({
     }
     if (errors.titel || errors.description) {
       toastError("Titel en offerteregel zijn verplicht");
-      focusField(errors.titel ? "billing-quote-titel" : "billing-quote-description");
+      focusField(errors.titel ? "billing-quote-title" : "billing-quote-description");
       return;
     }
     try {
@@ -583,31 +574,29 @@ export function LaventeCareBillingView({
       </div>
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="glass min-w-0 overflow-hidden p-4 sm:p-5">
+        <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 overflow-hidden p-4 sm:p-5")}>
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">
                 Commerciële workflow
               </p>
-              <h3 className="mt-1 text-lg font-bold text-white">
+              <h3 className="mt-1 text-lg font-bold text-[var(--color-text)]">
                 Offerte, uren en factuur
               </h3>
             </div>
-            <div className="grid w-full min-w-0 grid-cols-3 gap-1 rounded-lg border border-white/10 bg-black/20 p-1 sm:w-auto">
+            <div className="grid w-full min-w-0 grid-cols-3 gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-1 sm:w-auto">
               {(["uren", "offerte", "factuur"] as BillingMode[]).map((item) => (
-                <button
+                <Button
                   key={item}
                   type="button"
+                  size="sm"
+                  variant={mode === item ? "primary" : "ghost"}
                   onClick={() => setMode(item)}
-                  className={cn(
-                    "min-h-9 min-w-0 rounded-md px-2 text-xs font-bold capitalize transition sm:px-3",
-                    mode === item
-                      ? "bg-amber-400 text-slate-950"
-                      : "text-slate-400 hover:bg-white/10 hover:text-white",
-                  )}
+                  aria-pressed={mode === item}
+                  className="min-w-0 rounded-md px-2 capitalize sm:px-3"
                 >
                   {item}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -627,51 +616,47 @@ export function LaventeCareBillingView({
                   setTimeForm((current) => ({ ...current, ...fields }))
                 }
               />
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Werk gedaan <span className="text-rose-300">*</span>
-                </span>
-                <input
-                  id="billing-time-description"
-                  required
-                  aria-invalid={Boolean(timeErrors.description)}
-                  value={timeForm.description}
-                  onChange={(event) =>
-                    setTimeForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  className={cn(
-                    inputClass,
-                    timeErrors.description &&
-                      "border-rose-400/60 focus:border-rose-400/60",
-                  )}
-                  placeholder="Bijv. integratiecheck, advies, configuratie..."
-                />
-                {timeErrors.description ? (
-                  <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
-                    {timeErrors.description}
-                  </p>
-                ) : null}
-              </label>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                    Datum
-                  </span>
-                  <input
-                    type="date"
-                    value={timeForm.entryDate}
+              <FormField
+                id="billing-time-description"
+                label={<>Werk gedaan <span aria-hidden="true" className="text-[var(--color-danger)]">*</span></>}
+                error={timeErrors.description || undefined}
+              >
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    required
+                    invalid={Boolean(timeErrors.description)}
+                    value={timeForm.description}
                     onChange={(event) =>
                       setTimeForm((current) => ({
                         ...current,
-                        entryDate: event.target.value,
+                        description: event.target.value,
                       }))
                     }
-                    className={inputClass}
+                    placeholder="Bijv. integratiecheck, advies, configuratie..."
                   />
-                </label>
+                )}
+              </FormField>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FormField
+                  id="billing-time-entry-date"
+                  label="Datum"
+                >
+                  {(controlProps) => (
+                    <Input
+                      {...controlProps}
+                      type="date"
+                      value={timeForm.entryDate}
+                      onChange={(event) =>
+                        setTimeForm((current) => ({
+                          ...current,
+                          entryDate: event.target.value,
+                        }))
+                      }
+
+                    />
+                  )}
+                </FormField>
                 <NumberField
                   label="Minuten"
                   id="billing-time-minutes"
@@ -693,32 +678,29 @@ export function LaventeCareBillingView({
                 />
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={timeForm.billable}
-                    onChange={(event) =>
-                      setTimeForm((current) => ({
-                        ...current,
-                        billable: event.target.checked,
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-white/20 bg-black/20 text-amber-400"
-                  />
-                  Factureerbaar
-                </label>
-                <button
+                <Checkbox
+                  label="Factureerbaar"
+                  checked={timeForm.billable}
+                  onChange={(event) =>
+                    setTimeForm((current) => ({
+                      ...current,
+                      billable: event.target.checked,
+                    }))
+                  }
+                  className="px-0"
+                />
+                <Button
                   type="submit"
                   disabled={creatingTimeEntry}
-                  className="btn btn--primary justify-center sm:min-w-40"
+                  variant="primary" className="sm:min-w-40"
                 >
                   {creatingTimeEntry ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />
                   ) : (
                     <Clock3 size={16} />
                   )}
                   Uren opslaan
-                </button>
+                </Button>
               </div>
             </form>
           ) : null}
@@ -738,63 +720,49 @@ export function LaventeCareBillingView({
                   setQuoteForm((current) => ({ ...current, ...fields }))
                 }
               />
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Offertetitel <span className="text-rose-300">*</span>
-                </span>
-                <input
-                  id="billing-quote-titel"
-                  required
-                  aria-invalid={Boolean(quoteErrors.titel)}
-                  value={quoteForm.titel}
-                  onChange={(event) =>
-                    setQuoteForm((current) => ({
-                      ...current,
-                      titel: event.target.value,
-                    }))
-                  }
-                  className={cn(
-                    inputClass,
-                    quoteErrors.titel &&
-                      "border-rose-400/60 focus:border-rose-400/60",
-                  )}
-                  placeholder="Bijv. Advies en integratie audit"
-                />
-                {quoteErrors.titel ? (
-                  <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
-                    {quoteErrors.titel}
-                  </p>
-                ) : null}
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Regel <span className="text-rose-300">*</span>
-                </span>
-                <textarea
-                  id="billing-quote-description"
-                  required
-                  aria-invalid={Boolean(quoteErrors.description)}
-                  value={quoteForm.description}
-                  onChange={(event) =>
-                    setQuoteForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  className={cn(
-                    inputClass,
-                    "min-h-24 resize-none",
-                    quoteErrors.description &&
-                      "border-rose-400/60 focus:border-rose-400/60",
-                  )}
-                  placeholder="Scope, deliverable of vaste projectregel"
-                />
-                {quoteErrors.description ? (
-                  <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
-                    {quoteErrors.description}
-                  </p>
-                ) : null}
-              </label>
+              <FormField
+                id="billing-quote-title"
+                label={<>Offertetitel <span aria-hidden="true" className="text-[var(--color-danger)]">*</span></>}
+                error={quoteErrors.titel || undefined}
+              >
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    required
+                    invalid={Boolean(quoteErrors.titel)}
+                    value={quoteForm.titel}
+                    onChange={(event) =>
+                      setQuoteForm((current) => ({
+                        ...current,
+                        titel: event.target.value,
+                      }))
+                    }
+                    placeholder="Bijv. Advies en integratie audit"
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="billing-quote-description"
+                label={<>Regel <span aria-hidden="true" className="text-[var(--color-danger)]">*</span></>}
+                error={quoteErrors.description || undefined}
+              >
+                {(controlProps) => (
+                  <Textarea
+                    {...controlProps}
+                    required
+                    invalid={Boolean(quoteErrors.description)}
+                    value={quoteForm.description}
+                    onChange={(event) =>
+                      setQuoteForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    className="min-h-24 resize-none"
+                    placeholder="Scope, deliverable of vaste projectregel"
+                  />
+                )}
+              </FormField>
               <div className="grid gap-3 sm:grid-cols-3">
                 <NumberField
                   label="Aantal"
@@ -812,52 +780,58 @@ export function LaventeCareBillingView({
                     setQuoteForm((current) => ({ ...current, unitAmount }))
                   }
                 />
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                    Geldig tot
-                  </span>
-                  <input
-                    type="date"
-                    value={quoteForm.validUntil}
+                <FormField
+                  id="billing-quote-valid-until"
+                  label="Geldig tot"
+                >
+                  {(controlProps) => (
+                    <Input
+                      {...controlProps}
+                      type="date"
+                      value={quoteForm.validUntil}
+                      onChange={(event) =>
+                        setQuoteForm((current) => ({
+                          ...current,
+                          validUntil: event.target.value,
+                        }))
+                      }
+
+                    />
+                  )}
+                </FormField>
+              </div>
+              <FormField
+                id="billing-quote-notes"
+                label="Notitie"
+              >
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    value={quoteForm.notes}
                     onChange={(event) =>
                       setQuoteForm((current) => ({
                         ...current,
-                        validUntil: event.target.value,
+                        notes: event.target.value,
                       }))
                     }
-                    className={inputClass}
+
+                    placeholder="Optionele interne of klantnotitie"
                   />
-                </label>
-              </div>
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Notitie
-                </span>
-                <input
-                  value={quoteForm.notes}
-                  onChange={(event) =>
-                    setQuoteForm((current) => ({
-                      ...current,
-                      notes: event.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                  placeholder="Optionele interne of klantnotitie"
-                />
-              </label>
+                )}
+              </FormField>
               <div className="flex justify-end">
-                <button
+                <Button
                   type="submit"
                   disabled={creatingQuote}
-                  className="btn btn--primary justify-center sm:min-w-44"
+                  variant="primary" className="sm:min-w-44"
                 >
                   {creatingQuote ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />
                   ) : (
                     <FileSignature size={16} />
                   )}
                   Offerte maken
-                </button>
+                </Button>
               </div>
             </form>
           ) : null}
@@ -882,43 +856,40 @@ export function LaventeCareBillingView({
                 }
               />
               {invoiceForm.companyId ? (
-                <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+                <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">
                       Open uren meenemen
                     </p>
-                    <span className="text-[11px] font-semibold text-slate-500">
+                    <span className="text-micro font-semibold text-[var(--color-text-muted)]">
                       {uninvoicedEntries.length} van{" "}
                       {openUninvoicedEntries.length} regels passen bij deze
                       context
                     </span>
                   </div>
                   {uninvoicedEntries.length > 0 ? (
-                    <label className="mt-2 inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-300">
-                      <input
-                        type="checkbox"
-                        checked={
-                          uninvoicedEntries.length > 0 &&
-                          uninvoicedEntries.every((entry) =>
-                            invoiceForm.selectedTimeEntryIds.includes(entry.id),
-                          )
-                        }
-                        onChange={(event) =>
-                          setInvoiceForm((current) => ({
-                            ...current,
-                            selectedTimeEntryIds: event.target.checked
-                              ? uninvoicedEntries.map((entry) => entry.id)
-                              : [],
-                          }))
-                        }
-                        className="h-4 w-4 rounded border-white/20 bg-black/20 text-amber-400"
-                      />
-                      Selecteer alles ({uninvoicedEntries.length} regels)
-                    </label>
+                    <Checkbox
+                      label={`Selecteer alles (${uninvoicedEntries.length} regels)`}
+                      checked={
+                        uninvoicedEntries.length > 0 &&
+                        uninvoicedEntries.every((entry) =>
+                          invoiceForm.selectedTimeEntryIds.includes(entry.id),
+                        )
+                      }
+                      onChange={(event) =>
+                        setInvoiceForm((current) => ({
+                          ...current,
+                          selectedTimeEntryIds: event.target.checked
+                            ? uninvoicedEntries.map((entry) => entry.id)
+                            : [],
+                        }))
+                      }
+                      className="mt-2 px-0 text-xs"
+                    />
                   ) : null}
                   <div className="mt-3 max-h-52 space-y-2 overflow-y-auto pr-1">
                     {uninvoicedEntries.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500">
+                      <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs leading-5 text-[var(--color-text-muted)]">
                         Geen open urenregels voor deze klant/project/opdracht.
                       </div>
                     ) : (
@@ -929,98 +900,69 @@ export function LaventeCareBillingView({
                         const selected =
                           invoiceForm.selectedTimeEntryIds.includes(entry.id);
                         return (
-                          <label
+                          <Checkbox
                             key={entry.id}
-                            className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm transition hover:bg-white/[0.06]"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={(event) =>
-                                setInvoiceForm((current) => ({
-                                  ...current,
-                                  selectedTimeEntryIds: event.target.checked
-                                    ? [
-                                        ...current.selectedTimeEntryIds,
-                                        entry.id,
-                                      ]
-                                    : current.selectedTimeEntryIds.filter(
-                                        (id) => id !== entry.id,
-                                      ),
-                                }))
-                              }
-                              className="mt-0.5 h-4 w-4 rounded border-white/20 bg-black/20 text-amber-400"
-                            />
-                            <span className="min-w-0">
-                              <span className="block font-semibold text-white">
-                                {entry.description}
+                            checked={selected}
+                            onChange={(event) =>
+                              setInvoiceForm((current) => ({
+                                ...current,
+                                selectedTimeEntryIds: event.target.checked
+                                  ? [...current.selectedTimeEntryIds, entry.id]
+                                  : current.selectedTimeEntryIds.filter((id) => id !== entry.id),
+                              }))
+                            }
+                            label={
+                              <span className="min-w-0">
+                                <span className="block font-semibold text-[var(--color-text)]">
+                                  {entry.description}
+                                </span>
+                                <span className="mt-0.5 block text-xs text-[var(--color-text-muted)]">
+                                  {formatDate(entry.entry_date)} -{" "}
+                                  {formatMinutes(entry.minutes)} -{" "}
+                                  {formatCents(Math.round((entry.minutes * entry.hourly_rate_cents) / 60))}
+                                </span>
                               </span>
-                              <span className="mt-0.5 block text-xs text-slate-500">
-                                {formatDate(entry.entry_date)} -{" "}
-                                {formatMinutes(entry.minutes)} -{" "}
-                                {formatCents(
-                                  Math.round(
-                                    (entry.minutes * entry.hourly_rate_cents) /
-                                      60,
-                                  ),
-                                )}
-                              </span>
-                            </span>
-                          </label>
+                            }
+                            className="border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3"
+                          />
                         );
                       })
                     )}
                   </div>
                   {uninvoicedEntries.length > 8 ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllUninvoiced((value) => !value)}
-                      aria-expanded={showAllUninvoiced}
-                      className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
-                    >
-                      {showAllUninvoiced
-                        ? "Toon minder"
-                        : `Toon alle ${uninvoicedEntries.length} regels`}
-                    </button>
+                    <Button type="button" variant="ghost" size="sm" fullWidth onClick={() => setShowAllUninvoiced((value) => !value)} aria-expanded={showAllUninvoiced} className="mt-2">
+                      {showAllUninvoiced ? "Toon minder" : `Toon alle ${uninvoicedEntries.length} regels`}
+                    </Button>
                   ) : null}
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500">
+                <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs leading-5 text-[var(--color-text-muted)]">
                   Kies eerst een klant; daarna tonen we alleen open urenregels
                   die bij die klant en context horen.
                 </div>
               )}
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Handmatige factuurregel{" "}
-                  <span className="normal-case text-slate-600">
-                    (verplicht als je geen uren selecteert)
-                  </span>
-                </span>
-                <input
-                  id="billing-invoice-description"
-                  aria-invalid={Boolean(invoiceErrors.lines)}
-                  value={invoiceForm.description}
-                  disabled={invoiceForm.selectedTimeEntryIds.length > 0}
-                  onChange={(event) =>
-                    setInvoiceForm((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  className={cn(
-                    inputClass,
-                    invoiceErrors.lines &&
-                      "border-rose-400/60 focus:border-rose-400/60",
-                  )}
-                  placeholder="Bijv. Advies, implementatie of beheer"
-                />
-                {invoiceErrors.lines ? (
-                  <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
-                    {invoiceErrors.lines}
-                  </p>
-                ) : null}
-              </label>
+              <FormField
+                id="billing-invoice-description"
+                label="Handmatige factuurregel"
+                description="Verplicht als je geen uren selecteert"
+                error={invoiceErrors.lines || undefined}
+              >
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    invalid={Boolean(invoiceErrors.lines)}
+                    value={invoiceForm.description}
+                    disabled={invoiceForm.selectedTimeEntryIds.length > 0}
+                    onChange={(event) =>
+                      setInvoiceForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    placeholder="Bijv. Advies, implementatie of beheer"
+                  />
+                )}
+              </FormField>
               <div className="grid gap-3 sm:grid-cols-3">
                 <NumberField
                   label="Minuten"
@@ -1042,66 +984,72 @@ export function LaventeCareBillingView({
                     setInvoiceForm((current) => ({ ...current, hourlyRate }))
                   }
                 />
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                    Vervaldatum
-                  </span>
-                  <input
-                    type="date"
-                    value={invoiceForm.dueDate}
+                <FormField
+                  id="billing-invoice-due-date"
+                  label="Vervaldatum"
+                >
+                  {(controlProps) => (
+                    <Input
+                      {...controlProps}
+                      type="date"
+                      value={invoiceForm.dueDate}
+                      onChange={(event) =>
+                        setInvoiceForm((current) => ({
+                          ...current,
+                          dueDate: event.target.value,
+                        }))
+                      }
+
+                    />
+                  )}
+                </FormField>
+              </div>
+              <FormField
+                id="billing-invoice-notes"
+                label="Notitie"
+              >
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    value={invoiceForm.notes}
                     onChange={(event) =>
                       setInvoiceForm((current) => ({
                         ...current,
-                        dueDate: event.target.value,
+                        notes: event.target.value,
                       }))
                     }
-                    className={inputClass}
+
+                    placeholder="Bijv. bunq betaalverzoek volgt na akkoord"
                   />
-                </label>
-              </div>
-              <label className="block">
-                <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-                  Notitie
-                </span>
-                <input
-                  value={invoiceForm.notes}
-                  onChange={(event) =>
-                    setInvoiceForm((current) => ({
-                      ...current,
-                      notes: event.target.value,
-                    }))
-                  }
-                  className={inputClass}
-                  placeholder="Bijv. bunq betaalverzoek volgt na akkoord"
-                />
-              </label>
+                )}
+              </FormField>
               {invoiceSelectionPreview.exclCents > 0 ? (
-                <div className="flex flex-col gap-1 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
-                  <span className="font-semibold text-amber-100">
+                <div className="flex flex-col gap-1 rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-semibold text-[var(--color-primary-hover)]">
                     Totaal van deze factuur
                     {invoiceSelectionPreview.count > 0
                       ? ` (${invoiceSelectionPreview.count} urenregel${invoiceSelectionPreview.count === 1 ? "" : "s"}, ${formatMinutes(invoiceSelectionPreview.minutes)})`
                       : ` (${formatMinutes(invoiceSelectionPreview.minutes)})`}
                   </span>
-                  <span className="font-bold text-white">
+                  <span className="font-bold text-[var(--color-text)]">
                     {formatCents(invoiceSelectionPreview.exclCents)} excl. ·{" "}
                     {formatCents(invoiceSelectionPreview.inclCents)} incl. btw
                   </span>
                 </div>
               ) : null}
               <div className="flex justify-end">
-                <button
+                <Button
                   type="submit"
                   disabled={creatingInvoice}
-                  className="btn btn--primary justify-center sm:min-w-44"
+                  variant="primary" className="sm:min-w-44"
                 >
                   {creatingInvoice ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />
                   ) : (
                     <ReceiptText size={16} />
                   )}
                   Factuur maken
-                </button>
+                </Button>
               </div>
             </form>
           ) : null}
@@ -1181,7 +1129,7 @@ export function LaventeCareBillingView({
                 ]
                   .filter(Boolean)
                   .join(" - "),
-                badge: expired ? { label: "Verlopen", tone: "rose" as const } : undefined,
+                badge: expired ? { label: "Verlopen", tone: "danger" as const } : undefined,
                 filterKeys: [quote.status, ...(expired ? ["verlopen"] : [])],
                 searchText: `${quote.quote_number} ${quote.titel} ${quote.company_name ?? ""}`,
                 actions: actions.length > 0 ? actions : undefined,
@@ -1299,7 +1247,7 @@ export function LaventeCareBillingView({
               const notice = pending
                 ? {
                     text: pending.message,
-                    tone: "amber" as const,
+                    tone: "warning" as const,
                     link: settingsHref
                       ? { label: "Bevestig in Settings", href: settingsHref }
                       : undefined,
@@ -1322,7 +1270,7 @@ export function LaventeCareBillingView({
                   overdueDays > 0
                     ? {
                         label: `${overdueDays} ${overdueDays === 1 ? "dag" : "dagen"} te laat`,
-                        tone: "rose" as const,
+                        tone: "danger" as const,
                       }
                     : undefined,
                 filterKeys: [invoice.status, ...(overdueDays > 0 ? ["te_laat"] : [])],
@@ -1364,19 +1312,19 @@ function BillingMetric({
   detail: string;
 }) {
   return (
-    <div className="glass min-w-0 p-4">
+    <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">
             {metricLabel}
           </p>
-          <p className="mt-2 truncate text-xl font-bold text-white">{value}</p>
+          <p className="mt-2 truncate text-xl font-bold text-[var(--color-text)]">{value}</p>
         </div>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 text-amber-300">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]">
           <Icon size={18} />
         </div>
       </div>
-      <p className="mt-3 line-clamp-2 text-sm text-slate-400">{detail}</p>
+      <p className="mt-3 line-clamp-2 text-sm text-[var(--color-text-muted)]">{detail}</p>
     </div>
   );
 }
@@ -1384,27 +1332,27 @@ function BillingMetric({
 function ProviderStatus({ billing }: { billing?: BillingItem }) {
   const ready = Boolean(billing?.summary.bunqReady);
   return (
-    <div className="glass p-4">
+    <div className={cn(surfaceVariants({ padding: "none" }), "p-4")}>
       <div className="flex items-start gap-3">
         <div
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
             ready
-              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-300"
-              : "border-sky-500/25 bg-sky-500/10 text-sky-300",
+              ? "border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)]"
+              : "border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)]",
           )}
         >
           <Banknote size={18} />
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">
             Betaalprovider
           </p>
-          <h4 className="mt-1 text-sm font-bold text-white">
+          <h4 className="mt-1 text-sm font-bold text-[var(--color-text)]">
             bunq{" "}
             {ready ? "klaar voor live koppeling" : "voorbereid in facturen"}
           </h4>
-          <p className="mt-2 text-sm leading-5 text-slate-400">
+          <p className="mt-2 text-sm leading-5 text-[var(--color-text-muted)]">
             {ready
               ? "Facturen maken eerst een bevestigingsactie. Na akkoord wordt een bunq RequestInquiry gekoppeld en krijgt de factuur status verstuurd; mailen doe je daarna via Mailbox."
               : "De betaalprovider-configuratie op de server ontbreekt nog; die moet compleet zijn voordat live betaalverzoeken aangaan."}
@@ -1446,85 +1394,77 @@ function TargetFields({
   const filteredWorkstreams = companyId
     ? workstreams.filter((workstream) => workstream.company_id === companyId)
     : workstreams;
+  const generatedId = useId();
+  const companyControlId = companySelectId ?? generatedId + "-company";
+  const projectControlId = generatedId + "-project";
+  const workstreamControlId = generatedId + "-workstream";
+
   return (
     <div className="grid gap-3 md:grid-cols-3">
-      <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-          Klant <span className="text-rose-300">*</span>
-        </span>
-        <select
-          id={companySelectId}
-          required
-          aria-invalid={Boolean(companyError)}
-          value={companyId}
-          onChange={(event) =>
-            onChange({
-              companyId: event.target.value,
-              projectId: "",
-              workstreamId: "",
-            })
-          }
-          className={cn(
-            selectClass,
-            companyError && "border-rose-400/60 focus:border-rose-400/60",
-          )}
-        >
-          <option value="">Kies klant</option>
-          {companies.map((company) => (
-            <option
-              key={company._id ?? company.id}
-              value={company._id ?? company.id}
-            >
-              {company.naam}
-            </option>
-          ))}
-        </select>
-        {companyError ? (
-          <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
-            {companyError}
-          </p>
-        ) : null}
-      </label>
-      <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-          Project
-        </span>
-        <select
-          value={projectId}
-          onChange={(event) => onChange({ projectId: event.target.value })}
-          className={selectClass}
-        >
-          <option value="">Geen project</option>
-          {filteredProjects.map((project) => (
-            <option
-              key={project._id ?? project.id}
-              value={project._id ?? project.id}
-            >
-              {project.naam}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="block">
-        <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-          Opdracht
-        </span>
-        <select
-          value={workstreamId}
-          onChange={(event) => onChange({ workstreamId: event.target.value })}
-          className={selectClass}
-        >
-          <option value="">Geen opdracht</option>
-          {filteredWorkstreams.map((workstream) => (
-            <option
-              key={workstream._id ?? workstream.id}
-              value={workstream._id ?? workstream.id}
-            >
-              {workstream.titel}
-            </option>
-          ))}
-        </select>
-      </label>
+      <FormField
+        id={companyControlId}
+        label={
+          <>
+            Klant <span className="text-[var(--color-danger)]">*</span>
+          </>
+        }
+        error={companyError}
+      >
+        {(controlProps) => (
+          <Select
+            {...controlProps}
+            required
+            value={companyId}
+            invalid={Boolean(companyError)}
+            onChange={(event) =>
+              onChange({
+                companyId: event.target.value,
+                projectId: "",
+                workstreamId: "",
+              })
+            }
+          >
+            <option value="">Kies klant</option>
+            {companies.map((company) => (
+              <option key={company._id ?? company.id} value={company._id ?? company.id}>
+                {company.naam}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
+      <FormField id={projectControlId} label="Project" optional>
+        {(controlProps) => (
+          <Select
+            {...controlProps}
+            value={projectId}
+            onChange={(event) => onChange({ projectId: event.target.value })}
+          >
+            <option value="">Geen project</option>
+            {filteredProjects.map((project) => (
+              <option key={project._id ?? project.id} value={project._id ?? project.id}>
+                {project.naam}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
+      <FormField id={workstreamControlId} label="Opdracht" optional>
+        {(controlProps) => (
+          <Select
+            {...controlProps}
+            value={workstreamId}
+            onChange={(event) => onChange({ workstreamId: event.target.value })}
+          >
+            <option value="">Geen opdracht</option>
+            {filteredWorkstreams.map((workstream) => (
+              <option key={workstream._id ?? workstream.id} value={workstream._id ?? workstream.id}>
+                {workstream.titel}
+              </option>
+            ))}
+          </Select>
+        )}
+      </FormField>
     </div>
   );
 }
@@ -1553,43 +1493,46 @@ function NumberField({
    *  getallen (step=1 + afronden) zodat "90,5" geen decode-fail-toast geeft. */
   integer?: boolean;
 }) {
+  const generatedId = useId();
+  const controlId = id ?? generatedId;
+
   return (
-    <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-normal text-slate-500">
-        {fieldLabel}
-        {required ? <span className="text-rose-300"> *</span> : null}
-        {hint ? (
-          <span className="ml-1 normal-case tracking-normal text-slate-600">({hint})</span>
-        ) : null}
-      </span>
-      <input
-        id={id}
-        type="number"
-        min={0}
-        step={integer ? 1 : "0.01"}
-        value={value}
-        disabled={disabled}
-        required={required}
-        aria-invalid={Boolean(error)}
-        onChange={(event) => {
-          if (event.target.value === "") {
-            onChange("");
-            return;
-          }
-          const parsed = Number(event.target.value);
-          onChange(integer ? Math.round(parsed) : parsed);
-        }}
-        className={cn(
-          inputClass,
-          error && "border-rose-400/60 focus:border-rose-400/60",
-        )}
-      />
-      {error ? (
-        <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
-          {error}
-        </p>
-      ) : null}
-    </label>
+    <FormField
+      id={controlId}
+      label={
+        <>
+          {fieldLabel}
+          {required ? <span className="text-[var(--color-danger)]"> *</span> : null}
+          {hint ? (
+            <span className="ml-1 text-xs font-normal text-[var(--color-text-subtle)]">
+              ({hint})
+            </span>
+          ) : null}
+        </>
+      }
+      error={error}
+    >
+      {(controlProps) => (
+        <Input
+          {...controlProps}
+          type="number"
+          min={0}
+          step={integer ? 1 : "0.01"}
+          value={value}
+          disabled={disabled}
+          required={required}
+          invalid={Boolean(error)}
+          onChange={(event) => {
+            if (event.target.value === "") {
+              onChange("");
+              return;
+            }
+            const parsed = Number(event.target.value);
+            onChange(integer ? Math.round(parsed) : parsed);
+          }}
+        />
+      )}
+    </FormField>
   );
 }
 
@@ -1598,7 +1541,7 @@ type ListPanelItem = {
   title: string;
   meta: string;
   /** Klein statuslabel naast de titel, bijv. "12 dagen te laat" (N9). */
-  badge?: { label: string; tone: "rose" | "amber" | "emerald" };
+  badge?: { label: string; tone: UiTone };
   /** Sleutels waarop de filterchips matchen (M-H). */
   filterKeys?: string[];
   /** Tekst waarop het zoekveld matcht (M-H); valt terug op titel + meta. */
@@ -1607,7 +1550,7 @@ type ListPanelItem = {
    *  betaalverzoek dat nog bevestigd moet worden). */
   notice?: {
     text: string;
-    tone?: "amber" | "rose";
+    tone?: UiTone;
     link?: { label: string; href: string };
     onDismiss?: () => void;
   };
@@ -1615,11 +1558,6 @@ type ListPanelItem = {
   actions?: Array<{ label: string; busy: boolean; onClick: () => void }>;
 };
 
-const listBadgeClasses = {
-  rose: "border-rose-500/25 bg-rose-500/10 text-rose-300",
-  amber: "border-amber-500/25 bg-amber-500/10 text-amber-200",
-  emerald: "border-emerald-500/25 bg-emerald-500/10 text-emerald-200",
-} as const;
 
 function ListPanel({
   title,
@@ -1660,128 +1598,102 @@ function ListPanel({
   const visibleItems = capped && !expanded ? filteredItems.slice(0, initialCount) : filteredItems;
   const isFiltering = expanded && (activeChip !== null || needle.length > 0);
   return (
-    <div className="glass p-4">
-      <h4 className="text-sm font-bold text-white">
+    <div className={cn(surfaceVariants({ padding: "none" }), "p-4")}>
+      <h4 className="text-sm font-bold text-[var(--color-text)]">
         {expanded && expandedTitle ? expandedTitle : title}
       </h4>
       {expanded && (filterChips?.length || searchPlaceholder) ? (
         <div className="mt-2 space-y-2">
           {filterChips?.length ? (
             <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setActiveChip(null)}
-                aria-pressed={activeChip === null}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-                  activeChip === null
-                    ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
-                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-                )}
-              >
+              <Button type="button" size="sm" variant={activeChip === null ? "primary" : "secondary"} onClick={() => setActiveChip(null)} aria-pressed={activeChip === null} className="rounded-full">
                 Alles
-              </button>
+              </Button>
               {filterChips.map((chip) => (
-                <button
+                <Button
                   key={chip.key}
                   type="button"
-                  onClick={() =>
-                    setActiveChip((current) => (current === chip.key ? null : chip.key))
-                  }
+                  size="sm"
+                  variant={activeChip === chip.key ? "primary" : "secondary"}
+                  onClick={() => setActiveChip((current) => (current === chip.key ? null : chip.key))}
                   aria-pressed={activeChip === chip.key}
-                  className={cn(
-                    "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-                    activeChip === chip.key
-                      ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
-                      : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-                  )}
+                  className="rounded-full"
                 >
                   {chip.label}
-                </button>
+                </Button>
               ))}
             </div>
           ) : null}
           {searchPlaceholder ? (
-            <div className="relative">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"
-              />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={searchPlaceholder}
-                aria-label={searchPlaceholder}
-                className="w-full rounded-lg border border-white/10 bg-black/20 py-1.5 pl-8 pr-3 text-xs text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/50"
-              />
-            </div>
+            <SearchField
+              label={searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onClear={() => setQuery("")}
+              placeholder={searchPlaceholder}
+              density="compact"
+            />
           ) : null}
         </div>
       ) : null}
       <div className="mt-3 space-y-2">
         {isFiltering && filteredItems.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-3 text-sm text-slate-500">
+          <p className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-sm text-[var(--color-text-muted)]">
             Geen {expandNoun} voor deze filter.
           </p>
         ) : items.length > 0 ? (
           visibleItems.map((item) => (
             <div
               key={item.id}
-              className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-white">
+                  <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-[var(--color-text)]">
                     <span className="truncate">{item.title}</span>
                     {item.badge ? (
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold",
-                          listBadgeClasses[item.badge.tone],
-                        )}
-                      >
+                      <Badge tone={item.badge.tone} size="sm" className="shrink-0">
                         {item.badge.label}
-                      </span>
+                      </Badge>
                     ) : null}
                   </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                  <p className="mt-1 line-clamp-2 text-xs text-[var(--color-text-muted)]">
                     {item.meta}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col gap-1.5 sm:flex-row">
                   {(item.actions ?? (item.action ? [item.action] : [])).map(
                     (action) => (
-                      <button
+                      <Button
                         key={action.label}
                         type="button"
+                        size="sm"
+                        variant="secondary"
                         onClick={action.onClick}
-                        disabled={action.busy}
-                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
+                        loading={Boolean(action.busy)}
+                        loadingLabel={action.label}
                       >
-                        {action.busy ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : action.label === "Betaald" ||
-                          action.label === "Akkoord" ? (
-                          <CheckCircle2 size={13} />
+                        {action.label === "Betaald" || action.label === "Akkoord" ? (
+                          <CheckCircle2 size={13} aria-hidden="true" />
                         ) : action.label === "Factuur" ? (
-                          <ReceiptText size={13} />
+                          <ReceiptText size={13} aria-hidden="true" />
                         ) : action.label === "Betaalverzoek" ? (
-                          <Banknote size={13} />
+                          <Banknote size={13} aria-hidden="true" />
                         ) : action.label === "Document" ? (
-                          <FileText size={13} />
+                          <FileText size={13} aria-hidden="true" />
                         ) : action.label === "UBL" ? (
-                          <Download size={13} />
+                          <Download size={13} aria-hidden="true" />
                         ) : action.label === "Check betaling" ? (
-                          <RefreshCw size={13} />
+                          <RefreshCw size={13} aria-hidden="true" />
                         ) : action.label === "Afgewezen" ? (
-                          <XCircle size={13} />
+                          <XCircle size={13} aria-hidden="true" />
                         ) : action.label === "Verlopen" ? (
-                          <Clock3 size={13} />
+                          <Clock3 size={13} aria-hidden="true" />
                         ) : (
-                          <Send size={13} />
+                          <Send size={13} aria-hidden="true" />
                         )}
                         {action.label}
-                      </button>
+                      </Button>
                     ),
                   )}
                 </div>
@@ -1790,15 +1702,14 @@ function ListPanel({
                 <div
                   className={cn(
                     "mt-3 flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-center sm:justify-between",
-                    item.notice.tone === "rose"
-                      ? "border-rose-500/25 bg-rose-500/10"
-                      : "border-amber-500/25 bg-amber-500/10",
+                    uiToneClasses[item.notice.tone ?? "warning"].border,
+                    uiToneClasses[item.notice.tone ?? "warning"].surface,
                   )}
                 >
                   <p
                     className={cn(
                       "min-w-0 text-xs leading-5",
-                      item.notice.tone === "rose" ? "text-rose-100" : "text-amber-100",
+                      uiToneClasses[item.notice.tone ?? "warning"].text,
                     )}
                   >
                     {item.notice.text}
@@ -1807,20 +1718,13 @@ function ListPanel({
                     {item.notice.link ? (
                       <a
                         href={item.notice.link.href}
-                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/15 bg-white/[0.06] px-2.5 text-xs font-bold text-white transition hover:bg-white/[0.12]"
+                        className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface-active)] px-2.5 text-xs font-bold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)]"
                       >
                         {item.notice.link.label}
                       </a>
                     ) : null}
                     {item.notice.onDismiss ? (
-                      <button
-                        type="button"
-                        onClick={item.notice.onDismiss}
-                        aria-label="Melding sluiten"
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-                      >
-                        <XCircle size={14} />
-                      </button>
+                      <IconButton onClick={item.notice.onDismiss} label="Melding sluiten" icon={<XCircle size={14} />} />
                     ) : null}
                   </div>
                 </div>
@@ -1828,22 +1732,15 @@ function ListPanel({
             </div>
           ))
         ) : (
-          <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-3 text-sm text-slate-500">
+          <p className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-sm text-[var(--color-text-muted)]">
             {empty}
           </p>
         )}
       </div>
       {capped ? (
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-          className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
-        >
-          {expanded
-            ? "Toon minder"
-            : `Toon alle ${items.length} ${expandNoun}`}
-        </button>
+        <Button type="button" variant="ghost" size="sm" fullWidth onClick={() => setExpanded((value) => !value)} aria-expanded={expanded} className="mt-2">
+          {expanded ? "Toon minder" : `Toon alle ${items.length} ${expandNoun}`}
+        </Button>
       ) : null}
     </div>
   );
@@ -1953,9 +1850,9 @@ function TimeEntriesPanel({
   };
 
   return (
-    <div className="glass p-4">
+    <div className={cn(surfaceVariants({ padding: "none" }), "p-4")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-bold text-white">Urenregels</h4>
+        <h4 className="text-sm font-bold text-[var(--color-text)]">Urenregels</h4>
         <div className="flex flex-wrap gap-1.5">
           {(
             [
@@ -1964,41 +1861,34 @@ function TimeEntriesPanel({
               { key: "gefactureerd", label: `Gefactureerd (${invoicedEntries.length})` },
             ] as Array<{ key: TimeEntryTab; label: string }>
           ).map((chip) => (
-            <button
+            <Button
               key={chip.key}
               type="button"
+              size="sm"
+              variant={tab === chip.key ? "primary" : "secondary"}
               onClick={() => switchTab(chip.key)}
               aria-pressed={tab === chip.key}
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-                tab === chip.key
-                  ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
-                  : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-              )}
+              className="rounded-full"
             >
               {chip.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
       {rawTabEntries.length > 0 ? (
-        <div className="relative mt-3">
-          <Search
-            size={13}
-            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"
-          />
-          <input
-            value={entryQuery}
-            onChange={(event) => setEntryQuery(event.target.value)}
-            placeholder="Filter op omschrijving of klant..."
-            aria-label="Urenregels filteren"
-            className="w-full rounded-lg border border-white/10 bg-black/20 py-1.5 pl-8 pr-3 text-xs text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/50"
-          />
-        </div>
+        <SearchField
+          label="Urenregels filteren"
+          value={entryQuery}
+          onChange={(event) => setEntryQuery(event.target.value)}
+          onClear={() => setEntryQuery("")}
+          placeholder="Filter op omschrijving of klant..."
+          density="compact"
+          wrapperClassName="mt-3"
+        />
       ) : null}
       <div className="mt-3 space-y-2">
         {tabEntries.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] p-3 text-sm text-slate-500">
+          <p className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-sm text-[var(--color-text-muted)]">
             {entryNeedle
               ? `Geen urenregels gevonden voor "${entryQuery}".`
               : tab === "open"
@@ -2014,14 +1904,14 @@ function TimeEntriesPanel({
             return (
               <div
                 key={entry.id}
-                className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
+                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">
+                    <p className="truncate text-sm font-semibold text-[var(--color-text)]">
                       {entry.description}
                     </p>
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                    <p className="mt-1 line-clamp-2 text-xs text-[var(--color-text-muted)]">
                       {[
                         formatDate(entry.entry_date),
                         formatMinutes(entry.minutes),
@@ -2038,86 +1928,72 @@ function TimeEntriesPanel({
                     <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
                       {tab === "open" ? (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => (editing ? setEditingId(null) : startEdit(entry))}
-                            disabled={busy}
-                            className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
-                          >
-                            <Pencil size={13} />
+                          <Button type="button" size="sm" variant="secondary" onClick={() => (editing ? setEditingId(null) : startEdit(entry))} disabled={busy}>
+                            <Pencil size={13} aria-hidden="true" />
                             {editing ? "Sluit" : "Bewerk"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void onWriteOff(entry)}
-                            disabled={busy}
-                            className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
-                          >
-                            {busy ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
+                          </Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => void onWriteOff(entry)} loading={busy} loadingLabel="Afschrijven">
+                            <XCircle size={13} aria-hidden="true" />
                             Afschrijven
-                          </button>
+                          </Button>
                         </>
                       ) : onReopen ? (
-                        <button
-                          type="button"
-                          onClick={() => void onReopen(entry)}
-                          disabled={busy}
-                          className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 text-xs font-bold text-slate-300 transition hover:bg-white/[0.08] disabled:opacity-60"
-                        >
-                          {busy ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                        <Button type="button" size="sm" variant="secondary" onClick={() => void onReopen(entry)} loading={busy} loadingLabel="Heropenen">
+                          <RotateCcw size={13} aria-hidden="true" />
                           Heropenen
-                        </button>
+                        </Button>
                       ) : null}
-                      <button
-                        type="button"
-                        onClick={() => void onDelete(entry)}
-                        disabled={busy}
-                        className="inline-flex min-h-8 items-center justify-center gap-1 rounded-lg border border-rose-500/25 bg-rose-500/10 px-2 text-xs font-bold text-rose-300 transition hover:bg-rose-500/20 disabled:opacity-60"
-                      >
-                        {busy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                      <Button type="button" size="sm" variant="danger" onClick={() => void onDelete(entry)} loading={busy} loadingLabel="Verwijder">
+                        <Trash2 size={13} aria-hidden="true" />
                         Verwijder
-                      </button>
+                      </Button>
                     </div>
                   ) : null}
                 </div>
                 {editing && tab === "open" ? (
-                  <div className="mt-3 grid gap-2 border-t border-white/5 pt-3 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
-                    <label className="block">
-                      <span className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">
-                        Omschrijving
-                      </span>
-                      <input
-                        value={editDescription}
-                        onChange={(event) => setEditDescription(event.target.value)}
-                        className={inputClass}
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">
-                        Minuten
-                      </span>
-                      <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={editMinutes}
-                        onChange={(event) =>
-                          setEditMinutes(event.target.value === "" ? "" : Number(event.target.value))
-                        }
-                        className={inputClass}
-                      />
-                    </label>
-                    <button
+                  <div className="mt-3 grid gap-2 border-t border-[var(--color-border)] pt-3 sm:grid-cols-[minmax(0,1fr)_110px_auto]">
+                    <FormField
+                      id="billing-entry-edit-description"
+                      label="Omschrijving"
+                    >
+                      {(controlProps) => (
+                        <Input
+                          {...controlProps}
+                          value={editDescription}
+                          onChange={(event) => setEditDescription(event.target.value)}
+
+                        />
+                      )}
+                    </FormField>
+                    <FormField
+                      id="billing-entry-edit-minutes"
+                      label="Minuten"
+                    >
+                      {(controlProps) => (
+                        <Input
+                          {...controlProps}
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={editMinutes}
+                          onChange={(event) =>
+                            setEditMinutes(event.target.value === "" ? "" : Number(event.target.value))
+                          }
+
+                        />
+                      )}
+                    </FormField>
+                    <Button
                       type="button"
                       onClick={() => void saveEdit(entry)}
                       disabled={busy}
-                      className="btn btn--primary self-end justify-center"
+                      variant="primary" className="self-end"
                     >
-                      {busy ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                      {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <CheckCircle2 size={14} />}
                       Opslaan
-                    </button>
+                    </Button>
                     {editError ? (
-                      <p className="text-xs font-semibold text-rose-300 sm:col-span-3" role="alert">
+                      <p className="text-xs font-semibold text-[var(--color-danger)] sm:col-span-3" role="alert">
                         {editError}
                       </p>
                     ) : null}
@@ -2129,14 +2005,9 @@ function TimeEntriesPanel({
         )}
       </div>
       {tabEntries.length > TIME_ENTRIES_INITIAL_COUNT ? (
-        <button
-          type="button"
-          onClick={() => setShowAll((value) => !value)}
-          aria-expanded={showAll}
-          className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
-        >
+        <Button type="button" variant="ghost" size="sm" fullWidth onClick={() => setShowAll((value) => !value)} aria-expanded={showAll} className="mt-2">
           {showAll ? "Toon minder" : `Toon alle ${tabEntries.length} regels`}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

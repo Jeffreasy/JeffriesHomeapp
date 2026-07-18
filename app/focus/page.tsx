@@ -1,13 +1,18 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { IconButton } from "@/components/ui/IconButton";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { DailyChecklist } from "@/components/habits/DailyChecklist";
 import { useDevices, useLampCommand } from "@/hooks/useDevices";
 import { getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
@@ -30,50 +35,55 @@ import {
 } from "@/lib/api";
 import type { DienstRow } from "@/lib/schedule";
 import { CUSTOM_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 import { cn } from "@/lib/utils";
+import { scheduleToneVars } from "@/components/schedule/schedulePresentation";
+import { createLampAmbientStyle } from "@/lib/lampPresentation";
+
+const LazyCreateEventModal = dynamic(
+  () => import("@/components/schedule/CreateEventModal").then((module) => module.CreateEventModal),
+  { ssr: false },
+);
+
 
 /*
  * Kiosk-designtaal (R4-redesign):
- *  - Kleur = betekenis. Kaarten zijn neutraal; een dunne accent-rail codeert de
- *    sóórt (dienst = amber, afspraak = sky), emerald = nu bezig, en alleen échte
- *    urgentie (aandachtspunten) krijgt een gevulde rose/amber-kaart. Voorheen
- *    kleurde het shift-type hele kaarten donkerrood en oogde het hele board als
- *    één storing.
+ *  - Tone = betekenis. Kaarten blijven neutraal; een accent- of info-rail
+ *    onderscheidt de soort, success is uitsluitend een actieve/afgeronde status
+ *    en danger/warning blijven gereserveerd voor echte urgentie. Zo domineert
+ *    categoriekleur nooit de operationele status van het bord.
  *  - Alles past ALTIJD in de viewport op xl: kolommen zijn flex-cols met
  *    min-h-0 + interne overflow, geen vaste grid-rows die content afkappen.
  *  - De hero toont het eerstvolgende item groot mét countdown — niet het woord
  *    "Focus". De tijdlijn begint ná het hero-item (geen duplicaat).
  */
 
-const PANEL =
-  "rounded-2xl border border-white/[0.07] bg-gradient-to-b from-white/[0.045] to-white/[0.015] shadow-[0_18px_50px_rgba(0,0,0,0.35)]";
+const PANEL = cn(
+  surfaceVariants({ tone: "subtle", padding: "none" }),
+  "bg-gradient-to-b from-[var(--color-surface-hover)] to-[var(--color-surface-muted)] shadow-[var(--shadow-surface)]",
+);
 
 type Accent = {
+  tone: UiTone;
   rail: string;
   text: string;
   chip: string;
-  glow: string;
 };
 
+function createAccent(tone: UiTone): Accent {
+  const classes = uiToneClasses[tone];
+  return {
+    tone,
+    rail: classes.dot,
+    text: classes.text,
+    chip: cn(classes.border, classes.surface, classes.text),
+  };
+}
+
 const ACCENTS: Record<"dienst" | "afspraak" | "now", Accent> = {
-  dienst: {
-    rail: "bg-amber-400",
-    text: "text-amber-200",
-    chip: "border-amber-400/25 bg-amber-400/10 text-amber-200",
-    glow: "rgba(245,158,11,0.14)",
-  },
-  afspraak: {
-    rail: "bg-sky-400",
-    text: "text-sky-200",
-    chip: "border-sky-400/25 bg-sky-400/10 text-sky-200",
-    glow: "rgba(56,189,248,0.13)",
-  },
-  now: {
-    rail: "bg-emerald-400",
-    text: "text-emerald-200",
-    chip: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-    glow: "rgba(52,211,153,0.16)",
-  },
+  dienst: createAccent("accent"),
+  afspraak: createAccent("info"),
+  now: createAccent("success"),
 };
 
 function accentFor(item: FocusTimelineItem): Accent {
@@ -84,22 +94,22 @@ function accentFor(item: FocusTimelineItem): Accent {
 function severityClasses(severity: string) {
   switch (severity) {
     case "high":
-      return "border-rose-400/30 bg-rose-500/[0.12]";
+      return "border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)]";
     case "medium":
-      return "border-amber-400/25 bg-amber-500/10";
+      return "border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)]";
     default:
-      return "border-sky-400/20 bg-sky-500/[0.08]";
+      return "border-[var(--color-info-border)] bg-[var(--color-info-subtle)]";
   }
 }
 
 function severityIconTone(severity: string) {
   switch (severity) {
     case "high":
-      return "text-rose-300";
+      return "text-[var(--color-danger)]";
     case "medium":
-      return "text-amber-300";
+      return "text-[var(--color-warning)]";
     default:
-      return "text-sky-300";
+      return "text-[var(--color-info)]";
   }
 }
 
@@ -142,36 +152,34 @@ function Header({
   /** M-G: subtiele 1-2px verschuiving van de grote klok tegen OLED burn-in. */
   jitter?: { x: number; y: number };
 }) {
-  // F4: op een wandkiosk moet een hangende refresh zichtbaar zijn — rose bij
-  // een echte fout, amber wanneer de data ouder is dan ~2 refresh-intervallen.
-  const timestampClass = summaryError ? "text-rose-300" : stale ? "text-amber-300" : "text-slate-500";
+  // A wall kiosk must surface stalled refreshes: danger for failure, warning once data exceeds about two refresh intervals.
+  const timestampClass = summaryError ? "text-[var(--color-danger)]" : stale ? "text-[var(--color-warning)]" : "text-[var(--color-text-subtle)]";
   return (
-    <header className="relative flex shrink-0 flex-col gap-3 border-b border-white/[0.07] bg-black/25 px-4 py-3 backdrop-blur-xl sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+    <header className="relative flex shrink-0 flex-col gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface-active)] px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-6 lg:flex-row lg:items-center lg:justify-between">
       {/* Dunne accentlijn onderaan de header — geeft de kiosk een as. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[var(--color-primary)] to-transparent"
       />
-      <div className="flex min-w-0 items-end gap-5">
+      <div className="flex min-w-0 items-end gap-3 sm:gap-5">
         <div
-          className="font-mono text-5xl font-semibold leading-none tracking-tight text-white sm:text-6xl"
+          className="shrink-0 translate-x-[var(--focus-jitter-x)] translate-y-[var(--focus-jitter-y)] font-mono text-4xl font-semibold leading-none tracking-tight text-[var(--color-text)] transition-transform duration-[var(--motion-slow)] ease-[var(--ease-standard)] motion-reduce:transition-none sm:text-6xl"
           style={{
-            // Alleen transform (geen reflow); verschuift elke paar minuten 1-2px.
-            transform: `translate(${jitter?.x ?? 0}px, ${jitter?.y ?? 0}px)`,
-            transition: "transform 1.5s ease",
-          }}
+            "--focus-jitter-x": `${jitter?.x ?? 0}px`,
+            "--focus-jitter-y": `${jitter?.y ?? 0}px`,
+          } as CSSProperties}
         >
           {time ?? "--:--"}
         </div>
         <div className="min-w-0 pb-1">
-          <p className="truncate text-base font-semibold capitalize text-slate-100">{today ?? "Focus laden"}</p>
-          <p className={`mt-0.5 text-xs ${timestampClass}`}>
+          <p className="truncate text-sm font-semibold capitalize text-[var(--color-text)] sm:text-base">{today ?? "Focus laden"}</p>
+          <p className={`mt-0.5 truncate text-xs ${timestampClass}`}>
             Bijgewerkt {formatGeneratedAt(generatedAt)}
             {summaryError ? " · verversen mislukt" : stale ? " · verouderd" : ""}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 lg:flex lg:w-auto">
         <HeaderPill
           icon="radar"
           label={attentionCount === 0 ? "Alles rustig" : `${attentionCount} aandacht`}
@@ -180,7 +188,7 @@ function Header({
         <HeaderPill icon={bridgeOnline ? "wifi" : "wifiOff"} label={bridgeOnline ? "Bridge live" : "Bridge offline"} tone={bridgeOnline ? "ok" : "warn"} />
         <Link
           href="/"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-hover)] px-3.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)]"
         >
           <AppIcon name="dashboard" size="xs" />
           App
@@ -194,10 +202,10 @@ function HeaderPill({ icon, label, tone }: { icon: "radar" | "wifi" | "wifiOff";
   return (
     <div
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-semibold",
+        "inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2.5 text-xs font-semibold sm:px-3.5",
         tone === "ok"
-          ? "border-emerald-400/20 bg-emerald-500/[0.08] text-emerald-200"
-          : "border-amber-400/30 bg-amber-500/10 text-amber-200",
+          ? "border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)]"
+          : "border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]",
       )}
     >
       <AppIcon name={icon} size="xs" />
@@ -215,7 +223,7 @@ function SkeletonLines({ rows = 3 }: { rows?: number }) {
   return (
     <div role="status" aria-live="polite" className="space-y-2">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-12 animate-pulse rounded-xl border border-white/[0.06] bg-white/[0.03]" />
+        <Skeleton key={i} className="h-12 border border-[var(--color-border)]" />
       ))}
       <span className="sr-only">Laden…</span>
     </div>
@@ -262,14 +270,14 @@ function HeroPanel({
       {/* Zachte glow in de accentkleur — de hero mag als enige paneel gloeien. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full blur-3xl"
-        style={{ background: item ? accent.glow : "rgba(245,158,11,0.08)" }}
+        className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[color-mix(in_srgb,var(--schedule-accent)_14%,transparent)] blur-3xl"
+        style={scheduleToneVars(accent.tone)}
       />
       <div className="relative">
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Nu centraal</p>
+          <p className="text-micro font-semibold uppercase tracking-[0.2em] text-[var(--color-text-subtle)]">Nu centraal</p>
           {item && (
-            <span className={cn("rounded-lg border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide", accent.chip)}>
+            <span className={cn("rounded-lg border px-2.5 py-1 text-micro font-bold uppercase tracking-wide", accent.chip)}>
               {item.status === "now" ? "Bezig" : "Volgende"}
             </span>
           )}
@@ -278,34 +286,34 @@ function HeroPanel({
         {item ? (
           // In-place detail (afspraak-modal / dienst-modal) i.p.v. een
           // paginanavigatie die je van het kiosk-scherm haalt (R4-interactie).
-          <button type="button" onClick={() => onOpen(item)} className="group mt-4 block w-full text-left">
+          <button type="button" onClick={() => onOpen(item)} className="group mt-4 block min-h-11 w-full text-left">
             <div className="flex items-baseline justify-between gap-3">
-              <h1 className="min-w-0 truncate text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl">
+              <h1 className="min-w-0 truncate text-4xl font-bold leading-tight tracking-tight text-[var(--color-text)] sm:text-5xl">
                 {item.title}
               </h1>
-              <span className="hidden shrink-0 font-mono text-lg font-semibold text-slate-300 sm:block">{item.timeLabel}</span>
+              <span className="hidden shrink-0 font-mono text-lg font-semibold text-[var(--color-text)] sm:block">{item.timeLabel}</span>
             </div>
-            <p className="mt-2 truncate text-base text-slate-400">{item.subtitle}</p>
+            <p className="mt-2 truncate text-base text-[var(--color-text-muted)]">{item.subtitle}</p>
             <div className="mt-5 flex flex-wrap items-center gap-2">
               {countdown && (
                 <span className={cn("rounded-lg border px-3 py-1.5 font-mono text-sm font-semibold", accent.chip)}>
                   {countdown}
                 </span>
               )}
-              <span className="truncate text-sm font-medium text-slate-500 transition-colors group-hover:text-slate-400">
+              <span className="truncate text-sm font-medium text-[var(--color-text-subtle)] transition-colors group-hover:text-[var(--color-text-muted)]">
                 {formatTimelineMeta(item, todayIso)}
               </span>
             </div>
           </button>
         ) : isLoading ? (
-          <div role="status" aria-live="polite" className="mt-4 animate-pulse rounded-xl border border-white/[0.07] bg-white/[0.03] p-6">
-            <p className="text-lg font-semibold text-slate-400">Laden…</p>
-            <p className="mt-1 text-sm text-slate-600">Rooster en agenda worden opgehaald.</p>
+          <div role="status" aria-live="polite" className="mt-4 animate-pulse rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-6 motion-reduce:animate-none">
+            <p className="text-lg font-semibold text-[var(--color-text-muted)]">Laden…</p>
+            <p className="mt-1 text-sm text-[var(--color-text-subtle)]">Rooster en agenda worden opgehaald.</p>
           </div>
         ) : (
-          <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.03] p-6">
-            <p className="text-2xl font-bold text-white">Vrij moment</p>
-            <p className="mt-1 text-sm text-slate-500">Geen dienst of afspraak in de komende dagen.</p>
+          <div className="mt-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-6">
+            <p className="text-2xl font-bold text-[var(--color-text)]">Vrij moment</p>
+            <p className="mt-1 text-sm text-[var(--color-text-subtle)]">Geen dienst of afspraak in de komende dagen.</p>
           </div>
         )}
       </div>
@@ -366,8 +374,8 @@ function TimelinePanel({
           groups.map((group) => (
             <div key={group.label}>
               <div className="mb-1.5 flex items-center gap-3">
-                <p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{group.label}</p>
-                <div className="h-px flex-1 bg-white/[0.06]" />
+                <p className="shrink-0 text-micro font-semibold uppercase tracking-[0.16em] text-[var(--color-text-subtle)]">{group.label}</p>
+                <div className="h-px flex-1 bg-[var(--color-surface-hover)]" />
               </div>
               <div className="space-y-1.5">
                 {group.items.map((item) => {
@@ -378,24 +386,24 @@ function TimelinePanel({
                       type="button"
                       onClick={() => onOpen(item)}
                       className={cn(
-                        "grid min-h-[52px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-white/[0.02] px-3 py-2 text-left transition-colors hover:bg-white/[0.055]",
-                        item.status === "now" ? "border-emerald-400/30" : "border-white/[0.06]",
+                        "grid min-h-14 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border bg-[var(--color-surface-muted)] px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)]",
+                        item.status === "now" ? "border-[var(--color-success-border)]" : "border-[var(--color-border)]",
                       )}
                     >
                       <div className="flex items-center gap-2.5">
                         <span aria-hidden className={cn("h-8 w-1 shrink-0 rounded-full", accent.rail)} />
-                        <span className="w-[86px] font-mono text-[13px] font-semibold leading-tight text-slate-200">
+                        <span className="w-[86px] font-mono text-[13px] font-semibold leading-tight text-[var(--color-text)]">
                           {item.timeLabel}
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-[15px] font-semibold text-white">{item.title}</p>
-                        <p className="mt-0.5 truncate text-xs text-slate-500">{item.subtitle}</p>
+                        <p className="truncate text-[15px] font-semibold text-[var(--color-text)]">{item.title}</p>
+                        <p className="mt-0.5 truncate text-xs text-[var(--color-text-subtle)]">{item.subtitle}</p>
                       </div>
                       <span
                         className={cn(
-                          "hidden shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold sm:inline-block",
-                          item.status === "now" ? ACCENTS.now.chip : "border-transparent text-slate-500",
+                          "hidden shrink-0 rounded-md border px-2 py-0.5 text-micro font-semibold sm:inline-block",
+                          item.status === "now" ? ACCENTS.now.chip : "border-transparent text-[var(--color-text-subtle)]",
                         )}
                       >
                         {item.status === "now" ? "Nu" : item.kind === "dienst" ? "Dienst" : "Afspraak"}
@@ -450,12 +458,12 @@ function AttentionPanel({
                     iconClassName={cn("mt-0.5 shrink-0", severityIconTone(item.severity))}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-white">{item.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-300">{item.detail}</p>
+                    <p className="text-sm font-bold text-[var(--color-text)]">{item.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--color-text)]">{item.detail}</p>
                   </div>
                   {/* In-place kaarten openen een modal op de kiosk; de rest
                       verlaat bewust de pagina — de pijl markeert dat verschil. */}
-                  <span aria-hidden className="mt-0.5 shrink-0 text-sm font-semibold text-slate-500">
+                  <span aria-hidden className="mt-0.5 shrink-0 text-sm font-semibold text-[var(--color-text-subtle)]">
                     {inPlace ? "▸" : item.href ? "→" : ""}
                   </span>
                 </div>
@@ -463,13 +471,13 @@ function AttentionPanel({
             );
             if (inPlace) {
               return (
-                <button key={item.id} type="button" onClick={() => onOpen(item)} className="block w-full text-left transition-opacity hover:opacity-85">
+                <button key={item.id} type="button" onClick={() => onOpen(item)} className="block min-h-11 w-full text-left transition-opacity hover:opacity-85">
                   {content}
                 </button>
               );
             }
             return item.href ? (
-              <Link key={item.id} href={item.href} className="block transition-opacity hover:opacity-85">
+              <Link key={item.id} href={item.href} className="block min-h-11 transition-opacity hover:opacity-85">
                 {content}
               </Link>
             ) : (
@@ -536,21 +544,13 @@ function SystemPanel({
             action={
               // F5: dezelfde "finance"-privacyscope als de eye-toggles op de
               // andere pagina's — maskeren/tonen kan nu ook vanaf de kiosk.
-              <button
-                type="button"
+              <IconButton
                 onClick={finance.togglePrivacy}
                 aria-pressed={finance.hidden}
-                aria-label={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
-                title={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
-                className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors",
-                  finance.hidden
-                    ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200",
-                )}
-              >
-                <AppIcon name={finance.hidden ? "hide" : "show"} size="xs" />
-              </button>
+                label={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
+                icon={<AppIcon name={finance.hidden ? "hide" : "show"} size="xs" />}
+                variant={finance.hidden ? "primary" : "secondary"}
+              />
             }
           />
           <InfoRow label="Volgende afspraak" value={nextAppointment} />
@@ -564,11 +564,11 @@ function StatusChip({ ok, label }: { ok: boolean; label: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold",
-        ok ? "border-white/[0.08] bg-white/[0.03] text-slate-300" : "border-amber-400/30 bg-amber-500/10 text-amber-200",
+        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-micro font-semibold",
+        ok ? "border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text)]" : "border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]",
       )}
     >
-      <span aria-hidden className={cn("h-1.5 w-1.5 rounded-full", ok ? "bg-emerald-400" : "bg-amber-400")} />
+      <span aria-hidden className={cn("h-1.5 w-1.5 rounded-full", ok ? "bg-[var(--color-success)]" : "bg-[var(--color-warning)]")} />
       {label}
     </span>
   );
@@ -596,47 +596,46 @@ function FocusLightControls() {
   const allOff = onDevices.length === 0;
   const toggleLabel = allOff ? "Alles aan" : "Alles uit";
 
-  const applyCommand = (label: string, cmd: DeviceCommand) => {
+  const applyCommand = async (label: string, cmd: DeviceCommand) => {
+    if (isPending) return;
+
     if (!canSend) {
       error("Geen online lampen beschikbaar");
       return;
     }
 
-    // R3-16: use the shared sendBatch path (like home/lampen) — one optimistic
-    // patch + one bundled error toast, instead of N invalidate-refetches and up
-    // to N error toasts from forEach(sendCommand). The toast reports what was
-    // SENT (the real outcome surfaces via sendBatch's bundled failure toast),
-    // not a premature success claim.
-    sendBatch(onlineDevices, cmd);
-    success(`${label} verstuurd naar ${onlineDevices.length} lampen`);
+    // sendBatch meldt partial/total failures zelf als één gebundelde fout. Een
+    // succesmelding is daarom uitsluitend juist als elk uniek doel slaagde.
+    const result = await sendBatch(onlineDevices, cmd);
+    if (result.total > 0 && result.failed.length === 0) {
+      success(`${label} verstuurd naar ${result.succeeded} lampen`);
+    }
   };
 
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-black/20 p-3">
+    <div aria-busy={isPending} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <AppIcon name="lights" size="sm" tone="amber" framed />
+          <AppIcon name="lights" size="sm" tone="accent" framed />
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">Lichten</p>
-            <p className="truncate text-xs text-slate-500">
+            <p className="truncate text-sm font-bold text-[var(--color-text)]">Lichten</p>
+            <p className="truncate text-xs text-[var(--color-text-subtle)]">
               {isLoading ? "Laden…" : `${onlineDevices.length} online · ${onDevices.length} aan`}
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => applyCommand(toggleLabel, allOff ? { on: true, brightness: 70 } : { on: false })}
-          disabled={!canSend || isPending}
-          className={cn(
-            "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
-            allOff
-              ? "border-amber-400/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15"
-              : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]",
-          )}
+        <Button
+          onClick={() => void applyCommand(toggleLabel, allOff ? { on: true, brightness: 70 } : { on: false })}
+          disabled={!canSend}
+          loading={isPending}
+          loadingLabel="Bezig…"
+          variant={allOff ? "warning" : "secondary"}
+          size="sm"
+          className="shrink-0"
         >
           <AppIcon name="power" size="xs" />
           {toggleLabel}
-        </button>
+        </Button>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-5 xl:grid-cols-2 2xl:grid-cols-5">
@@ -646,20 +645,19 @@ function FocusLightControls() {
             <button
               key={scene.id}
               type="button"
-              onClick={() => applyCommand(scene.label, scene.command)}
+              onClick={() => void applyCommand(scene.label, scene.command)}
               disabled={!canSend || isPending}
               aria-pressed={active}
               className={cn(
-                "flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border px-2 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-45",
-                active ? "bg-white/[0.09]" : "bg-white/[0.02] hover:bg-white/[0.06]",
+                "flex min-h-[var(--touch-target)] flex-col items-center justify-center gap-1 rounded-xl border px-2 py-1.5 transition-[background-color,border-color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-standard)] disabled:cursor-not-allowed disabled:opacity-45",
+                active
+                  ? "border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-medium)] shadow-[0_0_18px_-6px_var(--lamp-ambient-shadow)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface-muted)] hover:bg-[var(--color-surface-hover)]",
               )}
-              style={{
-                borderColor: active ? scene.color : "rgba(255,255,255,0.07)",
-                boxShadow: active ? `0 0 18px -6px ${scene.color}` : undefined,
-              }}
+              style={createLampAmbientStyle(scene.color, true)}
             >
-              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: scene.color }} />
-              <span className="max-w-full truncate text-[11px] font-bold text-white">{scene.label}</span>
+              <span aria-hidden className="h-2 w-2 rounded-full bg-[var(--lamp-accent)]" />
+              <span className="max-w-full truncate text-micro font-bold text-[var(--color-text)]">{scene.label}</span>
             </button>
           );
         })}
@@ -701,7 +699,7 @@ function HabitNotePanel({
       />
       <div className="mt-3 grid min-h-0 flex-1 gap-4 sm:grid-cols-2">
         <div className="flex min-h-0 flex-col">
-          <p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Habits</p>
+          <p className="shrink-0 text-micro font-semibold uppercase tracking-[0.16em] text-[var(--color-text-subtle)]">Habits</p>
           <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
             {isLoading && habits.length === 0 ? (
               <SkeletonLines rows={3} />
@@ -713,17 +711,17 @@ function HabitNotePanel({
                     <AppIcon
                       name={habit.done ? "statusOk" : "statusActive"}
                       size="sm"
-                      iconClassName={cn(habit.done ? "text-emerald-300" : "text-slate-500", pending && "animate-pulse")}
+                      iconClassName={cn(habit.done ? "text-[var(--color-success)]" : "text-[var(--color-text-subtle)]", pending && "animate-pulse motion-reduce:animate-none")}
                     />
                     <div className="min-w-0">
-                      <p className={cn("truncate text-sm font-semibold", habit.done ? "text-slate-400" : "text-white")}>{habit.title}</p>
-                      <p className="truncate text-xs text-slate-500">{habit.meta}</p>
+                      <p className={cn("truncate text-sm font-semibold", habit.done ? "text-[var(--color-text-muted)]" : "text-[var(--color-text)]")}>{habit.title}</p>
+                      <p className="truncate text-xs text-[var(--color-text-subtle)]">{habit.meta}</p>
                     </div>
                   </>
                 );
                 const rowClass = cn(
-                  "flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/[0.06] px-3 py-2 text-left transition-colors hover:bg-white/[0.055]",
-                  habit.done ? "bg-emerald-500/[0.05]" : "bg-white/[0.02]",
+                  "flex min-h-11 w-full items-center gap-3 rounded-xl border border-[var(--color-border)] px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)]",
+                  habit.done ? "bg-[var(--color-success-subtle)]" : "bg-[var(--color-surface-muted)]",
                 );
                 // Toggle-bare (positieve, niet-kwantitatieve) habits: één tik vinkt
                 // direct af (optimistic via useHabits). Kwantitatief/negatief/
@@ -750,7 +748,7 @@ function HabitNotePanel({
                     className={rowClass}
                   >
                     {inner}
-                    <span aria-hidden className="ml-auto shrink-0 text-sm font-semibold text-slate-600">▸</span>
+                    <span aria-hidden className="ml-auto shrink-0 text-sm font-semibold text-[var(--color-text-subtle)]">▸</span>
                   </button>
                 );
               })
@@ -760,7 +758,7 @@ function HabitNotePanel({
           </div>
         </div>
         <div className="flex min-h-0 flex-col">
-          <p className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Notities</p>
+          <p className="shrink-0 text-micro font-semibold uppercase tracking-[0.16em] text-[var(--color-text-subtle)]">Notities</p>
           <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
             {isLoading && visibleNotes.length === 0 ? (
               <SkeletonLines rows={3} />
@@ -770,18 +768,18 @@ function HabitNotePanel({
                   key={note.id}
                   type="button"
                   onClick={() => onOpenNote(note.id)}
-                  className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left transition-colors hover:bg-white/[0.055]"
+                  className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
                 >
                   <span
                     aria-hidden
                     className={cn(
                       "h-1.5 w-1.5 shrink-0 rounded-full",
-                      note.priority === "hoog" ? "bg-rose-400" : note.priority === "laag" ? "bg-slate-500" : "bg-sky-400",
+                      note.priority === "hoog" ? "bg-[var(--color-danger)]" : note.priority === "laag" ? "bg-[var(--color-surface-muted)]" : "bg-[var(--color-info)]",
                     )}
                   />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">{note.title}</p>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">{note.meta}</p>
+                    <p className="truncate text-sm font-semibold text-[var(--color-text)]">{note.title}</p>
+                    <p className="mt-0.5 truncate text-xs text-[var(--color-text-subtle)]">{note.meta}</p>
                   </div>
                 </button>
               ))
@@ -809,9 +807,9 @@ function BusinessPanel({ business, summaryError }: { business?: FocusBusinessSta
       <PanelHeader icon="business" label="LaventeCare" value={headerValue} />
       <div className="mt-3 grid grid-cols-4 gap-1.5">
         <Metric label="Opdrachten" value={metric(business?.activeWorkstreams)} />
-        <Metric label="Acties" value={metric(business?.openActions)} tone={overdue ? "rose" : undefined} />
+        <Metric label="Acties" value={metric(business?.openActions)} tone={overdue ? "danger" : undefined} />
         <Metric label="Offertes" value={metric(business?.openQuotes)} />
-        <Metric label="Open" value={formatEuroCents(business?.outstandingCents)} tone={(business?.openInvoices ?? 0) > 0 ? "amber" : undefined} />
+        <Metric label="Open" value={formatEuroCents(business?.outstandingCents)} tone={(business?.openInvoices ?? 0) > 0 ? "warning" : undefined} />
       </div>
     </section>
   );
@@ -823,34 +821,34 @@ function PanelHeader({ icon, label, value }: { icon: Parameters<typeof AppIcon>[
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="flex min-w-0 items-center gap-2.5">
-        <AppIcon name={icon} size="xs" iconClassName="text-amber-200/80" />
-        <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</p>
+        <AppIcon name={icon} size="xs" iconClassName="text-[var(--color-primary-hover)]" />
+        <p className="min-w-0 truncate text-micro font-semibold uppercase tracking-[0.2em] text-[var(--color-text-muted)]">{label}</p>
       </div>
-      <span className="shrink-0 rounded-lg border border-white/[0.08] bg-black/25 px-2.5 py-1 text-[11px] font-semibold text-slate-300">
+      <span className="shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] px-2.5 py-1 text-micro font-semibold text-[var(--color-text)]">
         {value}
       </span>
     </div>
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: "amber" | "rose" }) {
-  const color = tone === "rose" ? "text-rose-300" : tone === "amber" ? "text-amber-200" : "text-slate-100";
+function Metric({ label, value, tone }: { label: string; value: string; tone?: UiTone }) {
+  const color = uiToneClasses[tone ?? "neutral"].text;
   return (
-    <div className="min-h-[52px] rounded-xl border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
-      <p className="truncate text-[11px] text-slate-500">{label}</p>
+    <div className="min-h-14 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2.5 py-2">
+      <p className="truncate text-micro text-[var(--color-text-subtle)]">{label}</p>
       <p className={`mt-1 truncate text-lg font-bold leading-tight ${color}`}>{value}</p>
     </div>
   );
 }
 
-function InfoRow({ label, value, meta, tone, action }: { label: string; value: string; meta?: string; tone?: "rose"; action?: ReactNode }) {
+function InfoRow({ label, value, meta, tone, action }: { label: string; value: string; meta?: string; tone?: UiTone; action?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] text-slate-500">{label}</p>
-          <p className={cn("mt-0.5 truncate text-sm font-semibold", tone === "rose" ? "text-rose-300" : "text-white")}>{value}</p>
-          {meta && <p className="mt-0.5 truncate text-[11px] text-slate-600">{meta}</p>}
+          <p className="text-micro text-[var(--color-text-subtle)]">{label}</p>
+          <p className={cn("mt-0.5 truncate text-sm font-semibold", uiToneClasses[tone ?? "neutral"].text)}>{value}</p>
+          {meta && <p className="mt-0.5 truncate text-micro text-[var(--color-text-subtle)]">{meta}</p>}
         </div>
         {action}
       </div>
@@ -860,9 +858,9 @@ function InfoRow({ label, value, meta, tone, action }: { label: string; value: s
 
 function EmptyLine({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.015] px-3 py-4">
-      <p className="text-sm font-semibold text-slate-300">{title}</p>
-      <p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p>
+    <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-4">
+      <p className="text-sm font-semibold text-[var(--color-text)]">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-[var(--color-text-subtle)]">{detail}</p>
     </div>
   );
 }
@@ -878,30 +876,23 @@ function addDaysIso(iso: string, days: number) {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
-      <p className="text-[11px] text-slate-500">{label}</p>
-      <p className="mt-0.5 truncate text-sm font-semibold text-white">{value}</p>
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2">
+      <p className="text-micro text-[var(--color-text-subtle)]">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-[var(--color-text)]">{value}</p>
     </div>
   );
 }
 
 function ModalFooter({ href, hrefLabel, onClose }: { href: string; hrefLabel: string; onClose: () => void }) {
   return (
-    <div className="mt-5 flex items-center justify-end gap-2 border-t border-white/[0.06] pt-4">
-      <Link
-        href={href}
-        className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
-      >
+    <div className="mt-5 flex items-center justify-end gap-2 border-t border-[var(--color-border)] pt-4">
+      <ButtonLink href={href} variant="secondary" size="sm">
         {hrefLabel}
         <span aria-hidden>→</span>
-      </Link>
-      <button
-        type="button"
-        onClick={onClose}
-        className="inline-flex h-10 items-center rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-500/15"
-      >
+      </ButtonLink>
+      <Button onClick={onClose} variant="secondary" size="sm">
         Sluiten
-      </button>
+      </Button>
     </div>
   );
 }
@@ -911,11 +902,11 @@ function ModalFooter({ href, hrefLabel, onClose }: { href: string; hrefLabel: st
  *  secundaire "Open rooster"-uitgang voor wie echt de pagina wil. */
 function DienstDetailModal({ dienst, todayIso, onClose }: { dienst: DienstRow | null; todayIso?: string; onClose: () => void }) {
   return (
-    <Modal isOpen={Boolean(dienst)} onClose={onClose} title="Dienst" icon={<AppIcon name="calendarDays" size="sm" />} maxWidth="md" theme="amber">
+    <Modal isOpen={Boolean(dienst)} onClose={onClose} title="Dienst" icon={<AppIcon name="calendarDays" size="sm" />} maxWidth="md" tone="accent">
       {dienst && (
         <div>
-          <p className="text-3xl font-bold tracking-tight text-white">{dienst.shiftType || dienst.titel || "Dienst"}</p>
-          <p className="mt-1 text-sm capitalize text-slate-400">
+          <p className="text-3xl font-bold tracking-tight text-[var(--color-text)]">{dienst.shiftType || dienst.titel || "Dienst"}</p>
+          <p className="mt-1 text-sm capitalize text-[var(--color-text-muted)]">
             {relativeDayLabel(dienst.startDatum, todayIso)} · {dienst.werktijd || `${dienst.startTijd}–${dienst.eindTijd}`}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-2">
@@ -925,7 +916,7 @@ function DienstDetailModal({ dienst, todayIso, onClose }: { dienst: DienstRow | 
             <DetailRow label="Status" value={dienst.status || "—"} />
           </div>
           {dienst.beschrijving && (
-            <p className="mt-3 whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-sm leading-6 text-slate-300">
+            <p className="mt-3 whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2.5 text-sm leading-6 text-[var(--color-text)]">
               {dienst.beschrijving}
             </p>
           )}
@@ -953,43 +944,43 @@ function NoteViewModal({ noteId, onClose }: { noteId: string | null; onClose: ()
     ? new Date(note.deadline).toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" })
     : null;
   return (
-    <Modal isOpen={open} onClose={onClose} title="Notitie" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" theme="sky">
+    <Modal isOpen={open} onClose={onClose} title="Notitie" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" tone="info">
       {noteQuery.isLoading ? (
         <SkeletonLines rows={4} />
       ) : noteQuery.isError || !note ? (
-        <div className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-4 py-3">
-          <p className="text-sm font-bold text-white">Notitie kon niet worden geladen</p>
-          <p className="mt-1 text-xs text-slate-300">Controleer de verbinding en probeer het opnieuw.</p>
+        <div className="rounded-xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-4 py-3">
+          <p className="text-sm font-bold text-[var(--color-text)]">Notitie kon niet worden geladen</p>
+          <p className="mt-1 text-xs text-[var(--color-text)]">Controleer de verbinding en probeer het opnieuw.</p>
         </div>
       ) : (
         <div>
-          <p className="text-2xl font-bold leading-tight tracking-tight text-white">{title}</p>
+          <p className="text-2xl font-bold leading-tight tracking-tight text-[var(--color-text)]">{title}</p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {note.prioriteit && (
               <span
                 className={cn(
-                  "rounded-md border px-2 py-0.5 text-[11px] font-semibold capitalize",
+                  "rounded-md border px-2 py-0.5 text-micro font-semibold capitalize",
                   note.prioriteit === "hoog"
-                    ? "border-rose-400/30 bg-rose-500/10 text-rose-200"
-                    : "border-white/[0.08] bg-white/[0.03] text-slate-300",
+                    ? "border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] text-[var(--color-danger)]"
+                    : "border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text)]",
                 )}
               >
                 {note.prioriteit}
               </span>
             )}
             {deadline && (
-              <span className="rounded-md border border-amber-400/25 bg-amber-400/10 px-2 py-0.5 text-[11px] font-semibold text-amber-200">
+              <span className="rounded-md border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-2 py-0.5 text-micro font-semibold text-[var(--color-warning)]">
                 {deadline}
               </span>
             )}
             {(note.tags ?? []).slice(0, 4).map((tag) => (
-              <span key={tag} className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0.5 text-[11px] font-semibold text-slate-400">
+              <span key={tag} className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-0.5 text-micro font-semibold text-[var(--color-text-muted)]">
                 #{tag}
               </span>
             ))}
           </div>
           {note.inhoud && (
-            <p className="mt-4 max-h-[46dvh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 text-sm leading-6 text-slate-200">
+            <p className="mt-4 max-h-[46dvh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3.5 py-3 text-sm leading-6 text-[var(--color-text)]">
               {note.inhoud}
             </p>
           )}
@@ -1018,7 +1009,7 @@ function ConflictListModal({
   onOpenEvent: (event: PersonalEvent) => void;
 }) {
   return (
-    <Modal isOpen={open} onClose={onClose} title="Agenda conflicten" icon={<AppIcon name="warning" size="sm" />} maxWidth="lg" theme="rose">
+    <Modal isOpen={open} onClose={onClose} title="Agenda conflicten" icon={<AppIcon name="warning" size="sm" />} maxWidth="lg" tone="danger">
       <div className="space-y-1.5">
         {events.length === 0 ? (
           <EmptyLine title="Geen conflicten meer" detail="Alle afspraken passen naast je diensten." />
@@ -1030,14 +1021,14 @@ function ConflictListModal({
                 key={event.eventId}
                 type="button"
                 onClick={() => onOpenEvent(event)}
-                className="w-full rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-white/[0.055]"
+                className="min-h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3.5 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="min-w-0 truncate text-sm font-bold text-white">{event.titel}</p>
-                  <span className="shrink-0 font-mono text-xs font-semibold text-slate-400">{getTimeLabel(event)}</span>
+                  <p className="min-w-0 truncate text-sm font-bold text-[var(--color-text)]">{event.titel}</p>
+                  <span className="shrink-0 font-mono text-xs font-semibold text-[var(--color-text-muted)]">{getTimeLabel(event)}</span>
                 </div>
-                {conflict && <p className="mt-1 text-xs leading-5 text-rose-200">{conflict.message}</p>}
-                <p className="mt-1 text-[11px] text-slate-500">Tik om te verplaatsen of aan te passen</p>
+                {conflict && <p className="mt-1 text-xs leading-5 text-[var(--color-danger)]">{conflict.message}</p>}
+                <p className="mt-1 text-micro text-[var(--color-text-subtle)]">Tik om te verplaatsen of aan te passen</p>
               </button>
             );
           })
@@ -1049,9 +1040,9 @@ function ConflictListModal({
 }
 
 const NOTE_KIND_CHIP: Record<FocusAttentionNote["kind"], string> = {
-  verlopen: "border-rose-400/30 bg-rose-500/10 text-rose-200",
-  vandaag: "border-amber-400/25 bg-amber-400/10 text-amber-200",
-  triage: "border-sky-400/25 bg-sky-400/10 text-sky-200",
+  verlopen: "border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] text-[var(--color-danger)]",
+  vandaag: "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]",
+  triage: "border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)]",
 };
 
 /** Notities met aandacht: verlopen/vandaag/triage; een tik opent de viewer. */
@@ -1067,7 +1058,7 @@ function NotesAttentionModal({
   onOpenNote: (id: string) => void;
 }) {
   return (
-    <Modal isOpen={open} onClose={onClose} title="Notities met aandacht" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" theme="amber">
+    <Modal isOpen={open} onClose={onClose} title="Notities met aandacht" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" tone="accent">
       <div className="space-y-1.5">
         {notes.length === 0 ? (
           <EmptyLine title="Niets dat aandacht vraagt" detail="Geen verlopen, vandaag- of triage-notities." />
@@ -1077,12 +1068,12 @@ function NotesAttentionModal({
               key={note.id}
               type="button"
               onClick={() => onOpenNote(note.id)}
-              className="flex w-full items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-white/[0.055]"
+              className="flex min-h-11 w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3.5 py-2.5 text-left transition-colors hover:bg-[var(--color-surface-hover)]"
             >
-              <span className={cn("shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-bold capitalize", NOTE_KIND_CHIP[note.kind])}>
+              <span className={cn("shrink-0 rounded-md border px-2 py-0.5 text-micro font-bold capitalize", NOTE_KIND_CHIP[note.kind])}>
                 {note.kind}
               </span>
-              <p className="min-w-0 truncate text-sm font-semibold text-white">{note.title}</p>
+              <p className="min-w-0 truncate text-sm font-semibold text-[var(--color-text)]">{note.title}</p>
             </button>
           ))
         )}
@@ -1096,7 +1087,7 @@ function NotesAttentionModal({
  *  habits) hergebruikt in een kiosk-modal — afvinken zonder paginawissel. */
 function HabitsTodayModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Modal isOpen={open} onClose={onClose} title="Habits vandaag" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" theme="emerald">
+    <Modal isOpen={open} onClose={onClose} title="Habits vandaag" icon={<AppIcon name="habit" size="sm" />} maxWidth="lg" tone="success">
       <DailyChecklist />
       <ModalFooter href="/habits" hrefLabel="Open habits" onClose={onClose} />
     </Modal>
@@ -1147,13 +1138,13 @@ function LcActionsModal({ open, todayIso, onClose }: { open: boolean; todayIso?:
   };
 
   return (
-    <Modal isOpen={open} onClose={onClose} title="LaventeCare acties" icon={<AppIcon name="business" size="sm" />} maxWidth="lg" theme="rose">
+    <Modal isOpen={open} onClose={onClose} title="LaventeCare acties" icon={<AppIcon name="business" size="sm" />} maxWidth="lg" tone="danger">
       {actionsQuery.isLoading ? (
         <SkeletonLines rows={4} />
       ) : actionsQuery.isError ? (
-        <div className="rounded-xl border border-rose-400/25 bg-rose-500/10 px-4 py-3">
-          <p className="text-sm font-bold text-white">Acties konden niet worden geladen</p>
-          <p className="mt-1 text-xs text-slate-300">Controleer de verbinding en probeer het opnieuw.</p>
+        <div className="rounded-xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-4 py-3">
+          <p className="text-sm font-bold text-[var(--color-text)]">Acties konden niet worden geladen</p>
+          <p className="mt-1 text-xs text-[var(--color-text)]">Controleer de verbinding en probeer het opnieuw.</p>
         </div>
       ) : (
         <div className="max-h-[52dvh] space-y-1.5 overflow-y-auto pr-1">
@@ -1164,33 +1155,26 @@ function LcActionsModal({ open, todayIso, onClose }: { open: boolean; todayIso?:
               const overdue = action.due_date ? action.due_date.slice(0, 10) < (todayIso ?? "") : false;
               const pending = pendingId === action.id;
               return (
-                <div key={action.id} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5">
-                  <button
-                    type="button"
+                <div key={action.id} className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3.5 py-2.5">
+                  <IconButton
                     onClick={() => {
                       setPendingId(action.id);
                       complete.mutate(action.id);
                     }}
-                    disabled={pending}
-                    aria-label={`${action.title} afronden`}
+                    loading={pending}
+                    label={`${action.title} afronden`}
                     title="Afronden"
-                    className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors",
-                      pending
-                        ? "cursor-wait border-white/10 bg-white/[0.04] text-slate-500"
-                        : "border-emerald-400/25 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20",
-                    )}
-                  >
-                    <AppIcon name="statusOk" size="xs" iconClassName={pending ? "animate-pulse" : undefined} />
-                  </button>
+                    icon={<AppIcon name="statusOk" size="xs" />}
+                    variant="success"
+                  />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-white">{action.title}</p>
-                    {action.summary && <p className="mt-0.5 truncate text-xs text-slate-500">{action.summary}</p>}
+                    <p className="truncate text-sm font-semibold text-[var(--color-text)]">{action.title}</p>
+                    {action.summary && <p className="mt-0.5 truncate text-xs text-[var(--color-text-subtle)]">{action.summary}</p>}
                   </div>
                   <span
                     className={cn(
-                      "shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold",
-                      overdue ? "border-rose-400/30 bg-rose-500/10 text-rose-200" : "border-amber-400/25 bg-amber-400/10 text-amber-200",
+                      "shrink-0 rounded-md border px-2 py-0.5 text-micro font-semibold",
+                      overdue ? "border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] text-[var(--color-danger)]" : "border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]",
                     )}
                   >
                     {dueLabel(action)}
@@ -1283,14 +1267,10 @@ export default function FocusPage() {
 
   return (
     <div
-      className="min-h-dvh overflow-y-auto text-slate-100 xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden"
-      style={{
-        // Gelaagde achtergrond: vlak zwart → nachtblauw met twee zachte glows.
-        background:
-          "radial-gradient(1100px 480px at 82% -12%, rgba(245,158,11,0.055), transparent 65%), radial-gradient(900px 520px at -8% 112%, rgba(99,102,241,0.05), transparent 60%), #05070c",
-        filter: nightDim ? "brightness(0.6)" : "none",
-        transition: "filter 2s ease",
-      }}
+      className={cn(
+        "min-h-dvh min-w-0 overflow-x-clip overflow-y-auto bg-[var(--color-background)] text-[var(--color-text)] transition-[filter] duration-[var(--motion-slow)] ease-[var(--ease-standard)] xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden",
+        nightDim && "brightness-[0.6]",
+      )}
     >
       <Header
         time={focus.clock?.time ?? focus.summary?.time}
@@ -1309,8 +1289,8 @@ export default function FocusPage() {
        * grid met vaste row-fracties kapte het Netto-paneel en de onderste rij af).
        * Onder xl stapelt alles in prioriteitsvolgorde en scrollt de pagina.
        */}
-      <main className="grid gap-3 p-3 sm:p-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(310px,0.98fr)_minmax(430px,1.35fr)_minmax(310px,0.98fr)]">
-        <div className="order-1 flex min-h-0 flex-col gap-3 xl:order-none">
+      <main className="grid min-w-0 gap-3 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(310px,0.98fr)_minmax(430px,1.35fr)_minmax(310px,0.98fr)] xl:pb-4">
+        <div className="order-1 flex min-h-0 min-w-0 flex-col gap-3 xl:order-none">
           <HeroPanel item={focus.nextItem} todayIso={todayIso} clock={focus.clock} isLoading={focus.isLoading} onOpen={openTimelineItem} />
           <SystemPanel
             devices={focus.devices}
@@ -1321,7 +1301,7 @@ export default function FocusPage() {
           />
         </div>
 
-        <div className="order-3 flex min-h-0 flex-col gap-3 xl:order-none">
+        <div className="order-3 flex min-h-0 min-w-0 flex-col gap-3 xl:order-none">
           <TimelinePanel items={focus.timeline} heroId={focus.nextItem?.id} todayIso={todayIso} isLoading={focus.isLoading} onOpen={openTimelineItem} />
           <HabitNotePanel
             habits={focus.habitItems}
@@ -1335,7 +1315,7 @@ export default function FocusPage() {
           />
         </div>
 
-        <div className="order-2 flex min-h-0 flex-col gap-3 xl:order-none">
+        <div className="order-2 flex min-h-0 min-w-0 flex-col gap-3 xl:order-none">
           <AttentionPanel items={focus.attention} isLoading={focus.isLoading} inPlaceIds={attentionInPlaceIds} onOpen={openAttentionItem} />
           <BusinessPanel business={focus.business} summaryError={focus.summaryError} />
         </div>
@@ -1343,12 +1323,14 @@ export default function FocusPage() {
 
       {/* Kiosk-modals: details openen in-place; navigatie is de secundaire
           uitgang in de modal-footer (of de fallback als de rij niet geladen is). */}
-      <CreateEventModal
-        open={Boolean(eventModal)}
-        editEvent={eventModal}
-        onClose={() => setEventModal(null)}
-        onSuccess={() => void focus.refetchPersonal()}
-      />
+      {eventModal && (
+        <LazyCreateEventModal
+          open
+          editEvent={eventModal}
+          onClose={() => setEventModal(null)}
+          onSuccess={() => void focus.refetchPersonal()}
+        />
+      )}
       <DienstDetailModal dienst={dienstModal} todayIso={todayIso} onClose={() => setDienstModal(null)} />
       <NoteViewModal noteId={noteModalId} onClose={() => setNoteModalId(null)} />
 

@@ -1,56 +1,83 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WifiOff } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { RefreshCw, WifiOff } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Button } from "@/components/ui/Button";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { reportClientError } from "@/lib/observability/client-events";
+import { decideControllerChange } from "@/lib/pwa-update";
+import { cn } from "@/lib/utils";
 
 export function PwaRegistry() {
-  const [isOffline, setIsOffline] = useState(() =>
-    typeof window === "undefined" ? false : !window.navigator.onLine
-  );
+  const [isOffline, setIsOffline] = useState(false);
+  const [updateReady, setUpdateReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     let updateInterval: ReturnType<typeof setInterval> | undefined;
+    let registration: ServiceWorkerRegistration | undefined;
+    let hadController = Boolean(navigator.serviceWorker?.controller);
 
-    const registerServiceWorker = () => {
-      // Only register the production SW build (L12) — in dev @serwist/next is
-      // disabled, so registering would serve a stale public/sw.js and cache
-      // dev responses.
-      if (process.env.NODE_ENV !== "production") return;
-      if ("serviceWorker" in navigator) {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((registration) => {
-            console.log("Service Worker registered with scope:", registration.scope);
-            // Periodically check for a new deploy (M6) so long-lived tabs
-            // (kiosk!) pick up the new build instead of eventually dying on a
-            // ChunkLoadError against deleted chunk URLs.
-            updateInterval = setInterval(() => {
-              registration.update().catch(() => {});
-            }, 60 * 60 * 1000);
-          })
-          .catch((error) => {
-            console.error("Service Worker registration failed:", error);
-          });
-      }
+    const inspectInstallingWorker = (worker: ServiceWorker | null) => {
+      if (!worker) return;
+      worker.addEventListener("statechange", () => {
+        if (
+          !cancelled &&
+          worker.state === "installed" &&
+          navigator.serviceWorker.controller
+        ) {
+          setUpdateReady(true);
+        }
+      });
     };
 
+    const handleUpdateFound = () => {
+      inspectInstallingWorker(registration?.installing ?? null);
+    };
+
+    const registerServiceWorker = async () => {
+      if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+
+      try {
+        const nextRegistration = await navigator.serviceWorker.register("/sw.js");
+        if (cancelled || !nextRegistration) return;
+        registration = nextRegistration;
+        if (registration.waiting) setUpdateReady(true);
+        inspectInstallingWorker(registration.installing);
+        registration.addEventListener("updatefound", handleUpdateFound);
+        updateInterval = setInterval(() => {
+          registration?.update().catch((error) => reportClientError(error, "pwa"));
+        }, 60 * 60 * 1000);
+      } catch (error) {
+        if (!cancelled) reportClientError(error, "pwa");
+      }
+    };
+    const handleWindowLoad = () => void registerServiceWorker();
+
+    const handleControllerChange = () => {
+      const decision = decideControllerChange(hadController);
+      hadController = decision.hadController;
+      if (decision.promptForUpdate) setUpdateReady(true);
+    };
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
+    const connectionSyncFrame = window.requestAnimationFrame(() => {
+      setIsOffline(!window.navigator.onLine);
+    });
 
-    // The window `load` event may already have fired by the time this effect
-    // runs (hydration after load) — in that case the listener would never
-    // fire and the service worker would silently never register.
-    if (document.readyState === "complete") {
-      registerServiceWorker();
-    } else {
-      window.addEventListener("load", registerServiceWorker);
-    }
+    if (document.readyState === "complete") void registerServiceWorker();
+    else window.addEventListener("load", handleWindowLoad);
+    navigator.serviceWorker?.addEventListener("controllerchange", handleControllerChange);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
     return () => {
-      window.removeEventListener("load", registerServiceWorker);
+      cancelled = true;
+      window.cancelAnimationFrame(connectionSyncFrame);
+      window.removeEventListener("load", handleWindowLoad);
+      navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
+      registration?.removeEventListener("updatefound", handleUpdateFound);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       if (updateInterval !== undefined) clearInterval(updateInterval);
@@ -58,18 +85,38 @@ export function PwaRegistry() {
   }, []);
 
   return (
-    <AnimatePresence>
-      {isOffline && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/20 px-4 py-1.5 text-sm font-semibold text-rose-200 shadow-lg backdrop-blur-md"
-        >
-          <WifiOff size={16} />
-          <span>Offline modus actief</span>
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div className="pointer-events-none fixed inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top,0px))] z-[var(--layer-status)] flex flex-col items-center gap-2">
+      <AnimatePresence>
+        {isOffline ? (
+          <motion.div
+            key="offline"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            role="status"
+            className={cn(surfaceVariants({ tone: "danger", radius: "lg", padding: "sm" }), "pointer-events-auto flex min-h-11 items-center gap-2 rounded-full text-sm font-semibold backdrop-blur-md")}
+          >
+            <WifiOff size={16} aria-hidden="true" />
+            <span>Offline modus actief</span>
+          </motion.div>
+        ) : null}
+        {updateReady ? (
+          <motion.div
+            key="update"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            role="status"
+            className={cn(surfaceVariants({ tone: "accent", radius: "lg", padding: "sm" }), "pointer-events-auto flex min-h-11 max-w-md items-center gap-3 text-sm backdrop-blur-md")}
+          >
+            <RefreshCw size={16} className="shrink-0 text-[var(--color-primary-hover)]" aria-hidden="true" />
+            <span className="min-w-0 flex-1">Nieuwe versie gereed</span>
+            <Button size="sm" variant="primary" onClick={() => window.location.reload()}>
+              Nu herladen
+            </Button>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   );
 }

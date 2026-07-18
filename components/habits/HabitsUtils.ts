@@ -1,7 +1,11 @@
+import type { CSSProperties } from "react";
 import { BarChart3, CalendarCheck, LayoutGrid, type LucideIcon } from "lucide-react";
+import { HABIT_COLORS } from "@/lib/habit-constants";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
+import { solidForegroundToken } from "@/lib/ui/colorContrast";
 
 export type TabId = "vandaag" | "overzicht" | "stats";
-export type Tone = "amber" | "green" | "rose" | "sky" | "indigo" | "slate";
+export type Tone = UiTone;
 
 export const TABS: Array<{ id: TabId; label: string; icon: LucideIcon }> = [
   { id: "vandaag", label: "Vandaag", icon: CalendarCheck },
@@ -9,44 +13,39 @@ export const TABS: Array<{ id: TabId; label: string; icon: LucideIcon }> = [
   { id: "stats", label: "Statistieken", icon: BarChart3 },
 ];
 
-export const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string }> = {
-  amber: {
-    border: "border-amber-500/25",
-    surface: "bg-amber-500/10",
-    icon: "text-amber-300",
-    text: "text-amber-200",
-  },
-  green: {
-    border: "border-emerald-500/20",
-    surface: "bg-emerald-500/10",
-    icon: "text-emerald-300",
-    text: "text-emerald-200",
-  },
-  rose: {
-    border: "border-rose-500/20",
-    surface: "bg-rose-500/10",
-    icon: "text-rose-300",
-    text: "text-rose-200",
-  },
-  sky: {
-    border: "border-sky-500/20",
-    surface: "bg-sky-500/10",
-    icon: "text-sky-300",
-    text: "text-sky-200",
-  },
-  indigo: {
-    border: "border-indigo-500/20",
-    surface: "bg-indigo-500/10",
-    icon: "text-indigo-300",
-    text: "text-indigo-200",
-  },
-  slate: {
-    border: "border-[var(--color-border)]",
-    surface: "bg-[rgba(255,255,255,0.04)]",
-    icon: "text-slate-300",
-    text: "text-slate-200",
-  },
-};
+export const toneClasses = uiToneClasses;
+
+export type HabitColor = (typeof HABIT_COLORS)[number];
+
+export interface HabitColorVariables extends CSSProperties {
+  "--habit-color": string;
+  "--habit-color-soft": string;
+  "--habit-color-border": string;
+  "--habit-color-contrast": string;
+  "--habit-color-foreground": string;
+}
+
+export function habitColorForeground(value?: string | null) {
+  return solidForegroundToken(normalizeHabitColor(value));
+}
+
+export function normalizeHabitColor(value?: string | null): HabitColor {
+  const normalized = value?.trim().toLowerCase();
+  return (HABIT_COLORS as readonly string[]).includes(normalized ?? "")
+    ? (normalized as HabitColor)
+    : HABIT_COLORS[0];
+}
+
+export function habitColorStyle(value?: string | null): HabitColorVariables {
+  const color = normalizeHabitColor(value);
+  return {
+    "--habit-color": color,
+    "--habit-color-soft": `color-mix(in srgb, ${color} 12%, transparent)`,
+    "--habit-color-border": `color-mix(in srgb, ${color} 30%, transparent)`,
+    "--habit-color-contrast": `color-mix(in srgb, ${color} 44%, white)`,
+    "--habit-color-foreground": habitColorForeground(color),
+  };
+}
 
 export function todayStr(): string {
   return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Amsterdam" });

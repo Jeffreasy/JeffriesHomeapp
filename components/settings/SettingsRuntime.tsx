@@ -1,9 +1,12 @@
 "use client";
 
-import { Activity, AlertTriangle, CheckCircle2, Gauge, Hourglass, Lightbulb, Loader2, Network, PlugZap, RadioTower, Smartphone } from "lucide-react";
-import { EmptyState, Panel, SectionHeader, StatusMetric, StatusPill, StatusRow } from "./SettingsCards";
+import { Activity, AlertTriangle, CheckCircle2, Gauge, Hourglass, Lightbulb, Network, PlugZap, RadioTower, Smartphone } from "lucide-react";
+import { EmptyState, SectionHeader, StatusMetric, StatusPill, StatusRow } from "./SettingsCards";
+import { Surface } from "@/components/ui/Surface";
+import { SurfaceHeader } from "@/components/ui/SurfaceHeader";
+import { Button } from "@/components/ui/Button";
 import { formatDateTime } from "./SettingsUtils";
-import type { PendingAIAction } from "@/lib/api";
+import type { PendingAIAction, SettingsOverview, SettingsOverviewDevices } from "@/lib/api";
 
 const SENSITIVE_ARG_KEY_PATTERN = /token|secret|password|apikey|authorization/i;
 
@@ -32,22 +35,22 @@ export function SettingsRuntime({
   deviceHealth,
   localApiHost,
 }: {
-  overview: any;
-  overviewDevices: any;
+  overview: SettingsOverview | null | undefined;
+  overviewDevices: SettingsOverviewDevices;
   deviceHealth: number;
   localApiHost: string;
 }) {
   return (
-    <Panel className="overflow-hidden p-0">
+    <Surface radius="sm" className="overflow-hidden p-0">
       <div className="min-w-0 border-b border-[var(--color-border)] px-4 py-3 sm:px-6 sm:py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase text-slate-500">Overzicht</p>
-            <h2 className="mt-0.5 text-lg font-bold text-white sm:mt-1 sm:text-xl">Homeapp runtime</h2>
-            <p className="mt-1 line-clamp-2 text-sm text-slate-500">{localApiHost}</p>
-          </div>
-          <StatusPill ok={Boolean(overview?.integrations.backend ?? overview?.integrations.convex)} label="Backend" />
-        </div>
+        <SurfaceHeader
+          eyebrow="Overzicht"
+          title="Homeapp runtime"
+          meta={localApiHost}
+          action={<StatusPill ok={Boolean(overview?.integrations.backend ?? overview?.integrations.convex)} label="Backend" />}
+          compact
+          className="mb-0"
+        />
       </div>
       <div className="grid min-w-0 grid-cols-2 gap-px bg-[var(--color-border)] xl:grid-cols-4">
         <StatusMetric
@@ -55,31 +58,31 @@ export function SettingsRuntime({
           label="Lampen"
           value={overviewDevices.total === 0 ? "Geen" : String(overviewDevices.total)}
           sub={`${overviewDevices.online}/${overviewDevices.total} online`}
-          tone={overviewDevices.offline > 0 ? "amber" : overviewDevices.total > 0 ? "green" : "slate"}
+          tone={overviewDevices.offline > 0 ? "warning" : overviewDevices.total > 0 ? "success" : "neutral"}
         />
         <StatusMetric
           icon={Gauge}
           label="Gezondheid"
           value={overviewDevices.total === 0 ? "-" : `${deviceHealth}%`}
           sub={`${overviewDevices.on} actief, ${overviewDevices.offline} offline`}
-          tone={deviceHealth === 100 ? "green" : overviewDevices.total > 0 ? "amber" : "slate"}
+          tone={deviceHealth === 100 ? "success" : overviewDevices.total > 0 ? "warning" : "neutral"}
         />
         <StatusMetric
           icon={PlugZap}
           label="Automations"
           value={`${overview?.automations.active ?? 0}/${overview?.automations.total ?? 0}`}
           sub="actief versus totaal"
-          tone={(overview?.automations.active ?? 0) > 0 ? "sky" : "slate"}
+          tone={(overview?.automations.active ?? 0) > 0 ? "info" : "neutral"}
         />
         <StatusMetric
           icon={Network}
           label="Command queue"
           value={String(overview?.commands.pending ?? 0)}
           sub={`${overview?.commands.processing ?? 0} bezig, ${overview?.commands.failed ?? 0} mislukt`}
-          tone={(overview?.commands.failed ?? 0) > 0 ? "rose" : (overview?.commands.pending ?? 0) > 0 ? "amber" : "green"}
+          tone={(overview?.commands.failed ?? 0) > 0 ? "danger" : (overview?.commands.pending ?? 0) > 0 ? "warning" : "success"}
         />
       </div>
-    </Panel>
+    </Surface>
   );
 }
 
@@ -95,7 +98,7 @@ export function SettingsPendingActions({
   handleConfirmPending: (id: string) => void;
 }) {
   return (
-    <Panel>
+    <Surface radius="sm">
       <SectionHeader
         icon={Hourglass}
         label="AI safety"
@@ -107,56 +110,56 @@ export function SettingsPendingActions({
           <EmptyState icon={CheckCircle2} title="Geen openstaande Grok-acties" />
         ) : (
           pendingActions.map((action) => (
-            <div key={action.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 min-w-0">
+            <Surface key={action.id} tone="warning" radius="sm" padding="sm">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-xs font-bold uppercase text-amber-200">{action.code}</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{action.summary}</p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="text-xs font-bold uppercase text-[var(--color-warning)]">{action.code}</p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--color-text)]">{action.summary}</p>
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                     {action.agentId} - {action.toolName} - verloopt {formatDateTime(action.expiresAt)}
                   </p>
                   {action.args && Object.keys(action.args).length > 0 && (
                     <details className="mt-2 min-w-0">
-                      <summary className="cursor-pointer text-xs font-semibold text-slate-500 hover:text-slate-300">
+                      <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text)]">
                         Toon exacte parameters
                       </summary>
-                      <pre className="mt-1 max-h-48 overflow-auto rounded-lg border border-[var(--color-border)] bg-black/20 p-2 text-[11px] text-slate-400">
+                      <pre className="mt-1 max-h-48 overflow-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2 text-micro text-[var(--color-text-muted)]">
                         {JSON.stringify(redactArgs(action.args), null, 2)}
                       </pre>
                     </details>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
+                    variant="secondary"
                     onClick={() => handleCancelPending(action.id)}
                     disabled={pendingBusyId === action.id}
-                    className="h-9 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-bold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
                   >
                     Annuleer
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="success"
                     onClick={() => handleConfirmPending(action.id)}
-                    disabled={pendingBusyId === action.id}
-                    className="inline-flex h-9 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 text-xs font-bold text-emerald-200 transition-colors hover:bg-emerald-500/15 disabled:opacity-50"
+                    loading={pendingBusyId === action.id}
+                    loadingLabel="Uitvoeren…"
                   >
-                    {pendingBusyId === action.id && <Loader2 size={13} className="animate-spin" />}
                     Uitvoeren
-                  </button>
+                  </Button>
                 </div>
               </div>
-            </div>
+            </Surface>
           ))
         )}
       </div>
-    </Panel>
+    </Surface>
   );
 }
 
-export function SettingsBridge({ overview }: { overview: any }) {
+export function SettingsBridge({ overview }: { overview: SettingsOverview | null | undefined }) {
   return (
-    <Panel>
+    <Surface radius="sm">
       <SectionHeader
         icon={RadioTower}
         label="Bridge"
@@ -168,21 +171,21 @@ export function SettingsBridge({ overview }: { overview: any }) {
           icon={Smartphone}
           label="Status"
           value={overview?.bridge ? (overview.bridge.online ? overview.bridge.status : "offline") : "Geen heartbeat"}
-          tone={overview?.bridge?.online ? "green" : "rose"}
+          tone={overview?.bridge?.online ? "success" : "danger"}
         />
         <StatusRow
           icon={Activity}
           label="Commands"
           value={`${overview?.bridge?.commandsPending ?? 0} wachtend / ${overview?.bridge?.commandsProcessing ?? 0} bezig / ${overview?.bridge?.commandsFailed ?? 0} mislukt`}
-          tone={(overview?.bridge?.commandsFailed ?? 0) > 0 ? "amber" : "slate"}
+          tone={(overview?.bridge?.commandsFailed ?? 0) > 0 ? "danger" : (overview?.bridge?.commandsPending ?? 0) > 0 || (overview?.bridge?.commandsProcessing ?? 0) > 0 ? "warning" : "neutral"}
         />
         <StatusRow
           icon={AlertTriangle}
           label="Laatste fout"
           value={overview?.bridge?.lastError ?? "Geen fout gemeld"}
-          tone={overview?.bridge?.lastError ? "rose" : "green"}
+          tone={overview?.bridge?.lastError ? "danger" : "success"}
         />
       </div>
-    </Panel>
+    </Surface>
   );
 }

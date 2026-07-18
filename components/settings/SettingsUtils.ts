@@ -9,8 +9,9 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 
-export type Tone = "amber" | "green" | "rose" | "sky" | "indigo" | "slate";
+export type Tone = UiTone;
 export type SyncTarget = "calendar" | "gmail" | "all";
 export type PrivacyScope = "finance" | "habits" | "notes" | "email" | "account";
 
@@ -151,54 +152,17 @@ export type AiDiagnosticsResult = {
   usage?: AiUsage;
 };
 
-export const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string }> = {
-  amber: {
-    border: "border-amber-500/25",
-    surface: "bg-amber-500/10",
-    icon: "text-amber-300",
-    text: "text-amber-200",
-  },
-  green: {
-    border: "border-emerald-500/20",
-    surface: "bg-emerald-500/10",
-    icon: "text-emerald-300",
-    text: "text-emerald-200",
-  },
-  rose: {
-    border: "border-rose-500/20",
-    surface: "bg-rose-500/10",
-    icon: "text-rose-300",
-    text: "text-rose-200",
-  },
-  sky: {
-    border: "border-sky-500/20",
-    surface: "bg-sky-500/10",
-    icon: "text-sky-300",
-    text: "text-sky-200",
-  },
-  indigo: {
-    border: "border-indigo-500/20",
-    surface: "bg-indigo-500/10",
-    icon: "text-indigo-300",
-    text: "text-indigo-200",
-  },
-  slate: {
-    border: "border-[var(--color-border)]",
-    surface: "bg-[var(--color-surface)]",
-    icon: "text-slate-300",
-    text: "text-slate-200",
-  },
-};
+export const toneClasses = uiToneClasses;
 
 export const routeTiles: Array<{ href: string; label: string; meta: string; icon: LucideIcon; tone: Tone }> = [
-  { href: "/lampen", label: "Verlichting", meta: "Lampen bedienen", icon: Lightbulb, tone: "amber" },
-  { href: "/automations", label: "Automations", meta: "Wekkers en schema's", icon: Zap, tone: "amber" },
-  { href: "/rooster", label: "Rooster", meta: "Diensten", icon: CalendarClock, tone: "sky" },
-  { href: "/agenda", label: "Agenda", meta: "Afspraken en sync", icon: CalendarDays, tone: "indigo" },
-  { href: "/finance", label: "Finance", meta: "Transacties", icon: Database, tone: "green" },
-  { href: "/laventecare", label: "LaventeCare", meta: "Klanten en facturatie", icon: Briefcase, tone: "green" },
-  { href: "/notities", label: "Notities", meta: "Knowledge base", icon: StickyNote, tone: "indigo" },
-  { href: "/habits", label: "Habits", meta: "Privacygevoelig", icon: Target, tone: "rose" },
+  { href: "/lampen", label: "Verlichting", meta: "Lampen bedienen", icon: Lightbulb, tone: "accent" },
+  { href: "/automations", label: "Automations", meta: "Wekkers en schema's", icon: Zap, tone: "accent" },
+  { href: "/rooster", label: "Rooster", meta: "Diensten", icon: CalendarClock, tone: "info" },
+  { href: "/agenda", label: "Agenda", meta: "Afspraken en sync", icon: CalendarDays, tone: "info" },
+  { href: "/finance", label: "Finance", meta: "Transacties", icon: Database, tone: "success" },
+  { href: "/laventecare", label: "LaventeCare", meta: "Klanten en facturatie", icon: Briefcase, tone: "success" },
+  { href: "/notities", label: "Notities", meta: "Knowledge base", icon: StickyNote, tone: "info" },
+  { href: "/habits", label: "Habits", meta: "Privacygevoelig", icon: Target, tone: "danger" },
 ];
 
 export function formatDateTime(iso?: string | null) {

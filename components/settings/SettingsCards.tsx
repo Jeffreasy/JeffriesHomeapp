@@ -1,23 +1,16 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { motion } from "framer-motion";
-import Link from "next/link";
 import { AlertTriangle, ArrowRight, CheckCircle2, CircleMinus, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toneClasses, type Tone } from "./SettingsUtils";
-
-export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn("min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 backdrop-blur-xl sm:p-5", className)}
-    >
-      {children}
-    </motion.div>
-  );
-}
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Badge } from "@/components/ui/Badge";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { MetricCard as UiMetricCard } from "@/components/ui/MetricCard";
+import { Surface } from "@/components/ui/Surface";
+import { SurfaceHeader } from "@/components/ui/SurfaceHeader";
+import type { UiTone } from "@/lib/ui/tones";
 
 export function SectionHeader({
   icon: Icon,
@@ -33,19 +26,13 @@ export function SectionHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
-          <Icon size={16} className="text-amber-300" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-          <h2 className="truncate text-base font-bold text-white">{title}</h2>
-          {sub && <p className="mt-0.5 truncate text-xs text-slate-500">{sub}</p>}
-        </div>
-      </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </div>
+    <SurfaceHeader
+      icon={<Icon size={16} className="text-[var(--color-warning)]" />}
+      eyebrow={label}
+      title={title}
+      meta={sub}
+      action={action}
+    />
   );
 }
 
@@ -65,14 +52,12 @@ export function StatusMetric({
   const classes = toneClasses[tone];
 
   return (
-    <div className="min-h-[96px] min-w-0 bg-[var(--color-surface)] p-3 sm:min-h-[124px] sm:p-4">
-      <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg border sm:h-9 sm:w-9", classes.border, classes.surface)}>
-        <Icon size={15} className={classes.icon} />
-      </div>
-      <p className="mt-2 line-clamp-1 text-xs font-semibold uppercase text-slate-500 sm:mt-4">{label}</p>
+    <Surface tone={tone === "neutral" ? "subtle" : tone} radius="sm" padding="sm" className="min-h-24 sm:min-h-32">
+      <Icon size={15} className={classes.icon} aria-hidden="true" />
+      <p className="mt-2 line-clamp-1 text-xs font-semibold uppercase text-[var(--color-text-muted)] sm:mt-4">{label}</p>
       <p className={cn("mt-1 truncate text-base font-bold", classes.text)}>{value}</p>
-      <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">{sub}</p>
-    </div>
+      <p className="mt-1 line-clamp-2 text-xs leading-4 text-[var(--color-text-muted)]">{sub}</p>
+    </Surface>
   );
 }
 
@@ -89,21 +74,15 @@ export function MetricCard({
   meta: string;
   tone: Tone;
 }) {
-  const classes = toneClasses[tone];
-
   return (
-    <div className={cn("min-w-0 rounded-lg border bg-[var(--color-surface)] p-3 sm:p-4", classes.border)}>
-      <div className="flex items-start gap-3">
-        <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10", classes.surface)}>
-          <Icon size={17} className={classes.icon} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-          <p className={cn("mt-1 truncate text-xl font-bold sm:mt-2 sm:text-2xl", classes.text)}>{value}</p>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{meta}</p>
-        </div>
-      </div>
-    </div>
+    <UiMetricCard
+      icon={Icon}
+      label={label}
+      value={value}
+      description={meta}
+      tone={tone}
+      iconPosition="leading"
+    />
   );
 }
 
@@ -121,37 +100,27 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
-      <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
-        <Icon size={15} className={classes.icon} />
-      </div>
+    <Surface tone="subtle" radius="sm" padding="sm" className="flex items-start gap-3">
+      <Icon size={15} className={cn("mt-0.5 shrink-0", classes.icon)} aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-0.5 line-clamp-2 break-words text-sm font-semibold leading-5 text-slate-200">{value}</p>
+        <p className="text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
+        <p className="mt-0.5 line-clamp-2 break-words text-sm font-semibold leading-5 text-[var(--color-text)]">{value}</p>
       </div>
-    </div>
+    </Surface>
   );
 }
 
-export type StatusPillTone = "ok" | "warn" | "neutral" | "bad";
+export type StatusPillTone = Extract<UiTone, "success" | "warning" | "neutral" | "danger">;
 
 export function StatusPill({ ok, label, tone }: { ok: boolean; label: string; tone?: StatusPillTone }) {
-  const resolvedTone: StatusPillTone = tone ?? (ok ? "ok" : "bad");
-  const Icon = resolvedTone === "ok" ? CheckCircle2 : resolvedTone === "neutral" ? CircleMinus : AlertTriangle;
+  const resolvedTone: StatusPillTone = tone ?? (ok ? "success" : "danger");
+  const Icon = resolvedTone === "success" ? CheckCircle2 : resolvedTone === "neutral" ? CircleMinus : AlertTriangle;
 
   return (
-    <span
-      className={cn(
-        "inline-flex h-7 max-w-full shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-bold",
-        resolvedTone === "ok" && "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
-        resolvedTone === "warn" && "border-amber-500/20 bg-amber-500/10 text-amber-200",
-        resolvedTone === "neutral" && "border-slate-500/20 bg-slate-500/10 text-slate-300",
-        resolvedTone === "bad" && "border-rose-500/20 bg-rose-500/10 text-rose-200"
-      )}
-    >
-      <Icon size={13} />
+    <Badge tone={resolvedTone} size="md">
+      <Icon size={13} aria-hidden="true" />
       <span className="truncate">{label}</span>
-    </span>
+    </Badge>
   );
 }
 
@@ -159,27 +128,17 @@ export function RouteTile({ href, label, meta, icon: Icon, tone }: { href: strin
   const classes = toneClasses[tone];
 
   return (
-    <Link
-      href={href}
-      className="flex min-w-0 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 transition-colors hover:bg-[var(--color-surface-hover)]"
-    >
-      <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
-        <Icon size={16} className={classes.icon} />
-      </div>
+    <ButtonLink href={href} variant="secondary" fullWidth className="h-auto justify-start px-3 py-3 text-left">
+      <Icon size={16} className={cn("shrink-0", classes.icon)} aria-hidden="true" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-slate-200">{label}</span>
-        <span className="mt-0.5 block truncate text-xs text-slate-500">{meta}</span>
+        <span className="block truncate text-sm font-semibold text-[var(--color-text)]">{label}</span>
+        <span className="mt-0.5 block truncate text-xs font-normal text-[var(--color-text-muted)]">{meta}</span>
       </span>
-      <ArrowRight size={14} className="shrink-0 text-slate-600" />
-    </Link>
+      <ArrowRight size={14} className="shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
+    </ButtonLink>
   );
 }
 
 export function EmptyState({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
-  return (
-    <div className="min-w-0 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-5 text-center">
-      <Icon size={28} className="mx-auto text-slate-700" />
-      <p className="mt-3 text-sm font-semibold text-slate-400">{title}</p>
-    </div>
-  );
+  return <FeedbackState icon={Icon} title={title} description="Er zijn nog geen items om te tonen." compact />;
 }

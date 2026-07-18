@@ -1,51 +1,94 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# JeffriesHomeapp
 
-## Backend API
+JeffriesHomeapp is de Next.js single-owner frontend voor JeffriesBackend: smart home, agenda en rooster, notities, habits, financiën, contacten en het LaventeCare CRM.
 
-Start with [`docs/backend-api-overview.md`](docs/backend-api-overview.md) when working on API calls. The frontend calls the Go backend through `/api/backend`, and the Next.js proxy injects the backend API key server-side.
+Lees vóór architectuur- of securitywerk:
 
-## Getting Started
+- [FRONTEND_ARCHITECTURE.md](FRONTEND_ARCHITECTURE.md) voor de actuele frontend- en trust-boundarykaart;
+- [docs/interface-system.md](docs/interface-system.md) voor het enterprise layout-, overlay- en interactioncontract;
+- [docs/backend-api-overview.md](docs/backend-api-overview.md) voor het BFF/backendcontract;
+- [docs/testing.md](docs/testing.md) voor de uitvoerbare verificatie.
 
-First, run the development server:
+Oudere audit- en reviewbestanden blijven historisch bewijs. Gebruik hun oorspronkelijke bevindingen niet als actuele backlog zonder ze tegen de huidige code te herverifiëren.
 
-```bash
+## Architectuur in één regel
+
+~~~text
+Browser -> Next.js /api/backend BFF -> geconfigureerde JeffriesBackend /api/v1 -> PostgreSQL
+~~~
+
+Browsercode praat niet rechtstreeks met de Go-API en ontvangt nooit de backend API-key. proxy.ts verzorgt redirect-UX, maar de BFF en de PDF-/dossierresources doen daarnaast hun eigen Clerk- en ownercontrole.
+
+Deze repository is een Next.js App Router-app. Een root-index.html hoort er niet bij; het oude gegenereerde artefact is verwijderd.
+
+## Vereisten
+
+- Node.js 24, gelijk aan CI en Vercel-productie;
+- npm;
+- een Clerk-app voor lokaal inloggen;
+- een draaiende JeffriesBackend voor geauthenticeerde dataflows.
+
+## Configuratie
+
+Kopieer .env.example naar .env.local en vul minimaal de Clerk- en ownerconfiguratie in.
+
+| Variabele | Doel |
+|---|---|
+| NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY | Publieke Clerk-identifier. |
+| CLERK_SECRET_KEY | Server-only Clerk-secret. |
+| BACKEND_API_URL | Server-only backendbasis, inclusief /api/v1. |
+| BACKEND_API_KEY | Server-only X-API-Key voor JeffriesBackend. |
+| HOMEAPP_OWNER_USER_ID | Enige Clerk-user die private data mag benaderen. |
+
+| LAVENTECARE_PDF_SOURCE_HOSTS | Optionele server-only komma-lijst met exacte hostnames voor klikbare externe PDF-bronnen; leeg blijft fail-closed. |
+Productie faalt gesloten wanneer BACKEND_API_URL, een backendkey of HOMEAPP_OWNER_USER_ID ontbreekt. Er is geen productie- of Renderfallback. Development mag zonder BACKEND_API_URL terugvallen op http://127.0.0.1:8000/api/v1; expliciet configureren via .env.local blijft aanbevolen.
+
+## Lokaal ontwikkelen
+
+~~~bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+~~~
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open daarna http://localhost:3000.
 
-## LaventeCare Intake Bridge
+## Kwaliteitscontroles
 
-The Convex HTTP endpoint `POST /laventecare/intake` accepts structured website intakes from
-LaventeCareAuthSystems and turns them into a LaventeCare lead, contact, and follow-up action.
-Incoming requests are idempotent by `(userId, bron, sourceId)`, contacts are matched by e-mail, and
-successful ingests are written to `auditLogs` for traceability.
+~~~bash
+npm audit --omit=dev --audit-level=high
+npm run typecheck
+npm run lint
+npm run test:unit
+npm run build
+npm run check:performance
+npm run test:e2e
+~~~
 
-Set `LAVENTECARE_INTAKE_SECRET` in Convex and use the same value as
-`HOMEAPP_LAVENTECARE_INTAKE_SECRET` in LaventeCareAuthSystems. The AuthSystems URL should point to
-`https://<convex-deployment>.convex.site/laventecare/intake`.
+De altijd actieve security-E2E draait zonder sessie. `npm run test:e2e:authenticated` maakt via afhankelijke Clerk setup-projecten afzonderlijke ignored owner- en non-ownerstates, controleert de read-only desktop-, tablet- en mobiele ownerflows plus de echte 403-grens en verwijdert beide states via teardowns. Gebruik daarvoor uitsluitend een Clerk testtenant; zie [docs/testing.md](docs/testing.md).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+De geauthenticeerde flow stuurt veilige reads door de echte Clerk-/owner-BFF naar een door Playwright beheerde read-only loopbackstub. Browsermutaties en niet-gemodelleerde endpoints falen gesloten; tests gebruiken nooit de productiebackend of een echte backendcredential.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## LaventeCare intakebridge
 
-## Learn More
+De publieke website stuurt een contactaanvraag eerst naar LaventeCareAuthSystems. AuthSystems zet die server-to-server door naar JeffriesBackend:
 
-To learn more about Next.js, take a look at the following resources:
+~~~http
+POST /api/v1/laventecare/intake
+Authorization: Bearer <LAVENTECARE_INTAKE_SECRET>
+Idempotency-Key: <requestId>
+Content-Type: application/json
+~~~
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+requestId, name en email zijn verplicht. Idempotency-Key moet exact gelijk zijn aan requestId en 8–128 tekens uit de toegestane set A–Z, a–z, 0–9, punt, underscore, dubbele punt en koppelteken bevatten.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+De overige intakevelden zijn optioneel: source, phone, companyName, website, projectType, budget, timeline, goal, message, pageUrl, origin en submittedAt.
 
-## Deploy on Vercel
+Configureer de keten als volgt:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- JeffriesBackend: LAVENTECARE_INTAKE_SECRET;
+- LaventeCareAuthSystems: HOMEAPP_LAVENTECARE_INTAKE_URL=https://backend.example/api/v1/laventecare/intake;
+- LaventeCareAuthSystems: dezelfde waarde in HOMEAPP_LAVENTECARE_INTAKE_SECRET.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Een nieuwe intake retourneert 201. Een idempotente replay retourneert 200. Dezelfde key met een andere payload retourneert 409. Een gelijktijdig nog lopende aanvraag retourneert 503 met Retry-After.
+
+De oude Convex-intakeroute is vervallen en hoort nergens geconfigureerd te zijn.

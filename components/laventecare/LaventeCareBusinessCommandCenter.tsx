@@ -1,5 +1,12 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
+import { SearchField } from "@/components/ui/SearchField";
+
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { IconButton } from "@/components/ui/IconButton";
+import { cn } from "@/lib/utils";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, Building2, Download, FileCheck2, FileText, ShieldCheck, Workflow } from "lucide-react";
 import type { LCCockpit } from "@/lib/api";
@@ -192,15 +199,15 @@ export function LaventeCareBusinessCommandCenter({
   return (
     <section className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="glass min-w-0 p-4">
+        <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-300">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)]">
               <Building2 size={18} />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Klant- en bedrijfsfundament</p>
-              <h2 className="mt-1 text-lg font-bold text-white">LaventeCare als systeempartner</h2>
-              <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-6 text-slate-400">{LAVENTECARE_PROFILE.positie}</p>
+              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Klant- en bedrijfsfundament</p>
+              <h2 className="mt-1 text-lg font-bold text-[var(--color-text)]">LaventeCare als systeempartner</h2>
+              <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-6 text-[var(--color-text-muted)]">{LAVENTECARE_PROFILE.positie}</p>
             </div>
           </div>
 
@@ -212,28 +219,28 @@ export function LaventeCareBusinessCommandCenter({
             <CompactMetric label="Docs" value={summary.documents} detail="templates" />
           </div>
 
-          <div className="mt-4 flex items-start gap-3 rounded-lg border border-emerald-500/15 bg-emerald-500/[0.06] px-3 py-2">
-            <ShieldCheck size={16} className="mt-0.5 shrink-0 text-emerald-300" />
-            <p className="text-xs leading-5 text-slate-300">
+          <div className="mt-4 flex items-start gap-3 rounded-lg border border-[var(--color-success-border)] bg-[var(--color-success-subtle)] px-3 py-2">
+            <ShieldCheck size={16} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
+            <p className="text-xs leading-5 text-[var(--color-text-muted)]">
               {LAVENTECARE_PROFILE.security.philosophy} Context, dossiers en klantwerk blijven gekoppeld.
             </p>
           </div>
         </div>
 
-        <div className="glass min-w-0 p-4">
+        <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
           <div className="flex items-center gap-2">
-            <Workflow size={18} className="text-emerald-300" />
-            <h2 className="text-lg font-bold text-white">Operating model</h2>
+            <Workflow size={18} className="text-[var(--color-success)]" />
+            <h2 className="text-lg font-bold text-[var(--color-text)]">Operating model</h2>
           </div>
           <div className="mt-3 grid gap-2">
             {LAVENTECARE_PROCESS_STAGES.slice(0, 4).map((stage, index) => (
-              <div key={stage.key} className="flex gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white/[0.04] text-[11px] font-bold text-slate-400">
+              <div key={stage.key} className="flex gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--color-surface-muted)] text-micro font-bold text-[var(--color-text-muted)]">
                   {index + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-white">{stage.title}</p>
-                  <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-slate-500">{stage.output}</p>
+                  <p className="truncate text-sm font-semibold text-[var(--color-text)]">{stage.title}</p>
+                  <p className="mt-0.5 line-clamp-1 text-xs leading-5 text-[var(--color-text-muted)]">{stage.output}</p>
                 </div>
               </div>
             ))}
@@ -241,93 +248,95 @@ export function LaventeCareBusinessCommandCenter({
         </div>
       </div>
 
-      <details className="glass min-w-0 overflow-hidden">
+      <details className={cn(surfaceVariants({ padding: "none" }), "min-w-0 overflow-hidden")}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 marker:hidden">
           <span className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]">
               <FileText size={17} />
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-bold text-white">PDF Studio en dossierdocumenten</span>
-              <span className="mt-0.5 block truncate text-xs text-slate-500">
+              <span className="block text-sm font-bold text-[var(--color-text)]">PDF Studio en dossierdocumenten</span>
+              <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
                 Context kiezen, PDF openen/downloaden en vastleggen in klantdossier
               </span>
             </span>
           </span>
-          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-bold text-slate-400">
+          <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-0.5 text-micro font-bold text-[var(--color-text-muted)]">
             {documents.length} snel
           </span>
         </summary>
 
-        <div className="grid gap-4 border-t border-white/10 p-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid gap-4 border-t border-[var(--color-border)] p-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 space-y-2">
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Dossiercontext</p>
-                  <p className="mt-1 line-clamp-1 text-sm font-semibold text-white">
+                  <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Dossiercontext</p>
+                  <p className="mt-1 line-clamp-1 text-sm font-semibold text-[var(--color-text)]">
                     {selectedContextOption?.label ?? "Geen dossier gekoppeld"}
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-bold text-slate-400">
+                <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-0.5 text-micro font-bold text-[var(--color-text-muted)]">
                   {contextOptions.length} opties
                 </span>
               </div>
 
               {contextOptions.length > 0 ? (
                 <div className="mt-3 space-y-2">
-                  <input
+                  <SearchField
+                    label="Zoek dossiercontext"
                     value={contextQuery}
                     onChange={(event) => setContextQuery(event.target.value)}
+                    onClear={() => setContextQuery("")}
                     placeholder={`Zoek in ${contextOptions.length} klanten, opdrachten, projecten en leads...`}
-                    aria-label="Zoek dossiercontext"
-                    className="w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-emerald-400/50"
                   />
                   <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
-                    <button
+                    <Button
                       type="button"
+                      variant="secondary"
+                      fullWidth
                       onClick={() => setSelectedContextKey("none")}
                       aria-pressed={!selectedContextOption}
-                      className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                        !selectedContextOption
-                          ? "border-slate-400/30 bg-white/[0.07] text-white"
-                          : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
-                      }`}
+                      className={cn(
+                        "h-auto flex-col items-stretch gap-0 p-3 text-left",
+                        !selectedContextOption && "border-[var(--color-border-strong)] bg-[var(--color-surface-active)]",
+                      )}
                     >
                       <span className="block truncate text-xs font-bold">Geen context</span>
-                      <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                      <span className="mt-0.5 block truncate text-micro text-[var(--color-text-muted)]">
                         Generieke PDF — niet vast te leggen in een dossier
                       </span>
-                    </button>
+                    </Button>
                     {filteredContextOptions.map((option) => {
                       const isSelected = selectedContextOption?.key === option.key;
 
                       return (
-                        <button
+                        <Button
                           key={option.key}
                           type="button"
+                          variant="secondary"
+                          fullWidth
                           onClick={() => setSelectedContextKey(option.key)}
                           aria-pressed={isSelected}
-                          className={`w-full rounded-lg border px-3 py-2 text-left transition ${
-                            isSelected
-                              ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-100"
-                              : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
-                          }`}
+                          className={cn(
+                            "h-auto flex-col items-stretch gap-0 p-3 text-left",
+                            isSelected && "border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)]",
+                          )}
                         >
                           <span className="block truncate text-xs font-bold">{option.label}</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-slate-500">{option.subtext}</span>
-                        </button>
+                          <span className="mt-0.5 block truncate text-micro text-[var(--color-text-muted)]">{option.subtext}</span>
+                        </Button>
                       );
                     })}
                     {filteredContextOptions.length === 0 ? (
-                      <p className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs text-slate-500">
+                      <p className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-muted)]">
                         Geen context gevonden voor &ldquo;{contextQuery}&rdquo;.
                       </p>
                     ) : null}
                   </div>
                 </div>
               ) : (
-                <p className="mt-3 text-xs leading-5 text-slate-500">
+                <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
                   Maak of activeer een klant, lead, opdracht of project om PDF-documenten automatisch als dossierdocument te renderen.
                 </p>
               )}
@@ -360,33 +369,38 @@ export function LaventeCareBusinessCommandCenter({
                 const isLogging = loggingDocumentKey === document.key;
 
                 return (
-                  <div key={document.key} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                  <div key={document.key} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="line-clamp-1 text-sm font-semibold text-white">{document.title}</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="line-clamp-1 text-sm font-semibold text-[var(--color-text)]">{document.title}</p>
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                           {template.label} - {sectionCount} secties - {document.badge}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <a
+                        <ButtonLink
                           href={previewPageUrl}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-sky-500/20 bg-sky-500/10 text-sky-300 transition hover:bg-sky-500/20"
                           aria-label={`${document.title} preview openen`}
                           title="Preview"
+                          size="icon"
+                          variant="ghost"
+                          className="border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)] hover:bg-[var(--color-info-border)]"
                         >
                           <ArrowUpRight size={14} />
-                        </a>
-                        <a
+                        </ButtonLink>
+                        <ButtonLink
                           href={printUrl}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300 transition hover:bg-amber-500/20"
                           aria-label={`${document.title} print PDF downloaden`}
                           title="Print PDF"
+                          size="icon"
+                          variant="ghost"
+                          className="border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)] hover:bg-[var(--color-primary-border)]"
                         >
                           <Download size={14} />
-                        </a>
-                        <button
-                          type="button"
+                        </ButtonLink>
+                        <IconButton
+                          label={`${document.title} vastleggen in dossier`}
+                          title={canLog ? "Vastleggen in dossier" : "Kies eerst dossiercontext"}
                           disabled={!canLog || isLogging}
                           onClick={() => {
                             if (!selectedContext) return;
@@ -400,12 +414,10 @@ export function LaventeCareBusinessCommandCenter({
                               delivery: "inline",
                             });
                           }}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-300 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/[0.02] disabled:text-slate-600"
-                          aria-label={`${document.title} vastleggen in dossier`}
-                          title={canLog ? "Vastleggen in dossier" : "Kies eerst dossiercontext"}
-                        >
-                          <FileCheck2 size={14} />
-                        </button>
+                          icon={<FileCheck2 size={14} />}
+                          variant="ghost"
+                          className="border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)] hover:bg-[var(--color-success-border)] disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface-muted)] disabled:text-[var(--color-text-subtle)]"
+                        />
                       </div>
                     </div>
                   </div>
@@ -414,10 +426,10 @@ export function LaventeCareBusinessCommandCenter({
             </div>
           </div>
 
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-bold text-white">Recent vastgelegd</p>
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-bold text-slate-400">
+              <p className="text-sm font-bold text-[var(--color-text)]">Recent vastgelegd</p>
+              <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-0.5 text-micro font-bold text-[var(--color-text-muted)]">
                 {summary.dossierDocuments ?? dossierDocuments.length}
               </span>
             </div>
@@ -432,16 +444,22 @@ export function LaventeCareBusinessCommandCenter({
                     document_key: item.document_key,
                     theme,
                     pdf_url: item.pdf_url,
+                    context_type: item.context_type,
+                    context_id: item.context_id,
+                    company_id: item.company_id,
+                    lead_id: item.lead_id,
+                    project_id: item.project_id,
+                    workstream_id: item.workstream_id,
                   });
 
                   return (
                     <a
                       key={item.id}
                       href={href}
-                      className="block rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 transition hover:bg-white/[0.06]"
+                      className="block rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 transition-colors hover:bg-[var(--color-surface-hover)]"
                     >
-                      <span className="block truncate text-xs font-semibold text-slate-200">{item.titel}</span>
-                      <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                      <span className="block truncate text-xs font-semibold text-[var(--color-text)]">{item.titel}</span>
+                      <span className="mt-0.5 block truncate text-micro text-[var(--color-text-muted)]">
                         {item.context_title ?? label(item.context_type)} - {formatDate(item.created_at)}
                       </span>
                     </a>
@@ -449,7 +467,7 @@ export function LaventeCareBusinessCommandCenter({
                 })}
               </div>
             ) : (
-              <p className="mt-3 text-xs leading-5 text-slate-500">
+              <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
                 Nog geen gegenereerde PDF-documenten vastgelegd bij klanten, leads, opdrachten of projecten.
               </p>
             )}
@@ -462,10 +480,10 @@ export function LaventeCareBusinessCommandCenter({
 
 function CompactMetric({ label: metricLabel, value, detail }: { label: string; value: number | string; detail: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-      <p className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">{metricLabel}</p>
-      <p className="mt-1 text-xl font-bold text-white">{value}</p>
-      <p className="mt-0.5 truncate text-xs text-slate-500">{detail}</p>
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2">
+      <p className="text-micro font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">{metricLabel}</p>
+      <p className="mt-1 text-xl font-bold text-[var(--color-text)]">{value}</p>
+      <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{detail}</p>
     </div>
   );
 }

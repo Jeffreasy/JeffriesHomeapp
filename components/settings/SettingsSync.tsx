@@ -1,18 +1,22 @@
 "use client";
 
 import { Activity, CalendarClock, Cloud, Loader2, Mail, RefreshCw } from "lucide-react";
-import { Panel, SectionHeader } from "./SettingsCards";
+import { SectionHeader } from "./SettingsCards";
+import { Surface } from "@/components/ui/Surface";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { formatDateTime, toneClasses, type SyncStatusView, type SyncTarget, type Tone } from "./SettingsUtils";
 import { cn } from "@/lib/utils";
+import type { SettingsOverview } from "@/lib/api";
 
 function syncTone(status?: SyncStatusView): Tone {
-  if (!status) return "slate";
-  if (status.status === "failed") return "rose";
-  if (status.status === "missing_config") return "rose";
-  if (status.status === "running") return "amber";
-  if (status.status === "pending") return "amber";
-  if (status.status === "disabled") return "slate";
-  return "green";
+  if (!status) return "neutral";
+  if (status.status === "failed") return "danger";
+  if (status.status === "missing_config") return "danger";
+  if (status.status === "running") return "info";
+  if (status.status === "pending") return "warning";
+  if (status.status === "disabled") return "neutral";
+  return "success";
 }
 
 function syncTimestamp(status?: SyncStatusView) {
@@ -40,27 +44,27 @@ function SyncStatusRow({ label, status }: { label: string; status?: SyncStatusVi
         : "Geen run";
 
   return (
-    <div className="flex min-h-20 items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3 min-w-0">
+    <Surface tone="subtle" radius="sm" padding="sm" className="flex min-h-20 items-center gap-3">
       <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         {status?.status === "running" ? (
-          <Loader2 size={14} className={cn("animate-spin", classes.icon)} />
+          <Loader2 size={14} className={cn("animate-spin motion-reduce:animate-none", classes.icon)} />
         ) : (
           <Activity size={14} className={classes.icon} />
         )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-sm font-semibold text-slate-200">{label}</p>
-          <span className={cn("text-xs font-bold", classes.text)}>{value}</span>
+          <p className="truncate text-sm font-semibold text-[var(--color-text)]">{label}</p>
+          <Badge tone={tone} size="sm">{value}</Badge>
         </div>
         {/* lastError is sticky on the backend status object — only show it while
             the sync is actually in "failed" state (L10), otherwise a long-fixed
             error keeps scaring the user next to a green "Succes" badge. */}
-        <p className="mt-1 truncate text-xs text-slate-500">
+        <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">
           {status?.status === "failed" && status.lastError ? status.lastError : syncTimestamp(status)}
         </p>
       </div>
-    </div>
+    </Surface>
   );
 }
 
@@ -80,23 +84,23 @@ function SyncButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
       onClick={onClick}
       disabled={disabled}
-      className="flex min-h-[96px] min-w-0 flex-col items-start gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-55 sm:min-h-24 sm:flex-row sm:gap-3 sm:p-4"
+      variant="secondary"
+      fullWidth
+      className="h-auto min-h-24 min-w-0 flex-col items-start justify-start gap-2 p-3 text-left sm:flex-row sm:gap-3 sm:p-4"
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-300">
-        {loading ? <Loader2 size={17} className="animate-spin" /> : <Icon size={17} />}
-      </div>
-      <span className="min-w-0">
-        <span className="block text-sm font-bold text-white">{title}</span>
-        <span className="mt-1 block line-clamp-2 text-xs leading-4 text-slate-500 sm:leading-5">{meta}</span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-warning-subtle)] text-[var(--color-warning)]">
+        {loading ? <Loader2 size={17} className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <Icon size={17} aria-hidden="true" />}
       </span>
-    </button>
+      <span className="min-w-0">
+        <span className="block text-sm font-bold text-[var(--color-text)]">{title}</span>
+        <span className="mt-1 block line-clamp-2 text-xs font-normal leading-4 text-[var(--color-text-muted)] sm:leading-5">{meta}</span>
+      </span>
+    </Button>
   );
 }
-
 export function SettingsSync({
   syncing,
   overview,
@@ -106,14 +110,14 @@ export function SettingsSync({
   handleAllSync,
 }: {
   syncing: SyncTarget | null;
-  overview: any;
+  overview: SettingsOverview | null | undefined;
   syncMap: Record<string, SyncStatusView | undefined>;
   handleCalendarSync: () => void;
   handleGmailSync: () => void;
   handleAllSync: () => void;
 }) {
   return (
-    <Panel>
+    <Surface radius="sm">
       <SectionHeader
         icon={RefreshCw}
         label="Sync"
@@ -151,6 +155,6 @@ export function SettingsSync({
         <SyncStatusRow label="Persoonlijk" status={syncMap.personal} />
         <SyncStatusRow label="Gmail" status={syncMap.gmail} />
       </div>
-    </Panel>
+    </Surface>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -7,7 +8,6 @@ import {
   CalendarDays,
   FileText,
   ListChecks,
-  Loader2,
   Pin,
   Plus,
   RefreshCw,
@@ -16,7 +16,6 @@ import {
 
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { syncApi, type SyncStatusResult } from "@/lib/api";
@@ -27,10 +26,8 @@ import {
   type PersonalEvent,
 } from "@/hooks/usePersonalEvents";
 import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
-import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { AgendaCalendar } from "@/components/schedule/AgendaCalendar";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
-import { NoteEditor } from "@/components/notes/NoteEditor";
 import { getDisplayTitle } from "@/components/notes/NotesUtils";
 import { groupNotesByDate, groupNotesByEventId } from "@/components/notes/NoteAgendaUtils";
 import { useToast } from "@/components/ui/Toast";
@@ -44,15 +41,33 @@ import {
   errorMessage,
 } from "@/components/schedule/AgendaUtils";
 import {
-  Panel,
+
   EmptyState,
   StatusPill,
   NextEventCard,
   TimelineDay,
 } from "@/components/schedule/AgendaCards";
-import { TabBar, tabBarPanelId, tabBarTabId } from "@/components/schedule/TabBar";
+import { TabPanel, Tabs } from "@/components/ui/Tabs";
+import { Surface } from "@/components/ui/Surface";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
 import { compareAllDayFirst, shortSyncError, getShiftAppointments } from "@/components/schedule/scheduleUtils";
 import { StatChip } from "@/components/ui/StatChip";
+import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  AppPageHeader,
+  AppPageShell,
+  PageToolbar,
+} from "@/components/layout/AppPageShell";
+const LazyCreateEventModal = dynamic(
+  () => import("@/components/schedule/CreateEventModal").then((module) => module.CreateEventModal),
+  { ssr: false },
+);
+const LazyNoteEditor = dynamic(
+  () => import("@/components/notes/NoteEditor").then((module) => module.NoteEditor),
+  { ssr: false },
+);
+
 
 type AgendaView = "today" | "upcoming" | "pending" | "history";
 type CalendarMode = "month" | "week";
@@ -416,58 +431,55 @@ export default function AgendaPage() {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="text-slate-100">
+    <AppPageShell width="standard" className="space-y-5 text-[var(--color-text)]">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#0a0a0f]/92 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-base font-semibold text-white sm:text-lg">Agenda</h1>
-              <p className="mt-0.5 truncate text-xs text-slate-500">
-                {formatDateLabel(todayIso)}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
+      <div className="sticky top-0 z-[var(--layer-sticky)] space-y-2 bg-[var(--color-background)]/95 pb-3 backdrop-blur-xl">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <AppPageHeader
+              title="Agenda"
+              description={
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span>{formatDateLabel(todayIso)}</span>
+                  <StatusPill status={syncStatus?.status} />
+                </span>
+              }
+              className="min-w-0 flex-1"
+            />
+            <div className="flex shrink-0 items-center gap-2">
+              <IconButton
                 onClick={handleSync}
-                disabled={syncing}
-                aria-label="Synchroniseer met Google Calendar"
-                aria-busy={syncing}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] text-slate-400 hover:text-sky-300 hover:border-sky-500/20 transition-colors disabled:opacity-40 cursor-pointer"
+                loading={syncing}
+                label="Synchroniseer met Google Calendar"
                 title="Sync met Google Calendar"
-              >
-                {syncing ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={15} aria-hidden="true" />}
-              </button>
-
-              <StatusPill status={syncStatus?.status} />
-
-              <button
-                onClick={() => openNewEvent()}
-                aria-label="Nieuwe afspraak"
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-500/12 border border-emerald-500/25 px-3 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/18 transition-colors cursor-pointer"
-              >
-                <Plus size={14} />
-                <span className="hidden sm:inline">Nieuw</span>
-              </button>
+                icon={<RefreshCw size={16} />}
+                className="hover:border-[var(--color-info-border)] hover:text-[var(--color-info)]"
+              />
+              <Button variant="primary" onClick={() => openNewEvent()}>
+                <Plus size={16} aria-hidden="true" />
+                <span className="hidden min-[390px]:inline">Nieuwe afspraak</span>
+                <span className="min-[390px]:hidden">Nieuw</span>
+              </Button>
             </div>
           </div>
 
-          <TabBar
-            tabs={viewTabs}
-            active={activeView}
-            onChange={setActiveView}
+          <PageToolbar label="Agenda-weergaven">
+          <Tabs
+            items={viewTabs}
+            value={activeView}
+            onValueChange={setActiveView}
             idPrefix="agenda"
             ariaLabel="Agenda-weergave"
-            tone="sky"
-            className="mt-3 pb-0.5"
+            tone="info"
+            className="w-full"
           />
+          </PageToolbar>
         </div>
-      </header>
+      </div>
 
       {/* ── Main ───────────────────────────────────────────────────────── */}
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:py-7">
+      <div className="space-y-5">
         <div className="mb-4">
           <AgendaCalendar
             events={calendarEvents}
@@ -496,14 +508,14 @@ export default function AgendaPage() {
         <section className="mb-5 flex flex-wrap items-center gap-1.5" aria-label="Agenda-overzicht">
           {agendaBusy ? (
             <>
-              <span className="h-8 w-28 animate-pulse rounded-lg border border-[var(--color-border)] bg-white/[0.03]" aria-hidden="true" />
-              <span className="h-8 w-28 animate-pulse rounded-lg border border-[var(--color-border)] bg-white/[0.03]" aria-hidden="true" />
+              <Skeleton className="h-8 w-28 rounded-lg border border-[var(--color-border)]" />
+              <Skeleton className="h-8 w-28 rounded-lg border border-[var(--color-border)]" />
               <span className="sr-only">Agenda-overzicht wordt geladen</span>
             </>
           ) : (
             <>
-              <StatChip icon={CalendarDays} label="Komend" value={String(upcomingTimelineEvents.length)} meta={formatSplitCounts(upcomingTimelineEvents)} tone="sky" onClick={() => setActiveView("upcoming")} active={activeView === "upcoming"} />
-              <StatChip icon={AlertTriangle} label="Conflicten" value={String(withConflicts.length)} meta={withConflicts.length ? "te controleren" : "geen conflicten"} tone={withConflicts.length ? "amber" : "green"} onClick={withConflicts.length ? () => setActiveView("upcoming") : undefined} />
+              <StatChip icon={CalendarDays} label="Komend" value={String(upcomingTimelineEvents.length)} meta={formatSplitCounts(upcomingTimelineEvents)} tone="info" onClick={() => setActiveView("upcoming")} active={activeView === "upcoming"} />
+              <StatChip icon={AlertTriangle} label="Conflicten" value={String(withConflicts.length)} meta={withConflicts.length ? "te controleren" : "geen conflicten"} tone={withConflicts.length ? "warning" : "success"} onClick={withConflicts.length ? () => setActiveView("upcoming") : undefined} />
             </>
           )}
         </section>
@@ -513,27 +525,22 @@ export default function AgendaPage() {
           {/* ── Timeline ─────────────────────────────────────────────── */}
           {/* Onder xl komt de sidebar (volgende dienst + conflicten) BOVEN de
               tijdlijn te staan (audit K5) — vandaar de order-utilities. */}
-          <div
+          <TabPanel
+            idPrefix="agenda"
+            value={activeView}
             className="order-2 space-y-5 xl:order-1"
-            role="tabpanel"
-            id={tabBarPanelId("agenda", activeView)}
-            aria-labelledby={tabBarTabId("agenda", activeView)}
-            tabIndex={0}
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-sm font-semibold text-white">{activeViewMeta.label}</h2>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <h2 className="text-sm font-semibold text-[var(--color-text)]">{activeViewMeta.label}</h2>
+                <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                   {formatSplitCounts(viewEvents)}
                 </p>
               </div>
               {activeView !== "today" && (
-                <button
-                  onClick={() => setActiveView("today")}
-                  className="rounded-lg border border-[var(--color-border)] bg-white/[0.03] px-3 py-1.5 text-xs text-slate-400 transition-colors hover:text-slate-200 hover:bg-white/[0.05] cursor-pointer"
-                >
+                <Button size="sm" variant="secondary" onClick={() => setActiveView("today")}>
                   Vandaag
-                </button>
+                </Button>
               )}
             </div>
 
@@ -541,68 +548,56 @@ export default function AgendaPage() {
                 alleen de events-fout getoond en leek een rooster-500 gewoon
                 een lege agenda. */}
             {scheduleIsError && (
-              <Panel className="border-amber-500/20 bg-amber-500/[0.045]">
-                <div className="flex flex-wrap items-start gap-3 text-sm text-amber-200">
+              <Surface tone="warning" radius="sm">
+                <div className="flex flex-wrap items-start gap-3 text-sm text-[var(--color-warning)]">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">Diensten konden niet worden geladen</p>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                       Je afspraken worden getoond, maar het rooster (diensten en conflicten) kan verouderd of onvolledig zijn.
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void refetchDiensten()}
-                    className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
-                  >
+                  <Button size="sm" variant="secondary" onClick={() => void refetchDiensten()}>
                     Opnieuw proberen
-                  </button>
+                  </Button>
                 </div>
-              </Panel>
+              </Surface>
             )}
 
             {/* Failed ≠ empty (audit H15): een mislukte background-refetch mag
                 een gevulde agenda niet vervangen door een foutscherm. Alleen bij
-                écht geen data het volle foutpaneel; anders een compacte amber
+                écht geen data het volle foutpaneel; anders een compacte semantische waarschuwing
                 stale-banner met retry (pariteit met /rooster). */}
             {agendaError && agendaHasData ? (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
-                <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2 text-xs text-[var(--color-warning)]">
+                <AlertTriangle size={13} className="shrink-0 text-[var(--color-warning)]" />
                 <span className="min-w-0 flex-1">
                   Agenda verversen mislukt — je ziet mogelijk verouderde afspraken.
                 </span>
-                <button
-                  type="button"
-                  onClick={() => void refetchEvents()}
-                  className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
-                >
+                <Button size="sm" variant="secondary" onClick={() => void refetchEvents()}>
                   Opnieuw proberen
-                </button>
+                </Button>
               </div>
             ) : agendaError ? (
-              <Panel className="border-amber-500/20 bg-amber-500/[0.045]">
-                <div className="flex flex-wrap items-start gap-3 text-sm text-amber-200">
+              <Surface tone="danger" radius="sm">
+                <div className="flex flex-wrap items-start gap-3 text-sm text-[var(--color-danger)]">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium">Agenda kon niet worden geladen</p>
-                    <p className="mt-1 text-xs text-slate-400">{errorMessage(agendaError)}</p>
+                    <p className="mt-1 text-xs text-[var(--color-text-muted)]">{errorMessage(agendaError)}</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void refetchEvents()}
-                    className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
-                  >
+                  <Button size="sm" variant="primary" onClick={() => void refetchEvents()}>
                     Opnieuw proberen
-                  </button>
+                  </Button>
                 </div>
-              </Panel>
+              </Surface>
             ) : agendaBusy ? (
               <div className="space-y-4">
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="space-y-2">
-                    <div className="h-4 w-40 animate-pulse rounded bg-white/5" />
-                    <div className="h-12 animate-pulse rounded-lg bg-white/[0.03]" />
-                    <div className="h-12 animate-pulse rounded-lg bg-white/[0.03]" />
+                    <Skeleton className="h-4 w-40 rounded" />
+                    <Skeleton className="h-12 rounded-lg" />
+                    <Skeleton className="h-12 rounded-lg" />
                   </div>
                 ))}
               </div>
@@ -626,7 +621,7 @@ export default function AgendaPage() {
                 ))}
               </div>
             ) : (
-              <Panel>
+              <Surface radius="sm">
                 <EmptyState
                   icon={CalendarDays}
                   title={emptyCopy.title}
@@ -635,22 +630,18 @@ export default function AgendaPage() {
                 {/* Zelfde CTA als de kalender-empty-state (audit K12). */}
                 {activeView !== "history" && (
                   <div className="flex justify-center pb-2">
-                    <button
-                      type="button"
-                      onClick={() => openNewEvent()}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/12 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/18 cursor-pointer"
-                    >
+                    <Button size="sm" variant="primary" onClick={() => openNewEvent()}>
                       <Plus size={14} />
                       Nieuwe afspraak
-                    </button>
+                    </Button>
                   </div>
                 )}
-              </Panel>
+              </Surface>
             )}
 
             {activeView === "history" && historyHiddenCount > 0 && (
-              <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-4 py-3 text-xs text-slate-500">
-                <Archive size={13} className="shrink-0 text-slate-600" aria-hidden="true" />
+              <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3 text-xs text-[var(--color-text-muted)]">
+                <Archive size={13} className="shrink-0 text-[var(--color-text-subtle)]" aria-hidden="true" />
                 <span>
                   {HISTORY_RENDER_LIMIT} van {historyTimelineEvents.length} getoond · {historyHiddenCount} oudere{historyHiddenCount === 1 ? "" : "n"} verborgen
                 </span>
@@ -658,18 +649,20 @@ export default function AgendaPage() {
             )}
 
             {activeView !== "pending" && pending.length > 0 && (
-              <button
+              <Button
+                variant="secondary"
+                fullWidth
                 onClick={() => setActiveView("pending")}
-                className="flex w-full items-center justify-between rounded-lg border border-sky-500/15 bg-sky-500/[0.045] px-4 py-3 text-left transition-colors hover:bg-sky-500/[0.07] cursor-pointer"
+                className="justify-between border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-left text-[var(--color-info)]"
               >
-                <span className="flex items-center gap-2 text-xs font-medium text-sky-200">
+                <span className="flex items-center gap-2 text-xs font-medium">
                   <Zap size={14} />
                   {pending.length} {pending.length === 1 ? "afspraak" : "afspraken"} nog niet in Google Calendar
                 </span>
-                <span className="text-xs text-sky-300">Bekijken</span>
-              </button>
+                <span className="text-xs">Bekijken</span>
+              </Button>
             )}
-          </div>
+          </TabPanel>
 
           {/* ── Sidebar ──────────────────────────────────────────────── */}
           <aside className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-20 xl:self-start">
@@ -688,22 +681,18 @@ export default function AgendaPage() {
 
             <NextEventCard event={nextAppointment} />
 
-            <div className="rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-4 py-3">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <FileText size={13} className="text-amber-300/70" />
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  <FileText size={13} className="text-[var(--color-primary-hover)]" />
+                  <p className="text-micro font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
                     Notities vandaag
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => openNewNoteForDate(todayIso)}
-                  className="flex h-7 items-center gap-1 rounded-md border border-amber-500/15 bg-amber-500/[0.06] px-2 text-[10px] font-semibold text-amber-300 transition-colors hover:bg-amber-500/[0.1] cursor-pointer"
-                >
+                <Button size="sm" variant="primary" onClick={() => openNewNoteForDate(todayIso)}>
                   <Plus size={11} />
                   Nieuw
-                </button>
+                </Button>
               </div>
 
               {todayNotes.length > 0 ? (
@@ -715,23 +704,23 @@ export default function AgendaPage() {
                         key={note.id}
                         type="button"
                         onClick={() => openEditNote(note)}
-                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-slate-300 transition-colors hover:bg-white/[0.04] cursor-pointer"
+                        className="flex min-h-[var(--touch-target)] w-full items-center gap-2 rounded-md px-2 text-left text-xs text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)] cursor-pointer"
                       >
                         {isPinned ? (
-                          <Pin size={11} className="shrink-0 text-amber-300 fill-amber-300" />
+                          <Pin size={11} className="shrink-0 text-[var(--color-primary-hover)] fill-[var(--color-primary)]" />
                         ) : (
-                          <FileText size={11} className="shrink-0 text-slate-600" />
+                          <FileText size={11} className="shrink-0 text-[var(--color-text-subtle)]" />
                         )}
                         <span className="truncate">{getDisplayTitle(note)}</span>
                       </button>
                     );
                   })}
                   {todayNotes.length > 5 && (
-                    <p className="px-2 text-[10px] text-slate-600">+{todayNotes.length - 5} meer notities vandaag</p>
+                    <p className="px-2 text-micro text-[var(--color-text-subtle)]">+{todayNotes.length - 5} meer notities vandaag</p>
                   )}
                 </div>
               ) : (
-                <p className="rounded-md border border-dashed border-[var(--color-border)] px-3 py-3 text-xs text-slate-600">
+                <p className="rounded-md border border-dashed border-[var(--color-border)] px-3 py-3 text-xs text-[var(--color-text-subtle)]">
                   Nog geen dagnotities.
                 </p>
               )}
@@ -739,10 +728,10 @@ export default function AgendaPage() {
 
             {/* Conflicts — only when present */}
             {withConflicts.length > 0 && (
-              <Panel className="border-amber-500/15 bg-amber-500/[0.035]">
+              <Surface tone="warning" radius="sm">
                 <div className="flex items-center gap-2 mb-3">
-                  <AlertTriangle size={14} className="text-amber-400" />
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <AlertTriangle size={14} className="text-[var(--color-warning)]" />
+                  <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">
                     {withConflicts.length} {withConflicts.length === 1 ? "conflict" : "conflicten"}
                   </p>
                 </div>
@@ -757,34 +746,31 @@ export default function AgendaPage() {
                     />
                   ))}
                 </div>
-              </Panel>
+              </Surface>
             )}
 
             {/* Wachtrij-fout van de laatste handmatige sync — persistent i.p.v.
                 alleen een 4s-toast (audit K11). */}
             {pendingSyncError && (
-              <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.05] px-4 py-3">
+              <div className="rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-4 py-3">
                 <div className="mb-1 flex items-center gap-2">
-                  <AlertTriangle size={13} className="shrink-0 text-amber-400" />
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">Wachtrij-fout</p>
+                  <AlertTriangle size={13} className="shrink-0 text-[var(--color-danger)]" />
+                  <p className="text-micro font-semibold uppercase tracking-wider text-[var(--color-danger)]">Wachtrij-fout</p>
                 </div>
-                <p className="text-[10px] leading-relaxed text-amber-400/80">{shortSyncError(pendingSyncError)}</p>
+                <p className="text-micro leading-relaxed text-[var(--color-danger)]">{shortSyncError(pendingSyncError)}</p>
                 <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
+                    variant="primary"
                     onClick={handleSync}
-                    disabled={syncing}
-                    className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50 cursor-pointer"
+                    loading={syncing}
+                    loadingLabel="Synchroniseren…"
                   >
                     Opnieuw syncen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingSyncError(null)}
-                    className="rounded-md px-2 py-1 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-300 cursor-pointer"
-                  >
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setPendingSyncError(null)}>
                     Verbergen
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -793,37 +779,38 @@ export default function AgendaPage() {
                 already shows the at-a-glance state, and Recent-voorbij lives on
                 the Historie tab + the no-conflict state on the Conflicten chip. */}
             {syncStatus?.lastError && (
-              <div className="rounded-lg border border-rose-500/20 bg-rose-500/[0.05] px-4 py-3">
+              <div className="rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-4 py-3">
                 <div className="mb-1 flex items-center gap-2">
-                  <AlertTriangle size={13} className="shrink-0 text-rose-400" />
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-300">Sync-fout</p>
+                  <AlertTriangle size={13} className="shrink-0 text-[var(--color-danger)]" />
+                  <p className="text-micro font-semibold uppercase tracking-wider text-[var(--color-danger)]">Sync-fout</p>
                 </div>
-                <p className="text-[10px] leading-relaxed text-rose-400/80">{syncStatus.lastError}</p>
-                <p className="mt-1 text-[10px] text-slate-500">Laatst geslaagd: {formatDateTime(syncStatus?.lastSuccessAt)}</p>
+                <p className="text-micro leading-relaxed text-[var(--color-danger)]">{syncStatus.lastError}</p>
+                <p className="mt-1 text-micro text-[var(--color-text-muted)]">Laatst geslaagd: {formatDateTime(syncStatus?.lastSuccessAt)}</p>
               </div>
             )}
           </aside>
         </div>
-      </main>
+      </div>
 
       {/* ── Modal ──────────────────────────────────────────────────────── */}
-      <CreateEventModal
-        open={modalOpen}
-        editEvent={editEvent}
-        initialDate={eventInitialDate}
-        initialTime={eventInitialTime}
-        onSuccess={() => refetchEvents()}
-        onClose={() => {
-          setModalOpen(false);
-          setEditEvent(null);
-          setEventInitialDate(undefined);
-          setEventInitialTime(undefined);
-        }}
-      />
+      {modalOpen && (
+        <LazyCreateEventModal
+          open={modalOpen}
+          editEvent={editEvent}
+          initialDate={eventInitialDate}
+          initialTime={eventInitialTime}
+          onSuccess={() => refetchEvents()}
+          onClose={() => {
+            setModalOpen(false);
+            setEditEvent(null);
+            setEventInitialDate(undefined);
+            setEventInitialTime(undefined);
+          }}
+        />
+      )}
 
-      <AnimatePresence>
         {noteEditorOpen && (
-          <NoteEditor
+          <LazyNoteEditor
             key={editNote?.id ?? [
               noteDefaults.linkedEventId ?? "new-note",
               noteDefaults.deadline ?? "",
@@ -854,7 +841,6 @@ export default function AgendaPage() {
             initialBusinessContext={noteDefaults.businessContext}
           />
         )}
-      </AnimatePresence>
-    </div>
+    </AppPageShell>
   );
 }

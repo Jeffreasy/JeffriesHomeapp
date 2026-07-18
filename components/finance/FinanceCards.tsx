@@ -1,63 +1,23 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { motion } from "framer-motion";
 import { type LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { MetricCard as UiMetricCard } from "@/components/ui/MetricCard";
+import { Surface } from "@/components/ui/Surface";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 import { cn } from "@/lib/utils";
 
-export type Tone = "amber" | "green" | "rose" | "sky" | "indigo" | "slate";
+export type Tone = UiTone;
 
-export const toneClasses: Record<Tone, { border: string; surface: string; icon: string; text: string; glow: string }> = {
-  amber: {
-    border: "border-amber-500/25",
-    surface: "bg-amber-500/10",
-    icon: "text-amber-300",
-    text: "text-amber-200",
-    glow: "shadow-[0_0_0_1px_rgba(245,158,11,0.05)]",
-  },
-  green: {
-    border: "border-emerald-500/20",
-    surface: "bg-emerald-500/10",
-    icon: "text-emerald-300",
-    text: "text-emerald-200",
-    glow: "shadow-[0_0_0_1px_rgba(16,185,129,0.04)]",
-  },
-  rose: {
-    border: "border-rose-500/20",
-    surface: "bg-rose-500/10",
-    icon: "text-rose-300",
-    text: "text-rose-200",
-    glow: "shadow-[0_0_0_1px_rgba(244,63,94,0.04)]",
-  },
-  sky: {
-    border: "border-sky-500/20",
-    surface: "bg-sky-500/10",
-    icon: "text-sky-300",
-    text: "text-sky-200",
-    glow: "shadow-[0_0_0_1px_rgba(14,165,233,0.04)]",
-  },
-  indigo: {
-    border: "border-indigo-500/20",
-    surface: "bg-indigo-500/10",
-    icon: "text-indigo-300",
-    text: "text-indigo-200",
-    glow: "shadow-[0_0_0_1px_rgba(99,102,241,0.04)]",
-  },
-  slate: {
-    border: "border-[var(--color-border)]",
-    surface: "bg-[rgba(255,255,255,0.04)]",
-    icon: "text-slate-300",
-    text: "text-slate-200",
-    glow: "shadow-none",
-  },
-};
+export const toneClasses = uiToneClasses;
 
 export function MetricCard({
   label,
   value,
   meta,
   icon: Icon,
-  tone = "slate",
+  tone = "neutral",
 }: {
   label: string;
   value: string;
@@ -65,31 +25,16 @@ export function MetricCard({
   icon: LucideIcon;
   tone?: Tone;
 }) {
-  const toneClass = toneClasses[tone];
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        "min-h-[116px] glass p-4 transition-colors hover:bg-[var(--color-surface-hover)]",
-        toneClass.border,
-        toneClass.glow
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", toneClass.surface)}>
-          <Icon size={19} className={toneClass.icon} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-slate-500">{label}</p>
-          <p className={cn("mt-2 truncate text-2xl font-bold leading-tight text-white", toneClass.text)}>
-            {value}
-          </p>
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">{meta}</p>
-        </div>
-      </div>
-    </motion.div>
+    <UiMetricCard
+      icon={Icon}
+      label={label}
+      value={value}
+      description={meta}
+      tone={tone}
+      iconPosition="leading"
+      className="min-h-28"
+    />
   );
 }
 
@@ -107,12 +52,12 @@ export function SectionTitle({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10">
-          <Icon size={17} className="text-amber-300" />
-        </div>
+        <Surface tone="accent" radius="sm" padding="none" className="flex h-10 w-10 shrink-0 items-center justify-center">
+          <Icon size={17} className="text-[var(--color-primary)]" aria-hidden="true" />
+        </Surface>
         <div className="min-w-0">
-          <h2 className="text-base font-bold text-white">{title}</h2>
-          {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+          <h2 className="text-base font-bold text-[var(--color-text)]">{title}</h2>
+          {subtitle && <p className="mt-1 text-sm text-[var(--color-text-muted)]">{subtitle}</p>}
         </div>
       </div>
       {action}
@@ -132,19 +77,16 @@ export function SegmentedButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant={active ? "primary" : "secondary"}
+      size="sm"
       onClick={onClick}
-      className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
-        active
-          ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-          : "border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
-      )}
+      className="shrink-0"
+      aria-pressed={active}
     >
-      {Icon && <Icon size={15} />}
+      {Icon && <Icon size={15} aria-hidden="true" />}
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -152,7 +94,7 @@ export function InsightRow({
   icon: Icon,
   label,
   value,
-  tone = "slate",
+  tone = "neutral",
 }: {
   icon: LucideIcon;
   label: string;
@@ -165,9 +107,9 @@ export function InsightRow({
     <div className="flex items-center justify-between gap-4 border-b border-[var(--color-border)] py-3 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
         <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneClass.surface)}>
-          <Icon size={15} className={toneClass.icon} />
+          <Icon size={15} className={toneClass.icon} aria-hidden="true" />
         </div>
-        <span className="truncate text-sm text-slate-400">{label}</span>
+        <span className="truncate text-sm text-[var(--color-text-muted)]">{label}</span>
       </div>
       <span className={cn("shrink-0 text-sm font-semibold", toneClass.text)}>{value}</span>
     </div>

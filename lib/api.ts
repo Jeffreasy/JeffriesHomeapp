@@ -1,4 +1,5 @@
-import { del } from "idb-keyval";
+import { fetchAllPages } from "@/lib/pagination";
+import { fetchWithTimeout, isRequestTimeoutError } from "@/lib/request-timeout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,21 +52,6 @@ export class ApiError extends Error {
   }
 }
 
-// ─── Query-client registry ────────────────────────────────────────────────────
-// providers.tsx registers its QueryClient here so the 401 path below can wipe
-// the in-memory react-query cache before redirecting to sign-in (L5), without
-// importing @tanstack/react-query (or providers.tsx) into this module — that
-// would create a circular import.
-interface ClearableCache {
-  clear: () => void;
-}
-
-let registeredQueryClient: ClearableCache | null = null;
-
-export function registerQueryClient(client: ClearableCache) {
-  registeredQueryClient = client;
-}
-
 // ─── Session-expired signal ───────────────────────────────────────────────────
 // A 401 (GET or mutation) no longer hard-redirects — that would unmount an open
 // dirty form and destroy the user's input seconds after a "safe" toast (R3-H3).
@@ -79,16 +65,19 @@ let sessionExpiredFired = false;
 
 export function registerSessionExpiredHandler(listener: SessionExpiredListener) {
   sessionExpiredListener = listener;
+  // A restored/background query can fail before the provider effect subscribes.
+  // Replay the one-shot state so the blocking recovery UI can never be missed.
+  if (sessionExpiredFired) listener();
+
+  return () => {
+    if (sessionExpiredListener === listener) sessionExpiredListener = null;
+  };
 }
 
 function triggerSessionExpired() {
   if (sessionExpiredFired) return;
   sessionExpiredFired = true;
-  // Purge cached user data — the session is gone, so nothing user-scoped may
-  // survive in memory, IndexedDB or the service-worker caches.
-  registeredQueryClient?.clear();
   if (typeof window !== "undefined") {
-    del("REACT_QUERY_OFFLINE_CACHE").catch(() => {});
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: "CLEAR_ALL_CACHES" });
     }
@@ -98,45 +87,77 @@ function triggerSessionExpired() {
 
 // apiFetchWithStatus returns the parsed body AND the real HTTP status so callers
 // (e.g. the orval mutator) can discriminate responses instead of assuming 200.
-export async function apiFetchWithStatus<T>(path: string, init?: RequestInit): Promise<{ data: T; status: number }> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
-
-  if (!res.ok) {
-    if (res.status === 401) {
-      // Session expired mid-use (R3-H3): NEVER hard-redirect here. A background
-      // GET-poll firing a redirect within ~10s used to destroy an open dirty
-      // form seconds after a "safe" mutation-toast. Instead fire a one-shot
-      // signal → providers.tsx shows a persistent, blocking "sessie verlopen"
-      // overlay with a re-login button. The cache-purge still happens (inside
-      // triggerSessionExpired). Both GET and mutation paths surface a readable
-      // Dutch error to their callers; the overlay handles the actual re-login.
-      triggerSessionExpired();
-      throw new ApiError("Je sessie is verlopen — log opnieuw in om verder te gaan.", 401);
-    }
-    const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(error.detail ?? error.message ?? `API error ${res.status}`, res.status, error);
-  }
-
-
-  if (res.status === 204) return { data: undefined as T, status: res.status };
-
-  // Guard against non-JSON 200s (e.g. an HTML page served after a silent
-  // redirect) so callers get a readable Dutch error instead of a raw
-  // "SyntaxError: Unexpected token '<'" (FH4).
-  const contentType = res.headers.get("content-type") ?? "";
-  if (!contentType.includes("json")) {
-    throw new ApiError(
-      "Onverwacht antwoord van de server (geen JSON). Herlaad de pagina of log opnieuw in.",
-      res.status
+export async function apiFetchWithStatus<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<{ data: T; status: number }> {
+  try {
+    const res = await fetchWithTimeout(
+      `${API_BASE}${path}`,
+      {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...init?.headers,
+        },
+      },
+      30_000,
     );
+
+    if (!res.ok) {
+      let errorBody: { detail?: string; message?: string; code?: string } = {
+        detail: res.statusText,
+      };
+      try {
+        errorBody = await res.json();
+      } catch (error) {
+        if (isRequestTimeoutError(error)) throw error;
+      }
+
+      if (
+        res.status === 401 &&
+        (errorBody.code === "UNAUTHORIZED" || errorBody.code === "SESSION_EXPIRED")
+      ) {
+        // Only the Homeapp auth boundary may trigger session recovery. An
+        // upstream backend credential failure has a different stable code.
+        triggerSessionExpired();
+        throw new ApiError(
+          "Je sessie is verlopen — log opnieuw in om verder te gaan.",
+          401,
+          errorBody,
+        );
+      }
+
+      throw new ApiError(
+        errorBody.detail ?? errorBody.message ?? `API error ${res.status}`,
+        res.status,
+        errorBody,
+      );
+    }
+
+    if (res.status === 204) return { data: undefined as T, status: res.status };
+
+    // Guard against HTML or another unexpected response after a redirect.
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.includes("json")) {
+      throw new ApiError(
+        "Onverwacht antwoord van de server (geen JSON). Herlaad de pagina of log opnieuw in.",
+        res.status,
+      );
+    }
+
+    try {
+      return { data: await res.json(), status: res.status };
+    } catch (error) {
+      if (isRequestTimeoutError(error)) throw error;
+      throw new ApiError("De server gaf een ongeldig antwoord. Probeer het opnieuw.", 502);
+    }
+  } catch (error) {
+    if (isRequestTimeoutError(error)) {
+      throw new ApiError("De server reageert niet op tijd. Probeer het opnieuw.", 504);
+    }
+    throw error;
   }
-  return { data: await res.json(), status: res.status };
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -161,11 +182,13 @@ export const roomsApi = {
 
 export const devicesApi = {
   list: () => apiFetch<Device[]>("/devices"),
-  get: (id: string) => apiFetch<Device>(`/devices/${id}`),
-  command: (id: string, cmd: DeviceCommand) =>
+  get: (id: string, signal?: AbortSignal) =>
+    apiFetch<Device>(`/devices/${id}`, { signal }),
+  command: (id: string, cmd: DeviceCommand, signal?: AbortSignal) =>
     apiFetch<void>(`/devices/${id}/command`, {
       method: "POST",
       body: JSON.stringify(cmd),
+      signal,
     }),
   register: (data: { ip_address: string; name: string; room_id?: string }) =>
     apiFetch<Device>("/devices/register", {
@@ -1776,9 +1799,38 @@ export interface PendingAIActionResult {
   error?: string | null;
 }
 
+export interface SettingsOverviewDevices {
+  total: number;
+  online: number;
+  offline: number;
+  on: number;
+}
+
+export interface SettingsOverview {
+  account?: { name?: string; email?: string };
+  devices: SettingsOverviewDevices;
+  rooms: { total: number; unassignedDevices: number };
+  integrations: Record<string, boolean | string | undefined>;
+  automations: { active: number; total: number };
+  commands: { pending: number; processing: number; failed: number };
+  bridge?: {
+    online: boolean;
+    status: string;
+    lastSeenAt?: string | null;
+    commandsPending?: number;
+    commandsProcessing?: number;
+    commandsFailed?: number;
+    lastError?: string | null;
+  };
+  schedule: { total: number; upcoming: number; importedAt?: string | null };
+  personalEvents?: { upcoming: number };
+  email: { total: number; unread: number; lastFullSync?: string | null };
+  data: { activeHabits: number; notes: number };
+}
+
 export const settingsApi = {
-	overview: () => apiFetch<any>("/settings/overview"),
-	telegramStatus: () => apiFetch<any>("/settings/telegram/status"),
+	overview: () => apiFetch<SettingsOverview>("/settings/overview"),
+	telegramStatus: () => apiFetch<Record<string, unknown>>("/settings/telegram/status"),
 	aiDiagnostics: () => apiFetch<unknown>("/settings/ai/diagnostics"),
 	pendingActions: (userId: string) =>
 		apiFetch<PendingAIAction[]>(`/ai/pending?userId=${encodeURIComponent(userId)}`),
@@ -1792,7 +1844,7 @@ export const settingsApi = {
 		}),
 	// Backup returns a Blob, so we can't use apiFetch which assumes JSON if it's not a download.
 	// But apiFetch doesn't handle Blobs yet. For now, we will handle download separately in component or just get JSON.
-	backup: (userId: string) => apiFetch<any>(`/settings/backup?userId=${userId}`),
+	backup: (userId: string) => apiFetch<Record<string, unknown>>(`/settings/backup?userId=${userId}`),
 };
 
 export const syncApi = {
@@ -2004,15 +2056,32 @@ export class DuplicateContactError extends Error {
   }
 }
 
+export type ContactListOptions = {
+  q?: string;
+  type?: string;
+  includeArchived?: boolean;
+  limit?: number;
+  offset?: number;
+  signal?: AbortSignal;
+};
+
+function listContactPage(userId: string, opts?: ContactListOptions) {
+  const params = new URLSearchParams({ userId });
+  if (opts?.q) params.set("q", opts.q);
+  if (opts?.type) params.set("type", opts.type);
+  if (opts?.includeArchived) params.set("includeArchived", "true");
+  if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts?.offset !== undefined) params.set("offset", String(opts.offset));
+  return apiFetch<Contact[]>(`/contacts?${params.toString()}`, { signal: opts?.signal });
+}
+
 export const contactenApi = {
-  list: (userId: string, opts?: { q?: string; type?: string; includeArchived?: boolean; limit?: number }) => {
-    const params = new URLSearchParams({ userId });
-    if (opts?.q) params.set("q", opts.q);
-    if (opts?.type) params.set("type", opts.type);
-    if (opts?.includeArchived) params.set("includeArchived", "true");
-    if (opts?.limit) params.set("limit", String(opts.limit));
-    return apiFetch<Contact[]>(`/contacts?${params.toString()}`);
-  },
+  list: listContactPage,
+  listAll: (userId: string, opts?: Omit<ContactListOptions, "limit" | "offset">) =>
+    fetchAllPages(
+      (limit, offset) => listContactPage(userId, { ...opts, limit, offset }),
+      { pageSize: 200, maxPages: 100, getKey: (contact) => contact.id },
+    ),
   get: (userId: string, id: string) =>
     apiFetch<Contact>(`/contacts/${id}?userId=${encodeURIComponent(userId)}`),
   create: async (userId: string, data: ContactCreate) => {

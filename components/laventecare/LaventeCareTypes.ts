@@ -21,8 +21,9 @@ import {
   type LCMailInboxItem,
   type LCDossierAdvice,
 } from "@/lib/api";
+import type { UiTone } from "@/lib/ui/tones";
 
-export type Tone = "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
+export type Tone = UiTone;
 
 export type DocumentItem = LCDocument & {
   documentKey?: string;

@@ -1,79 +1,146 @@
-import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { defineConfig, devices } from "@playwright/test";
+import {
+  clerkNonOwnerStateFile,
+  clerkOwnerStateFile,
+} from "./tests/e2e/support/clerk-state";
+import {
+  READ_ONLY_BACKEND_API_KEY,
+  READ_ONLY_BACKEND_BASE_URL,
+  READ_ONLY_BACKEND_ORIGIN,
+  READ_ONLY_BACKEND_READY_PATH,
+} from "./tests/e2e/support/read-only-backend.mjs";
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
+const localEnvFile = resolve(process.cwd(), ".env.local");
+if (!process.env.CI && existsSync(localEnvFile)) process.loadEnvFile(localEnvFile);
 
-/**
- * See https://playwright.dev/docs/test-configuration.
- */
+const e2eBaseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const useExternalServer = process.env.E2E_EXTERNAL_SERVER === "1";
+const ownerUserId = process.env.HOMEAPP_OWNER_USER_ID?.trim() || "user_ci_owner";
+const authenticatedSpecs = /(?:authenticated-navigation|enterprise-shell)\.e2e\.spec\.ts/;
+const protectedBrowserPolicy = {
+  serviceWorkers: "block",
+  screenshot: "off",
+  trace: "off",
+  video: "off",
+} as const;
+
 export default defineConfig({
-  testDir: './tests',
-  /* Run tests in files in parallel */
+  testDir: "./tests/e2e",
   fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
-  forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
+  forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  reporter: process.env.CI ? "github" : "html",
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3000',
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    baseURL: e2eBaseURL,
+    trace: "on-first-retry",
   },
-
-  /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "security-chromium",
+      testMatch: /security\.e2e\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
     },
-
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: "clerk-owner-setup",
+      testMatch: /[\\/]auth\.setup\.ts$/,
+      teardown: "clerk-owner-teardown",
+      use: {
+        ...devices["Desktop Chrome"],
+        ...protectedBrowserPolicy,
+      },
     },
-
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: "clerk-owner-teardown",
+      testMatch: /[\\/]auth\.teardown\.ts$/,
+      use: protectedBrowserPolicy,
     },
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
+    {
+      name: "clerk-non-owner-setup",
+      testMatch: /[\\/]non-owner-auth\.setup\.ts$/,
+      teardown: "clerk-non-owner-teardown",
+      use: {
+        ...devices["Desktop Chrome"],
+        ...protectedBrowserPolicy,
+      },
+    },
+    {
+      name: "clerk-non-owner-teardown",
+      testMatch: /[\\/]non-owner-auth\.teardown\.ts$/,
+      use: protectedBrowserPolicy,
+    },
+    {
+      name: "auth-desktop",
+      testMatch: authenticatedSpecs,
+      dependencies: ["clerk-owner-setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        ...protectedBrowserPolicy,
+        storageState: clerkOwnerStateFile,
+      },
+    },
+    {
+      name: "auth-tablet",
+      testMatch: authenticatedSpecs,
+      dependencies: ["clerk-owner-setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 834, height: 1194 },
+        ...protectedBrowserPolicy,
+        storageState: clerkOwnerStateFile,
+      },
+    },
+    {
+      name: "auth-mobile",
+      testMatch: authenticatedSpecs,
+      dependencies: ["clerk-owner-setup"],
+      use: {
+        ...devices["Pixel 5"],
+        ...protectedBrowserPolicy,
+        storageState: clerkOwnerStateFile,
+      },
+    },
+    {
+      name: "auth-non-owner",
+      testMatch: /non-owner-access\.e2e\.spec\.ts/,
+      dependencies: ["clerk-non-owner-setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        ...protectedBrowserPolicy,
+        storageState: clerkNonOwnerStateFile,
+      },
+    },
   ],
-
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  webServer: useExternalServer
+    ? undefined
+    : [
+        {
+          name: "Read-only backend",
+          command: "node tests/e2e/support/read-only-backend.mjs",
+          url: `${READ_ONLY_BACKEND_ORIGIN}${READ_ONLY_BACKEND_READY_PATH}`,
+          env: {
+            E2E_BACKEND_API_KEY: READ_ONLY_BACKEND_API_KEY,
+            HOMEAPP_OWNER_USER_ID: ownerUserId,
+          },
+          reuseExistingServer: false,
+          timeout: 120_000,
+          stdout: "ignore",
+          stderr: "pipe",
+          gracefulShutdown: { signal: "SIGTERM", timeout: 1_000 },
+        },
+        {
+          name: "Homeapp",
+          command: process.env.CI ? "npm run start" : "npm run dev",
+          url: `${e2eBaseURL}/sign-in`,
+          env: {
+            BACKEND_API_URL: READ_ONLY_BACKEND_BASE_URL,
+            BACKEND_API_KEY: READ_ONLY_BACKEND_API_KEY,
+            HOMEAPP_OWNER_USER_ID: ownerUserId,
+          },
+          reuseExistingServer: false,
+          timeout: 120_000,
+        },
+      ],
 });

@@ -1,19 +1,23 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Calendar, CalendarClock, CalendarDays, CheckCircle2, ChevronDown, Clock3, FileSpreadsheet, History, List, Zap } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, type Variants } from "framer-motion";
+import { uiMotion } from "@/lib/ui/motion";
 
 import type { DienstRow } from "@/lib/schedule";
 import type { UnifiedWeek } from "@/lib/unified";
 import type { PersonalEvent } from "@/hooks/usePersonalEvents";
 
-import { EmptyInline, MiniBreakdown, Panel, SectionTitle, StatusMetric, StatusRow } from "./RoosterCards";
+import { EmptyInline, MiniBreakdown, SectionTitle, StatusMetric, StatusRow } from "./RoosterCards";
+import { Surface } from "@/components/ui/Surface";
 import { WeekBlock } from "./RoosterTimeline";
 import { formatHours, formatMetaDate, pluralize } from "./RoosterUtils";
 import { DienstItem } from "./DienstItem";
 import { PersonalEventItem } from "./PersonalEventItem";
+import { ContractWidget } from "./ContractWidget";
 import { cn } from "@/lib/utils";
 
 export function OverviewPanel({
@@ -37,7 +41,7 @@ export function OverviewPanel({
   shifts: Record<string, number>;
   teams: Record<string, number>;
 }) {
-  const containerVariants: any = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -48,27 +52,27 @@ export function OverviewPanel({
     }
   };
 
-  const itemVariants: any = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    show: { opacity: 1, y: 0, transition: uiMotion.spring.disclosure }
   };
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show">
       {/* Zachte huid i.p.v. brutalistische zwarte eilanden (audit F14). */}
-      <Panel className="overflow-hidden p-0">
+      <Surface radius="md" className="overflow-hidden p-0">
         <div className="min-w-0 border-b border-[var(--color-border)] px-4 py-4 sm:px-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <motion.div variants={itemVariants}>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <p className="text-micro font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
                 Roosterstatus
               </p>
-              <h2 className="mt-1 text-xl font-bold tracking-tight text-white sm:text-2xl">Werk, agenda en signalen</h2>
+              <h2 className="mt-1 text-xl font-bold tracking-tight text-[var(--color-text)] sm:text-2xl">Werk, agenda en signalen</h2>
             </motion.div>
             <motion.div variants={itemVariants}>
               <Link
                 href="/finance"
-                className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-4 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+                className="inline-flex min-h-[var(--touch-target)] items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 text-xs font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
               >
                 Finance
                 <ArrowRight size={14} />
@@ -83,14 +87,14 @@ export function OverviewPanel({
             label="Komende uren"
             value={formatHours(upcomingHours)}
             sub={pluralize(upcomingCount, "dienst", "diensten")}
-            tone="amber"
+            tone="accent"
           />
           <StatusMetric
             icon={Calendar}
             label="Volgende dienst"
             value={nextDienst ? `${nextDienst.startTijd}–${nextDienst.eindTijd}` : "Geen dienst"}
             sub={nextDienst ? `${nextDienst.dag}, ${new Date(`${nextDienst.startDatum}T12:00:00`).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })}` : "Rooster rustig"}
-            tone={nextDienst ? "indigo" : "slate"}
+            tone={nextDienst ? "info" : "neutral"}
           />
           {/* Stabiele betekenis: waarde = komende afspraken; vandaag in de sub (audit N6). */}
           <StatusMetric
@@ -98,14 +102,14 @@ export function OverviewPanel({
             label="Agenda"
             value={`${eventCount} komend`}
             sub={`${todayEventCount} vandaag · persoonlijk`}
-            tone={todayEventCount > 0 ? "green" : "blue"}
+            tone={todayEventCount > 0 ? "accent" : "info"}
           />
           <StatusMetric
             icon={AlertTriangle}
             label="Conflicten"
             value={hardConflicts > 0 ? `${hardConflicts} hard` : String(conflicts)}
             sub={hardConflicts > 0 ? "direct nalopen" : "aandachtspunten"}
-            tone={hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "green"}
+            tone={hardConflicts > 0 ? "danger" : conflicts > 0 ? "warning" : "success"}
           />
         </motion.div>
 
@@ -114,13 +118,25 @@ export function OverviewPanel({
           <MiniBreakdown label="Team R." value={String(teams["R."] ?? 0)} sub="komende diensten" />
           <MiniBreakdown label="Team A." value={String(teams["A."] ?? 0)} sub="komende diensten" />
         </motion.div>
-      </Panel>
+      </Surface>
     </motion.div>
   );
 }
 
-import { ContractWidget } from "./ContractWidget";
-import { MonthBalanceChart } from "./MonthBalanceChart";
+const LazyMonthBalanceChart = dynamic(
+  () => import("./MonthBalanceChart").then((module) => module.MonthBalanceChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        role="status"
+        className="flex min-h-48 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-active)] text-sm text-[var(--color-text-muted)]"
+      >
+        Maandbalans laden...
+      </div>
+    ),
+  },
+);
 
 export function OverviewTab({
   unifiedWeeks,
@@ -172,9 +188,9 @@ export function OverviewTab({
       <div className="space-y-4">
         <div className="space-y-4">
           <ContractWidget />
-          <MonthBalanceChart />
+          <LazyMonthBalanceChart />
         </div>
-        <Panel>
+        <Surface radius="md">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <SectionTitle
               icon={List}
@@ -186,20 +202,20 @@ export function OverviewTab({
               <button
                 type="button"
                 onClick={() => setAllWeeks(true)}
-                className="h-9 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
+                className="min-h-[var(--touch-target)] rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
               >
                 Alles open
               </button>
               <button
                 type="button"
                 onClick={() => setAllWeeks(false)}
-                className="h-9 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
+                className="min-h-[var(--touch-target)] rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
               >
                 Compact
               </button>
             </div>
           </div>
-        </Panel>
+        </Surface>
 
         {unifiedWeeks.length > 0 ? (
           <div className="space-y-3">
@@ -217,13 +233,13 @@ export function OverviewTab({
             ))}
           </div>
         ) : (
-          <Panel>
+          <Surface radius="md">
             <EmptyInline
               icon={Calendar}
               title="Geen komende items"
               text="Sync je rooster of maak een afspraak om je tijdlijn te vullen."
             />
-          </Panel>
+          </Surface>
         )}
       </div>
 
@@ -232,13 +248,13 @@ export function OverviewTab({
         type="button"
         onClick={() => setShowMobileAside((current) => !current)}
         aria-expanded={showMobileAside}
-        className="flex w-full items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.03] px-4 py-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] md:hidden"
+        className="flex min-h-[var(--touch-target)] w-full items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-3 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)] md:hidden"
       >
         <span className="flex items-center gap-2">
-          <CalendarDays size={15} className="text-slate-400" />
+          <CalendarDays size={15} className="text-[var(--color-text-muted)]" />
           Afspraken, datakwaliteit &amp; historie
         </span>
-        <ChevronDown size={16} className={cn("shrink-0 text-slate-500 transition-transform", showMobileAside && "rotate-180")} />
+        <ChevronDown size={16} className={cn("shrink-0 text-[var(--color-text-muted)] transition-transform", showMobileAside && "rotate-180")} />
       </button>
 
       <aside
@@ -247,7 +263,7 @@ export function OverviewTab({
           showMobileAside ? "block" : "hidden",
         )}
       >
-        <Panel>
+        <Surface radius="md">
           <SectionTitle
             icon={CalendarDays}
             label="Agenda"
@@ -273,9 +289,9 @@ export function OverviewTab({
               />
             )}
           </div>
-        </Panel>
+        </Surface>
 
-        <Panel>
+        <Surface radius="md">
           <SectionTitle
             icon={CheckCircle2}
             label="Status"
@@ -283,30 +299,30 @@ export function OverviewTab({
             sub={formatMetaDate(metaSyncedAt)}
           />
           <div className="mt-4 space-y-3">
-            <StatusRow icon={FileSpreadsheet} label="Roosterregels" value={pluralize(metaRows, "dienst", "diensten")} tone="blue" />
+            <StatusRow icon={FileSpreadsheet} label="Roosterregels" value={pluralize(metaRows, "dienst", "diensten")} tone="info" />
             <StatusRow
               icon={AlertTriangle}
               label="Conflicten"
               value={withConflicts.length > 0 ? `${withConflicts.length} aandachtspunt(en)` : "Geen conflicten"}
-              tone={withConflicts.length > 0 ? "amber" : "green"}
+              tone={withConflicts.length > 0 ? "warning" : "success"}
             />
             <StatusRow
               icon={Zap}
               label="Wachtrij"
               value={pendingEvents.length > 0 ? `${pendingEvents.length} in wachtrij` : "Geen wachtrij-acties"}
-              tone={pendingEvents.length > 0 ? "indigo" : "green"}
+              tone={pendingEvents.length > 0 ? "info" : "success"}
             />
-            <StatusRow icon={CalendarClock} label="Deze maand" value={pluralize(thisMonthEvents, "afspraak", "afspraken")} tone="slate" />
+            <StatusRow icon={CalendarClock} label="Deze maand" value={pluralize(thisMonthEvents, "afspraak", "afspraken")} tone="neutral" />
           </div>
-        </Panel>
+        </Surface>
 
         {history.length > 0 && (
-          <Panel>
+          <Surface radius="md">
             <button
               type="button"
               onClick={() => setShowHistory((current) => !current)}
               aria-expanded={showHistory}
-              className="flex w-full items-center justify-between gap-3 text-left"
+              className="flex min-h-[var(--touch-target)] w-full items-center justify-between gap-3 text-left"
             >
               <SectionTitle
                 icon={History}
@@ -316,7 +332,7 @@ export function OverviewTab({
               />
               <ChevronDown
                 size={16}
-                className={cn("shrink-0 text-slate-500 transition-transform", showHistory && "rotate-180")}
+                className={cn("shrink-0 text-[var(--color-text-muted)] transition-transform", showHistory && "rotate-180")}
               />
             </button>
             <AnimatePresence initial={false}>
@@ -325,7 +341,7 @@ export function OverviewTab({
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
+                  transition={{ duration: uiMotion.durationSeconds.standard }}
                   className="overflow-hidden"
                 >
                   {/* Geen opacity-dimming op de hele lijst — expliciete tekstkleuren
@@ -339,11 +355,11 @@ export function OverviewTab({
                         type="button"
                         onClick={() => setShowAllHistory((current) => !current)}
                         aria-expanded={showAllHistory}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.05] hover:text-slate-200"
+                        className="flex min-h-[var(--touch-target)] w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
                       >
                         {showAllHistory ? "Toon minder" : `Toon alle ${history.length}`}
                         {!showAllHistory && hiddenHistoryCount > 0 && (
-                          <span className="text-slate-600">(+{hiddenHistoryCount})</span>
+                          <span className="text-[var(--color-text-subtle)]">(+{hiddenHistoryCount})</span>
                         )}
                       </button>
                     )}
@@ -351,7 +367,7 @@ export function OverviewTab({
                 </motion.div>
               )}
             </AnimatePresence>
-          </Panel>
+          </Surface>
         )}
       </aside>
     </section>

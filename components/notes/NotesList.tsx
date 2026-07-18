@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, Archive, CalendarClock, CheckCircle2, Inbox, Link2, NotebookPen, Pin, Plus, RotateCcw, Sparkles } from "lucide-react";
+import { AlertTriangle, Archive, CalendarClock, CheckCircle2, Inbox, Link2, NotebookPen, Pin, Plus, Sparkles } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
 import { NoteCard, type NoteBacklink } from "./NoteCard";
 import { SectionTitle } from "./NotesPrimitives";
 import type { NoteRecord } from "@/hooks/useNotes";
-import type { BoardMode, ViewMode, SortMode, NoteScope } from "./NotesUtils";
-import { getDeadlineState, isAttentionNote, SCOPE_OPTIONS, SORT_OPTIONS, VIEW_OPTIONS } from "./NotesUtils";
+import type { BoardMode, ViewMode, SortMode, NoteScope, Tone } from "./NotesUtils";
+import { getDeadlineState, isAttentionNote, SCOPE_OPTIONS, SORT_OPTIONS, VIEW_OPTIONS, toneClasses } from "./NotesUtils";
 import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { surfaceVariants } from "@/components/ui/Surface";
 
+import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/utils";
 export function NotesList({
   displayed,
   isLoading,
@@ -77,7 +82,7 @@ export function NotesList({
 
   return (
     <section className="min-w-0 space-y-4">
-      <div className="glass p-3 sm:p-4">
+      <div className={`${surfaceVariants({ padding: "none" })} p-3 sm:p-4`}>
         <SectionTitle
           icon={NotebookPen}
           title={viewMode === "active" ? "Notitie-board" : viewMode === "completed" ? "Afgeronde notities" : "Archief"}
@@ -87,39 +92,33 @@ export function NotesList({
               : `${displayed.length} zichtbaar · ${boardMode === "board" ? "board · gegroepeerd" : `grid · ${activeSort.label.toLowerCase()}`}`
           }
           action={
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={handleNew}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 sm:w-auto"
+              className="w-full sm:w-auto"
             >
               <Plus size={16} />
               Nieuwe notitie
-            </button>
+            </Button>
           }
         />
       </div>
 
       {isError ? (
-        <div role="alert" className="glass flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-rose-500/20 bg-rose-500/[0.04] px-4 py-12 text-center">
-          <AlertTriangle size={34} className="text-rose-400/70" />
-          <p className="mt-4 font-semibold text-slate-200">Notities konden niet geladen worden</p>
-          <p className="mt-1 max-w-md text-sm text-slate-500">Controleer je verbinding en probeer het opnieuw.</p>
-          {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/15"
-            >
-              <RotateCcw size={14} />
-              Opnieuw proberen
-            </button>
-          )}
-        </div>
+        <FeedbackState
+          tone="error"
+          icon={AlertTriangle}
+          title="Notities konden niet geladen worden"
+          description="Controleer je verbinding en probeer het opnieuw."
+          actionLabel={onRetry ? "Opnieuw proberen" : undefined}
+          onAction={onRetry}
+        />
       ) : isLoading ? (
-        <div role="status" aria-live="polite" className="glass flex min-h-[260px] items-center justify-center p-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-amber-400/30 border-t-amber-400" />
-          <span className="sr-only">Notities laden…</span>
-        </div>
+        <FeedbackState
+          tone="loading"
+          title="Notities laden"
+          description="Je notitie-board wordt bijgewerkt."
+        />
       ) : displayed.length === 0 ? (
         (() => {
           // Branch the empty state on the engaged view + scope + filters so the
@@ -147,30 +146,13 @@ export function NotesList({
             subtitle = "Maak je eerste notitie en leg losse gedachten meteen vast.";
           }
           return (
-            <div className="glass flex min-h-[260px] flex-col items-center justify-center rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-12 text-center">
-              <Sparkles size={34} className="text-slate-700" />
-              <p className="mt-4 font-semibold text-slate-200">{title}</p>
-              <p className="mt-1 max-w-md text-sm text-slate-500">{subtitle}</p>
-              {hasNarrowing ? (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
-                >
-                  <RotateCcw size={14} />
-                  Filters wissen
-                </button>
-              ) : viewMode === "active" ? (
-                <button
-                  type="button"
-                  onClick={handleNew}
-                  className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20"
-                >
-                  <Plus size={14} />
-                  Eerste notitie maken
-                </button>
-              ) : null}
-            </div>
+            <FeedbackState
+              icon={Sparkles}
+              title={title}
+              description={subtitle}
+              actionLabel={hasNarrowing ? "Filters wissen" : viewMode === "active" ? "Eerste notitie maken" : undefined}
+              onAction={hasNarrowing ? clearFilters : viewMode === "active" ? handleNew : undefined}
+            />
           );
         })()
       ) : boardMode === "board" ? (
@@ -236,7 +218,7 @@ export function NotesList({
                         />
                       ))
                     ) : (
-                      <div className="rounded-lg border border-dashed border-[var(--color-border)] px-3 py-6 text-center text-xs text-slate-600">
+                      <div className="rounded-lg border border-dashed border-[var(--color-border)] px-3 py-6 text-center text-xs text-[var(--color-text-subtle)]">
                         Geen notities in deze kolom.
                       </div>
                     )}
@@ -279,20 +261,21 @@ function CardsPresence({ animate, children }: { animate: boolean; children: Reac
 }
 
 function BoardGroupHeader({ group }: { group: BoardGroup }) {
+  const toneClass = toneClasses[group.tone];
   return (
     <div className="flex min-h-[38px] items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2">
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${group.surface}`}>
-          <group.icon size={15} className={group.iconClass} />
+        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneClass.surface)}>
+          <group.icon size={15} className={toneClass.icon} />
         </div>
         <div className="min-w-0">
-          <h3 className="truncate text-sm font-bold text-slate-100">{group.title}</h3>
-          <p className="truncate text-xs text-slate-500">{group.subtitle}</p>
+          <h3 className="truncate text-sm font-bold text-[var(--color-text)]">{group.title}</h3>
+          <p className="truncate text-xs text-[var(--color-text-muted)]">{group.subtitle}</p>
         </div>
       </div>
-      <span className="rounded-md bg-black/15 px-2 py-1 text-xs font-semibold tabular-nums text-slate-400">
+      <Badge tone="neutral" size="sm" className="tabular-nums">
         {group.notes.length}
-      </span>
+      </Badge>
     </div>
   );
 }
@@ -307,8 +290,7 @@ type BoardGroup = {
   title: string;
   subtitle: string;
   icon: LucideIcon;
-  iconClass: string;
-  surface: string;
+  tone: Tone;
   notes: NoteRecord[];
 };
 
@@ -324,8 +306,7 @@ function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: No
       title: option?.label ?? "Resultaten",
       subtitle: "Gefilterd op scope",
       icon: option?.icon ?? Inbox,
-      iconClass: "text-amber-300",
-      surface: "bg-amber-500/10",
+      tone: "accent",
       notes,
     }];
   }
@@ -336,8 +317,7 @@ function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: No
       title: "Archief",
       subtitle: "Bewaard buiten actief",
       icon: Archive,
-      iconClass: "text-slate-300",
-      surface: "bg-slate-500/10",
+      tone: "neutral",
       notes,
     }];
   }
@@ -348,8 +328,7 @@ function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: No
       title: "Afgerond",
       subtitle: "Klaar, maar vindbaar",
       icon: CheckCircle2,
-      iconClass: "text-emerald-300",
-      surface: "bg-emerald-500/10",
+      tone: "success",
       notes,
     }];
   }
@@ -360,8 +339,7 @@ function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: No
       title: "Vastgezet",
       subtitle: "Blijft bovenaan",
       icon: Pin,
-      iconClass: "text-amber-300",
-      surface: "bg-amber-500/10",
+      tone: "accent",
       notes: [],
     },
     {
@@ -369,8 +347,7 @@ function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: No
       title: "Aandacht",
       subtitle: "Hoog, vandaag of verlopen",
       icon: AlertTriangle,
-      iconClass: "text-rose-300",
-      surface: "bg-rose-500/10",
+      tone: "danger",
       notes: [],
     },
     {
@@ -378,8 +355,7 @@ function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: No
       title: "Gepland",
       subtitle: "Met deadline",
       icon: CalendarClock,
-      iconClass: "text-sky-300",
-      surface: "bg-sky-500/10",
+      tone: "info",
       notes: [],
     },
     {
@@ -387,8 +363,7 @@ function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: No
       title: "Agenda",
       subtitle: "Gekoppelde afspraken",
       icon: Link2,
-      iconClass: "text-cyan-300",
-      surface: "bg-cyan-500/10",
+      tone: "info",
       notes: [],
     },
     {
@@ -396,8 +371,7 @@ function buildBoardGroups(notes: NoteRecord[], viewMode: ViewMode, noteScope: No
       title: "Overig",
       subtitle: "Vrije notities",
       icon: Inbox,
-      iconClass: "text-slate-300",
-      surface: "bg-slate-500/10",
+      tone: "neutral",
       notes: [],
     },
   ];

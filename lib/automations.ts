@@ -56,35 +56,6 @@ export interface Automation {
   group?: string;
 }
 
-// ─── Storage ──────────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = "homeapp_automations";
-
-export function loadAutomations(): Automation[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function saveAutomations(automations: Automation[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(automations));
-}
-
-export function createAutomation(
-  data: Omit<Automation, "id" | "createdAt" | "lastFiredAt">
-): Automation {
-  return {
-    ...data,
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-  };
-}
-
 // ─── Dienst-Wekker Templates ─────────────────────────────────────────────────
 
 export interface DienstWekkerTemplate {
@@ -155,6 +126,16 @@ export const DIENST_WEKKER_PACKS: Record<ShiftType, DienstWekkerTemplate[]> = {
   ],
   any: [],
 };
+
+function createAutomation(
+  data: Omit<Automation, "id" | "createdAt" | "lastFiredAt">,
+): Automation {
+  return {
+    ...data,
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+  };
+}
 
 /** Create a full set of automation objects for a shift type */
 export function createDienstWekkerPack(shiftType: ShiftType, times: Partial<DienstWekkerTimes> = {}): Automation[] {

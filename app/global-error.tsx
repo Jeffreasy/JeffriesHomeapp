@@ -1,18 +1,10 @@
 "use client";
 
-/**
- * Global error boundary (FH3) — replaces the ROOT layout when it crashes, so
- * it must render its own <html>/<body>. globals.css is not guaranteed to be
- * loaded here, hence the inline styles matching the app theme (#0a0a0f).
- */
+import { useEffect } from "react";
+import { reportClientError } from "@/lib/observability/client-events";
 
-// A ChunkLoadError means the deployed build changed under this tab: the old
-// chunk URLs are gone, so reset() can never succeed — only a hard reload
-// fetches the new build (M6, kiosk-relevant).
 function isChunkLoadError(error: Error) {
-  return (
-    error.name === "ChunkLoadError" || /Loading chunk|ChunkLoadError/.test(error.message ?? "")
-  );
+  return error.name === "ChunkLoadError" || /Loading chunk|ChunkLoadError/.test(error.message ?? "");
 }
 
 export default function GlobalError({
@@ -22,7 +14,13 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    reportClientError(error, "global", error.digest);
+  }, [error]);
+
   const chunkError = isChunkLoadError(error);
+
+  // This boundary replaces the root layout, so recovery cannot depend on its CSS or providers.
 
   return (
     <html lang="nl">
@@ -57,46 +55,33 @@ export default function GlobalError({
               fontSize: 22,
               fontWeight: 700,
             }}
-            aria-hidden
+            aria-hidden="true"
           >
             !
           </div>
           <h1 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px", color: "#ffffff" }}>
             {chunkError ? "Nieuwe versie beschikbaar" : "Er ging iets mis"}
           </h1>
-          <p style={{ fontSize: 13, lineHeight: "20px", color: "#94a3b8", margin: "0 0 8px" }}>
+          <p style={{ fontSize: 13, lineHeight: "20px", color: "#94a3b8", margin: "0 0 16px" }}>
             {chunkError
               ? "De app is bijgewerkt sinds deze pagina is geladen. Herlaad om de nieuwste versie te gebruiken."
-              : "De app kon niet worden weergegeven. Probeer het opnieuw of herlaad de app."}
+              : "De app kon niet veilig worden weergegeven. Probeer het opnieuw of herlaad de app."}
           </p>
-          {/* Raw error text only as a small secondary detail line — never as
-              the headline (L3/L6): it is usually English developer jargon. */}
-          {!chunkError && error?.message ? (
-            <p
-              style={{
-                fontSize: 11,
-                lineHeight: "16px",
-                color: "#64748b",
-                margin: "0 0 16px",
-                overflowWrap: "break-word",
-              }}
-            >
-              {error.message}
+          {error.digest ? (
+            <p style={{ fontSize: 11, color: "#8b98a9", margin: "0 0 16px" }}>
+              Referentie {error.digest}
             </p>
-          ) : (
-            <div style={{ height: 8 }} />
-          )}
+          ) : null}
           <button
+            type="button"
             onClick={() => (chunkError ? window.location.reload() : reset())}
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
+              minHeight: 44,
               padding: "10px 16px",
               borderRadius: 12,
               border: "1px solid rgba(255, 255, 255, 0.08)",
               background: "#12121a",
-              color: "#cbd5e1",
+              color: "#f1f5f9",
               fontSize: 14,
               fontFamily: "inherit",
               cursor: "pointer",

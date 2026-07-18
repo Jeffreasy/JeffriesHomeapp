@@ -1,3 +1,5 @@
+import { detectCsvDelimiter, parseDelimitedRows, type CsvDelimiter } from "@/lib/csv";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface DienstRow {
@@ -35,44 +37,14 @@ export interface ScheduleMeta {
 // ─── CSV → DienstRow ──────────────────────────────────────────────────────────
 
 /** Native CSV parser replacing vulnerable xlsx library */
-export function parseCsv(text: string, delimiter = ","): { headers: string[]; rows: string[][] } {
-  function parseLine(line: string): string[] {
-    const fields: string[] = [];
-    let field = "";
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (inQuotes) {
-        if (ch === '"') {
-          if (line[i + 1] === '"') { field += '"'; i++; }
-          else inQuotes = false;
-        } else field += ch;
-      } else {
-        if (ch === '"') inQuotes = true;
-        else if (ch === delimiter) { fields.push(field); field = ""; }
-        else field += ch;
-      }
-    }
-    fields.push(field);
-    return fields;
-  }
-
-  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-  if (lines.length < 2) return { headers: [], rows: [] };
-  
-  if (delimiter === "," && lines[0].includes(";") && !lines[0].includes(",")) {
-    delimiter = ";";
-  }
-
-  const headers = parseLine(lines[0]).map(h => h.trim());
-  const rows: string[][] = [];
-  for (let i = 1; i < lines.length; i++) {
-    rows.push(parseLine(lines[i]).map(c => c.trim()));
-  }
-
-  return { headers, rows };
+export function parseCsv(text: string, delimiter: CsvDelimiter = detectCsvDelimiter(text)): { headers: string[]; rows: string[][] } {
+  const records = parseDelimitedRows(text, delimiter);
+  if (records.length < 2) return { headers: [], rows: [] };
+  return {
+    headers: records[0].map((header) => header.trim()),
+    rows: records.slice(1).map((row) => row.map((cell) => cell.trim())),
+  };
 }
-
 /** Parse raw row from csv to DienstRow */
 export function parseCsvRow(row: unknown[], headers: string[]): DienstRow | null {
   const get = (col: string): unknown => {
@@ -263,13 +235,6 @@ export function getThisWeek(diensten: DienstRow[]): DienstRow[] {
   return getUpcoming(diensten, 7);
 }
 
-export function shiftTypeColor(type: string): { bg: string; text: string; accent: string } {
-  switch (type) {
-    case "Vroeg":  return { bg: "bg-orange-900/30", text: "text-orange-300", accent: "#f97316" };
-    case "Laat":   return { bg: "bg-red-900/30",    text: "text-red-300",    accent: "#ef4444" };
-    default:       return { bg: "bg-blue-900/30",   text: "text-blue-300",   accent: "#3b82f6" };
-  }
-}
 
 export function formatDienst(d: DienstRow): string {
   return `${d.dag} ${d.startDatum.slice(8)} ${d.startDatum.slice(5, 7)} · ${d.startTijd}–${d.eindTijd}`;

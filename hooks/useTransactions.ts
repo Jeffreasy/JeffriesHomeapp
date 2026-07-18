@@ -3,6 +3,9 @@
 import { useDeferredValue, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useToast } from "@/components/ui/Toast";
+import { appendUniqueBy } from "@/lib/collections";
+import { createRequestGenerationGate } from "@/lib/request-generation";
+import { transactionStatsScopeKey } from "@/lib/transaction-stats-scope";
 
 import {
   getTransactions,
@@ -115,6 +118,9 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
   const [stats, setStats] = useState<TransactionFullStats | null>(null);
   const [offset, setOffset] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
+  const loadMoreInFlightRef = useRef(false);
+  const requestGate = useMemo(createRequestGenerationGate, []);
+  const statsRequestGate = useMemo(createRequestGenerationGate, []);
 
   // Build a stable filter key for resetting pagination
   const filterKey = useMemo(
@@ -142,15 +148,39 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
     ]
   );
 
+  // Stats only depend on period/account scope. Search and list-only filters
+  // deliberately do not invalidate this key or trigger an aggregate scan.
+  const statsFilterKey = useMemo(
+    () =>
+      transactionStatsScopeKey({
+        userId,
+        ibanFilter: filter.ibanFilter,
+        jaarFilter: filter.jaarFilter,
+        maandFilter: filter.maandFilter,
+        datumVan: filter.datumVan,
+        datumTot: filter.datumTot,
+      }),
+    [
+      userId,
+      filter.ibanFilter,
+      filter.jaarFilter,
+      filter.maandFilter,
+      filter.datumVan,
+      filter.datumTot,
+    ],
+  );
+
   // Reset pagination when filters change
   useEffect(() => {
     setOffset(0);
   }, [filterKey]);
 
-  // Fetch transactions + stats
+  // Fetch the filtered transaction list. Aggregate stats have their own scope
+  // below, so typing in search never re-runs the heavier stats query.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
+    const generation = requestGate.begin();
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -166,21 +196,21 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
 
         applyPeriodRange(apiFilter, filter);
 
-        const [listResult, statsResult] = await Promise.all([
-          getTransactions(apiFilter),
-          getTransactionsStats(buildStatsParams(userId, filter)),
-        ]);
+        const listResult = await getTransactions(apiFilter);
 
-        if (cancelled || typeof listResult.data === "string" || typeof statsResult.data === "string") return;
+        if (
+          cancelled ||
+          !requestGate.isCurrent(generation) ||
+          typeof listResult.data === "string"
+        ) return;
         const listData = listResult.data;
         const pageItems = (listData.page ?? []).map(mapTransaction);
         setTransactions(pageItems);
         setTotalCount(listData.totalCount ?? 0);
         setIsDone(listData.isDone ?? true);
-        setStats(statsResult.data);
         setOffset(pageItems.length);
       } catch {
-        if (!cancelled) {
+        if (!cancelled && requestGate.isCurrent(generation)) {
           // Surface the failure instead of resetting to an empty result, so the
           // UI can distinguish "load failed" from "no transactions".
           setIsError(true);
@@ -189,36 +219,84 @@ export function useTransactions(filter: TransactionFilter = {} as TransactionFil
           setIsDone(true);
         }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled && requestGate.isCurrent(generation)) setIsLoading(false);
       }
     };
 
     fetchData();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (requestGate.isCurrent(generation)) requestGate.invalidate();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, filterKey, refreshTick]);
 
-  const loadMore = useCallback(async () => {
-    if (!userId || isDone) return;
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const generation = statsRequestGate.begin();
 
-    const apiFilter: GetTransactionsParams = {
-      ...filter,
-      userId,
-      zoekterm: deferredZoek.trim() || undefined,
-      limit: PAGE_SIZE,
-      offset,
+    const fetchStats = async () => {
+      try {
+        const statsResult = await getTransactionsStats(buildStatsParams(userId, filter));
+        if (
+          cancelled ||
+          !statsRequestGate.isCurrent(generation) ||
+          typeof statsResult.data === "string"
+        ) return;
+        setStats(statsResult.data);
+      } catch {
+        if (!cancelled && statsRequestGate.isCurrent(generation)) {
+          toastError("Financiële statistieken laden mislukt.");
+        }
+      }
     };
-    applyPeriodRange(apiFilter, filter);
 
-    const result = await getTransactions(apiFilter);
-    if (typeof result.data === "string") return;
-    const resultData = result.data;
-    const pageItems = (resultData.page ?? []).map(mapTransaction);
-    setTransactions(prev => [...prev, ...pageItems]);
-    setIsDone(resultData.isDone ?? true);
-    setOffset(prev => prev + pageItems.length);
-  }, [userId, isDone, offset, filter, deferredZoek]);
+    void fetchStats();
+    return () => {
+      cancelled = true;
+      if (statsRequestGate.isCurrent(generation)) statsRequestGate.invalidate();
+    };
+    // The key contains every field used by buildStatsParams; list-only fields
+    // are intentionally excluded to avoid aggregate requests while searching.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, statsFilterKey, refreshTick, statsRequestGate, toastError]);
 
+  const loadMore = useCallback(async () => {
+    if (!userId || isDone || isLoading || loadMoreInFlightRef.current) return;
+    loadMoreInFlightRef.current = true;
+    const generation = requestGate.current();
+
+    try {
+      const apiFilter: GetTransactionsParams = {
+        ...filter,
+        userId,
+        zoekterm: deferredZoek.trim() || undefined,
+        limit: PAGE_SIZE,
+        offset,
+      };
+      applyPeriodRange(apiFilter, filter);
+
+      const result = await getTransactions(apiFilter);
+      if (!requestGate.isCurrent(generation)) return;
+      if (typeof result.data === "string") {
+        throw new Error("Onverwacht antwoord van de server.");
+      }
+      const resultData = result.data;
+      const pageItems = (resultData.page ?? []).map(mapTransaction);
+      setTransactions((previous) =>
+        appendUniqueBy(previous, pageItems, (transaction) => transaction._id ?? transaction.id ?? `${transaction.datum}:${transaction.volgnr}`)
+      );
+      setIsDone(resultData.isDone ?? true);
+      setOffset((previous) => previous + pageItems.length);
+    } catch {
+      if (requestGate.isCurrent(generation)) {
+        toastError("Meer transacties laden mislukt.");
+      }
+    } finally {
+      loadMoreInFlightRef.current = false;
+    }
+  }, [userId, isDone, isLoading, offset, filter, deferredZoek, requestGate, toastError]);
   // F5: export-annulering. Een simpele vlag (AbortController-patroon) die de
   // fetchAll-lus tussen twee pagina's controleert; ook gezet bij unmount zodat
   // een wegnavigatie geen pagina's blijft ophalen.

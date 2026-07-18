@@ -1,7 +1,10 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/Skeleton";
+import { cn } from "@/lib/utils";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
-import { RotateCcw, TriangleAlert } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
@@ -11,6 +14,7 @@ import {
   toLaventeCareSeedDocuments,
 } from "@/lib/laventecare";
 import { useLaventeCare } from "@/hooks/useLaventeCare";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   type CompanyForm,
   type ContactForm,
@@ -31,24 +35,17 @@ import {
   emptyWorkstreamForm,
 } from "@/components/laventecare/LaventeCareTypes";
 import { label, optional } from "@/components/laventecare/LaventeCareUtils";
+import { RefreshFailedBanner } from "@/components/laventecare/RefreshFailedBanner";
+import {
+  normalizeCompanyRelation,
+  normalizeCompanyStatus,
+  parseTagInput,
+} from "@/lib/laventecare/form-normalization";
 
 import { LaventeCareHeader } from "@/components/laventecare/LaventeCareHeader";
-import {
-  LaventeCareBusinessCommandCenter,
-  type LaventeCareDossierDocumentLogPayload,
+import type {
+  LaventeCareDossierDocumentLogPayload,
 } from "@/components/laventecare/LaventeCareBusinessCommandCenter";
-import { LaventeCareCompanyModal } from "@/components/laventecare/LaventeCareCompanyModal";
-import { LaventeCareContactModal } from "@/components/laventecare/LaventeCareContactModal";
-import { LaventeCareLeadModal } from "@/components/laventecare/LaventeCareLeadModal";
-import { LaventeCareProjectModal } from "@/components/laventecare/LaventeCareProjectModal";
-import { LaventeCareWorkstreamModal } from "@/components/laventecare/LaventeCareWorkstreamModal";
-import { LaventeCareCustomerDossier } from "@/components/laventecare/LaventeCareCustomerDossier";
-import { LaventeCareSignalsView } from "@/components/laventecare/LaventeCareSignalsView";
-import { LaventeCarePipelineView } from "@/components/laventecare/LaventeCarePipelineView";
-import { LaventeCareOperationsView } from "@/components/laventecare/LaventeCareOperationsView";
-import { LaventeCareKnowledgeView } from "@/components/laventecare/LaventeCareKnowledgeView";
-import { LaventeCareBillingView } from "@/components/laventecare/LaventeCareBillingView";
-import { LaventeCareMailboxView } from "@/components/laventecare/LaventeCareMailboxView";
 import {
   CapabilityMatrix,
   LaventeCarePortalHero,
@@ -60,8 +57,87 @@ import {
   type PortalSection,
   type PortalView,
 } from "@/components/laventecare/LaventeCarePortal";
+import { AppPageShell } from "@/components/layout/AppPageShell";
+
+const LaventeCareBusinessCommandCenter = dynamic(() =>
+  import("@/components/laventecare/LaventeCareBusinessCommandCenter").then(
+    (module) => module.LaventeCareBusinessCommandCenter,
+  ),
+);
+const LaventeCareCompanyModal = dynamic(() =>
+  import("@/components/laventecare/LaventeCareCompanyModal").then(
+    (module) => module.LaventeCareCompanyModal,
+  ),
+);
+const LaventeCareContactModal = dynamic(() =>
+  import("@/components/laventecare/LaventeCareContactModal").then(
+    (module) => module.LaventeCareContactModal,
+  ),
+);
+const LaventeCareLeadModal = dynamic(() =>
+  import("@/components/laventecare/LaventeCareLeadModal").then(
+    (module) => module.LaventeCareLeadModal,
+  ),
+);
+const LaventeCareProjectModal = dynamic(() =>
+  import("@/components/laventecare/LaventeCareProjectModal").then(
+    (module) => module.LaventeCareProjectModal,
+  ),
+);
+const LaventeCareWorkstreamModal = dynamic(() =>
+  import("@/components/laventecare/LaventeCareWorkstreamModal").then(
+    (module) => module.LaventeCareWorkstreamModal,
+  ),
+);
+const LaventeCareCustomerDossier = dynamic(() =>
+  import("@/components/laventecare/LaventeCareCustomerDossier").then(
+    (module) => module.LaventeCareCustomerDossier,
+  ),
+);
+const LaventeCarePipelineView = dynamic(() =>
+  import("@/components/laventecare/LaventeCarePipelineView").then(
+    (module) => module.LaventeCarePipelineView,
+  ),
+);
+const LaventeCareSignalsView = dynamic(() =>
+  import("@/components/laventecare/LaventeCareSignalsView").then(
+    (module) => module.LaventeCareSignalsView,
+  ),
+);
+const LaventeCareBillingView = dynamic(() =>
+  import("@/components/laventecare/LaventeCareBillingView").then(
+    (module) => module.LaventeCareBillingView,
+  ),
+);
+const LaventeCareMailboxView = dynamic(() =>
+  import("@/components/laventecare/LaventeCareMailboxView").then(
+    (module) => module.LaventeCareMailboxView,
+  ),
+);
+const LaventeCareOperationsView = dynamic(() =>
+  import("@/components/laventecare/LaventeCareOperationsView").then(
+    (module) => module.LaventeCareOperationsView,
+  ),
+);
+const LaventeCareKnowledgeView = dynamic(() =>
+  import("@/components/laventecare/LaventeCareKnowledgeView").then(
+    (module) => module.LaventeCareKnowledgeView,
+  ),
+);
 
 export default function LaventeCarePage() {
+  const [activeView, setActiveView] = useState<PortalView>("overview");
+  const [showCompanyForm, setShowCompanyForm] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [showLeadForm, setShowLeadForm] = useState(false);
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [showWorkstreamForm, setShowWorkstreamForm] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(
+    null,
+  );
+  const [showFullCapabilities, setShowFullCapabilities] = useState(false);
+  const showInsightRail = useMediaQuery("(min-width: 1280px)");
+
   const {
     cockpit,
     cockpitLoading,
@@ -146,15 +222,18 @@ export default function LaventeCarePage() {
     refreshInvoicePaymentMut,
     suggestMailContentMut,
     sendTemplatedMailMut,
-  } = useLaventeCare();
+  } = useLaventeCare({
+    activeView,
+    companyFormOpen: showCompanyForm,
+    contactFormOpen: showContactForm,
+    leadFormOpen: showLeadForm,
+    projectFormOpen: showProjectForm,
+    workstreamFormOpen: showWorkstreamForm,
+    customerDossierOpen: selectedCompanyId !== null,
+  });
 
   const { success, error: toastError } = useToast();
   const { openConfirm } = useConfirm();
-  const [showCompanyForm, setShowCompanyForm] = useState(false);
-  const [showContactForm, setShowContactForm] = useState(false);
-  const [showLeadForm, setShowLeadForm] = useState(false);
-  const [showProjectForm, setShowProjectForm] = useState(false);
-  const [showWorkstreamForm, setShowWorkstreamForm] = useState(false);
   const [companyForm, setCompanyForm] = useState<CompanyForm>(emptyCompanyForm);
   const [contactForm, setContactForm] = useState<ContactForm>(emptyContactForm);
   const [leadForm, setLeadForm] = useState<LeadForm>(emptyLeadForm);
@@ -223,10 +302,6 @@ export default function LaventeCarePage() {
   // Set once an inbox-sync reports that the Graph app lacks Mail.Read; the
   // mailbox view then shows a persistent notice instead of only a toast (M15).
   const [inboundBlocked, setInboundBlocked] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(
-    null,
-  );
-  const [activeView, setActiveView] = useState<PortalView>("overview");
   const [mailboxInvoiceId, setMailboxInvoiceId] = useState("");
   // R3-maandafsluiting: signaleer de mailbox dat een herinnering bedoeld is,
   // zodat die de herinneringstemplate voorselecteert.
@@ -314,55 +389,66 @@ export default function LaventeCarePage() {
   );
 
   const capabilityRows = useMemo<CapabilityRow[]>(() => {
-    const quoteCount = billing?.summary.quotes ?? quotes.length;
-    const timeEntryCount = billing?.summary.timeEntries ?? timeEntries.length;
-    const invoiceCount = billing?.summary.invoices ?? invoices.length;
+    const billingKnown = billing !== undefined;
+    const quoteCount = billing?.summary.quotes ?? 0;
+    const timeEntryCount = billing?.summary.timeEntries ?? 0;
+    const invoiceCount = billing?.summary.invoices ?? 0;
     const hasCommercialData =
       quoteCount > 0 || timeEntryCount > 0 || invoiceCount > 0;
+    const companyCount = Math.max(summary.companies ?? 0, companies.length);
+    const contactCount = Math.max(summary.contacts ?? 0, contacts.length);
+    const activeLeadCount = Math.max(summary.activeLeads ?? 0, activeLeads.length);
+    const activeProjectCount = Math.max(summary.activeProjects ?? 0, activeProjects.length);
+    const dossierDocumentCount = Math.max(summary.dossierDocuments ?? 0, dossierDocuments.length);
+    const activityEventCount = Math.max(summary.activityEvents ?? 0, activityEvents.length);
+    const mailboxSummary = mailbox?.summary ?? cockpit?.mailbox;
+    const mailTemplateCount = mailboxSummary?.templates ?? summary.mailTemplates ?? 0;
+    const mailOutboxCount = mailboxSummary?.outbox ?? summary.mailOutbox ?? 0;
+    const mailboxConfigured = mailboxSummary?.configured ?? summary.mailConfigured;
     const rows: CapabilityRow[] = [
       {
         label: "Klantenbasis",
-        detail: `${companies.length} klanten, ${contacts.length} contactpersonen`,
+        detail: `${companyCount} klanten, ${contactCount} contactpersonen`,
         status:
-          companies.length > 0 && contacts.length > 0
+          companyCount > 0 && contactCount > 0
             ? "ready"
-            : companies.length > 0
+            : companyCount > 0
               ? "attention"
               : "missing",
         owner: "CRM",
         view: "pipeline",
         score:
-          companies.length > 0 && contacts.length > 0
+          companyCount > 0 && contactCount > 0
             ? 100
-            : companies.length > 0
+            : companyCount > 0
               ? 70
               : 25,
         priority:
-          contacts.length >= companies.length && companies.length > 0
+          contactCount >= companyCount && companyCount > 0
             ? "laag"
             : "middel",
         nextStep:
-          companies.length > 0 && contacts.length > 0
+          companyCount > 0 && contactCount > 0
             ? "Basis staat. Houd per klant minimaal een primair contact, website en status bij."
             : "Maak klantrecords en primaire contactpersonen aan voordat offertes en dossiers groeien.",
         actionLabel: "Open klanten",
       },
       {
         label: "Sales intake",
-        detail: `${activeLeads.length} actieve leads, ${businessSignals.length} signalen`,
+        detail: `${activeLeadCount} actieve leads, ${businessSignals.length} signalen`,
         status:
-          activeLeads.length > 0 || businessSignals.length > 0
+          activeLeadCount > 0 || businessSignals.length > 0
             ? "ready"
             : "attention",
         owner: "Funnel",
         view: "signals",
         score: 100,
         priority:
-          activeLeads.length > 0 || businessSignals.length > 0
+          activeLeadCount > 0 || businessSignals.length > 0
             ? "laag"
             : "middel",
         nextStep:
-          activeLeads.length > 0 || businessSignals.length > 0
+          activeLeadCount > 0 || businessSignals.length > 0
             ? "Triageer signalen en zet kansrijke items om naar lead of actie."
             : "Zet de eerstvolgende prospect of inbound vraag vast, zodat sales niet alleen ad hoc blijft.",
         actionLabel: "Open signalen",
@@ -385,84 +471,92 @@ export default function LaventeCarePage() {
       },
       {
         label: "Delivery projecten",
-        detail: `${activeProjects.length} actieve projecten`,
-        status: activeProjects.length > 0 ? "ready" : "attention",
+        detail: `${activeProjectCount} actieve projecten`,
+        status: activeProjectCount > 0 ? "ready" : "attention",
         owner: "Delivery",
         view: "pipeline",
         score: 100,
-        priority: activeProjects.length > 0 ? "laag" : "middel",
+        priority: activeProjectCount > 0 ? "laag" : "middel",
         nextStep:
-          activeProjects.length > 0
+          activeProjectCount > 0
             ? "Gebruik projectfase, deadline en waarde om delivery strak te volgen."
             : "Maak actieve klanttrajecten zichtbaar als project zodra ze langer lopen dan een losse opdracht.",
         actionLabel: "Open delivery",
       },
       {
         label: "Offerte, uren, factuur",
-        detail: `${quoteCount} offertes, ${timeEntryCount} uren, ${invoiceCount} facturen`,
-        status: hasCommercialData ? "ready" : "attention",
+        detail: billingKnown
+          ? `${quoteCount} offertes, ${timeEntryCount} uren, ${invoiceCount} facturen`
+          : "Nog niet geladen; open Commercie voor de actuele stand",
+        status: billingKnown ? (hasCommercialData ? "ready" : "attention") : "unknown",
         owner: "Commercie",
         view: "commerce",
-        score: 100,
-        priority: hasCommercialData ? "laag" : "middel",
-        nextStep: hasCommercialData
-          ? "Controleer open uren, conceptoffertes en verstuurde facturen periodiek."
-          : "Maak de eerste urenregel of offerte voor een bestaande klant en test daarna factuur plus betaalverzoek.",
+        score: billingKnown ? 100 : 0,
+        priority: billingKnown && hasCommercialData ? "laag" : "middel",
+        nextStep: billingKnown
+          ? hasCommercialData
+            ? "Controleer open uren, conceptoffertes en verstuurde facturen periodiek."
+            : "Maak de eerste urenregel of offerte voor een bestaande klant en test daarna factuur plus betaalverzoek."
+          : "Open Commercie om de actuele facturatiegegevens veilig op te halen.",
         actionLabel: "Open commercie",
       },
       {
         label: "Mailbox en templates",
-        detail: `${mailTemplates.length} templates, ${mailOutbox.length} outbox items`,
+        detail: `${mailTemplateCount} templates, ${mailOutboxCount} outbox items`,
         status:
-          mailbox?.summary.configured && mailTemplates.length > 0
+          mailboxConfigured && mailTemplateCount > 0
             ? "ready"
-            : mailTemplates.length > 0
+            : mailTemplateCount > 0
               ? "attention"
               : "missing",
         owner: "Communicatie",
         view: "mailbox",
-        score: mailbox?.summary.configured
+        score: mailboxConfigured
           ? 100
-          : mailTemplates.length > 0
+          : mailTemplateCount > 0
             ? 70
             : 20,
-        priority: mailbox?.summary.configured ? "laag" : "hoog",
+        priority: mailboxConfigured ? "laag" : "hoog",
         nextStep:
-          mailbox?.summary.nextStep ??
+          mailboxSummary?.nextStep ??
           "Richt Microsoft Graph in en gebruik templates voor klantmails.",
         actionLabel: "Open mailbox",
       },
       {
         label: "Bunq betalingen",
-        detail: billing?.summary.bunqReady
-          ? "API en rekening staan klaar"
-          : "Betaalprovider-configuratie op de server ontbreekt nog",
-        status: billing?.summary.bunqReady ? "ready" : "missing",
+        detail: billingKnown
+          ? billing.summary.bunqReady
+            ? "API en rekening staan klaar"
+            : "Betaalprovider-configuratie op de server ontbreekt nog"
+          : "Nog niet geladen; open Commercie voor providerstatus",
+        status: billingKnown ? (billing.summary.bunqReady ? "ready" : "missing") : "unknown",
         owner: "Finance",
         view: "commerce",
-        score: billing?.summary.bunqReady ? 100 : 20,
-        priority: billing?.summary.bunqReady ? "laag" : "hoog",
-        nextStep: billing?.summary.bunqReady
+        score: billingKnown ? (billing.summary.bunqReady ? 100 : 20) : 0,
+        priority: billingKnown && !billing.summary.bunqReady ? "hoog" : "middel",
+        nextStep: !billingKnown
+          ? "Open Commercie om de actuele betaalproviderstatus op te halen."
+          : billing.summary.bunqReady
           ? "Koppel het eerste betaalverzoek aan een factuur zodra de commerciële flow gevuld is."
           : "De betaalprovider-configuratie op de server ontbreekt nog; die moet compleet zijn voordat betaalverzoeken live kunnen.",
         actionLabel: "Open betalingen",
       },
       {
         label: "Klantdossier",
-        detail: `${dossierDocuments.length} dossierstukken, ${activityEvents.length} klantmomenten`,
+        detail: `${dossierDocumentCount} dossierstukken, ${activityEventCount} klantmomenten`,
         status:
-          dossierDocuments.length > 0 || activityEvents.length > 0
+          dossierDocumentCount > 0 || activityEventCount > 0
             ? "ready"
             : "attention",
         owner: "Dossier",
         view: "pipeline",
         score: 100,
         priority:
-          dossierDocuments.length > 0 || activityEvents.length > 0
+          dossierDocumentCount > 0 || activityEventCount > 0
             ? "laag"
             : "middel",
         nextStep:
-          dossierDocuments.length > 0 || activityEvents.length > 0
+          dossierDocumentCount > 0 || activityEventCount > 0
             ? "Blijf klantmomenten en dossierstukken aan de juiste klant koppelen."
             : "Log per bestaande klant minimaal een klantmoment of dossierstuk als start van de audit trail.",
         actionLabel: "Open klantdossiers",
@@ -527,6 +621,7 @@ export default function LaventeCarePage() {
       if (row.status === "ready") return row;
       if (row.status === "attention" && row.score > 70) return { ...row, score: 65 };
       if (row.status === "missing" && row.score > 40) return { ...row, score: 20 };
+      if (row.status === "unknown") return row;
       return row;
     });
   }, [
@@ -534,25 +629,26 @@ export default function LaventeCarePage() {
     activeProjects.length,
     activeWorkstreams.length,
     activityEvents.length,
-    billing?.summary.bunqReady,
-    billing?.summary.invoices,
-    billing?.summary.quotes,
-    billing?.summary.timeEntries,
+    billing,
     businessSignals.length,
+    cockpit?.mailbox,
     companies.length,
     contacts.length,
     dossierDocuments.length,
-    invoices.length,
-    mailOutbox.length,
-    mailTemplates.length,
-    mailbox?.summary.configured,
-    mailbox?.summary.nextStep,
+    mailbox?.summary,
     openChanges.length,
     openIncidents.length,
-    quotes.length,
     recentDecisions.length,
     summary.documents,
-    timeEntries.length,
+    summary.activeLeads,
+    summary.activeProjects,
+    summary.activityEvents,
+    summary.companies,
+    summary.contacts,
+    summary.dossierDocuments,
+    summary.mailConfigured,
+    summary.mailOutbox,
+    summary.mailTemplates,
     totalWorkstreams,
   ]);
 
@@ -565,7 +661,7 @@ export default function LaventeCarePage() {
         description: "Klantdossiers, operating model en snelle context.",
         count: `${companies.length + activeLeads.length + totalWorkstreams + activeProjects.length}`,
         icon: portalIcons.overview,
-        tone: "sky",
+        tone: "info",
       },
       {
         id: "pipeline",
@@ -574,7 +670,7 @@ export default function LaventeCarePage() {
         description: "Klantdossiers, leads, projecten en opdrachten in een werkstroom.",
         count: `${companies.length + activeLeads.length + totalWorkstreams + activeProjects.length}`,
         icon: portalIcons.pipeline,
-        tone: "amber",
+        tone: "accent",
       },
       {
         id: "signals",
@@ -583,7 +679,7 @@ export default function LaventeCarePage() {
         description: "Nieuwe matches, open acties en follow-ups.",
         count: `${businessSignals.length + actionItems.length + followUps.length}`,
         icon: portalIcons.signals,
-        tone: "violet",
+        tone: "info",
       },
       {
         id: "commerce",
@@ -592,7 +688,7 @@ export default function LaventeCarePage() {
         description: "Uren, offertes, facturen en Bunq betaalverzoeken.",
         count: `${quotes.length + timeEntries.length + invoices.length}`,
         icon: portalIcons.commerce,
-        tone: "amber",
+        tone: "accent",
       },
       {
         id: "mailbox",
@@ -601,7 +697,7 @@ export default function LaventeCarePage() {
         description: "Zakelijke klantmails renderen, versturen en auditten.",
         count: `${mailTemplates.length + mailOutbox.length}`,
         icon: portalIcons.mailbox,
-        tone: mailbox?.summary.configured ? "emerald" : "amber",
+        tone: mailbox?.summary.configured ? "success" : "warning",
       },
       {
         id: "operations",
@@ -610,7 +706,7 @@ export default function LaventeCarePage() {
         description: "Besluiten, changes, SLA en supportsignalering.",
         count: `${recentDecisions.length + openChanges.length + openIncidents.length}`,
         icon: portalIcons.operations,
-        tone: openIncidents.length > 0 ? "rose" : "slate",
+        tone: openIncidents.length > 0 ? "danger" : "neutral",
       },
       {
         id: "knowledge",
@@ -619,7 +715,7 @@ export default function LaventeCarePage() {
         description: "Documenttemplates, zoeklaag en PDF dossierhistorie.",
         count: `${summary.documents}`,
         icon: portalIcons.knowledge,
-        tone: "sky",
+        tone: "info",
       },
     ],
     [
@@ -1627,10 +1723,11 @@ export default function LaventeCarePage() {
       toastError("Factuurpreview kon niet worden geopend. Sta pop-ups toe voor deze site.");
       return;
     }
+    // This detached preview cannot consume app CSS; mirror the emergency palette until generated HTML replaces it.
     preview.document.open();
     preview.document.write(
       "<!doctype html><html lang=\"nl\"><head><meta charset=\"utf-8\"><title>Factuurdocument</title></head>" +
-        "<body style=\"margin:0;display:grid;place-items:center;min-height:100vh;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif\">" +
+        "<body style=\"margin:0;display:grid;place-items:center;min-height:100vh;background:#0a0a0f;color:#f1f5f9;font-family:Inter,system-ui,sans-serif\">" +
         "<p>Factuurdocument genereren…</p></body></html>",
     );
     preview.document.close();
@@ -1804,19 +1901,17 @@ export default function LaventeCarePage() {
   // volstaat de amber banner hieronder.
   if (cockpitError && !cockpitLoading && !cockpit) {
     return (
-      <div className="text-slate-100">
-        <main className="mx-auto max-w-[1600px] px-4 py-10 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-xl">
-            <ErrorState
-              title="LaventeCare kon niet laden"
-              text="De cockpitgegevens zijn niet opgehaald. Je klanten, leads en projecten bestaan nog steeds — dit is een verbindings- of serverprobleem, geen lege klantenbasis."
-              onRetry={() => {
-                void refetchCockpit();
-              }}
-            />
-          </div>
-        </main>
-      </div>
+      <AppPageShell width="wide" className="py-10 text-[var(--color-text)]">
+        <div className="mx-auto max-w-xl">
+          <ErrorState
+            title="LaventeCare kon niet laden"
+            text="De cockpitgegevens zijn niet opgehaald. Je klanten, leads en projecten bestaan nog steeds — dit is een verbindings- of serverprobleem, geen lege klantenbasis."
+            onRetry={() => {
+              void refetchCockpit();
+            }}
+          />
+        </div>
+      </AppPageShell>
     );
   }
 
@@ -1824,26 +1919,26 @@ export default function LaventeCarePage() {
     // Skeleton mirrors the real layout (full-width hero + max-w-[1600px] main +
     // a tall workspace) so the page doesn't jump when cockpit data resolves.
     return (
-      <div className="text-slate-100" aria-busy="true">
-        <div className="h-44 w-full animate-pulse border-b border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] sm:h-48" />
-        <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
-          <div className="h-11 w-full max-w-md animate-pulse rounded-xl glass" />
+      <AppPageShell width="wide" className="space-y-5 text-[var(--color-text)]" aria-busy="true">
+        <Skeleton className="h-44 w-full rounded-none border-b border-[var(--color-border)] sm:h-48" />
+        <div className="space-y-5">
+          <Skeleton className="h-11 w-full max-w-md" />
           <div className="grid gap-4 md:grid-cols-4">
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="h-28 animate-pulse rounded-2xl glass" />
+              <Skeleton key={item} className="h-28 rounded-2xl" />
             ))}
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <div className="min-h-[50vh] animate-pulse rounded-2xl glass" />
-            <div className="hidden min-h-[50vh] animate-pulse rounded-2xl glass lg:block" />
+            <Skeleton className="min-h-[50vh] rounded-2xl" />
+            <Skeleton className="hidden min-h-[50vh] rounded-2xl lg:block" />
           </div>
-        </main>
-      </div>
+        </div>
+      </AppPageShell>
     );
   }
 
   return (
-    <div className="text-slate-100">
+    <AppPageShell width="wide" className="space-y-5 text-[var(--color-text)]">
       <LaventeCareHeader
         summary={summary}
         seeding={seeding}
@@ -1858,7 +1953,7 @@ export default function LaventeCarePage() {
         handleSeedDocuments={handleSeedDocuments}
       />
 
-      <main className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
+      <div className="space-y-5 [--portal-navigation-offset:env(safe-area-inset-top)] lg:[&>nav]:top-[var(--portal-navigation-offset)]">
         {/* R7: er is gecachte cockpit-data, maar de laatste refresh faalde —
             toon de data mét een persistente waarschuwing i.p.v. een
             foutscherm dat de werkende CRM vervangt. */}
@@ -1870,111 +1965,124 @@ export default function LaventeCarePage() {
             }}
           />
         ) : null}
-        <LaventeCareCompanyModal
-          isOpen={showCompanyForm}
-          onClose={closeCompanyForm}
-          dirty={companyFormDirty}
-          companyForm={companyForm}
-          setCompanyForm={setCompanyForm}
-          savingCompany={savingCompany}
-          editingCompany={!!editingCompanyId}
-          onSubmit={handleCompanySubmit}
-        />
+        {showCompanyForm ? (
+          <LaventeCareCompanyModal
+            isOpen={showCompanyForm}
+            onClose={closeCompanyForm}
+            dirty={companyFormDirty}
+            companyForm={companyForm}
+            setCompanyForm={setCompanyForm}
+            savingCompany={savingCompany}
+            editingCompany={!!editingCompanyId}
+            onSubmit={handleCompanySubmit}
+          />
+        ) : null}
 
-        <LaventeCareContactModal
-          isOpen={showContactForm}
-          onClose={closeContactForm}
-          dirty={contactFormDirty}
-          contactForm={contactForm}
-          setContactForm={setContactForm}
-          companies={companies}
-          savingContact={savingContact}
-          editingContact={!!editingContactId}
-          onSubmit={handleContactSubmit}
-        />
+        {showContactForm ? (
+          <LaventeCareContactModal
+            isOpen={showContactForm}
+            onClose={closeContactForm}
+            dirty={contactFormDirty}
+            contactForm={contactForm}
+            setContactForm={setContactForm}
+            companies={companies}
+            savingContact={savingContact}
+            editingContact={!!editingContactId}
+            onSubmit={handleContactSubmit}
+          />
+        ) : null}
 
-        <LaventeCareLeadModal
-          isOpen={showLeadForm}
-          onClose={closeLeadForm}
-          dirty={leadFormDirty}
-          leadForm={leadForm}
-          setLeadForm={setLeadForm}
-          companies={companies}
-          contacts={contacts}
-          savingLead={savingLead}
-          onSubmit={handleLeadSubmit}
-        />
+        {showLeadForm ? (
+          <LaventeCareLeadModal
+            isOpen={showLeadForm}
+            onClose={closeLeadForm}
+            dirty={leadFormDirty}
+            leadForm={leadForm}
+            setLeadForm={setLeadForm}
+            companies={companies}
+            contacts={contacts}
+            savingLead={savingLead}
+            onSubmit={handleLeadSubmit}
+          />
+        ) : null}
 
-        <LaventeCareProjectModal
-          isOpen={showProjectForm}
-          onClose={closeProjectForm}
-          dirty={projectFormDirty}
-          projectForm={projectForm}
-          setProjectForm={setProjectForm}
-          companies={companies}
-          savingProject={savingProject}
-          onSubmit={handleProjectSubmit}
-        />
+        {showProjectForm ? (
+          <LaventeCareProjectModal
+            isOpen={showProjectForm}
+            onClose={closeProjectForm}
+            dirty={projectFormDirty}
+            projectForm={projectForm}
+            setProjectForm={setProjectForm}
+            companies={companies}
+            savingProject={savingProject}
+            onSubmit={handleProjectSubmit}
+          />
+        ) : null}
 
-        <LaventeCareWorkstreamModal
-          isOpen={showWorkstreamForm}
-          onClose={closeWorkstreamForm}
-          dirty={workstreamFormDirty}
-          workstreamForm={workstreamForm}
-          setWorkstreamForm={setWorkstreamForm}
-          companies={companies}
-          projects={activeProjects}
-          savingWorkstream={savingWorkstream}
-          onSubmit={handleWorkstreamSubmit}
-        />
+        {showWorkstreamForm ? (
+          <LaventeCareWorkstreamModal
+            isOpen={showWorkstreamForm}
+            onClose={closeWorkstreamForm}
+            dirty={workstreamFormDirty}
+            workstreamForm={workstreamForm}
+            setWorkstreamForm={setWorkstreamForm}
+            companies={companies}
+            projects={activeProjects}
+            savingWorkstream={savingWorkstream}
+            onSubmit={handleWorkstreamSubmit}
+          />
+        ) : null}
 
-        <LaventeCareCustomerDossier
-          isOpen={!!selectedCompany}
-          company={selectedCompany}
-          contacts={contacts}
-          accessCredentials={accessCredentials}
-          // M-J: het dossier krijgt de VOLLEDIGE lijsten (incl. gesloten/
-          // gewonnen/verloren) — klantgeschiedenis is geen actieve funnel.
-          leads={leads}
-          workstreams={workstreams}
-          projects={projects}
-          actions={actionItems}
-          dossierDocuments={dossierDocuments}
-          activityEvents={activityEvents}
-          timeEntries={timeEntries}
-          invoices={invoices}
-          savingActivity={createActivityEventMut.isPending}
-          savingAccessCredential={savingAccessCredential}
-          onClose={() => setSelectedCompanyId(null)}
-          onEditCompany={(company) => {
-            setSelectedCompanyId(null);
-            handleEditCompany(company);
-          }}
-          onAddContact={(company) => {
-            setSelectedCompanyId(null);
-            handleAddContact(company);
-          }}
-          onStartWorkstream={(company) => {
-            setSelectedCompanyId(null);
-            handleStartWorkstreamForCompany(company);
-          }}
-          onOpenCommerce={(company) => {
-            void handleOpenCommerceForCompany(company);
-          }}
-          onCreateActivity={handleCreateActivityEvent}
-          onCreateAccessCredential={handleCreateAccessCredential}
-          updatingAccessCredentialId={updatingAccessCredentialId}
-          onUpdateAccessCredential={handleUpdateAccessCredential}
-        />
+        {selectedCompany ? (
+          <LaventeCareCustomerDossier
+            key={selectedCompany?._id ?? selectedCompany?.id ?? "closed"}
+            isOpen={!!selectedCompany}
+            company={selectedCompany}
+            contacts={contacts}
+            accessCredentials={accessCredentials}
+            // M-J: het dossier krijgt de VOLLEDIGE lijsten (incl. gesloten/
+            // gewonnen/verloren) — klantgeschiedenis is geen actieve funnel.
+            leads={leads}
+            workstreams={workstreams}
+            projects={projects}
+            actions={actionItems}
+            dossierDocuments={dossierDocuments}
+            activityEvents={activityEvents}
+            timeEntries={timeEntries}
+            invoices={invoices}
+            savingActivity={createActivityEventMut.isPending}
+            savingAccessCredential={savingAccessCredential}
+            onClose={() => setSelectedCompanyId(null)}
+            onEditCompany={(company) => {
+              setSelectedCompanyId(null);
+              handleEditCompany(company);
+            }}
+            onAddContact={(company) => {
+              setSelectedCompanyId(null);
+              handleAddContact(company);
+            }}
+            onStartWorkstream={(company) => {
+              setSelectedCompanyId(null);
+              handleStartWorkstreamForCompany(company);
+            }}
+            onOpenCommerce={(company) => {
+              void handleOpenCommerceForCompany(company);
+            }}
+            onCreateActivity={handleCreateActivityEvent}
+            onCreateAccessCredential={handleCreateAccessCredential}
+            updatingAccessCredentialId={updatingAccessCredentialId}
+            onUpdateAccessCredential={handleUpdateAccessCredential}
+          />
+        ) : null}
 
         <LaventeCarePortalHero
           capabilityRows={capabilityRows}
-          companies={companies.length}
-          contacts={contacts.length}
-          leads={activeLeads.length}
+          companies={Math.max(summary.companies ?? 0, companies.length)}
+          contacts={Math.max(summary.contacts ?? 0, contacts.length)}
+          leads={Math.max(summary.activeLeads ?? 0, activeLeads.length)}
           workstreams={totalWorkstreams}
-          projects={activeProjects.length}
-          invoices={invoices.length}
+          projects={Math.max(summary.activeProjects ?? 0, activeProjects.length)}
+          invoices={billing?.summary.invoices ?? null}
           documents={summary.documents}
           onOpenCapabilities={() => {
             void handleChangeView("overview");
@@ -1988,7 +2096,7 @@ export default function LaventeCarePage() {
         />
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="hidden xl:order-2 xl:block">
+          {showInsightRail ? <div className="order-2">
             <PortalInsightRail
               capabilityRows={capabilityRows}
               sections={portalSections}
@@ -1996,10 +2104,10 @@ export default function LaventeCarePage() {
               onChange={handleChangeView}
               signals={businessSignals.length}
               actions={actionItems.length}
-              openInvoices={billing?.summary.openInvoices ?? 0}
+              openInvoices={billing?.summary.openInvoices ?? null}
               openIncidents={openIncidents.length}
             />
-          </div>
+          </div> : null}
 
           <section className="order-1 min-w-0 space-y-4">
             {activeView === "overview" ? (
@@ -2020,14 +2128,17 @@ export default function LaventeCarePage() {
                     void handleChangeView(view);
                   }}
                 />
-                <details className="glass min-w-0 overflow-hidden">
-                  <summary className="cursor-pointer list-none p-4 text-sm font-bold text-white marker:hidden">
+                <details
+ className={cn(surfaceVariants({ padding: "none" }), "min-w-0 overflow-hidden")}
+                  onToggle={(event) => setShowFullCapabilities(event.currentTarget.open)}
+                >
+                  <summary className="cursor-pointer list-none p-4 text-sm font-bold text-[var(--color-text)] marker:hidden">
                     Volledige capability matrix
-                    {capabilityRows.filter((row) => row.status !== "ready").length > 0
-                      ? ` (${capabilityRows.filter((row) => row.status !== "ready").length} focus)`
+                    {capabilityRows.filter((row) => row.status === "attention" || row.status === "missing").length > 0
+                      ? ` (${capabilityRows.filter((row) => row.status === "attention" || row.status === "missing").length} focus)`
                       : ""}
                   </summary>
-                  <div className="space-y-5 border-t border-white/10 p-4">
+                  {showFullCapabilities ? <div className="space-y-5 border-t border-[var(--color-border)] p-4">
                     <CapabilityMatrix
                       capabilityRows={capabilityRows}
                       expanded
@@ -2046,7 +2157,7 @@ export default function LaventeCarePage() {
                         void handleChangeView("knowledge");
                       }}
                     />
-                  </div>
+                  </div> : null}
                 </details>
               </div>
             ) : null}
@@ -2117,6 +2228,7 @@ export default function LaventeCarePage() {
 
             {activeView === "commerce" && (!billingError || billing) ? (
               <LaventeCareBillingView
+                key={commercePrefillCompanyId ?? "billing"}
                 billing={billing}
                 billingLoading={billingLoading}
                 companies={companies}
@@ -2246,63 +2358,7 @@ export default function LaventeCarePage() {
             ) : null}
           </section>
         </div>
-      </main>
-    </div>
+      </div>
+    </AppPageShell>
   );
-}
-
-// R7: kleine persistente banner voor "data staat er, maar de laatste refresh
-// faalde" — in plaats van de werkende view te vervangen door een foutscherm.
-function RefreshFailedBanner({
-  text,
-  onRetry,
-}: {
-  text: string;
-  onRetry: () => void;
-}) {
-  return (
-    <div
-      role="status"
-      className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.08] px-4 py-3"
-    >
-      <TriangleAlert size={16} className="shrink-0 text-amber-300" />
-      <p className="min-w-0 flex-1 text-sm leading-5 text-amber-100">{text}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 text-xs font-bold text-amber-100 transition hover:bg-amber-400/20"
-      >
-        <RotateCcw size={13} />
-        Opnieuw laden
-      </button>
-    </div>
-  );
-}
-
-function parseTagInput(value: string) {
-  return value
-    .split(/[,\n]/)
-    .map((tag) => tag.trim().replace(/^#/, "").toLowerCase())
-    .filter((tag, index, all) => tag && all.indexOf(tag) === index);
-}
-
-function normalizeCompanyStatus(value?: string | null): CompanyForm["status"] {
-  if (value === "actief" || value === "prospect" || value === "inactief")
-    return value;
-  return "actief";
-}
-
-function normalizeCompanyRelation(
-  value?: string | null,
-): CompanyForm["relatieType"] {
-  if (
-    value === "prospect" ||
-    value === "klant" ||
-    value === "partner" ||
-    value === "leverancier" ||
-    value === "intern" ||
-    value === "eigen_project"
-  )
-    return value;
-  return "prospect";
 }

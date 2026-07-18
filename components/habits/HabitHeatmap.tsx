@@ -11,6 +11,9 @@ import { Activity } from "lucide-react";
 import { HEATMAP_COLORS, getHeatmapLevel } from "@/lib/habit-constants";
 import { useGetHabitsHeatmap } from "@/lib/api/generated/habits/habits";
 import { useUser } from "@clerk/nextjs";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { cn } from "@/lib/utils";
 
 const MONTHS = [
   "jan",
@@ -27,7 +30,15 @@ const MONTHS = [
   "dec",
 ];
 // Rij 0 is écht maandag: de reeks wordt terug-gepad tot de eerste maandag (M-D).
-const DAYS = ["Ma", "", "Wo", "", "Vr", "", ""];
+const WEEKDAYS = [
+  { short: "Ma", label: "Maandag" },
+  { short: "", label: "Dinsdag" },
+  { short: "Wo", label: "Woensdag" },
+  { short: "", label: "Donderdag" },
+  { short: "Vr", label: "Vrijdag" },
+  { short: "", label: "Zaterdag" },
+  { short: "", label: "Zondag" },
+] as const;
 
 type HeatmapDay = {
   datum: string;
@@ -126,39 +137,79 @@ export function HabitHeatmap() {
     document.getElementById(`habit-heatmap-cell-${clamped}`)?.focus();
   };
 
-  const handleGridKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+  const handleGridKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!days.length) return;
-    let next: number | null = null;
-    switch (e.key) {
-      case "ArrowUp": next = effectiveFocusIndex - 1; break;
-      case "ArrowDown": next = effectiveFocusIndex + 1; break;
-      case "ArrowLeft": next = effectiveFocusIndex - 7; break;
-      case "ArrowRight": next = effectiveFocusIndex + 7; break;
-      case "Home": next = 0; break;
-      case "End": next = days.length - 1; break;
-      default: return;
+
+    let currentColumn = -1;
+    let currentRow = -1;
+    for (let column = 0; column < weeks.length; column += 1) {
+      const row = weeks[column].findIndex((cell) => cell?.index === effectiveFocusIndex);
+      if (row >= 0) {
+        currentColumn = column;
+        currentRow = row;
+        break;
+      }
     }
-    e.preventDefault();
-    focusCell(next);
+    if (currentColumn < 0 || currentRow < 0) return;
+
+    let nextIndex: number | undefined;
+    switch (event.key) {
+      case "ArrowUp":
+        nextIndex = weeks[currentColumn]?.[currentRow - 1]?.index;
+        break;
+      case "ArrowDown":
+        nextIndex = weeks[currentColumn]?.[currentRow + 1]?.index;
+        break;
+      case "ArrowLeft":
+        nextIndex = weeks[currentColumn - 1]?.[currentRow]?.index;
+        break;
+      case "ArrowRight":
+        nextIndex = weeks[currentColumn + 1]?.[currentRow]?.index;
+        break;
+      case "Home":
+        nextIndex = event.ctrlKey
+          ? 0
+          : weeks.find((week) => week[currentRow] !== null)?.[currentRow]?.index;
+        break;
+      case "End": {
+        if (event.ctrlKey) {
+          nextIndex = days.length - 1;
+          break;
+        }
+        for (let column = weeks.length - 1; column >= 0; column -= 1) {
+          const cell = weeks[column]?.[currentRow];
+          if (cell) {
+            nextIndex = cell.index;
+            break;
+          }
+        }
+        break;
+      }
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    if (nextIndex !== undefined) focusCell(nextIndex);
   };
 
   if (!userId || isLoading) {
     return (
-      <div className="glass rounded-2xl p-4 animate-pulse">
-        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-slate-200">
-          <Activity size={14} className="text-orange-400" /> Activiteit (365
+      <div className={`${surfaceVariants({ padding: "sm" })}`}>
+        <h3 className="mb-3 flex items-center gap-1.5 text-sm font-bold text-[var(--color-text)]">
+          <Activity size={14} className="text-[var(--color-primary)]" /> Activiteit (365
           dagen)
         </h3>
-        <div className="h-[120px] bg-[rgba(255,255,255,0.05)] rounded-xl" />
+        <Skeleton className="h-[120px]" />
       </div>
     );
   }
 
   if (isError || !heatmapRaw) {
     return (
-      <div className="glass rounded-2xl p-4">
-        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-slate-200">
-          <Activity size={14} className="text-orange-400" /> Activiteit (365
+      <div className={surfaceVariants({ padding: "sm" })}>
+        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-[var(--color-text)]">
+          <Activity size={14} className="text-[var(--color-primary)]" /> Activiteit (365
           dagen)
         </h3>
         <p className="text-sm text-[var(--color-text-muted)]">
@@ -170,9 +221,9 @@ export function HabitHeatmap() {
 
   if (days.length === 0) {
     return (
-      <div className="glass rounded-2xl p-4">
-        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-slate-200">
-          <Activity size={14} className="text-orange-400" /> Activiteit (365
+      <div className={surfaceVariants({ padding: "sm" })}>
+        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold text-[var(--color-text)]">
+          <Activity size={14} className="text-[var(--color-primary)]" /> Activiteit (365
           dagen)
         </h3>
         <p className="text-sm text-[var(--color-text-muted)]">
@@ -183,125 +234,114 @@ export function HabitHeatmap() {
   }
 
   return (
-    <div className="glass rounded-2xl p-4">
-      <h3 className="text-sm font-bold text-slate-200 mb-3 flex items-center gap-1.5">
-        <Activity size={14} className="text-orange-400" /> Activiteit (365
+    <div className={surfaceVariants({ padding: "sm" })}>
+      <h3 className="text-sm font-bold text-[var(--color-text)] mb-3 flex items-center gap-1.5">
+        <Activity size={14} className="text-[var(--color-primary)]" /> Activiteit (365
         dagen)
       </h3>
 
       {/* Scrollable container for mobile */}
       <div ref={scrollRef} className="overflow-x-auto -mx-1 px-1 pb-2 scrollbar-none">
         <div
-          className="inline-flex flex-col gap-1"
-          style={{ minWidth: "max-content" }}
+          className="inline-flex min-w-max flex-col gap-1"
         >
           {/* Month labels */}
-          <div className="relative flex gap-[3px] pl-7 mb-1 h-4">
-            {monthLabels.map(({ label, col }, i) => (
-              <div
-                key={i}
-                className="text-[9px] text-[var(--color-text-muted)] absolute"
-                style={{ left: `${col * 15 + 28}px` }}
-              >
-                {label}
+          <div className="mb-1 flex h-4 gap-[3px] pl-7">
+            {weeks.map((_, columnIndex) => {
+              const monthLabel = monthLabels.find(({ col }) => col === columnIndex)?.label;
+              return (
+                <div
+                  key={columnIndex}
+                  className="w-11 shrink-0 text-micro text-[var(--color-text-muted)] pointer-fine:w-6"
+                >
+                  {monthLabel ?? ""}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* De DOM-rijen zijn ook de visuele weekdagen; pijlnavigatie volgt
+              daardoor exact hetzelfde rij/kolommodel als het ARIA-grid. */}
+          <div
+            role="grid"
+            aria-label="Habit-activiteit per dag, kolommen zijn weken"
+            aria-rowcount={WEEKDAYS.length}
+            aria-colcount={weeks.length}
+            onKeyDown={handleGridKeyDown}
+            className="flex flex-col gap-[3px]"
+          >
+            {WEEKDAYS.map((weekday, rowIndex) => (
+              <div key={weekday.label} role="row" aria-rowindex={rowIndex + 1} className="flex gap-[3px]">
+                <span
+                  role="rowheader"
+                  aria-label={weekday.label}
+                  className="mr-1.5 flex h-11 w-5 shrink-0 items-center justify-end text-micro text-[var(--color-text-muted)] pointer-fine:h-6"
+                >
+                  {weekday.short}
+                </span>
+                {weeks.map((week, columnIndex) => {
+                  const cell = week[rowIndex];
+                  if (!cell) {
+                    return (
+                      <span
+                        key={`pad-${columnIndex}`}
+                        role="gridcell"
+                        aria-colindex={columnIndex + 1}
+                        aria-hidden="true"
+                        className="h-11 w-11 shrink-0 pointer-fine:h-6 pointer-fine:w-6"
+                      />
+                    );
+                  }
+
+                  const { day, index } = cell;
+                  const level = getHeatmapLevel(day.rate);
+                  const dueText = typeof day.due === "number" ? `/${day.due}` : "";
+                  const spokenDate = new Date(`${day.datum}T12:00:00`).toLocaleDateString("nl-NL", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  });
+                  const label = `${spokenDate}: ${day.count}${dueText} habits (${Math.round(day.rate * 100)}%)`;
+                  const isSelected = selectedDay?.datum === day.datum;
+
+                  return (
+                    <button
+                      key={day.datum}
+                      type="button"
+                      role="gridcell"
+                      aria-colindex={columnIndex + 1}
+                      id={`habit-heatmap-cell-${index}`}
+                      tabIndex={index === effectiveFocusIndex ? 0 : -1}
+                      onFocus={() => setFocusIndex(index)}
+                      onClick={() => {
+                        setFocusIndex(index);
+                        setSelectedDay((previous) => previous?.datum === day.datum ? null : day);
+                      }}
+                      onKeyDown={(keyboardEvent) => {
+                        if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
+                          keyboardEvent.preventDefault();
+                          setSelectedDay((previous) => previous?.datum === day.datum ? null : day);
+                        }
+                      }}
+                      aria-label={label}
+                      aria-selected={isSelected}
+                      className={cn(
+                        "h-11 min-h-11 w-11 min-w-11 shrink-0 rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] pointer-fine:h-6 pointer-fine:min-h-6 pointer-fine:w-6 pointer-fine:min-w-6",
+                        isSelected && "ring-2 ring-[var(--color-primary)]",
+                      )}
+                      style={{ background: HEATMAP_COLORS[level] }}
+                      title={label}
+                    />
+                  );
+                })}
               </div>
             ))}
           </div>
-
-          {/* Grid: day labels + cells */}
-          <div className="flex gap-0">
-            {/* Day labels */}
-            <div className="flex flex-col gap-[3px] mr-1.5 pt-0.5">
-              {DAYS.map((d, i) => (
-                <div key={i} className="h-[12px] flex items-center">
-                  <span className="text-[8px] text-[var(--color-text-muted)] w-5 text-right">
-                    {d}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Heatmap cells — role=grid met roving tabindex (M-E) */}
-            <div
-              role="grid"
-              aria-label="Habit-activiteit per dag, kolommen zijn weken"
-              onKeyDown={handleGridKeyDown}
-              className="flex gap-[3px]"
-            >
-              {weeks.map((week, wi) => (
-                <div key={wi} role="row" className="flex flex-col gap-[3px]">
-                  {week.map((cell, di) => {
-                    if (!cell) {
-                      // Pad-cel vóór de eerste datum (uitlijning op maandag).
-                      return (
-                        <div
-                          key={`pad-${di}`}
-                          role="gridcell"
-                          aria-hidden="true"
-                          className="w-[12px] h-[12px]"
-                        />
-                      );
-                    }
-                    const { day, index } = cell;
-                    const level = getHeatmapLevel(day.rate);
-                    const dueText =
-                      typeof day.due === "number" ? `/${day.due}` : "";
-                    // A11y (R3): announce a human nl-NL date, not the raw ISO
-                    // string ("maandag 3 maart 2026" i.p.v. "2026-03-03").
-                    const spokenDate = new Date(
-                      `${day.datum}T12:00:00`,
-                    ).toLocaleDateString("nl-NL", {
-                      weekday: "long",
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    });
-                    const label = `${spokenDate}: ${day.count}${dueText} habits (${Math.round(day.rate * 100)}%)`;
-                    const isSelected = selectedDay?.datum === day.datum;
-                    return (
-                      <button
-                        key={di}
-                        type="button"
-                        role="gridcell"
-                        id={`habit-heatmap-cell-${index}`}
-                        tabIndex={index === effectiveFocusIndex ? 0 : -1}
-                        onFocus={() => setFocusIndex(index)}
-                        onClick={() => {
-                          setFocusIndex(index);
-                          setSelectedDay((prev) =>
-                            prev?.datum === day.datum ? null : day,
-                          );
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setSelectedDay((prev) =>
-                              prev?.datum === day.datum ? null : day,
-                            );
-                          }
-                        }}
-                        aria-label={label}
-                        aria-selected={isSelected}
-                        className="w-[12px] h-[12px] rounded-[2px] transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-400"
-                        style={{
-                          background: HEATMAP_COLORS[level],
-                          boxShadow: isSelected
-                            ? "0 0 0 1.5px rgba(251,191,36,0.9)"
-                            : undefined,
-                        }}
-                        title={label}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Detail van de aangetikte dag */}
           {selectedDay && (
             <p
-              className="mt-2 pl-7 text-[11px] text-slate-300"
+              className="mt-2 pl-7 text-micro text-[var(--color-text)]"
               role="status"
               aria-live="polite"
             >
@@ -323,15 +363,15 @@ export function HabitHeatmap() {
 
           {/* Legend */}
           <div className="flex items-center gap-1.5 mt-2 pl-7">
-            <span className="text-[8px] text-[var(--color-text-muted)]">Minder</span>
+            <span className="text-micro text-[var(--color-text-muted)]">Minder</span>
             {HEATMAP_COLORS.map((color, i) => (
               <div
                 key={i}
-                className="w-[10px] h-[10px] rounded-[2px]"
+                className="h-2.5 w-2.5 rounded-sm"
                 style={{ background: color }}
               />
             ))}
-            <span className="text-[8px] text-[var(--color-text-muted)]">Meer</span>
+            <span className="text-micro text-[var(--color-text-muted)]">Meer</span>
           </div>
         </div>
       </div>

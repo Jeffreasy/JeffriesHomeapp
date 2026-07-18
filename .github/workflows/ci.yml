@@ -5,18 +5,110 @@ on:
     branches: [master, main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25.12"
+          cache: false
+      - name: Install Gitleaks
+        run: go install github.com/zricethezav/gitleaks/v8@v8.28.0
+      - name: Scan tracked frontend tree for secrets (redacted)
+        working-directory: ${{ github.workspace }}
+        run: gitleaks dir . --redact --no-banner --verbose
+
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version-file: ".nvmrc"
           cache: npm
       - name: Install
         run: npm ci
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
       - name: Type-check
-        run: npx tsc --noEmit
+        run: npm run typecheck
       - name: Lint
         run: npm run lint
+      - name: Unit tests
+        run: npm run test:unit
+      - name: Configure isolated CI credentials
+        shell: bash
+        run: |
+          {
+            printf 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=%s%s\n' 'pk_test_' 'Y2xlcmsuZXhhbXBsZS5jb20k'
+            printf 'CLERK_SECRET_KEY=%s%s\n' 'sk_test_' 'ci_only_not_a_real_secret'
+          } >> "$GITHUB_ENV"
+      - name: Production build
+        env:
+          BACKEND_API_URL: http://127.0.0.1:18080/api/v1
+          BACKEND_API_KEY: ci-only-not-a-real-secret
+          HOMEAPP_OWNER_USER_ID: user_ci_owner
+        run: npm run build
+      - name: Enforce performance budgets
+        run: npm run check:performance
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Security E2E
+        env:
+          BACKEND_API_URL: http://127.0.0.1:18080/api/v1
+          BACKEND_API_KEY: ci-only-not-a-real-secret
+          HOMEAPP_OWNER_USER_ID: user_ci_owner
+        run: npm run test:e2e
+
+  authenticated-e2e:
+    if: ${{ vars.HOMEAPP_AUTH_E2E_ENABLED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: homeapp-e2e
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Build with the isolated Clerk test tenant
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          HOMEAPP_OWNER_USER_ID: ${{ secrets.E2E_CLERK_OWNER_USER_ID }}
+          BACKEND_API_URL: http://127.0.0.1:18080/api/v1
+          BACKEND_API_KEY: authenticated-e2e-read-only
+        run: npm run build
+      - name: Enforce performance budgets
+        run: npm run check:performance
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Authenticated owner and non-owner read-only E2E
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          E2E_CLERK_OWNER_EMAIL: ${{ secrets.E2E_CLERK_OWNER_EMAIL }}
+          E2E_CLERK_NON_OWNER_EMAIL: ${{ secrets.E2E_CLERK_NON_OWNER_EMAIL }}
+          HOMEAPP_OWNER_USER_ID: ${{ secrets.E2E_CLERK_OWNER_USER_ID }}
+          BACKEND_API_URL: http://127.0.0.1:18080/api/v1
+          BACKEND_API_KEY: authenticated-e2e-read-only
+        run: npm run test:e2e:authenticated
+
+  authenticated-e2e-gate:
+    if: ${{ always() }}
+    needs: authenticated-e2e
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the authenticated E2E suite
+        env:
+          AUTHENTICATED_E2E_RESULT: ${{ needs.authenticated-e2e.result }}
+        run: test "$AUTHENTICATED_E2E_RESULT" = "success"

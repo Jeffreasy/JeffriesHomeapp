@@ -1,245 +1,178 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, X } from "lucide-react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useId,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { X } from "lucide-react";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { IconButton } from "@/components/ui/IconButton";
+import { OverlaySurface, type OverlayPresentation } from "@/components/ui/OverlaySurface";
+import type { UiTone } from "@/lib/ui/tones";
 import { cn } from "@/lib/utils";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
 
-/**
- * Guarded close, exposed to modal children (R11). "Annuleren"-knoppen in de
- * modal-body moeten dezelfde dirty-guard doorlopen als Escape/backdrop/X in
- * plaats van onClose direct aan te roepen.
- */
 const ModalCloseContext = createContext<(() => void) | null>(null);
 
 export function useModalRequestClose() {
   return useContext(ModalCloseContext);
 }
 
-/**
- * Drop-in vervanging voor de losse "Annuleren"-knoppen in modals: routeert
- * door de dirty-guard van de omringende Modal. `onFallback` dekt gebruik
- * buiten een Modal (zou niet moeten voorkomen).
- */
-export function ModalCancelButton({
-  className,
-  children = "Annuleren",
-  onFallback,
-}: {
-  className?: string;
-  children?: React.ReactNode;
-  onFallback?: () => void;
-}) {
-  const requestClose = useContext(ModalCloseContext);
-  return (
-    <button type="button" onClick={requestClose ?? onFallback} className={className}>
-      {children}
-    </button>
-  );
-}
-
-interface ModalProps {
+export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl";
+  subtitle?: ReactNode;
+  icon?: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl";
   className?: string;
-  theme?: "primary" | "sky" | "emerald" | "rose" | "violet" | "slate" | "amber";
-  /**
-   * When true, an accidental close (Escape, backdrop click, X) first asks
-   * "Wijzigingen verwerpen?" before calling onClose. Default (undefined/false)
-   * keeps the original close-immediately behavior.
-   */
+  contentClassName?: string;
+  headerClassName?: string;
+  footerClassName?: string;
+  tone?: UiTone | "surface";
+  presentation?: OverlayPresentation;
   dirty?: boolean;
-  /** Override for the discard-confirmation question. */
   dirtyMessage?: string;
+  closeLabel?: string;
+  closeDisabled?: boolean;
+  closeOnBackdrop?: boolean;
+  closeOnEscape?: boolean;
+  dataAppModal?: string;
+  ariaBusy?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
-const maxWidthClasses = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
-  xl: "max-w-xl",
-  "2xl": "max-w-2xl",
-  "3xl": "max-w-3xl",
-  "4xl": "max-w-4xl",
-};
-
-const themeClasses = {
-  primary: "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]",
-  sky: "border-sky-500/20 bg-sky-500/10",
-  emerald: "border-emerald-500/20 bg-emerald-500/10",
-  rose: "border-rose-500/20 bg-rose-500/10",
-  violet: "border-violet-500/20 bg-violet-500/10",
-  slate: "border-slate-500/20 bg-slate-500/10",
-  amber: "border-amber-500/20 bg-amber-500/10",
+const modalToneClasses: Record<UiTone | "surface", string> = {
+  surface: "border-[var(--color-border)] bg-[var(--color-surface)]",
+  neutral: "border-[var(--color-border-strong)] bg-[var(--color-surface-elevated)]",
+  accent: "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]",
+  info: "border-[var(--color-info-border)] bg-[var(--color-info-subtle)]",
+  success: "border-[var(--color-success-border)] bg-[var(--color-success-subtle)]",
+  warning: "border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)]",
+  danger: "border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)]",
 };
 
 export function Modal({
   isOpen,
   onClose,
   title,
+  subtitle,
   icon,
   children,
+  footer,
   maxWidth = "2xl",
   className,
-  theme = "primary",
+  contentClassName,
+  headerClassName,
+  footerClassName,
+  tone = "surface",
+  presentation = "responsive",
   dirty = false,
-  // De overlay-titel stelt de vraag al ("Wijzigingen verwerpen?"); de
-  // standaardtekst herhaalt die niet (diff-review low).
   dirtyMessage = "Niet-opgeslagen invoer gaat verloren.",
+  closeLabel = "Sluiten",
+  closeDisabled = false,
+  closeOnBackdrop = true,
+  closeOnEscape = true,
+  dataAppModal,
+  ariaBusy,
+  initialFocusRef,
 }: ModalProps) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
-  useFocusTrap(isOpen, contentRef);
+  const titleId = useId();
+  const subtitleId = useId();
+  const { openConfirm } = useConfirm();
 
-  // Reset a pending discard-confirm when the modal opens/closes (render-time
-  // state adjustment instead of an effect, per react-hooks/set-state-in-effect).
-  const [prevOpen, setPrevOpen] = useState(isOpen);
-  if (prevOpen !== isOpen) {
-    setPrevOpen(isOpen);
-    setConfirmingDiscard(false);
-  }
-
-  // Dirty-guarded close: ask for confirmation before discarding typed input.
-  const requestClose = useCallback(() => {
+  const requestClose = useCallback(async () => {
+    if (closeDisabled) return;
     if (dirty) {
-      setConfirmingDiscard(true);
-      return;
+      const discard = await openConfirm({
+        title: "Wijzigingen verwerpen?",
+        message: dirtyMessage,
+        confirmLabel: "Verwerpen",
+        cancelLabel: "Verder bewerken",
+        variant: "danger",
+      });
+      if (!discard) return;
     }
     onClose();
-  }, [dirty, onClose]);
-
-  // Prevent scrolling when modal is open. Save and restore the PREVIOUS value
-  // (mirroring BottomNav) so a Modal opened above a BottomSheet/More-sheet
-  // doesn't unlock body scroll while that sheet is still open (R3).
-  useEffect(() => {
-    if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
-
-  // Handle escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (confirmingDiscard) {
-        // Escape in the confirm step = keep editing.
-        setConfirmingDiscard(false);
-        return;
-      }
-      requestClose();
-    };
-    if (isOpen) window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, requestClose, confirmingDiscard]);
+  }, [closeDisabled, dirty, dirtyMessage, onClose, openConfirm]);
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center overflow-y-auto p-3 pt-6 sm:items-center sm:p-6">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            onClick={requestClose}
-          />
+    <OverlaySurface
+      open={isOpen}
+      onClose={requestClose}
+      role="dialog"
+      ariaLabelledBy={titleId}
+      ariaDescribedBy={subtitle ? subtitleId : undefined}
+      presentation={presentation}
+      maxWidth={maxWidth}
+      closeOnBackdrop={closeOnBackdrop && !closeDisabled}
+      closeOnEscape={closeOnEscape && !closeDisabled}
+      initialFocusRef={initialFocusRef}
+      dataAppModal={dataAppModal}
+      ariaBusy={ariaBusy}
+      className={cn("shadow-[var(--shadow-overlay)]", modalToneClasses[tone], className)}
+    >
+      <ModalCloseContext.Provider value={requestClose}>
+        <div className="flex min-h-0 flex-1 flex-col">
+          {presentation !== "dialog" ? (
+            <div className="flex shrink-0 justify-center pb-1 pt-3 sm:hidden" aria-hidden="true">
+              <div className="h-1 w-10 rounded-full bg-[var(--color-border-strong)]" />
+            </div>
+          ) : null}
 
-          {/* Modal content */}
-          <motion.div
-            ref={contentRef}
-            tabIndex={-1}
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+          <header
             className={cn(
-              "relative flex max-h-[calc(100dvh-4rem)] w-full flex-col overflow-hidden rounded-2xl shadow-2xl glass focus:outline-none sm:max-h-[calc(100dvh-3rem)]",
-              maxWidthClasses[maxWidth],
-              themeClasses[theme],
-              className
+              "flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-5 py-3 sm:px-6 sm:py-4",
+              headerClassName,
             )}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="modal-title"
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-white/5 px-5 py-4 sm:px-6">
-              <div className="flex items-center gap-3">
-                {icon && <div className="text-white/80">{icon}</div>}
-                <h2 id="modal-title" className="text-lg font-bold text-white tracking-tight">
+            <div className="flex min-w-0 items-center gap-3">
+              {icon ? (
+                <div className="shrink-0 text-[var(--color-text-muted)]" aria-hidden="true">
+                  {icon}
+                </div>
+              ) : null}
+              <div className="min-w-0">
+                <h2 id={titleId} className="truncate text-base font-bold tracking-tight text-[var(--color-text)] sm:text-lg">
                   {title}
                 </h2>
-              </div>
-              <button
-                onClick={requestClose}
-                className="p-1.5 -mr-1.5 text-white/50 hover:text-white transition-colors rounded-lg hover:bg-white/10"
-                aria-label="Sluiten"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-5 custom-scrollbar sm:p-6">
-              <ModalCloseContext.Provider value={requestClose}>
-                {children}
-              </ModalCloseContext.Provider>
-            </div>
-
-            {/* Discard-confirmation overlay (only reachable when dirty) */}
-            {confirmingDiscard && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 p-5 backdrop-blur-sm">
-                <div
-                  role="alertdialog"
-                  aria-modal="true"
-                  aria-labelledby="modal-discard-title"
-                  className="w-full max-w-sm rounded-xl border border-[var(--color-border)] bg-[rgba(15,23,42,0.97)] p-5 shadow-2xl"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
-                      <AlertTriangle size={17} className="text-amber-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <p id="modal-discard-title" className="text-sm font-semibold text-white">
-                        Wijzigingen verwerpen?
-                      </p>
-                      <p className="mt-1 text-sm text-slate-400">{dirtyMessage}</p>
-                    </div>
+                {subtitle ? (
+                  <div id={subtitleId} className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
+                    {subtitle}
                   </div>
-                  <div className="mt-5 flex justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingDiscard(false)}
-                      autoFocus
-                      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
-                    >
-                      Verder bewerken
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmingDiscard(false);
-                        onClose();
-                      }}
-                      className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-4 py-2 text-sm font-medium text-rose-300 transition-colors hover:bg-rose-500/25"
-                    >
-                      Verwerpen
-                    </button>
-                  </div>
-                </div>
+                ) : null}
               </div>
-            )}
-          </motion.div>
+            </div>
+            <IconButton
+              icon={<X size={20} />}
+              label={closeLabel}
+              onClick={requestClose}
+              disabled={closeDisabled}
+              className="-mr-1"
+            />
+          </header>
+
+          <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6", contentClassName)}>
+            {children}
+          </div>
+
+          {footer ? (
+            <footer
+              className={cn(
+                "shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:px-6 sm:pb-3",
+                footerClassName,
+              )}
+            >
+              {footer}
+            </footer>
+          ) : null}
         </div>
-      )}
-    </AnimatePresence>
+      </ModalCloseContext.Provider>
+    </OverlaySurface>
   );
 }

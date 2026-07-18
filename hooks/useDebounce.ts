@@ -32,12 +32,20 @@ export interface DebouncedCallback<Args extends unknown[]> {
 
 export function useDebouncedCallback<Args extends unknown[]>(
   callback: (...args: Args) => void,
-  delay: number
+  delay: number,
+  options?: {
+    /**
+     * Defaults to true for persisted steppers. Live device controls opt out so
+     * closing a panel can never flush an obsolete physical command.
+     */
+    flushOnUnmount?: boolean;
+  },
 ): DebouncedCallback<Args> {
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cbRef = useRef(callback);
   // Remember the last scheduled args so flush() can replay them.
   const pendingArgsRef = useRef<Args | null>(null);
+  const flushOnUnmount = options?.flushOnUnmount ?? true;
 
   useEffect(() => {
     cbRef.current = callback;
@@ -58,10 +66,13 @@ export function useDebouncedCallback<Args extends unknown[]>(
     if (args) cbRef.current(...args);
   }, []);
 
-  // Flush (not drop) on unmount: a pending stepper commit must still persist.
+  // Persisted steppers flush; ephemeral physical controls explicitly cancel.
   useEffect(() => {
-    return () => flush();
-  }, [flush]);
+    return () => {
+      if (flushOnUnmount) flush();
+      else cancel();
+    };
+  }, [cancel, flush, flushOnUnmount]);
 
   // Build the composite (callable + flush/cancel) inside useMemo so the methods
   // are assigned to a freshly-created local function, not onto a frozen memoized

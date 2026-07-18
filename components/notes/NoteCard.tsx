@@ -1,13 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Pin, Archive, Trash2, Tag, ListChecks, Check, Clock, CalendarDays, AlertTriangle, Link2, CheckCircle2 } from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
 import { resolveAppIconName } from "@/lib/symbols";
+import { Progress } from "@/components/ui/Progress";
 import { CHECKLIST_ITEM, CHECKLIST_DONE, getChecklistInfo, amsterdamDayDiff } from "./NotesUtils";
 import { NoteContextBadge } from "./NoteContextBadge";
+import { KLEUREN } from "./NoteEditorTemplates";
+import { cn } from "@/lib/utils";
+import { surfaceVariants } from "@/components/ui/Surface";
 
 export type NoteBacklink = {
   id: string;
@@ -30,15 +36,22 @@ interface NoteCardProps {
   masked?:     boolean;
 }
 
-const KLEUR_OPACITY = "25";
-
 const PRIORITEIT_STYLES: Record<string, { dot: string; label: string }> = {
-  hoog:    { dot: "bg-red-500",    label: "Hoog" },
-  normaal: { dot: "bg-slate-500",  label: "Normaal" },
-  laag:    { dot: "bg-blue-400",   label: "Laag" },
+  hoog:    { dot: "bg-[var(--color-danger)]",     label: "Hoog" },
+  normaal: { dot: "bg-[var(--color-text-subtle)]", label: "Normaal" },
+  laag:    { dot: "bg-[var(--color-info)]",       label: "Laag" },
 };
 
 type PendingAction = "pin" | "complete" | "archive" | "delete" | "check" | null;
+function noteCardBackground(value?: string | null) {
+  const normalized = value?.trim().toLowerCase();
+  const paletteColor = normalized
+    ? KLEUREN.find((color) => color.toLowerCase() === normalized)
+    : undefined;
+  return paletteColor
+    ? `linear-gradient(135deg, color-mix(in srgb, ${paletteColor} 16%, transparent) 0%, var(--color-surface) 100%)`
+    : "var(--color-surface)";
+}
 
 export function NoteCard({
   note,
@@ -73,9 +86,6 @@ export function NoteCard({
   const isCompleted = note.isCompleted || note.is_completed;
   const isPinned = note.isPinned || note.is_pinned;
   const linkedEventId = note.linkedEventId ?? note.linked_event_id;
-  const actionButtonClass = compact
-    ? "flex min-h-9 min-w-9 cursor-pointer items-center justify-center rounded-lg p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-[40px] sm:min-w-[40px]"
-    : "flex min-h-[40px] min-w-[40px] cursor-pointer items-center justify-center rounded-lg p-2 transition-colors disabled:cursor-not-allowed disabled:opacity-45";
   const runAction = async (action: PendingAction, callback: () => void | Promise<void>) => {
     if (pendingAction) return;
     setPendingAction(action);
@@ -147,38 +157,36 @@ export function NoteCard({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`glass group relative rounded-xl border border-[var(--color-border)] outline-none transition-all ${
+      className={cn(
+        surfaceVariants({ padding: "none", radius: "md" }),
+        "group relative outline-none transition-[border-color,opacity] duration-[var(--motion-standard)] motion-reduce:transition-none",
         pendingAction
           ? "cursor-progress opacity-80"
-          : "cursor-pointer hover:border-[var(--color-border-hover)]"
-      }`}
-      style={{
-        background: note.kleur
-          ? `linear-gradient(135deg, ${note.kleur}${KLEUR_OPACITY} 0%, rgba(15,15,20,0.85) 100%)`
-          : "var(--color-surface)",
-      }}
+          : "cursor-pointer hover:border-[var(--color-border-hover)]",
+      )}
+      style={{ background: noteCardBackground(note.kleur) }}
       onClick={() => {
         if (!pendingAction) onEdit(note);
       }}
     >
       {/* Priority indicator — left strip */}
       {isCompleted ? (
-        <div className="absolute bottom-3 left-0 top-3 w-0.5 rounded-full bg-emerald-500" />
+        <div className="absolute bottom-3 left-0 top-3 w-0.5 rounded-full bg-[var(--color-success)]" />
       ) : note.prioriteit === "hoog" && (
-        <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-red-500" />
+        <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-[var(--color-danger)]" />
       )}
 
       {/* Pin indicator */}
       {isPinned && (
         <div className="absolute top-2 right-2">
-          <Pin size={12} className="text-amber-400 fill-amber-400" />
+          <Pin size={12} className="fill-[var(--color-primary)] text-[var(--color-primary)]" />
         </div>
       )}
 
       <div className={compact ? "p-3" : "p-4"}>
         {/* Title row with priority dot */}
         <div className="mb-1 flex items-center gap-2">
-          <AppIcon name={symbol} tone="amber" size="sm" framed className="h-8 w-8 rounded-lg" />
+          <AppIcon name={symbol} tone="accent" size="sm" framed className="h-8 w-8 rounded-lg" />
           {note.prioriteit && note.prioriteit !== "normaal" && (
             <span
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${prio.dot}`}
@@ -189,24 +197,25 @@ export function NoteCard({
               children was invalid ARIA nesting). The TITLE is the real,
               keyboard-focusable open-control; the card-wide onClick stays as a
               pointer convenience. */}
-          <h3 className={`min-w-0 flex-1 truncate text-sm font-semibold ${isCompleted ? "text-slate-400 line-through decoration-emerald-400/50" : "text-slate-200"}`}>
-            <button
-              type="button"
+          <h3 className={`min-w-0 flex-1 truncate text-sm font-semibold ${isCompleted ? "text-[var(--color-text-muted)] line-through decoration-[var(--color-success-border)]" : "text-[var(--color-text)]"}`}>
+            <Button
+              variant="ghost"
+              fullWidth
               disabled={Boolean(pendingAction)}
               aria-label={masked ? "Notitie openen" : `Notitie openen: ${displayTitle}`}
               onClick={(e) => {
                 e.stopPropagation();
                 if (!pendingAction) onEdit(note);
               }}
-              className="block w-full truncate rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60 disabled:cursor-progress"
+              className="min-w-0 justify-start truncate rounded border-0 px-0 text-left shadow-none disabled:cursor-progress"
             >
               {masked ? "••••••" : displayTitle}
-            </button>
+            </Button>
           </h3>
         </div>
 
         {!masked && isCompleted && (
-          <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300">
+          <div className="mb-2 inline-flex items-center gap-1 rounded-md bg-[var(--color-success-subtle)] px-1.5 py-0.5 text-micro font-semibold text-[var(--color-success)]">
             <CheckCircle2 size={9} aria-hidden="true" />
             Afgerond{note.completedAt || note.completed_at ? ` · ${formatAge(note.completedAt ?? note.completed_at ?? note.gewijzigd)}` : ""}
           </div>
@@ -214,7 +223,7 @@ export function NoteCard({
 
         {/* Deadline badge */}
         {!masked && deadlineInfo && (
-          <div className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md mb-2 ${deadlineInfo.style}`}>
+          <div className={`inline-flex items-center gap-1 text-micro px-1.5 py-0.5 rounded-md mb-2 ${deadlineInfo.style}`}>
             {deadlineInfo.overdue
               ? <AlertTriangle size={9} aria-hidden="true" />
               : <Clock size={9} aria-hidden="true" />
@@ -226,7 +235,7 @@ export function NoteCard({
         {/* Linked event chip */}
         {!masked && linkedEventId && (
           <div
-            className="inline-flex max-w-full items-center gap-1 rounded-md bg-cyan-500/10 px-1.5 py-0.5 text-[10px] text-cyan-400 mb-2 ml-1"
+            className="mb-2 ml-1 inline-flex max-w-full items-center gap-1 rounded-md bg-[var(--color-info-subtle)] px-1.5 py-0.5 text-micro text-[var(--color-info)]"
             title={linkedEventLabel ? `Gekoppeld aan ${linkedEventLabel}` : "Gekoppeld aan afspraak"}
           >
             <CalendarDays size={9} aria-hidden="true" />
@@ -242,28 +251,21 @@ export function NoteCard({
         />
 
         {/* Content preview with checklist + wiki-link support */}
-        <div className={`mb-2 break-words text-xs leading-relaxed text-slate-400 ${compact ? "line-clamp-3" : "line-clamp-4"}`}>
+        <div className={`mb-2 break-words text-xs leading-relaxed text-[var(--color-text-muted)] ${compact ? "line-clamp-3" : "line-clamp-4"}`}>
           {masked ? "•••• •••• ••••" : renderPreview(previewSourceLines, onUpdateContent ? toggleCheckbox : undefined, onNavigateToNote, allLines.length - previewSourceLines.length)}
         </div>
 
         {/* Checklist progress */}
         {!masked && checklistInfo.total > 0 && (
           <div className="mb-2 flex items-center gap-2">
-            <ListChecks size={10} className="text-slate-600 shrink-0" aria-hidden="true" />
-            <div className="flex-1 h-1 rounded-full bg-[var(--color-surface)] overflow-hidden" role="progressbar" aria-valuenow={checklistInfo.pct} aria-valuemin={0} aria-valuemax={100}>
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{
-                  width: `${checklistInfo.pct}%`,
-                  background: checklistInfo.pct === 100
-                    ? "#22c55e"
-                    : checklistInfo.pct > 50
-                      ? "#f59e0b"
-                      : "#64748b",
-                }}
-              />
-            </div>
-            <span className="text-[10px] text-slate-600 shrink-0 tabular-nums">
+            <ListChecks size={10} className="text-[var(--color-text-subtle)] shrink-0" aria-hidden="true" />
+            <Progress
+              value={checklistInfo.pct}
+              label={`Checklistvoortgang: ${checklistInfo.done} van ${checklistInfo.total}`}
+              tone={checklistInfo.pct === 100 ? "success" : checklistInfo.pct > 50 ? "warning" : "accent"}
+              className="h-1 flex-1"
+            />
+            <span className="text-micro text-[var(--color-text-subtle)] shrink-0 tabular-nums">
               {checklistInfo.done}/{checklistInfo.total}
             </span>
           </div>
@@ -273,7 +275,7 @@ export function NoteCard({
         <div className="flex items-end justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             {masked ? (
-              <span className="inline-flex items-center gap-0.5 rounded-md bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-slate-500">
+              <span className="inline-flex items-center gap-0.5 rounded-md bg-[var(--color-surface)] px-1.5 py-0.5 text-micro text-[var(--color-text-muted)]">
                 <Tag size={8} aria-hidden="true" />
                 ••••
               </span>
@@ -282,61 +284,59 @@ export function NoteCard({
                 {(note.tags ?? []).slice(0, 2).map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex min-w-0 items-center gap-0.5 rounded-md bg-[var(--color-surface)] px-1.5 py-0.5 text-[10px] text-slate-400"
+                    className="inline-flex min-w-0 items-center gap-0.5 rounded-md bg-[var(--color-surface)] px-1.5 py-0.5 text-micro text-[var(--color-text-muted)]"
                   >
                     <Tag size={8} aria-hidden="true" />
                     <span className="max-w-[5rem] truncate">{tag}</span>
                   </span>
                 ))}
                 {(note.tags ?? []).length > 2 && (
-                  <span className="text-[10px] text-slate-600">+{(note.tags ?? []).length - 2}</span>
+                  <span className="text-micro text-[var(--color-text-subtle)]">+{(note.tags ?? []).length - 2}</span>
                 )}
               </>
             )}
-            <span className="text-[10px] text-slate-600">{age}</span>
+            <span className="text-micro text-[var(--color-text-subtle)]">{age}</span>
           </div>
 
           {/* Action buttons — always visible on touch, hover-reveal only on hover-capable pointers (e.g. desktop) */}
           <div className="flex shrink-0 items-center gap-0.5 opacity-100 transition-opacity sm:[@media(hover:hover)]:opacity-0 sm:group-hover:opacity-100">
             {onToggleComplete && (
-              <button
-                type="button"
+              <IconButton
+                label={isCompleted ? "Heropenen" : "Afronden"}
+                title={isCompleted ? "Heropenen" : "Afronden"}
+                icon={<CheckCircle2 size={14} className={isCompleted ? "fill-current" : ""} />}
+                variant={isCompleted ? "success" : "ghost"}
                 onClick={(e) => { e.stopPropagation(); void runAction("complete", () => onToggleComplete(note.id)); }}
                 disabled={Boolean(pendingAction)}
-                className={`${actionButtonClass} hover:bg-emerald-500/15`}
-                aria-label={isCompleted ? "Heropenen" : "Afronden"}
-                title={isCompleted ? "Heropenen" : "Afronden"}
-              >
-                <CheckCircle2 size={14} className={isCompleted ? "text-emerald-400 fill-emerald-400/20" : "text-slate-500"} />
-              </button>
+                className="rounded-lg"
+                aria-pressed={isCompleted}
+              />
             )}
-            <button
-              type="button"
+            <IconButton
+              label={isPinned ? "Losmaken" : "Vastpinnen"}
+              icon={<Pin size={14} className={isPinned ? "fill-current" : ""} />}
+              variant={isPinned ? "primary" : "ghost"}
               onClick={(e) => { e.stopPropagation(); void runAction("pin", () => onTogglePin(note.id)); }}
               disabled={Boolean(pendingAction)}
-              className={`${actionButtonClass} hover:bg-[var(--color-surface-hover)]`}
-              aria-label={isPinned ? "Losmaken" : "Vastpinnen"}
-            >
-              <Pin size={14} className={isPinned ? "text-amber-400 fill-amber-400" : "text-slate-500"} />
-            </button>
-            <button
-              type="button"
+              className="rounded-lg"
+              aria-pressed={isPinned}
+            />
+            <IconButton
+              label={note.isArchived ? "Terugzetten" : "Archiveren"}
+              icon={<Archive size={14} />}
+              variant="ghost"
               onClick={(e) => { e.stopPropagation(); void runAction("archive", () => onArchive(note.id)); }}
               disabled={Boolean(pendingAction)}
-              className={`${actionButtonClass} hover:bg-[var(--color-surface-hover)]`}
-              aria-label={note.isArchived ? "Terugzetten" : "Archiveren"}
-            >
-              <Archive size={14} className="text-slate-500" />
-            </button>
-            <button
-              type="button"
+              className="rounded-lg"
+            />
+            <IconButton
+              label="Verwijderen"
+              icon={<Trash2 size={14} />}
+              variant="danger"
               onClick={(e) => { e.stopPropagation(); void runAction("delete", () => onDelete(note.id)); }}
               disabled={Boolean(pendingAction)}
-              className={`${actionButtonClass} hover:bg-red-500/20`}
-              aria-label="Verwijderen"
-            >
-              <Trash2 size={14} className="text-slate-500 hover:text-red-400" />
-            </button>
+              className="rounded-lg"
+            />
           </div>
         </div>
 
@@ -344,20 +344,21 @@ export function NoteCard({
             de horizontale padding al (N7, dubbele inspringing weg). */}
         {!masked && backlinks && backlinks.length > 0 && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <Link2 size={10} className="text-amber-400/60 shrink-0" />
+            <Link2 size={10} className="shrink-0 text-[var(--color-primary)]" />
             {backlinks.slice(0, 3).map((bl) => (
-              <button
+              <Button
                 key={bl.id}
-                type="button"
+                size="sm"
+                variant="ghost"
                 onClick={(e) => { e.stopPropagation(); onNavigateToNote?.(bl.titel || "Naamloos"); }}
                 aria-label={`Ga naar notitie: ${bl.titel || "Naamloos"}`}
-                className="text-[10px] text-amber-400/70 bg-amber-400/8 px-1.5 py-0.5 rounded-md cursor-pointer hover:bg-amber-400/15 transition-colors"
+                className="min-w-0 max-w-full rounded-md bg-[var(--color-primary-subtle)] px-2 text-micro text-[var(--color-primary)] hover:bg-[var(--color-primary-border)]"
               >
                 {bl.titel}
-              </button>
+              </Button>
             ))}
             {backlinks.length > 3 && (
-              <span className="text-[10px] text-slate-600">+{backlinks.length - 3}</span>
+              <span className="text-micro text-[var(--color-text-subtle)]">+{backlinks.length - 3}</span>
             )}
           </div>
         )}
@@ -386,13 +387,13 @@ function getDeadlineInfo(deadline: string): { label: string; style: string; over
   // agree with the backend (Telegram/AI) and the metric tiles.
   const days = amsterdamDayDiff(deadline);
 
-  if (days < 0) return { label: "Verlopen!", style: "text-red-400 bg-red-500/15", overdue: true };
-  if (days === 0) return { label: "Vandaag", style: "text-amber-400 bg-amber-500/15", overdue: false };
-  if (days === 1) return { label: "Morgen", style: "text-amber-400 bg-amber-500/15", overdue: false };
-  if (days <= 7) return { label: `Over ${days}d`, style: "text-sky-400 bg-sky-500/10", overdue: false };
+  if (days < 0) return { label: "Verlopen!", style: "bg-[var(--color-danger-subtle)] text-[var(--color-danger)]", overdue: true };
+  if (days === 0) return { label: "Vandaag", style: "bg-[var(--color-warning-subtle)] text-[var(--color-warning)]", overdue: false };
+  if (days === 1) return { label: "Morgen", style: "bg-[var(--color-warning-subtle)] text-[var(--color-warning)]", overdue: false };
+  if (days <= 7) return { label: `Over ${days}d`, style: "bg-[var(--color-info-subtle)] text-[var(--color-info)]", overdue: false };
   return {
     label: new Date(deadline).toLocaleDateString("nl-NL", { day: "numeric", month: "short" }),
-    style: "text-slate-400 bg-[var(--color-surface)]",
+    style: "bg-[var(--color-surface)] text-[var(--color-text-muted)]",
     overdue: false,
   };
 }
@@ -408,42 +409,37 @@ function renderPreview(allLines: string[], onToggle?: (originalLineIdx: number) 
     if (item) {
       const done = CHECKLIST_DONE.test(line);
       const label = item[1] || "";
-      // The single interactive element IS the ~28px hit area, carrying the
-      // checkbox role; the small visual box inside is decorative (aria-hidden) —
-      // no nested interactive roles.
-      const checkboxProps = onToggle
-        ? {
-            role: "checkbox" as const,
-            "aria-checked": done,
-            "aria-label": label || "taak",
-            tabIndex: 0,
-            onClick: (e: ReactMouseEvent) => { e.stopPropagation(); onToggle(originalIdx); },
-            onKeyDown: (e: ReactKeyboardEvent) => {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              e.stopPropagation();
-              onToggle(originalIdx);
-            },
-          }
-        : { role: "checkbox" as const, "aria-checked": done, "aria-label": label || "taak" };
+      const checkboxVisual = (
+        <span
+          className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${
+            done
+              ? "border-[var(--color-success-border)] bg-[var(--color-success-subtle)]"
+              : `border-[var(--color-border)] ${onToggle ? "group-hover/cb:border-[var(--color-primary-border)]" : ""}`
+          }`}
+        >
+          {done && <Check size={8} className="text-[var(--color-success)]" />}
+        </span>
+      );
       return (
         <div key={originalIdx} className="flex items-start gap-1.5">
-          <span
-            {...checkboxProps}
-            className={`group/cb -m-1 flex shrink-0 items-center justify-center rounded p-1 outline-none ${onToggle ? "cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400/60" : ""}`}
-          >
-            <span
-              aria-hidden
-              className={`flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border ${
-                done
-                  ? "border-emerald-500/50 bg-emerald-500/40"
-                  : `border-[var(--color-border)] ${onToggle ? "group-hover/cb:border-amber-400/50" : ""}`
-              }`}
-            >
-              {done && <Check size={8} className="text-emerald-300" />}
+          {onToggle ? (
+            <IconButton
+              label={label || "Taak wisselen"}
+              icon={checkboxVisual}
+              role="checkbox"
+              aria-checked={done}
+              onClick={(event) => {
+                event.stopPropagation();
+                void onToggle(originalIdx);
+              }}
+              className="group/cb rounded-lg p-0"
+            />
+          ) : (
+            <span aria-hidden="true" className="flex shrink-0 items-center justify-center p-1">
+              {checkboxVisual}
             </span>
-          </span>
-          <span className={done ? "mt-0.5 line-through text-slate-600" : "mt-0.5"}>
+          )}
+          <span className={done ? "mt-0.5 line-through text-[var(--color-text-subtle)]" : "mt-0.5"}>
             {renderLineWithLinks(label, onNavigateToNote)}
           </span>
         </div>
@@ -465,7 +461,7 @@ function renderLineWithLinks(text: string, onNavigateToNote?: (title: string) =>
         return (
           <span
             key={i}
-            className="inline-flex items-center gap-0.5 text-amber-400/80 bg-amber-400/10 px-1 py-0.5 rounded text-[10px]"
+            className="inline-flex items-center gap-0.5 rounded bg-[var(--color-primary-subtle)] px-1 py-0.5 text-micro text-[var(--color-primary)]"
           >
             <Link2 size={8} />
             {linkMatch[1]}
@@ -473,16 +469,17 @@ function renderLineWithLinks(text: string, onNavigateToNote?: (title: string) =>
         );
       }
       return (
-        <button
+        <Button
           key={i}
-          type="button"
+          size="sm"
+          variant="ghost"
           onClick={(e) => { e.stopPropagation(); onNavigateToNote(linkMatch[1]); }}
           aria-label={`Ga naar notitie: ${linkMatch[1]}`}
-          className="inline-flex items-center gap-0.5 text-amber-400/80 bg-amber-400/10 px-1 py-0.5 rounded text-[10px] cursor-pointer hover:bg-amber-400/20 transition-colors"
+          className="mx-0.5 min-w-0 gap-1 rounded bg-[var(--color-primary-subtle)] px-2 text-micro text-[var(--color-primary)] hover:bg-[var(--color-primary-border)]"
         >
           <Link2 size={8} />
           {linkMatch[1]}
-        </button>
+        </Button>
       );
     }
     return <span key={i}>{part}</span>;

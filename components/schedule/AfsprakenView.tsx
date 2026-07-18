@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { uiMotion } from "@/lib/ui/motion";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Calendar, CalendarClock, CalendarDays, ChevronDown, History, Plus, Zap } from "lucide-react";
@@ -10,6 +11,10 @@ import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents
 import { type DienstRow } from "@/lib/schedule";
 import { useToast } from "@/components/ui/Toast";
 import { StatChip } from "@/components/ui/StatChip";
+import { Button } from "@/components/ui/Button";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { PersonalEventItem } from "./PersonalEventItem";
 import { getAmsterdamTodayIso, formatShortDate } from "./RoosterUtils";
 import { shortSyncError } from "./scheduleUtils";
@@ -95,7 +100,7 @@ export function AfsprakenView({
     return (
       <div className="space-y-3">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-14 rounded-xl bg-[var(--color-surface)] animate-pulse" />
+          <Skeleton key={i} className="h-14" />
         ))}
       </div>
     );
@@ -105,32 +110,26 @@ export function AfsprakenView({
   // afspraken gevonden" verschijnen — anders lijkt een 500 een lege agenda.
   if (eventsError && upcoming.length === 0 && history.length === 0 && pending.length === 0) {
     return (
-      <div className="glass rounded-2xl p-10 text-center border border-amber-500/20 bg-amber-500/[0.04]">
-        <AlertTriangle size={32} className="text-amber-400 mx-auto mb-4" />
-        <h3 className="text-base font-semibold text-amber-100 mb-1">Afspraken konden niet worden geladen</h3>
-        <p className="text-sm text-slate-400 mb-4">
-          {eventsError instanceof Error ? eventsError.message : "Controleer je verbinding en probeer het opnieuw."}
-        </p>
-        <button
-          type="button"
-          onClick={() => void refetch()}
-          className="inline-flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
-        >
-          Opnieuw proberen
-        </button>
-      </div>
+      <FeedbackState
+        tone="error"
+        icon={AlertTriangle}
+        title="Afspraken konden niet worden geladen"
+        description={eventsError instanceof Error ? eventsError.message : "Controleer je verbinding en probeer het opnieuw."}
+        actionLabel="Opnieuw proberen"
+        onAction={() => void refetch()}
+      />
     );
   }
 
   if (upcoming.length === 0 && history.length === 0 && pending.length === 0) {
     return (
-      <div className="glass rounded-2xl p-10 text-center border border-dashed border-[var(--color-border)]">
-        <Calendar size={36} className="text-slate-600 mx-auto mb-4" />
-        <h3 className="text-base font-semibold text-slate-300 mb-1">Geen afspraken gevonden</h3>
-        <p className="text-sm text-slate-500">
-          Gebruik Agenda om te synchroniseren of maak direct een nieuwe afspraak.
-        </p>
-      </div>
+      <FeedbackState
+        icon={Calendar}
+        title="Geen afspraken gevonden"
+        description="Gebruik Agenda om te synchroniseren of maak direct een nieuwe afspraak."
+        actionLabel={onNewEvent ? "Eerste afspraak aanmaken" : undefined}
+        onAction={onNewEvent}
+      />
     );
   }
 
@@ -157,7 +156,7 @@ export function AfsprakenView({
                 icon={CalendarClock}
                 label="Aankomend"
                 value={String(upcoming.length)}
-                tone="indigo"
+                tone="info"
                 onClick={() => selectFilter("aankomend")}
                 active={upcomingFilter === "aankomend"}
               />
@@ -165,7 +164,7 @@ export function AfsprakenView({
                 icon={CalendarDays}
                 label="Deze maand"
                 value={String(thisMonthEvents.length)}
-                tone="slate"
+                tone="neutral"
                 onClick={() => selectFilter("maand")}
                 active={upcomingFilter === "maand"}
               />
@@ -174,7 +173,7 @@ export function AfsprakenView({
                 label="Conflicten"
                 value={String(withConflicts.length)}
                 meta={withConflicts.length > 0 ? "te controleren" : "geen conflicten"}
-                tone={withConflicts.length > 0 ? "amber" : "green"}
+                tone={withConflicts.length > 0 ? "warning" : "success"}
                 onClick={() => selectFilter("conflicten")}
                 active={upcomingFilter === "conflicten"}
               />
@@ -197,19 +196,20 @@ export function AfsprakenView({
                   ))}
                 </div>
               ) : (
-                <p className="rounded-lg border border-dashed border-[var(--color-border)] px-3 py-3 text-xs text-slate-500">
+                <p className="rounded-lg border border-dashed border-[var(--color-border)] px-3 py-3 text-xs text-[var(--color-text-muted)]">
                   Geen items binnen dit filter.
                 </p>
               )}
               {filteredUpcoming.length > 8 && (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  fullWidth
                   onClick={() => setShowAllUpcoming((v) => !v)}
                   aria-expanded={showAllUpcoming}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-white/[0.02] px-4 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/[0.05] hover:text-slate-200 cursor-pointer"
                 >
                   {showAllUpcoming ? "Toon minder" : `Toon alle ${filteredUpcoming.length}`}
-                </button>
+                </Button>
               )}
             </section>
           </>
@@ -218,36 +218,41 @@ export function AfsprakenView({
 
       {/* ── Nog niet in Google (wachtrij) ───────────────────────────────── */}
       {pending.length > 0 && (
-        <section className="space-y-2 rounded-xl border border-indigo-500/25 bg-indigo-500/[0.06] p-4">
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-300">
+        <section className="space-y-2 rounded-xl border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] p-4">
+          <p className="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-wider text-[var(--color-info)]">
             <Zap size={11} aria-hidden="true" />
             Nog niet in Google Calendar ({pending.length})
           </p>
           <div className="space-y-1">
             {pending.map(e => (
               <div key={e.eventId}
-                className="flex items-center justify-between rounded-lg bg-indigo-500/[0.08] px-3 py-1.5 text-xs">
+                className="flex items-center justify-between rounded-lg bg-[var(--color-info-subtle)] px-3 py-1.5 text-xs">
                 <div>
-                  <span className="font-medium text-slate-200">{e.titel}</span>
-                  <span className="ml-2 text-slate-500">
+                  <span className="font-medium text-[var(--color-text)]">{e.titel}</span>
+                  <span className="ml-2 text-[var(--color-text-muted)]">
                     {formatShortDate(e.startDatum)} {e.startTijd ? `· ${e.startTijd}` : "· Hele dag"}
                   </span>
                 </div>
-                <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-indigo-300">
+                <span className="rounded-full bg-[var(--color-info-subtle)] px-2 py-0.5 text-micro font-bold uppercase tracking-wider text-[var(--color-info)]">
                   {pendingLabel(e.status)}
                 </span>
               </div>
             ))}
           </div>
           <div className="flex items-center justify-between pt-2">
-            <p className="text-[10px] text-slate-500">
+            <p className="text-micro text-[var(--color-text-muted)]">
               Verwerk nu om direct naar Google Calendar te sturen
             </p>
-            <button onClick={handleVerwerk} disabled={processing}
-              className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-500/25 px-3 py-1.5 text-[10px] font-semibold text-indigo-300 transition-all hover:bg-indigo-500/35 disabled:opacity-50">
-              <Zap size={10} className={processing ? "animate-pulse" : ""} />
-              {processing ? "Verwerken..." : "Verwerk nu"}
-            </button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleVerwerk}
+              loading={processing}
+              loadingLabel="Verwerken…"
+            >
+              <Zap size={10} className={processing ? "animate-pulse motion-reduce:animate-none" : ""} />
+              Verwerk nu
+            </Button>
           </div>
         </section>
       )}
@@ -256,9 +261,10 @@ export function AfsprakenView({
       {history.length > 0 && (
         <section>
           <button
+            type="button"
             onClick={() => setShowHistory(v => !v)}
             aria-expanded={showHistory}
-            className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-wider text-slate-500 transition-colors hover:text-slate-300 cursor-pointer"
+            className="mb-3 flex min-h-[var(--touch-target)] items-center gap-2 text-micro uppercase tracking-wider text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)] cursor-pointer"
           >
             <History size={12} aria-hidden="true" />
             Historie ({history.length})
@@ -274,12 +280,12 @@ export function AfsprakenView({
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: uiMotion.durationSeconds.standard }}
                 className="overflow-hidden"
               >
                 {/* Geen opacity-dimming op de lijst — de items zelf gebruiken al
                     gedempte maar AA-leesbare tekstkleuren (audit K15). */}
-                <div className="glass min-w-0 divide-y divide-[var(--color-border)] overflow-hidden rounded-xl border border-[var(--color-border)]">
+                <div className={cn(surfaceVariants({ padding: "none", radius: "md" }), "divide-y divide-[var(--color-border)] overflow-hidden")}>
                   {history.map(e => (
                     <div key={e.eventId} className="px-4 py-0.5">
                       <PersonalEventItem event={e} onEdit={onEditEvent} />
@@ -294,10 +300,9 @@ export function AfsprakenView({
       {upcoming.length === 0 && !isLoading && (
         <div className="flex justify-center pt-2">
           {onNewEvent && (
-            <button onClick={onNewEvent}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-indigo-400 bg-indigo-500/10 border border-indigo-500/25 hover:bg-indigo-500/20 transition-all cursor-pointer">
+            <Button onClick={onNewEvent} variant="secondary">
               <Plus size={14} /> Eerste afspraak aanmaken
-            </button>
+            </Button>
           )}
         </div>
       )}

@@ -10,7 +10,6 @@ import {
   Gauge,
   ListChecks,
   LockKeyhole,
-  Loader2,
   Mail,
   Mic,
   Network,
@@ -22,8 +21,12 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import { Panel, SectionHeader, StatusPill, type StatusPillTone } from "./SettingsCards";
+import { SectionHeader, StatusPill, type StatusPillTone } from "./SettingsCards";
+import { Surface } from "@/components/ui/Surface";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import type { AiAgentCapability, AiDiagnosticCheck, AiDiagnosticsRecommendation, AiDiagnosticsResult, AiUsageWindow, SyncStatusView, TelegramStatusResult } from "./SettingsUtils";
+import { uiToneClasses } from "@/lib/ui/tones";
 import { cn } from "@/lib/utils";
 
 type IntegrationRowProps = {
@@ -39,33 +42,28 @@ type SettingsOverviewLike = {
 };
 
 function IntegrationRow({ icon: Icon, label, ok, statusLabel, tone }: IntegrationRowProps) {
-  const resolvedTone = tone ?? (ok ? "ok" : "bad");
-  const iconTone = {
-    ok: "bg-emerald-500/10 text-emerald-300",
-    warn: "bg-amber-500/10 text-amber-300",
-    neutral: "bg-slate-500/10 text-slate-300",
-    bad: "bg-rose-500/10 text-rose-300",
-  }[resolvedTone];
+  const resolvedTone = tone ?? (ok ? "success" : "danger");
+  const toneClass = uiToneClasses[resolvedTone];
 
   return (
-    <div className="flex min-w-0 items-start justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-3">
+    <Surface tone="subtle" radius="sm" padding="sm" className="flex items-start justify-between gap-3">
       <div className="flex min-w-0 items-start gap-3">
-        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", iconTone)}>
-          <Icon size={15} />
+        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneClass.surface, toneClass.icon)}>
+          <Icon size={15} aria-hidden="true" />
         </div>
-        <span className="line-clamp-2 min-w-0 text-sm font-semibold text-slate-300">{label}</span>
+        <span className="line-clamp-2 min-w-0 text-sm font-semibold text-[var(--color-text)]">{label}</span>
       </div>
       <StatusPill ok={Boolean(ok)} tone={resolvedTone} label={statusLabel ?? (ok ? "OK" : "Ontbreekt")} />
-    </div>
+    </Surface>
   );
 }
 
 function MiniInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-2">
-      <p className="truncate text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-0.5 truncate text-sm font-semibold text-slate-200">{value}</p>
-    </div>
+    <Surface tone="subtle" radius="sm" padding="xs">
+      <p className="truncate text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-[var(--color-text)]">{value}</p>
+    </Surface>
   );
 }
 
@@ -78,29 +76,30 @@ const euroFormatter = new Intl.NumberFormat("nl-NL", {
 function UsageWindowCard({ label, window, priced }: { label: string; window?: AiUsageWindow; priced: boolean }) {
   if (!window) {
     return (
-      <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-2">
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-        <p className="mt-1 text-sm text-slate-500">Geen data</p>
-      </div>
+      <Surface tone="subtle" radius="sm" padding="xs">
+        <p className="text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
+        <p className="mt-1 text-sm text-[var(--color-text-muted)]">Geen data</p>
+      </Surface>
     );
   }
+
   return (
-    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-2">
-      <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className="mt-0.5 truncate text-sm font-semibold text-slate-200">
+    <Surface tone="subtle" radius="sm" padding="xs">
+      <p className="text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
+      <p className="mt-0.5 truncate text-sm font-semibold text-[var(--color-text)]">
         {window.calls} calls{window.errors > 0 ? ` — ${window.errors} fouten` : ""}
       </p>
-      <p className="mt-0.5 truncate text-xs text-slate-400">{window.totalTokens.toLocaleString("nl-NL")} tokens</p>
-      {priced && <p className="mt-0.5 truncate text-xs text-emerald-300">{euroFormatter.format(window.estCost)}</p>}
-    </div>
+      <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{window.totalTokens.toLocaleString("nl-NL")} tokens</p>
+      {priced && <p className="mt-0.5 truncate text-xs text-[var(--color-success)]">{euroFormatter.format(window.estCost)}</p>}
+    </Surface>
   );
 }
 
 function checkTone(check?: AiDiagnosticCheck): StatusPillTone {
   if (!check) return "neutral";
-  if (check.status === "success") return "ok";
-  if (check.status === "warning" || check.status === "skipped") return "warn";
-  return "bad";
+  if (check.status === "success") return "success";
+  if (check.status === "warning" || check.status === "skipped") return "warning";
+  return "danger";
 }
 
 function checkLabel(check?: AiDiagnosticCheck) {
@@ -113,70 +112,56 @@ function checkLabel(check?: AiDiagnosticCheck) {
 
 function DiagnosticTile({ icon: Icon, label, check }: { icon: LucideIcon; label: string; check?: AiDiagnosticCheck }) {
   const tone = checkTone(check);
-  const iconTone = {
-    ok: "bg-emerald-500/10 text-emerald-300",
-    warn: "bg-amber-500/10 text-amber-300",
-    neutral: "bg-slate-500/10 text-slate-300",
-    bad: "bg-rose-500/10 text-rose-300",
-  }[tone];
+  const toneClass = uiToneClasses[tone];
 
   return (
-    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
+    <Surface tone="subtle" radius="sm" padding="sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", iconTone)}>
-            <Icon size={15} />
+          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneClass.surface, toneClass.icon)}>
+            <Icon size={15} aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-200">{label}</p>
-            <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-500">
+            <p className="truncate text-sm font-semibold text-[var(--color-text)]">{label}</p>
+            <p className="mt-1 line-clamp-2 text-xs leading-4 text-[var(--color-text-muted)]">
               {check?.error ?? check?.detail ?? "Nog niet gecontroleerd"}
             </p>
           </div>
         </div>
         <StatusPill ok={Boolean(check?.ok)} tone={tone} label={checkLabel(check)} />
       </div>
-    </div>
+    </Surface>
   );
 }
 
 function ToolChip({ label, tone = "live" }: { label: string; tone?: "live" | "pending" }) {
   return (
-    <span
-      className={cn(
-        "max-w-full truncate rounded-md border px-2 py-1 text-[11px] font-semibold",
-        tone === "live" && "border-white/10 bg-white/[0.03] text-slate-400",
-        tone === "pending" && "border-amber-500/20 bg-amber-500/10 text-amber-200"
-      )}
-    >
-      {label}
-    </span>
+    <Badge tone={tone === "pending" ? "warning" : "neutral"} size="sm" className="max-w-full">
+      <span className="truncate">{label}</span>
+    </Badge>
   );
 }
 
 function RecommendationCard({ item }: { item: AiDiagnosticsRecommendation }) {
   const isHigh = item.priority === "hoog";
+  const tone = isHigh ? "warning" : "info";
+  const toneClass = uiToneClasses[tone];
 
   return (
-    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
+    <Surface tone={tone} radius="sm" padding="sm">
       <div className="flex min-w-0 items-start gap-3">
-        <div
-          className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-            isHigh ? "bg-amber-500/10 text-amber-300" : "bg-sky-500/10 text-sky-300"
-          )}
-        >
-          {isHigh ? <ShieldAlert size={15} /> : <ListChecks size={15} />}
+        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", toneClass.surface, toneClass.icon)}>
+          {isHigh ? <ShieldAlert size={15} aria-hidden="true" /> : <ListChecks size={15} aria-hidden="true" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-200">{item.title}</p>
-            <StatusPill ok={!isHigh} tone={isHigh ? "warn" : "neutral"} label={item.priority} />
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--color-text)]">{item.title}</p>
+            <StatusPill ok={!isHigh} tone={isHigh ? "warning" : "neutral"} label={item.priority} />
           </div>
-          <p className="mt-1 line-clamp-3 text-xs leading-4 text-slate-500">{item.detail}</p>
+          <p className="mt-1 line-clamp-3 text-xs leading-4 text-[var(--color-text-muted)]">{item.detail}</p>
         </div>
       </div>
-    </div>
+    </Surface>
   );
 }
 
@@ -188,9 +173,9 @@ function ToolGovernancePanel({ diagnostics }: { diagnostics: AiDiagnosticsResult
   const coverage = diagnostics.governance?.coveragePercent;
 
   return (
-    <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-black/10 p-3">
-      <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
-        <Gauge size={13} />
+    <Surface tone="subtle" radius="sm" padding="sm" className="mt-3">
+      <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase text-[var(--color-text-muted)]">
+        <Gauge size={13} aria-hidden="true" />
         Tool governance
       </div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -200,12 +185,12 @@ function ToolGovernancePanel({ diagnostics }: { diagnostics: AiDiagnosticsResult
         <MiniInfo label="Confirmatie" value={`${pendingConfirmationTools} beschermd`} />
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <StatusPill ok={pendingPolicyTools === 0} tone={pendingPolicyTools === 0 ? "ok" : "warn"} label={pendingPolicyTools === 0 ? "Alles live" : `${pendingPolicyTools} wacht`} />
-        <StatusPill ok={diagnostics.capabilities.mutatingTools > 0} tone={diagnostics.capabilities.mutatingTools > 0 ? "ok" : "neutral"} label={`${diagnostics.capabilities.mutatingTools} live mutaties`} />
-        <StatusPill ok={pendingConfirmationTools > 0} tone={pendingConfirmationTools > 0 ? "warn" : "neutral"} label={coverage == null ? "Coverage onbekend" : `${coverage}% live`} />
+        <StatusPill ok={pendingPolicyTools === 0} tone={pendingPolicyTools === 0 ? "success" : "warning"} label={pendingPolicyTools === 0 ? "Alles live" : `${pendingPolicyTools} wacht`} />
+        <StatusPill ok={diagnostics.capabilities.mutatingTools > 0} tone={diagnostics.capabilities.mutatingTools > 0 ? "success" : "neutral"} label={`${diagnostics.capabilities.mutatingTools} live mutaties`} />
+        <StatusPill ok={pendingConfirmationTools > 0} tone={pendingConfirmationTools > 0 ? "warning" : "neutral"} label={coverage == null ? "Coverage onbekend" : `${coverage}% live`} />
         <StatusPill ok={Boolean(diagnostics.capabilities.readOnlyTools)} tone="neutral" label={`${diagnostics.capabilities.readOnlyTools ?? diagnostics.capabilities.tools} read-only`} />
       </div>
-    </div>
+    </Surface>
   );
 }
 
@@ -219,20 +204,20 @@ function AgentCapabilityCard({ agent }: { agent: AiAgentCapability }) {
   const pendingTools = agent.pendingTools ?? pendingToolNames.length;
 
   return (
-    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-black/10 px-3 py-3">
+    <Surface tone="subtle" radius="sm" padding="sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-200">
+          <p className="truncate text-sm font-semibold text-[var(--color-text)]">
             {agent.emoji} {agent.naam}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
             {agent.tools} live - {agent.mutatingTools} mutaties
             {pendingTools > 0 ? ` - ${pendingTools} wacht` : ""}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <StatusPill ok={agent.tools > 0} tone={agent.tools > 0 ? "ok" : "neutral"} label={`${agent.tools} live`} />
-          {pendingTools > 0 && <StatusPill ok={false} tone="warn" label={`${pendingTools} wacht`} />}
+          <StatusPill ok={agent.tools > 0} tone={agent.tools > 0 ? "success" : "neutral"} label={`${agent.tools} live`} />
+          {pendingTools > 0 && <StatusPill ok={false} tone="warning" label={`${pendingTools} wacht`} />}
         </div>
       </div>
       {visibleTools.length > 0 && (
@@ -240,15 +225,13 @@ function AgentCapabilityCard({ agent }: { agent: AiAgentCapability }) {
           {visibleTools.map((tool) => (
             <ToolChip key={tool} label={tool} />
           ))}
-          {remaining > 0 && (
-            <ToolChip label={`+${remaining}`} />
-          )}
+          {remaining > 0 && <ToolChip label={`+${remaining}`} />}
         </div>
       )}
       {visiblePendingTools.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <span className="flex h-6 items-center gap-1 text-[11px] font-semibold text-slate-500">
-            <LockKeyhole size={12} />
+          <span className="flex h-6 items-center gap-1 text-micro font-semibold text-[var(--color-text-muted)]">
+            <LockKeyhole size={12} aria-hidden="true" />
             beschermd
           </span>
           {visiblePendingTools.map((tool) => (
@@ -257,7 +240,7 @@ function AgentCapabilityCard({ agent }: { agent: AiAgentCapability }) {
           {pendingRemaining > 0 && <ToolChip label={`+${pendingRemaining}`} tone="pending" />}
         </div>
       )}
-    </div>
+    </Surface>
   );
 }
 
@@ -308,21 +291,21 @@ export function SettingsIntegrations({
         : "Uit"
       : "Onbekend";
   const telegramRuntimeTone: StatusPillTone = telegramRuntimeOK
-    ? "ok"
+    ? "success"
     : hasEngineFlag
-      ? "bad"
+      ? "danger"
       : "neutral";
   const calendarDerivedOK = syncMap.schedule?.status === "success" || syncMap.personal?.status === "success";
   const calendarKnown = hasIntegrationFlag("googleCalendar");
   const calendarOK = calendarKnown ? integrationBool("googleCalendar") : calendarDerivedOK || integrationBool("googleOAuth");
-  const calendarTone: StatusPillTone = calendarOK ? "ok" : calendarKnown ? "bad" : "neutral";
+  const calendarTone: StatusPillTone = calendarOK ? "success" : calendarKnown ? "danger" : "neutral";
   const calendarLabel = calendarKnown
     ? calendarOK ? "OK" : "Uit"
     : calendarDerivedOK ? "Sync OK" : integrationBool("googleOAuth") ? "OAuth OK" : "Onbekend";
   const gmailKnown = hasIntegrationFlag("gmail");
   const gmailStatus = syncMap.gmail?.status;
   const gmailOK = gmailKnown ? integrationBool("gmail") : gmailStatus === "success";
-  const gmailTone: StatusPillTone = gmailOK ? "ok" : gmailStatus === "pending" || integrationBool("googleOAuth") ? "warn" : gmailKnown ? "bad" : "neutral";
+  const gmailTone: StatusPillTone = gmailOK ? "success" : gmailStatus === "pending" || integrationBool("googleOAuth") ? "warning" : gmailKnown ? "danger" : "neutral";
   const gmailLabel = gmailOK
     ? "OK"
     : gmailStatus === "pending"
@@ -341,7 +324,7 @@ export function SettingsIntegrations({
     integrationBool("bunqApiKeyConfigured") ||
     integrationBool("bunqUserConfigured") ||
     integrationBool("bunqMonetaryAccount");
-  const bunqTone: StatusPillTone = bunqOK ? "ok" : bunqPartial ? "warn" : bunqKnown ? "bad" : "neutral";
+  const bunqTone: StatusPillTone = bunqOK ? "success" : bunqPartial ? "warning" : bunqKnown ? "danger" : "neutral";
   const bunqLabel = bunqOK ? bunqEnvironment ?? "Klaar" : bunqPartial ? "Deels" : bunqKnown ? "Ontbreekt" : "Onbekend";
   const grokModel = integrationString("grokModel") ?? telegramStatus?.grokModel;
   const grokReasoningEffort = integrationString("grokReasoningEffort") ?? telegramStatus?.grokReasoningEffort;
@@ -361,7 +344,7 @@ export function SettingsIntegrations({
     : "Chat, web-search, voice, Google sync en tool registry controleren";
 
   return (
-    <Panel>
+    <Surface radius="sm">
       <SectionHeader icon={SlidersHorizontal} label="Integraties" title="Koppelingen" sub="status zonder secrets" />
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         <IntegrationRow icon={Bot} label="Telegram bot" ok={integrationBool("telegramBot")} />
@@ -377,14 +360,14 @@ export function SettingsIntegrations({
           icon={Bot}
           label="Grok"
           ok={aiDiagnostics ? grokLiveOK : integrationBool("grok")}
-          tone={aiDiagnostics ? (grokLiveOK ? "ok" : "bad") : undefined}
+          tone={aiDiagnostics ? (grokLiveOK ? "success" : "danger") : undefined}
           statusLabel={aiDiagnostics ? (grokLiveOK ? "Live" : "Check") : integrationBool("grok") && grokModel ? grokModel : undefined}
         />
         <IntegrationRow
           icon={Activity}
           label="Groq voice"
           ok={aiDiagnostics ? groqLiveOK : groqOK}
-          tone={aiDiagnostics ? checkTone(groqVoiceCheck) : groqOK ? "ok" : groqKnown ? "warn" : "neutral"}
+          tone={aiDiagnostics ? checkTone(groqVoiceCheck) : groqOK ? "success" : groqKnown ? "warning" : "neutral"}
           statusLabel={aiDiagnostics ? checkLabel(groqVoiceCheck) : groqOK ? "OK" : groqKnown ? "Optioneel" : "Onbekend"}
         />
         <IntegrationRow
@@ -423,21 +406,21 @@ export function SettingsIntegrations({
           statusLabel={integrationBool("queueLightCommands") ? "Queue" : "Direct"}
         />
       </div>
-      <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 min-w-0">
+      <Surface tone="subtle" radius="sm" padding="sm" className="mt-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white">Telegram beheer</p>
-            <p className="mt-1 line-clamp-2 text-xs text-slate-500">{telegramSummary}</p>
+            <p className="text-sm font-bold text-[var(--color-text)]">Telegram beheer</p>
+            <p className="mt-1 line-clamp-2 text-xs text-[var(--color-text-muted)]">{telegramSummary}</p>
           </div>
-          <button
-            type="button"
+          <Button
             onClick={handleTelegramCheck}
-            disabled={telegramChecking}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 text-sm font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 disabled:opacity-50 sm:w-auto"
+            loading={telegramChecking}
+            loadingLabel="Controleren…"
+            className="w-full border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)] hover:bg-[var(--color-info-border)] sm:w-auto"
           >
-            {telegramChecking ? <Loader2 size={15} className="animate-spin" /> : <RadioTower size={15} />}
+            <RadioTower size={15} />
             Check
-          </button>
+          </Button>
         </div>
         {telegramStatus && (
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -447,23 +430,24 @@ export function SettingsIntegrations({
             <MiniInfo label="Pending updates" value={String(telegramWebhook?.pendingUpdateCount ?? 0)} />
           </div>
         )}
-      </div>
+      </Surface>
 
-      <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 min-w-0">
+      <Surface tone="subtle" radius="sm" padding="sm" className="mt-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white">AI diagnose</p>
-            <p className="mt-1 line-clamp-2 text-xs text-slate-500">{aiSummary}</p>
+            <p className="text-sm font-bold text-[var(--color-text)]">AI diagnose</p>
+            <p className="mt-1 line-clamp-2 text-xs text-[var(--color-text-muted)]">{aiSummary}</p>
           </div>
-          <button
-            type="button"
+          <Button
             onClick={handleAICheck}
-            disabled={aiChecking}
-            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 text-sm font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/15 disabled:opacity-50 sm:w-auto"
+            loading={aiChecking}
+            loadingLabel="Testen…"
+            variant="success"
+            className="w-full sm:w-auto"
           >
-            {aiChecking ? <Loader2 size={15} className="animate-spin" /> : <Brain size={15} />}
+            <Brain size={15} />
             Test AI
-          </button>
+          </Button>
         </div>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -486,7 +470,7 @@ export function SettingsIntegrations({
 
         {aiDiagnostics?.usage && (
           <div className="mt-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-[var(--color-text-muted)]">
               <Banknote size={13} />
               AI-gebruik {aiDiagnostics.usage.priced ? "" : "(geen prijzen ingesteld — alleen tokens/calls)"}
             </div>
@@ -502,7 +486,7 @@ export function SettingsIntegrations({
 
         {aiDiagnostics?.recommendations?.length ? (
           <div className="mt-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-[var(--color-text-muted)]">
               <ShieldCheck size={13} />
               Volgende optimalisaties
             </div>
@@ -516,7 +500,7 @@ export function SettingsIntegrations({
 
         {aiDiagnostics?.agents?.length ? (
           <div className="mt-4">
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-[var(--color-text-muted)]">
               <Wrench size={13} />
               Agent tool registry
             </div>
@@ -527,7 +511,7 @@ export function SettingsIntegrations({
             </div>
           </div>
         ) : null}
-      </div>
-    </Panel>
+      </Surface>
+    </Surface>
   );
 }

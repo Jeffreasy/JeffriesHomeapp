@@ -40,6 +40,7 @@ export interface ParseResult {
 // ─── Auto-categorisatie (centraal gedefinieerd) ──────────────────────────────
 
 import { autoCategorie } from "@/lib/autoCategorie";
+import { parseDelimitedObjects } from "@/lib/csv";
 
 // ─── Bedrag parser ("+1.453,80" → 1453.80, "-25,00" → -25) ─────────────────
 
@@ -71,58 +72,6 @@ function parseDatum(raw: string): string {
 
 // ─── Native RFC 4180 CSV parser ──────────────────────────────────────────────
 
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  let i = 0;
-
-  while (i < line.length) {
-    const ch = line[i];
-
-    if (inQuotes) {
-      if (ch === '"') {
-        // Escaped quote: "" → "
-        if (line[i + 1] === '"') { field += '"'; i += 2; continue; }
-        inQuotes = false;
-      } else {
-        field += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ",") {
-        fields.push(field);
-        field = "";
-      } else {
-        field += ch;
-      }
-    }
-    i++;
-  }
-
-  fields.push(field); // laatste veld
-  return fields;
-}
-
-function parseCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
-  // Rabobank CSV kan Windows-regeleindes hebben (\r\n)
-  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) return { headers: [], rows: [] };
-
-  const headers = parseCsvLine(lines[0]);
-  const rows: Record<string, string>[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const vals = parseCsvLine(lines[i]);
-    const row: Record<string, string> = {};
-    headers.forEach((h, idx) => { row[h] = (vals[idx] ?? "").trim(); });
-    rows.push(row);
-  }
-
-  return { headers, rows };
-}
-
 // ─── Hoofd-parser ────────────────────────────────────────────────────────────
 
 export async function parseRabobankCsv(file: File): Promise<ParseResult> {
@@ -131,7 +80,7 @@ export async function parseRabobankCsv(file: File): Promise<ParseResult> {
   // Strip BOM als aanwezig
   const clean = text.startsWith("\uFEFF") ? text.slice(1) : text;
 
-  const { rows } = parseCsv(clean);
+  const { rows } = parseDelimitedObjects(clean);
   if (rows.length === 0) throw new Error("Geen transacties gevonden in het CSV-bestand.");
 
   const ibansInFile = new Set(

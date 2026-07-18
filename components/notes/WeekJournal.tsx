@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { motion } from "framer-motion";
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, ListChecks } from "lucide-react";
 import { DayColumn } from "./DayColumn";
 import type { NoteRecord, NoteCreateData } from "@/hooks/useNotes";
 import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Surface } from "@/components/ui/Surface";
 import { type DienstRow } from "@/lib/schedule";
 import { getChecklistInfo } from "./NotesUtils";
 
@@ -153,14 +157,14 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
   return (
     <div className="space-y-4">
       {/* Week navigatie header */}
-      <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 sm:flex-row sm:items-center sm:justify-between">
+      <Surface radius="md" padding="sm" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <button
+          <IconButton
+            label="Vorige week"
+            icon={<ChevronLeft size={16} />}
             onClick={goToPrev}
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] transition-colors cursor-pointer"
-          >
-            <ChevronLeft size={16} />
-          </button>
+            variant="secondary"
+          />
 
           <div className="text-center">
             <p className="text-sm font-semibold text-[var(--color-text)]">
@@ -171,57 +175,56 @@ export function WeekJournal({ notes, diensten = [], agendaEvents = [], weekStart
             </p>
           </div>
 
-          <button
+          <IconButton
+            label="Volgende week"
+            icon={<ChevronRight size={16} />}
             onClick={goToNext}
-            className="h-8 w-8 flex items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] transition-colors cursor-pointer"
-          >
-            <ChevronRight size={16} />
-          </button>
+            variant="secondary"
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {!isCurrentWeek && (
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+            <Button
+              variant="success"
+              size="sm"
               onClick={goToToday}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-xs font-medium hover:bg-emerald-500/20 transition-colors cursor-pointer"
             >
               <CalendarDays size={13} />
               Vandaag
-            </motion.button>
+            </Button>
           )}
-          <span className="inline-flex items-center gap-1 rounded bg-white/5 px-2 py-1 text-xs text-[var(--color-text-subtle)]">
+          <Badge tone="neutral" size="sm">
             <CalendarDays size={12} />
             {weekStats.open} open
-          </span>
-          <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">
+          </Badge>
+          <Badge tone="success" size="sm">
             <CheckCircle2 size={12} />
             {weekStats.completed} afgerond
-          </span>
-          <span className="inline-flex items-center gap-1 rounded bg-sky-500/10 px-2 py-1 text-xs text-sky-300">
+          </Badge>
+          <Badge tone="info" size="sm">
             <ListChecks size={12} />
             {weekStats.checklistDone}/{weekStats.checklistTotal}
-          </span>
+          </Badge>
         </div>
-      </div>
+      </Surface>
 
       {/* K2: storing ≠ lege week — expliciete fout-banner i.p.v. 7 lege kolommen. */}
       {isError && (
-        <div role="alert" className="flex items-center gap-3 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 py-3">
-          <AlertTriangle size={18} className="shrink-0 text-rose-400/80" />
+        <Surface role="alert" tone="danger" radius="md" padding="sm" className="flex items-center gap-3">
+          <AlertTriangle size={18} className="shrink-0 text-[var(--color-danger)]" />
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-200">Notities konden niet geladen worden</p>
-            <p className="text-xs text-slate-500">Het weekjournaal kan onvolledig zijn — controleer je verbinding.</p>
+            <p className="text-sm font-semibold text-[var(--color-text)]">Notities konden niet geladen worden</p>
+            <p className="text-xs text-[var(--color-text-muted)]">Het weekjournaal kan onvolledig zijn — controleer je verbinding.</p>
           </div>
-        </div>
+        </Surface>
       )}
 
       {/* K2: skeleton-kolommen tijdens de eerste load. */}
       {isLoading && !isError ? (
         <div role="status" aria-live="polite" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
           {Array.from({ length: 7 }, (_, i) => (
-            <div key={i} className="h-44 animate-pulse rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]/60" />
+            <Skeleton key={i} className="h-44 border border-[var(--color-border)]" />
           ))}
           <span className="sr-only">Weekjournaal laden…</span>
         </div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
 import { privacyApi } from "@/lib/api";
+import { resolvePrivacyHidden } from "@/lib/privacy";
 
 const STORAGE_KEY = "jeffries-privacy-mode";
 const STORAGE_EVENT = "jeffries-privacy-mode-change";
@@ -70,12 +71,13 @@ function subscribeToPrivacyChanges(callback: () => void) {
  * reaches every mounted consumer (M23).
  */
 export function usePrivacy(scope?: PrivacyScope) {
-  const { user } = useUser();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const userId = user?.id ?? "";
 
   const {
     data: settings,
-    isError: isServerUnknown,
+    isError: isServerError,
+    isPending: isSettingsPending,
     error: serverError,
   } = useQuery({
     queryKey: privacyQueryKey(userId),
@@ -84,12 +86,12 @@ export function usePrivacy(scope?: PrivacyScope) {
   });
 
   useEffect(() => {
-    if (isServerUnknown) {
-      // Don't silently fail open: the local override (if any) still applies,
-      // but the server preference is unknown — surface that for debugging.
-      console.warn("Privacy-instellingen ophalen mislukt; lokale voorkeur blijft actief.", serverError);
+    if (isServerError) {
+      // Masking remains active; keep the failure visible for diagnostics
+      // without exposing sensitive data.
+      console.warn("Privacy-instellingen ophalen mislukt; waarden blijven afgeschermd.", serverError);
     }
-  }, [isServerUnknown, serverError]);
+  }, [isServerError, serverError]);
 
   const scopedKey = scope ? `${STORAGE_KEY}:${scope}` : STORAGE_KEY;
   const localOverride = useSyncExternalStore(
@@ -97,18 +99,26 @@ export function usePrivacy(scope?: PrivacyScope) {
     () => readOverride(scopedKey),
     () => null
   );
-  // Default for unset scopes is "visible" (hidden = false) — matches the
-  // settings page (M23: both sides use `?? false`).
+  // Keep sensitive values masked until identity and the persisted preference
+  // are both known. Startup latency and endpoint failures must never reveal
+  // information that may be configured as private.
+  const isServerUnknown =
+    !isUserLoaded || (Boolean(userId) && (isSettingsPending || isServerError));
   const remoteHidden = scope ? (settings?.[scope] ?? false) : false;
-  const hidden = localOverride ?? remoteHidden;
+  const hidden = resolvePrivacyHidden({
+    isServerUnknown,
+    localOverride,
+    remoteHidden,
+  });
 
   const toggle = useCallback(() => {
+    if (isServerUnknown) return;
     const current = readOverride(scopedKey) ?? remoteHidden;
     try {
       window.localStorage.setItem(scopedKey, String(!current));
       window.dispatchEvent(new Event(STORAGE_EVENT));
     } catch {}
-  }, [remoteHidden, scopedKey]);
+  }, [isServerUnknown, remoteHidden, scopedKey]);
 
   /** Mask a value when privacy mode is on */
   const mask = useCallback(

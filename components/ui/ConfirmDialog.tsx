@@ -1,51 +1,53 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AlertTriangle, X } from "lucide-react";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { OverlaySurface } from "@/components/ui/OverlaySurface";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface ConfirmOptions {
+export interface ConfirmOptions {
   title?: string;
   message: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   variant?: "danger" | "default";
-}
-
-interface ConfirmState extends ConfirmOptions {
-  resolve: (value: boolean) => void;
 }
 
 interface ConfirmContextValue {
   openConfirm: (options: ConfirmOptions) => Promise<boolean>;
 }
 
-// ─── Context ─────────────────────────────────────────────────────────────────
-
 const ConfirmContext = createContext<ConfirmContextValue | null>(null);
 
 export function useConfirm() {
-  const ctx = useContext(ConfirmContext);
-  if (!ctx) throw new Error("useConfirm must be used inside ConfirmProvider");
-  return ctx;
+  const context = useContext(ConfirmContext);
+  if (!context) throw new Error("useConfirm must be used inside ConfirmProvider");
+  return context;
 }
 
-// ─── Provider ────────────────────────────────────────────────────────────────
-
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<ConfirmState | null>(null);
-  const resolveRef = useRef<((v: boolean) => void) | null>(null);
+  const [state, setState] = useState<ConfirmOptions | null>(null);
+  const resolveRef = useRef<((value: boolean) => void) | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  const messageId = useId();
 
   const openConfirm = useCallback((options: ConfirmOptions): Promise<boolean> => {
     return new Promise((resolve) => {
-      // A second openConfirm while one is still pending replaces the dialog —
-      // resolve the first promise as "cancelled" instead of leaving its caller
-      // hanging on a promise that can never settle.
       resolveRef.current?.(false);
       resolveRef.current = resolve;
-      setState({ ...options, resolve });
+      setState(options);
     });
   }, []);
 
@@ -55,111 +57,79 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     setState(null);
   }, []);
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(!!state, dialogRef);
-
-  // Close on Escape (treated as cancel).
   useEffect(() => {
-    if (!state) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose(false);
+    return () => {
+      resolveRef.current?.(false);
+      resolveRef.current = null;
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state, handleClose]);
+  }, []);
 
-  const isDanger = state?.variant === "danger";
-
-  // Stable context value so consumers don't re-render when a dialog opens/closes.
   const contextValue = useMemo(() => ({ openConfirm }), [openConfirm]);
+  const isDanger = state?.variant === "danger";
 
   return (
     <ConfirmContext.Provider value={contextValue}>
       {children}
-      <AnimatePresence>
-        {state && (
+      <OverlaySurface
+        open={Boolean(state)}
+        onClose={() => handleClose(false)}
+        role="alertdialog"
+        presentation="dialog"
+        maxWidth="sm"
+        ariaLabelledBy={titleId}
+        ariaDescribedBy={messageId}
+        initialFocusRef={isDanger ? cancelRef : confirmRef}
+        priority="critical"
+        className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-overlay)] sm:p-6"
+      >
+        {state ? (
           <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+            <IconButton
+              icon={<X size={17} />}
+              label="Bevestigingsvenster sluiten"
               onClick={() => handleClose(false)}
+              className="absolute right-2 top-2"
             />
-            {/* Dialog */}
-            <motion.div
-              ref={dialogRef}
-              tabIndex={-1}
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={{ duration: 0.15 }}
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="confirm-title"
-              aria-describedby="confirm-message"
-              className="fixed z-[101] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm glass rounded-2xl p-6 shadow-2xl border border-[var(--color-border)] focus:outline-none"
-            >
-              <button
-                onClick={() => handleClose(false)}
-                className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300"
-                aria-label="Dialog sluiten"
+
+            <div className="mb-5 flex items-start gap-3 pr-10">
+              <div
+                className={
+                  isDanger
+                    ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)]"
+                    : "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-warning-subtle)] text-[var(--color-warning)]"
+                }
               >
-                <X size={16} />
-              </button>
-
-              <div className="flex items-start gap-3 mb-5">
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{
-                    background: isDanger ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)",
-                  }}
-                >
-                  <AlertTriangle
-                    size={17}
-                    style={{ color: isDanger ? "#ef4444" : "#f59e0b" }}
-                  />
-                </div>
-                <div>
-                  {state.title && (
-                    <p id="confirm-title" className="text-sm font-semibold text-white mb-1">
-                      {state.title}
-                    </p>
-                  )}
-                  <p id="confirm-message" className="text-sm text-slate-400">
-                    {state.message}
-                  </p>
-                </div>
+                <AlertTriangle size={18} aria-hidden="true" />
               </div>
-
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => handleClose(false)}
-                  // Danger dialogs autofocus "Annuleren" so a stray Enter cancels
-                  // rather than confirming a destructive action (R3).
-                  autoFocus={isDanger}
-                  className="px-4 py-2 rounded-xl bg-[var(--color-surface)] text-slate-300 border border-[var(--color-border)] text-sm hover:bg-[var(--color-surface-hover)] transition-colors"
-                >
-                  Annuleren
-                </button>
-                <button
-                  onClick={() => handleClose(true)}
-                  className="px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-                  style={{
-                    background: isDanger ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)",
-                    color: isDanger ? "#ef4444" : "#f59e0b",
-                    border: `1px solid ${isDanger ? "rgba(239,68,68,0.30)" : "rgba(245,158,11,0.30)"}`,
-                  }}
-                  autoFocus={!isDanger}
-                >
-                  {state.confirmLabel ?? "Bevestigen"}
-                </button>
+              <div className="min-w-0">
+                <h2 id={titleId} className="mb-1 text-sm font-semibold text-[var(--color-text)]">
+                  {state.title ?? "Bevestigen"}
+                </h2>
+                <p id={messageId} className="text-sm leading-5 text-[var(--color-text-muted)]">
+                  {state.message}
+                </p>
               </div>
-            </motion.div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                ref={cancelRef}
+                variant="secondary"
+                onClick={() => handleClose(false)}
+              >
+                {state.cancelLabel ?? "Annuleren"}
+              </Button>
+              <Button
+                ref={confirmRef}
+                variant={isDanger ? "danger" : "primary"}
+                onClick={() => handleClose(true)}
+              >
+                {state.confirmLabel ?? "Bevestigen"}
+              </Button>
+            </div>
           </>
-        )}
-      </AnimatePresence>
+        ) : null}
+      </OverlaySurface>
     </ConfirmContext.Provider>
   );
 }

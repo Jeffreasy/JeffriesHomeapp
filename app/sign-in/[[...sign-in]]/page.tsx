@@ -1,122 +1,88 @@
 import { SignIn } from "@clerk/nextjs";
+import { Home } from "lucide-react";
+import { Surface } from "@/components/ui/Surface";
 
 export default function SignInPage() {
   return (
-    <div
-      className="min-h-screen flex items-center justify-center relative overflow-hidden"
-      style={{ background: "#0a0a0f" }}
-    >
-      {/* Ambient background glows */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        aria-hidden="true"
-      >
-        <div
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-20"
-          style={{
-            background:
-              "radial-gradient(circle, #f59e0b 0%, transparent 70%)",
-            filter: "blur(80px)",
-          }}
-        />
-        <div
-          className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full opacity-10"
-          style={{
-            background:
-              "radial-gradient(circle, #3b82f6 0%, transparent 70%)",
-            filter: "blur(60px)",
-          }}
-        />
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[var(--color-background)]">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute left-1/2 top-1/4 h-[37.5rem] w-[37.5rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,var(--color-primary)_0%,transparent_70%)] opacity-20 blur-[80px]" />
+        <div className="absolute bottom-0 right-0 h-[25rem] w-[25rem] rounded-full bg-[radial-gradient(circle,var(--color-info)_0%,transparent_70%)] opacity-10 blur-[60px]" />
       </div>
 
-      {/* Content */}
       <div className="relative z-10 flex flex-col items-center gap-8 px-4">
-        {/* Logo + title */}
         <div className="flex flex-col items-center gap-3 text-center">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center border"
-            style={{
-              background: "rgba(245,158,11,0.15)",
-              borderColor: "rgba(245,158,11,0.3)",
-            }}
+          <Surface
+            tone="accent"
+            radius="lg"
+            padding="none"
+            className="flex h-16 w-16 items-center justify-center text-[var(--color-primary)]"
           >
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#f59e0b"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </div>
+            <Home size={28} aria-hidden="true" />
+          </Surface>
           <div>
-            <h1
-              className="text-2xl font-bold tracking-tight"
-              style={{ color: "#f1f5f9" }}
-            >
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text)]">
               Jeffries Dashboard
             </h1>
-            <p className="text-sm mt-1" style={{ color: "#8b98a9" }}>
+            <p className="mt-1 text-sm text-[var(--color-text-subtle)]">
               Jouw persoonlijke dashboard
             </p>
           </div>
         </div>
 
-        {/* Clerk SignIn component — styled to match dark theme */}
         <SignIn
+          // This private, single-owner app never offers an enrollment path.
+          withSignUp={false}
+          transferable={false}
+          signUpUrl="/sign-in"
           appearance={{
             variables: {
-              colorPrimary: "#f59e0b",
-              colorBackground: "#111118",
-              colorInputBackground: "#1a1a24",
-              colorInputText: "#f1f5f9",
-              colorText: "#f1f5f9",
-              colorTextSecondary: "#8b98a9",
-              borderRadius: "12px",
-              fontFamily: "Inter, sans-serif",
+              colorPrimary: "var(--color-primary)",
+              colorBackground: "var(--color-surface)",
+              colorInput: "var(--color-surface-elevated)",
+              colorInputForeground: "var(--color-text)",
+              colorForeground: "var(--color-text)",
+              colorMutedForeground: "var(--color-text-subtle)",
+              borderRadius: "var(--radius-lg)",
+              fontFamily: "var(--font-sans)",
             },
             elements: {
               card: {
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
+                background: "var(--color-surface-muted)",
+                border: "1px solid var(--color-border)",
+                boxShadow: "var(--shadow-overlay)",
                 backdropFilter: "blur(20px)",
               },
-              headerTitle: { color: "#f1f5f9", fontWeight: "700" },
-              headerSubtitle: { color: "#8b98a9" },
+              headerTitle: { color: "var(--color-text)", fontWeight: "700" },
+              headerSubtitle: { color: "var(--color-text-subtle)" },
               socialButtonsBlockButton: {
-                background: "rgba(255,255,255,0.05)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                color: "#f1f5f9",
+                background: "var(--color-surface-hover)",
+                border: "1px solid var(--color-border-hover)",
+                color: "var(--color-text)",
               },
               socialButtonsBlockButton__hover: {
-                background: "rgba(255,255,255,0.1)",
+                background: "var(--color-surface-active)",
               },
-              dividerLine: { background: "rgba(255,255,255,0.08)" },
-              dividerText: { color: "#8b98a9" },
+              dividerLine: { background: "var(--color-border)" },
+              dividerText: { color: "var(--color-text-subtle)" },
               formFieldInput: {
-                background: "#1a1a24",
-                border: "1px solid rgba(255,255,255,0.1)",
-                color: "#f1f5f9",
+                background: "var(--color-surface-elevated)",
+                border: "1px solid var(--color-border-hover)",
+                color: "var(--color-text)",
               },
               formButtonPrimary: {
-                background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                color: "#0a0a0f",
+                background: "var(--color-primary)",
+                color: "var(--color-primary-foreground)",
                 fontWeight: "700",
               },
-              footerActionLink: { color: "#f59e0b" },
-              identityPreviewText: { color: "#f1f5f9" },
-              identityPreviewEditButton: { color: "#f59e0b" },
+              footerAction: { display: "none" },
+              identityPreviewText: { color: "var(--color-text)" },
+              identityPreviewEditButton: { color: "var(--color-primary)" },
             },
           }}
         />
 
-        <p className="text-xs" style={{ color: "#8b98a9" }}>
+        <p className="text-xs text-[var(--color-text-subtle)]">
           Persoonlijk gebruik · Jeffrey Lavente
         </p>
       </div>

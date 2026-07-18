@@ -1,24 +1,22 @@
 "use client";
 
-import { Search, X } from "lucide-react";
+import { SearchField } from "@/components/ui/SearchField";
 
 interface SearchBarProps {
   value: string;
   onChange: (v: string) => void;
+  className?: string;
 }
 
-export function SearchBar({ value, onChange }: SearchBarProps) {
+export function SearchBar({ value, onChange, className }: SearchBarProps) {
   return (
-    <div className="search-bar">
-      <Search size={15} className="search-bar__icon" />
-      <input className="search-bar__input" type="search"
-        placeholder="Zoek op naam of omschrijving…"
-        value={value} onChange={(e) => onChange(e.target.value)} />
-      {value && (
-        <button className="search-bar__clear" onClick={() => onChange("")} aria-label="Wis zoekopdracht">
-          <X size={14} />
-        </button>
-      )}
-    </div>
+    <SearchField
+      label="Zoek transacties"
+      placeholder="Zoek op naam of omschrijving…"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      onClear={() => onChange("")}
+      wrapperClassName={className}
+    />
   );
 }

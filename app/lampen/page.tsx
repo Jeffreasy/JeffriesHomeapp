@@ -1,31 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
-  Activity,
   AlertTriangle,
   Lightbulb,
+  Loader2,
   Power,
   RefreshCw,
   Settings,
   Sparkles,
-  Sun,
-  Wifi,
-  Zap,
 } from "lucide-react";
-import Link from "next/link";
-import { useQueryClient } from "@tanstack/react-query";
-import { useDevices, useRooms, useLampCommand } from "@/hooks/useHomeapp";
+import { useDevices, useLampCommand, useRooms } from "@/hooks/useHomeapp";
 import { useBridgeStatus } from "@/hooks/useDevices";
-import { RoomSection } from "@/components/room/RoomSection";
-import { LampDetailPanel } from "@/components/lamp/LampDetailPanel";
-import { SceneBar } from "@/components/scenes/SceneBar";
 import { useGlobalShortcuts } from "@/hooks/useGlobalShortcuts";
-import { type Device } from "@/lib/api";
-
+import { RoomSection } from "@/components/room/RoomSection";
+import { SceneBar } from "@/components/scenes/SceneBar";
+import { BridgeStatusNotice } from "@/components/lamp/BridgeStatusNotice";
 import {
   buildRoomGroups,
-  getAverageBrightness,
   matchesFilter,
   type FilterMode,
 } from "@/components/lamp/LampUtils";
@@ -33,176 +27,236 @@ import {
   EmptyDevices,
   LoadingGrid,
   NoResults,
-  Panel,
   SectionHeader,
-  StatusRow,
   WarningPanel,
 } from "@/components/lamp/LampCards";
-import { LampCommandCenter } from "@/components/lamp/LampCommandCenter";
-import { LampToolbar } from "@/components/lamp/LampToolbar";
 import { LampOverviewSidebar } from "@/components/lamp/LampOverviewSidebar";
+import { LampToolbar } from "@/components/lamp/LampToolbar";
+import { AppPageShell } from "@/components/layout/AppPageShell";
+import { Surface } from "@/components/ui/Surface";
+import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { IconButton } from "@/components/ui/IconButton";
+import type { Device } from "@/lib/api";
+import {
+  createLampAmbientStyle,
+  deriveLampPresentation,
+} from "@/lib/lampPresentation";
+import { getLightingSummary } from "@/lib/lighting";
+import { detectActiveScene, SCENE_PRESETS } from "@/lib/scenes";
+import { cn } from "@/lib/utils";
+
+const LazyLampDetailPanel = dynamic(
+  () => import("@/components/lamp/LampDetailPanel").then((module) => module.LampDetailPanel),
+  { ssr: false },
+);
 
 export default function LampenPage() {
-  const { data: devices = [], isLoading: loadingDevices, isFetching: fetchingDevices, error: devicesError } = useDevices();
-  const { data: rooms = [], isLoading: loadingRooms, error: roomsError } = useRooms();
-  const { sendBatch } = useLampCommand();
-  const { bridge, bridgeOffline } = useBridgeStatus();
+  const {
+    data: devices = [],
+    isLoading: loadingDevices,
+    isFetching: fetchingDevices,
+    error: devicesError,
+  } = useDevices();
+  const {
+    data: rooms = [],
+    isLoading: loadingRooms,
+    error: roomsError,
+  } = useRooms();
+  const { sendBatch, isPending: lightingPending } = useLampCommand();
+  const {
+    bridge,
+    isOffline: bridgeOffline,
+    isLoading: bridgeStatusLoading,
+    isError: bridgeStatusError,
+    isStatusKnown: isBridgeStatusKnown,
+  } = useBridgeStatus();
   const queryClient = useQueryClient();
 
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterMode>("all");
 
-  const roomById = useMemo(() => new Map(rooms.map((room) => [room.id, room])), [rooms]);
-  const onlineDevices = useMemo(() => devices.filter((device) => device.status === "online"), [devices]);
-  const offlineDevices = useMemo(() => devices.filter((device) => device.status !== "online"), [devices]);
-  const onDevices = useMemo(() => devices.filter((device) => device.current_state?.on), [devices]);
-  const allOnlineOn =
-    onlineDevices.length > 0 && onlineDevices.every((device) => device.current_state?.on);
-  const avgBrightness = getAverageBrightness(devices);
-  const selectedDevice = devices.find((device) => device.id === selectedDeviceId) ?? null;
-  const isLoading = loadingDevices || loadingRooms;
+  const roomById = useMemo(
+    () => new Map(rooms.map((room) => [room.id, room])),
+    [rooms],
+  );
+  const lightingSummary = useMemo(
+    () => getLightingSummary(devices),
+    [devices],
+  );
+  const {
+    onlineDevices,
+    onDevices,
+    allOnlineOn,
+  } = lightingSummary;
+  const selectedDevice =
+    devices.find((device) => device.id === selectedDeviceId) ?? null;
+  const isInitialDeviceLoading = loadingDevices && devices.length === 0;
+  const roomMetadataLoading = loadingRooms && rooms.length === 0;
 
   const filteredDevices = useMemo(() => {
     const query = search.trim().toLowerCase();
-
     return devices.filter((device) => {
-      const roomName = device.room_id ? roomById.get(device.room_id)?.name ?? device.room_id : "";
+      const roomName = device.room_id
+        ? roomById.get(device.room_id)?.name ??
+          (roomMetadataLoading ? "" : device.room_id)
+        : "";
       const matchesSearch =
         query.length === 0 ||
         device.name.toLowerCase().includes(query) ||
         roomName.toLowerCase().includes(query) ||
         (device.ip_address ?? "").toLowerCase().includes(query);
-
       return matchesSearch && matchesFilter(device, filter);
     });
-  }, [devices, filter, roomById, search]);
+  }, [devices, filter, roomById, roomMetadataLoading, search]);
 
-  const roomGroups = useMemo(() => buildRoomGroups(filteredDevices, rooms), [filteredDevices, rooms]);
-  const unassignedDevices = useMemo(
-    () => filteredDevices.filter((device) => !device.room_id),
-    [filteredDevices]
+  const roomGroups = useMemo(
+    () =>
+      buildRoomGroups(filteredDevices, rooms, {
+        metadataLoading: roomMetadataLoading,
+      }),
+    [filteredDevices, roomMetadataLoading, rooms],
   );
-  const allRoomGroups = useMemo(() => buildRoomGroups(devices, rooms), [devices, rooms]);
-  const hasAnyResults = filteredDevices.length > 0;
-  const hasNoDevices = !isLoading && devices.length === 0 && !devicesError;
+  const unassignedDevices = useMemo(
+    () =>
+      roomMetadataLoading
+        ? []
+        : filteredDevices.filter((device) => !device.room_id),
+    [filteredDevices, roomMetadataLoading],
+  );
+  const allRoomGroups = useMemo(
+    () =>
+      buildRoomGroups(devices, rooms, {
+        metadataLoading: roomMetadataLoading,
+      }),
+    [devices, roomMetadataLoading, rooms],
+  );
+  const unassignedCount = roomMetadataLoading
+    ? 0
+    : devices.filter((device) => !device.room_id).length;
+
+  const activeSceneId = detectActiveScene(devices);
+  const activeScene = SCENE_PRESETS.find((scene) => scene.id === activeSceneId);
+  const pageAmbientStyle = selectedDevice
+    ? deriveLampPresentation(selectedDevice).ambientStyle
+    : createLampAmbientStyle(
+        activeScene?.color ?? "#94a3b8",
+        Boolean(activeScene && activeScene.id !== "uit" && onDevices.length > 0),
+      );
 
   const toggleAll = () => {
-    // Batch: één invalidate aan het eind i.p.v. een refetch-storm per lamp.
-    sendBatch(onlineDevices, { on: !allOnlineOn });
+    if (lightingPending) return;
+    void sendBatch(onlineDevices, { on: !allOnlineOn });
   };
 
   const refreshDevices = () => {
-    queryClient.invalidateQueries({ queryKey: ["devices"] });
+    void queryClient.invalidateQueries({ queryKey: ["devices"] });
   };
 
   const handleSelect = (device: Device) => {
-    setSelectedDeviceId((previous) => (previous === device.id ? null : device.id));
+    setSelectedDeviceId((current) =>
+      current === device.id ? null : device.id,
+    );
   };
 
-  useGlobalShortcuts({ devices: onlineDevices, allOn: allOnlineOn, sendBatch });
+  useGlobalShortcuts({
+    devices: onlineDevices,
+    allOn: allOnlineOn,
+    sendBatch,
+    disabled: lightingPending,
+  });
+
+  const hasNoDevices =
+    !loadingDevices && devices.length === 0 && !devicesError;
+  const hasAnyResults = filteredDevices.length > 0;
 
   return (
-    <div className="text-slate-100">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 shrink-0 border-b border-[var(--color-border)] bg-[var(--color-background)]/90 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
-                <Lightbulb size={20} className="text-amber-300" />
+    <div
+      className="relative min-h-full overflow-hidden text-[var(--color-text)]"
+      style={pageAmbientStyle}
+    >
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_50%_0,var(--lamp-ambient-medium),transparent_68%)] transition-colors duration-[var(--motion-slow)]"
+        aria-hidden="true"
+      />
+
+      <div className="relative flex min-w-0 flex-1 flex-col">
+        <header className="app-topbar sticky top-0 z-[var(--layer-sticky)] border-b border-[var(--lamp-ambient-border)] bg-[var(--color-background)]/92 backdrop-blur-xl">
+          <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-soft)] text-[var(--lamp-accent)]"
+                aria-hidden="true"
+              >
+                <Lightbulb size={17} />
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Slimme verlichting
-                </p>
-                <h1 className="mt-1 truncate text-2xl font-bold text-white">Verlichting</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  {onlineDevices.length}/{devices.length} online · {onDevices.length} aan
+                <h1 className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg">Verlichting</h1>
+                <p className="truncate text-xs text-[var(--color-text-muted)]" aria-live="polite">
+                  {isInitialDeviceLoading
+                    ? "Lampen laden..."
+                    : `${onlineDevices.length}/${devices.length} online / ${onDevices.length} aan`}
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
+            <div className="flex shrink-0 items-center gap-2">
+              <IconButton
                 onClick={refreshDevices}
                 disabled={fetchingDevices}
-                aria-label="Lampstatus verversen"
-                title="Haal de actuele lampstatus op"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-wait disabled:opacity-60"
-              >
-                <RefreshCw size={16} className={fetchingDevices ? "animate-spin" : ""} aria-hidden="true" />
-                <span className="hidden sm:inline">Verversen</span>
-              </button>
-              <Link
+                loading={fetchingDevices}
+                label="Laatst gemelde lampstatus verversen"
+                icon={<RefreshCw size={16} />}
+                variant="secondary"
+              />
+              <ButtonLink
                 href="/settings"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
+                aria-label="Lampinstellingen openen"
+                title="Lampinstellingen openen"
+                size="icon"
+                variant="secondary"
+                className="hidden sm:inline-flex"
               >
-                <Settings size={16} />
-                <span className="hidden sm:inline">Instellingen</span>
-              </Link>
+                <Settings size={16} aria-hidden="true" />
+              </ButtonLink>
               <button
                 type="button"
                 onClick={toggleAll}
-                disabled={onlineDevices.length === 0}
-                title="Alle online lampen aan/uit"
-                className="inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:border-[var(--color-border)] disabled:bg-[var(--color-surface)] disabled:text-slate-600"
+                disabled={onlineDevices.length === 0 || lightingPending}
+                aria-label={allOnlineOn ? "Alle online lampen uitzetten" : "Alle online lampen aanzetten"}
+                aria-busy={lightingPending}
+                className={cn(
+                  "inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
+                  allOnlineOn
+                    ? "border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-medium)] text-[var(--lamp-text)]"
+                    : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)]",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                )}
               >
-                <Power size={16} />
-                <span>{allOnlineOn ? "Alles uit" : "Alles aan"}</span>
+                {lightingPending ? (
+                  <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                ) : (
+                  <Power size={16} aria-hidden="true" />
+                )}
+                <span>{lightingPending ? "Bezig" : allOnlineOn ? "Alles uit" : "Alles aan"}</span>
               </button>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:py-7">
-          {/* N7: in queue-modus bevestigt de backend commando's vóór uitvoering —
-              bij een offline bridge is de getoonde staat dus mogelijk nep. */}
-          {bridgeOffline && (
-            <div
-              role="status"
-              className="flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4"
-            >
-              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" aria-hidden="true" />
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-amber-200">
-                  Bridge offline — lampcommando&apos;s worden uitgesteld en de getoonde status kan verouderd zijn.
-                </p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">
-                  {bridge?.lastSeenAt
-                    ? `Laatste heartbeat: ${new Date(bridge.lastSeenAt).toLocaleString("nl-NL", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}.`
-                    : "Nog geen heartbeat ontvangen."}
-                  {(bridge?.commandsPending ?? 0) > 0 && ` ${bridge?.commandsPending} commando('s) in de wachtrij.`}
-                </p>
-              </div>
-            </div>
-          )}
+        <AppPageShell width="standard" className="app-page-shell--after-topbar flex flex-1 flex-col gap-4">
+          <BridgeStatusNotice
+            bridge={bridge}
+            isOffline={bridgeOffline}
+            isLoading={bridgeStatusLoading}
+            isError={bridgeStatusError}
+            isStatusKnown={isBridgeStatusKnown}
+          />
 
-          <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.2fr)_420px]">
-            <LampCommandCenter
-              devices={devices.length}
-              online={onlineDevices.length}
-              offline={offlineDevices.length}
-              on={onDevices.length}
-              avgBrightness={avgBrightness}
-              allOn={allOnlineOn}
-              onToggleAll={toggleAll}
-            />
-
-            <Panel>
-              <SectionHeader
-                icon={Sparkles}
-                label="Scènes"
-                title="Snelle sfeer"
-                sub={`${onlineDevices.length} online beschikbaar`}
-              />
-              <SceneBar />
-            </Panel>
-          </section>
-
-          {(devicesError || roomsError) && (
+          {((devicesError && devices.length > 0) || roomsError) && (
             <div className="grid gap-3 lg:grid-cols-2">
-              {devicesError && (
+              {devicesError && devices.length > 0 && (
                 <WarningPanel
                   title="Deviceverbinding mislukt"
                   text={
@@ -221,8 +275,11 @@ export default function LampenPage() {
             </div>
           )}
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="min-w-0 space-y-5">
+          <section
+            aria-label="Individuele lampbediening"
+            className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]"
+          >
+            <div className="min-w-0 space-y-4">
               <LampToolbar
                 search={search}
                 filter={filter}
@@ -233,32 +290,32 @@ export default function LampenPage() {
                 onFilterChange={setFilter}
               />
 
-              {isLoading ? (
+              {isInitialDeviceLoading ? (
                 <LoadingGrid />
               ) : devicesError && devices.length === 0 ? (
-                // Failed ≠ empty: bij een device-fetch-fout géén "Filters resetten"
-                // maar een echte foutmelding met retry.
-                <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/5 px-6 py-12 text-center">
-                  <AlertTriangle size={28} className="text-rose-300" aria-hidden="true" />
-                  <h3 className="mt-4 text-base font-semibold text-rose-200">
+                <div className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-6 py-10 text-center">
+                  <AlertTriangle size={28} className="text-[var(--color-danger)]" aria-hidden="true" />
+                  <h2 className="mt-4 text-base font-semibold text-[var(--color-danger)]">
                     Lampen konden niet worden geladen
-                  </h3>
-                  <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-                    De deviceverbinding is mislukt. De lampen zelf werken mogelijk gewoon — alleen de status is niet op te halen.
+                  </h2>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
+                    De statusbron reageert niet. De lampen zelf kunnen nog actief zijn.
                   </p>
-                  <button
-                    type="button"
+                  <Button
                     onClick={refreshDevices}
-                    className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/15"
+                    variant="danger"
+                    loading={fetchingDevices}
+                    loadingLabel="Verversen…"
+                    className="mt-5"
                   >
-                    <RefreshCw size={15} className={fetchingDevices ? "animate-spin" : ""} aria-hidden="true" />
+                    <RefreshCw size={15} aria-hidden="true" />
                     Opnieuw proberen
-                  </button>
+                  </Button>
                 </div>
               ) : hasNoDevices ? (
                 <EmptyDevices />
               ) : hasAnyResults ? (
-                <div className="space-y-5">
+                <div className="space-y-4">
                   {roomGroups.map((group) => (
                     <RoomSection
                       key={group.room.id}
@@ -283,57 +340,50 @@ export default function LampenPage() {
                   )}
                 </div>
               ) : (
-                <NoResults search={search} filter={filter} onReset={() => {
-                  setSearch("");
-                  setFilter("all");
-                }} />
+                <NoResults
+                  search={search}
+                  filter={filter}
+                  onReset={() => {
+                    setSearch("");
+                    setFilter("all");
+                  }}
+                />
               )}
             </div>
 
-            <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
-              <LampOverviewSidebar groups={allRoomGroups} unassignedCount={devices.filter((device) => !device.room_id).length} />
-              <Panel>
+            <aside className="space-y-4 xl:sticky xl:top-20">
+              <Surface className="border-[var(--lamp-ambient-border)]">
                 <SectionHeader
-                  icon={Activity}
-                  label="Systeem"
-                  title="Live status"
-                  sub={isLoading ? "laden" : "ververst elke 10s"}
+                  icon={Sparkles}
+                  label="Sfeer"
+                  title="Scènes en kleur"
+                  sub={
+                    activeScene && activeScene.id !== "uit"
+                      ? `Actief: ${activeScene.label}`
+                      : `${onlineDevices.length} beschikbaar`
+                  }
                 />
-                {/* N7: eerlijk over de grens van "live" — de fysieke lampstatus
-                    reconvergeert in queue-modus pas bij de bridge-poll. */}
-                <p className="-mt-2 mb-3 text-[11px] leading-4 text-slate-500">
-                  Getoonde status is de laatst bekende — de fysieke lampstatus kan enkele minuten achterlopen.
-                </p>
-                <div className="space-y-3">
-                  <StatusRow
-                    icon={Wifi}
-                    label="Online"
-                    value={`${onlineDevices.length}/${devices.length} lampen`}
-                    tone={devices.length > 0 && offlineDevices.length === 0 ? "green" : "amber"}
-                  />
-                  <StatusRow
-                    icon={Sun}
-                    label="Helderheid"
-                    value={onDevices.length > 0 ? `${avgBrightness}% gemiddeld` : "Geen lampen aan"}
-                    tone={onDevices.length > 0 ? "amber" : "slate"}
-                  />
-                  <StatusRow
-                    icon={Zap}
-                    label="Shortcut"
-                    value="Spatie togglet alle online lampen"
-                    tone="blue"
-                  />
-                </div>
-              </Panel>
+                <SceneBar
+                  devices={devices}
+                  sendBatch={sendBatch}
+                  isPending={lightingPending}
+                />
+              </Surface>
+              <LampOverviewSidebar
+                groups={allRoomGroups}
+                unassignedCount={unassignedCount}
+              />
             </aside>
           </section>
-        </main>
+        </AppPageShell>
       </div>
 
-      <LampDetailPanel
-        device={selectedDevice}
-        onClose={() => setSelectedDeviceId(null)}
-      />
+      {selectedDevice && (
+        <LazyLampDetailPanel
+          device={selectedDevice}
+          onClose={() => setSelectedDeviceId(null)}
+        />
+      )}
     </div>
   );
 }

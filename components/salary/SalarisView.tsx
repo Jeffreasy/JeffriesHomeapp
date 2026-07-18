@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { TrendingUp, Euro, Briefcase, FileUp, ArrowRight, Clock3, Moon, Eye, EyeOff } from "lucide-react";
-import Link from "next/link";
+import { TrendingUp, Euro, Briefcase, ArrowRight, Clock3, Moon, Eye, EyeOff } from "lucide-react";
 
 import { useSalary, type SalarisRecord } from "@/hooks/useSalary";
 import { useLoonstroken, type LoonstrookRecord } from "@/hooks/useLoonstroken";
@@ -14,6 +13,12 @@ import { LoonstrookUploader } from "./LoonstrookUploader";
 import { type SalarisDisplayRecord } from "./SalaryTypes";
 import { displayRecordVanLoonstrook, displayRecord, fmt } from "./SalaryUtils";
 import { PrognoseCard, JaarSectie, TotaalCard, VergelijkingSectie } from "./SalaryCards";
+import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Surface } from "@/components/ui/Surface";
+import { SurfaceHeader } from "@/components/ui/SurfaceHeader";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 type SalarisViewProps = {
   diensten?: DienstRow[];
@@ -97,9 +102,12 @@ export function SalarisView({ diensten = [] }: SalarisViewProps) {
 
   if (isLoadingData) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-5 h-5 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
-      </div>
+      <FeedbackState
+        tone="loading"
+        title="Salarisgegevens laden…"
+        description="Roosterprognoses en loonstroken worden samengevoegd."
+        compact
+      />
     );
   }
 
@@ -123,23 +131,21 @@ export function SalarisView({ diensten = [] }: SalarisViewProps) {
     // routes (rooster óf loonstrook uploaden) genoemd worden.
     return (
       <div className="space-y-6">
-        <div className="glass rounded-2xl p-12 text-center border border-dashed border-[var(--color-border)]">
-          <Euro size={36} className="text-slate-600 mx-auto mb-4" />
-          <h3 className="text-base font-semibold text-slate-300 mb-1">Nog geen salarisdata</h3>
-          <p className="text-sm text-slate-500">
-            Upload hieronder je loonstroken, of importeer/synchroniseer je rooster
-            zodat diensten beschikbaar zijn.<br />
-            Deze tab rekent dan automatisch uren, contracturen en ORT door.
-          </p>
-        </div>
+        <FeedbackState
+          title="Nog geen salarisdata"
+          description="Upload hieronder je loonstroken, of importeer en synchroniseer je rooster. Deze tab rekent dan automatisch uren, contracturen en ORT door."
+          icon={Euro}
+        />
 
-        <div className="glass rounded-2xl p-5 border border-[var(--color-border)] min-w-0">
-          <div className="flex items-center gap-2 mb-4">
-            <FileUp size={14} className="text-indigo-400" />
-            <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-bold">Loonstroken uploaden</p>
-          </div>
+        <Surface padding="md">
+          <SurfaceHeader
+            icon={<AppIcon name="upload" tone="accent" size="sm" />}
+            eyebrow="Documentimport"
+            title="Loonstroken uploaden"
+            headingLevel={3}
+          />
           <LoonstrookUploader />
-        </div>
+        </Surface>
       </div>
     );
   }
@@ -148,58 +154,54 @@ export function SalarisView({ diensten = [] }: SalarisViewProps) {
     <div className="space-y-6">
       {/* S1: eigen eye-toggle, zelfde patroon als de finance-header. */}
       <div className="flex items-center justify-end">
-        <button
-          type="button"
+        <Button
           onClick={togglePrivacy}
           title={privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
           aria-label={privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
-          className={`inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors ${
-            privacyOn
-              ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-              : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
-          }`}
+          variant={privacyOn ? "primary" : "secondary"}
+          size="sm"
         >
-          {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}
+          {privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
           <span className="hidden sm:inline">{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
-        </button>
+        </Button>
       </div>
 
       {/* Totalen banner */}
       <div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <TotaalCard icon={Clock3} label="Roosteruren" value={`${Math.round(totaalUren * 10) / 10}u`} accent="#38bdf8" />
-          <TotaalCard icon={Moon} label="ORT uren" value={`${Math.round(totaalOrtUren * 10) / 10}u`} accent="#a78bfa" />
-          <TotaalCard icon={Briefcase} label="Totaal bruto" value={mask(fmt(totaalBruto))} accent="#f59e0b" />
-          <TotaalCard icon={TrendingUp} label="Netto totaal" value={mask(fmt(totaalNetto))} accent="#34d399" />
+          <TotaalCard icon={Clock3} label="Roosteruren" value={`${Math.round(totaalUren * 10) / 10}u`} tone="info" />
+          <TotaalCard icon={Moon} label="ORT uren" value={`${Math.round(totaalOrtUren * 10) / 10}u`} tone="accent" />
+          <TotaalCard icon={Briefcase} label="Totaal bruto" value={mask(fmt(totaalBruto))} tone="accent" />
+          <TotaalCard icon={TrendingUp} label="Netto totaal" value={mask(fmt(totaalNetto))} tone="success" />
         </div>
         {/* S5: expliciete scope — deze totalen beslaan álle jaren en mengen
             prognose- met loonstrookmaanden. */}
-        <p className="mt-2 text-[10px] uppercase tracking-wider text-slate-500">
+        <p className="mt-2 text-micro uppercase tracking-wider text-[var(--color-text-muted)]">
           alle jaren · prognose + werkelijk gemengd
         </p>
       </div>
 
       {scheduleForecastCount > 0 && (
-        <div className="rounded-2xl border border-sky-400/15 bg-sky-400/8 p-4 text-xs text-sky-100/80">
+        <Surface tone="info" padding="md" className="text-xs">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-sky-300/80">Roosterberekening actief</p>
-              <p className="mt-1 leading-relaxed text-slate-400">
+              <p className="text-micro font-bold uppercase tracking-wider text-[var(--color-info)]">Roosterberekening actief</p>
+              <p className="mt-1 leading-relaxed text-[var(--color-text-muted)]">
                 {scheduleForecastCount} maand(en) worden direct uit je diensten berekend. Loonstroken blijven leidend zodra ze geïmporteerd zijn.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-right sm:min-w-52">
-              <span className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-                <span className="block text-[10px] uppercase text-slate-500">Extra</span>
-                <span className="font-bold text-amber-200">{Math.round(totaalExtraUren * 10) / 10}u</span>
-              </span>
-              <span className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-                <span className="block text-[10px] uppercase text-slate-500">Pensioen</span>
-                <span className="font-bold text-red-300">{mask(fmt(totaalPensioen))}</span>
-              </span>
+            <div className="grid grid-cols-2 gap-2 sm:min-w-52">
+              <Surface tone="subtle" radius="sm" padding="sm" className="text-right">
+                <span className="block text-micro uppercase text-[var(--color-text-muted)]">Extra</span>
+                <span className="font-bold text-[var(--color-warning)]">{Math.round(totaalExtraUren * 10) / 10}u</span>
+              </Surface>
+              <Surface tone="subtle" radius="sm" padding="sm" className="text-right">
+                <span className="block text-micro uppercase text-[var(--color-text-muted)]">Pensioen</span>
+                <span className="font-bold text-[var(--color-danger)]">{mask(fmt(totaalPensioen))}</span>
+              </Surface>
             </div>
           </div>
-        </div>
+        </Surface>
       )}
 
       {/* Huidige maand prognose */}
@@ -211,13 +213,15 @@ export function SalarisView({ diensten = [] }: SalarisViewProps) {
       ))}
 
       {/* Loonstroken Upload */}
-      <div className="glass rounded-2xl p-5 border border-[var(--color-border)] min-w-0">
-        <div className="flex items-center gap-2 mb-4">
-          <FileUp size={14} className="text-indigo-400" />
-          <p className="text-[10px] text-indigo-400/70 uppercase tracking-wider font-bold">Loonstroken uploaden</p>
-        </div>
+      <Surface padding="md">
+        <SurfaceHeader
+          icon={<AppIcon name="upload" tone="accent" size="sm" />}
+          eyebrow="Documentimport"
+          title="Loonstroken uploaden"
+          headingLevel={3}
+        />
         <LoonstrookUploader />
-      </div>
+      </Surface>
 
       {/* Werkelijk vs Berekend vergelijking */}
       {loonstroken.count > 0 && (
@@ -225,15 +229,17 @@ export function SalarisView({ diensten = [] }: SalarisViewProps) {
       )}
 
       {/* Disclaimer + Finance link */}
-      <p className="text-[10px] text-slate-500 text-center leading-relaxed">
+      <p className="text-micro text-[var(--color-text-muted)] text-center leading-relaxed">
         Maanden met geïmporteerde loonstrook gebruiken werkelijke bedragen; overige maanden blijven prognoses.
         {"\u2248"} Netto prognose is een schatting op basis van de 2026-loonheffingstabel.
         De exacte verrekening door {"'"}s Heeren Loo kan afwijken door tijdvakfactor en heffingskortingen.
       </p>
       {loonstroken.count > 0 && (
-        <Link href="/finance" className="flex items-center justify-center gap-1.5 text-xs text-indigo-400/70 hover:text-indigo-400 transition-colors py-2">
-          Bekijk salaris in Finance overzicht <ArrowRight size={12} />
-        </Link>
+        <div className="flex justify-center">
+          <ButtonLink href="/finance" variant="ghost" size="sm">
+            Bekijk salaris in Finance overzicht <ArrowRight size={12} aria-hidden="true" />
+          </ButtonLink>
+        </div>
       )}
     </div>
   );

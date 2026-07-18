@@ -11,7 +11,8 @@ import {
 } from "lucide-react";
 import { MetricCard } from "./FinanceCards";
 import { formatPercent, formatMonth, formatShortDate } from "./FinanceUtils";
-import type { TransactionFilter } from "@/hooks/useTransactions";
+import type { TransactionFilter, TransactionFullStats } from "@/hooks/useTransactions";
+import type { LoonstrookRecord } from "@/hooks/useLoonstroken";
 
 export function FinanceMetricsGrid({
   stats,
@@ -26,12 +27,12 @@ export function FinanceMetricsGrid({
   formatPrivateEuro,
   formatPrivateSignedEuro,
 }: {
-  stats: any;
+  stats: TransactionFullStats;
   saldoTrend: number | null;
   momDelta: { inkomstenDelta: number; uitgavenDelta: number } | null;
   savingsRate: number | null;
-  salarisStat: { latest: any; delta: number; gemNetto: number } | null;
-  topCategory: any;
+  salarisStat: { latest: LoonstrookRecord; delta: number; gemNetto: number } | null;
+  topCategory: TransactionFullStats["uitPerCategorie"][number] | null;
   selectedFilterCount: number;
   filters: TransactionFilter;
   zoekterm: string;
@@ -53,7 +54,7 @@ export function FinanceMetricsGrid({
   return (
     <section className="space-y-2">
     {listOnlyFilterActive && (
-      <p className="text-[11px] text-slate-500">
+      <p className="text-xs text-[var(--color-text-subtle)]">
         Kaarten tonen de hele periode — categorie-, zoek- en richting-filters gelden alleen voor de lijst.
       </p>
     )}
@@ -65,42 +66,42 @@ export function FinanceMetricsGrid({
           ? `Laatste import t/m ${formatShortDate(stats.laatsteSaldoPeildatum)}`
           : saldoTrend === null ? "Laatste geïmporteerde bankbalans" : `${formatPrivateSignedEuro(saldoTrend)} sinds eerste maand`}
         icon={Landmark}
-        tone={stats.huidigSaldo >= 0 ? "amber" : "rose"}
+        tone={stats.huidigSaldo >= 0 ? "accent" : "danger"}
       />
       <MetricCard
         label="Inkomsten"
         value={formatPrivateEuro(stats.totaalIn)}
         meta={momDelta ? `${formatPercent(momDelta.inkomstenDelta)} versus vorige maand` : `${formatPrivateEuro(stats.gemiddeldIn)} gemiddeld per maand`}
         icon={TrendingUp}
-        tone="green"
+        tone="success"
       />
       <MetricCard
         label="Uitgaven"
         value={formatPrivateEuro(stats.totaalUit)}
         meta={momDelta ? `${formatPercent(momDelta.uitgavenDelta)} versus vorige maand` : `${formatPrivateEuro(stats.gemiddeldUit)} gemiddeld per maand`}
         icon={TrendingDown}
-        tone={momDelta && momDelta.uitgavenDelta > 10 ? "rose" : "sky"}
+        tone={momDelta && momDelta.uitgavenDelta > 10 ? "danger" : "info"}
       />
       <MetricCard
         label="Netto stroom"
         value={formatPrivateSignedEuro(stats.nettoStroom)}
         meta={savingsRate === null ? "Kasstroom minus uitgaven" : `${formatPercent(savingsRate)} van inkomsten`}
         icon={stats.nettoStroom >= 0 ? ArrowUpRight : ArrowDownRight}
-        tone={stats.nettoStroom >= 0 ? "green" : "rose"}
+        tone={stats.nettoStroom >= 0 ? "success" : "danger"}
       />
       <MetricCard
         label="Categorieën"
         value={`${stats.aantalCategorieen}`}
         meta={topCategory ? `${topCategory.categorie} is grootste uitgavenpost` : "Nog geen categorieën"}
         icon={Hash}
-        tone="indigo"
+        tone="info"
       />
       <MetricCard
         label="Storneringen"
         value={`${stats.storneringen}`}
         meta={stats.storneringen > 0 ? "Controleer mislukte incasso's" : "Geen storneringen actief"}
         icon={AlertTriangle}
-        tone={stats.storneringen > 0 ? "rose" : "green"}
+        tone={stats.storneringen > 0 ? "danger" : "success"}
       />
       {salarisStat && (
         <MetricCard
@@ -114,7 +115,7 @@ export function FinanceMetricsGrid({
               : `${formatPrivateEuro(salarisStat.gemNetto)} gemiddeld`
           }`}
           icon={Wallet}
-          tone="amber"
+          tone="accent"
         />
       )}
       <MetricCard
@@ -122,7 +123,7 @@ export function FinanceMetricsGrid({
         value={`${selectedFilterCount}`}
         meta={filters.maandFilter ? `Maand ${formatMonth(filters.maandFilter)} actief` : zoekterm ? `Zoeken op "${zoekterm}"` : "Standaard transactieweergave"}
         icon={Filter}
-        tone={selectedFilterCount > 0 || zoekterm ? "sky" : "slate"}
+        tone={selectedFilterCount > 0 || zoekterm ? "info" : "neutral"}
       />
     </div>
     </section>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { UsersRound, FolderKanban, Workflow, type LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { TabPanel, Tabs } from "@/components/ui/Tabs";
 import { LaventeCareCustomersView } from "./LaventeCareCustomersView";
 import { LaventeCareFunnelView } from "./LaventeCareFunnelView";
 import { LaventeCareWorkstreamsView } from "./LaventeCareWorkstreamsView";
@@ -76,71 +76,58 @@ export function LaventeCarePipelineView({
 
   return (
     <div className="space-y-4">
-      <div role="tablist" className="flex gap-1.5 overflow-x-auto rounded-lg border border-white/10 bg-white/[0.03] p-1">
-        {PIPELINE_TABS.map(({ id, label: tabLabel, icon: Icon }) => {
-          const active = tab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => setTab(id)}
-              className={cn(
-                "inline-flex h-9 min-w-0 flex-1 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition sm:flex-none sm:min-w-[132px]",
-                active
-                  ? "border-amber-400/40 bg-amber-500/10 text-amber-100"
-                  : "border-transparent text-slate-400 hover:bg-white/[0.06] hover:text-white"
-              )}
-            >
-              <Icon size={15} />
-              {tabLabel}
-            </button>
-          );
-        })}
-      </div>
+      <Tabs
+        items={PIPELINE_TABS}
+        value={tab}
+        onValueChange={setTab}
+        idPrefix="laventecare-pipeline"
+        ariaLabel="Pipeline onderdelen"
+        appearance="contained"
+      />
 
-      {tab === "customers" ? (
-        <LaventeCareCustomersView
-          companies={companies}
-          contacts={contacts}
-          activeLeads={activeLeads}
-          activeWorkstreams={workstreams}
-          activeProjects={activeProjects}
-          dossierDocuments={dossierDocuments}
-          onShowCompanyForm={onShowCompanyForm}
-          onEditCompany={onEditCompany}
-          onAddContact={onAddContact}
-          onEditContact={onEditContact}
-          onStartWorkstream={onStartWorkstream}
-          onOpenDossier={onOpenDossier}
-        />
-      ) : null}
+      <TabPanel idPrefix="laventecare-pipeline" value={tab}>
+        {tab === "customers" ? (
+          <LaventeCareCustomersView
+            companies={companies}
+            contacts={contacts}
+            activeLeads={activeLeads}
+            activeWorkstreams={workstreams}
+            activeProjects={activeProjects}
+            dossierDocuments={dossierDocuments}
+            onShowCompanyForm={onShowCompanyForm}
+            onEditCompany={onEditCompany}
+            onAddContact={onAddContact}
+            onEditContact={onEditContact}
+            onStartWorkstream={onStartWorkstream}
+            onOpenDossier={onOpenDossier}
+          />
+        ) : null}
 
-      {tab === "funnel" ? (
-        <LaventeCareFunnelView
-          activeLeads={activeLeads}
-          activeProjects={activeProjects}
-          processingLead={processingLead}
-          processingProject={processingProject}
-          handleLeadStatus={handleLeadStatus}
-          handleLeadToProject={handleLeadToProject}
-          handleProjectStatus={handleProjectStatus}
-          onShowProjectForm={onShowProjectForm}
-        />
-      ) : null}
+        {tab === "funnel" ? (
+          <LaventeCareFunnelView
+            activeLeads={activeLeads}
+            activeProjects={activeProjects}
+            processingLead={processingLead}
+            processingProject={processingProject}
+            handleLeadStatus={handleLeadStatus}
+            handleLeadToProject={handleLeadToProject}
+            handleProjectStatus={handleProjectStatus}
+            onShowProjectForm={onShowProjectForm}
+          />
+        ) : null}
 
-      {tab === "workstreams" ? (
-        <LaventeCareWorkstreamsView
-          workstreams={workstreams}
-          projects={activeProjects}
-          activeWorkstreamCount={activeWorkstreamCount}
-          processingWorkstream={processingWorkstream}
-          onShowWorkstreamForm={onShowWorkstreamForm}
-          handleWorkstreamStatus={handleWorkstreamStatus}
-          handleWorkstreamToProject={handleWorkstreamToProject}
-        />
-      ) : null}
+        {tab === "workstreams" ? (
+          <LaventeCareWorkstreamsView
+            workstreams={workstreams}
+            projects={activeProjects}
+            activeWorkstreamCount={activeWorkstreamCount}
+            processingWorkstream={processingWorkstream}
+            onShowWorkstreamForm={onShowWorkstreamForm}
+            handleWorkstreamStatus={handleWorkstreamStatus}
+            handleWorkstreamToProject={handleWorkstreamToProject}
+          />
+        ) : null}
+      </TabPanel>
     </div>
   );
 }

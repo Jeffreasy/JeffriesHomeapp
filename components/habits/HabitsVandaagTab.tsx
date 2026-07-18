@@ -99,9 +99,8 @@ export function HabitsVandaagTab({
           <div className="space-y-2">
             {todayHabits.map((habit) => (
               <HabitCard
-                key={habit._id}
+                key={habit._id + ":" + activeDate}
                 habit={habit}
-                datum={activeDate}
                 masked={privacyOn}
                 pending={pendingHabitIds.has(habit._id)}
                 onToggle={() => toggle(habit._id!)}
@@ -129,17 +128,17 @@ export function HabitsVandaagTab({
             <MiniStat
               label="Open"
               value={dayHealth.openPositive.toString()}
-              tone="amber"
+              tone="accent"
             />
             <MiniStat
               label="Schoon"
               value={dayHealth.negativeClear.toString()}
-              tone="green"
+              tone="success"
             />
             <MiniStat
               label="XP"
               value={formatXP(stats?.totaalXP ?? 0)}
-              tone="sky"
+              tone="info"
             />
           </div>
         </SidePanel>

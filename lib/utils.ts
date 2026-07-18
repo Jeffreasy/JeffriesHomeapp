@@ -12,12 +12,16 @@ export function kelvinToHex(k: number): string {
   const r = Math.round(255 - t * 60);
   const g = Math.round(200 + t * 30);
   const b = Math.round(120 + t * 135);
-  return `rgb(${r},${g},${b})`;
+  return rgbToHex(r, g, b);
 }
 
 /** Convert RGB to hex string */
 export function rgbToHex(r: number, g: number, b: number): string {
-  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+  const channel = (value: number) =>
+    Math.round(Math.max(0, Math.min(255, Number.isFinite(value) ? value : 0)))
+      .toString(16)
+      .padStart(2, "0");
+  return `#${channel(r)}${channel(g)}${channel(b)}`;
 }
 
 /** Convert hex to RGB */

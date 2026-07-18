@@ -1,5 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { useState } from "react";
 import { Clock3, Sparkles } from "lucide-react";
 import type { BusinessSignal, ActionItem, FollowUpSignal } from "./LaventeCareTypes";
@@ -17,14 +20,9 @@ function ShowAllToggle({
   onToggle: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={expanded}
-      className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
-    >
+    <Button type="button" variant="ghost" size="sm" fullWidth onClick={onToggle} aria-expanded={expanded} className="mt-2">
       {expanded ? "Toon minder" : `Toon alle ${total} ${noun}`}
-    </button>
+    </Button>
   );
 }
 
@@ -56,12 +54,12 @@ export function LaventeCareSignalsView({
 
   return (
     <section className="grid grid-cols-1 gap-5 xl:grid-cols-[1.3fr_0.7fr]">
-      <div className="glass min-w-0 p-5">
+      <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-5")}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Live koppelingen</p>
-            <h2 className="mt-1 text-lg font-bold text-white">Triage inbox</h2>
-            <p className="mt-1 text-sm text-slate-500">Nieuwe matches uit mail, agenda en notities.</p>
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Live koppelingen</p>
+            <h2 className="mt-1 text-lg font-bold text-[var(--color-text)]">Triage inbox</h2>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">Nieuwe matches uit mail, agenda en notities.</p>
           </div>
           <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[260px]">
             <TriageStat label="Nieuw" value={businessSignals.length} />
@@ -104,13 +102,13 @@ export function LaventeCareSignalsView({
         ) : null}
       </div>
 
-      <div className="glass min-w-0 p-5">
+      <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-5")}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Clock3 size={18} className="text-amber-300" />
-            <h2 className="text-lg font-bold text-white">Acties en follow-ups</h2>
+            <Clock3 size={18} className="text-[var(--color-primary-hover)]" />
+            <h2 className="text-lg font-bold text-[var(--color-text)]">Acties en follow-ups</h2>
           </div>
-          <Sparkles size={18} className="text-violet-300" />
+          <Sparkles size={18} className="text-[var(--color-info)]" />
         </div>
         <div className="mt-4 space-y-3">
           {actionItems.length === 0 ? (
@@ -136,7 +134,7 @@ export function LaventeCareSignalsView({
         ) : null}
         {followUps.length > 0 && (
           <div className="mt-5 border-t border-[var(--color-border)] pt-4">
-            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Follow-ups uit funnel</p>
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Follow-ups uit funnel</p>
             <div className="mt-3 space-y-3">
               {(showAllFollowUps ? followUps : followUps.slice(0, 3)).map((followUp) => (
                 <FollowUpCard key={`${followUp.source}-${followUp.id}`} followUp={followUp} />
@@ -159,9 +157,9 @@ export function LaventeCareSignalsView({
 
 function TriageStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-2">
-      <p className="text-base font-bold text-white">{value}</p>
-      <p className="mt-0.5 truncate text-[11px] font-semibold text-slate-500">{label}</p>
+    <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-2">
+      <p className="text-base font-bold text-[var(--color-text)]">{value}</p>
+      <p className="mt-0.5 truncate text-micro font-semibold text-[var(--color-text-muted)]">{label}</p>
     </div>
   );
 }

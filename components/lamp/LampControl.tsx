@@ -1,15 +1,21 @@
 "use client";
 
 import { HexColorPicker } from "react-colorful";
-import { useState, useEffect, useRef, useId } from "react";
+import { useState, useEffect, useRef, useId, useCallback, type CSSProperties } from "react";
 import { Thermometer, Sun, Palette, RefreshCw } from "lucide-react";
-import { type Device, type DeviceCommand } from "@/lib/api";
+import { devicesApi, type Device, type DeviceCommand } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
+import { FormField } from "@/components/ui/FormField";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Range } from "@/components/ui/Range";
 import { useToast } from "@/components/ui/Toast";
-import { cn, hexToRgb, rgbToHex } from "@/lib/utils";
+import { cn, hexToRgb, kelvinToHex, rgbToHex } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import { devicesApi } from "@/lib/api";
+import { mergeRefreshedDevice } from "@/lib/lampCommandJournal";
+import { runWithAbortTimeout } from "@/lib/lampCommandTransport";
+import { createLampAmbientStyle } from "@/lib/lampPresentation";
 
 interface LampControlProps {
   device: Device;
@@ -28,8 +34,15 @@ const COLOR_PRESETS = [
   { hex: "#ff69b4", label: "Roze" },
 ];
 
+const DEVICE_REFRESH_TIMEOUT_MS = 15_000;
+
 export function LampControl({ device }: LampControlProps) {
-  const { mutate: sendCommand } = useLampCommand();
+  const {
+    mutateAsync: sendCommand,
+    isPending,
+    subscribeToBarriers,
+    hasPendingCommands,
+  } = useLampCommand(device.id);
   const queryClient = useQueryClient();
   const { error: toastError } = useToast();
   const [refreshing, setRefreshing] = useState(false);
@@ -43,6 +56,26 @@ export function LampControl({ device }: LampControlProps) {
   // Grace-window dat het gat dekt tussen de laatste lokale edit en het moment
   // dat de gedebouncete send daadwerkelijk vertrekt (max 200ms debounce).
   const localEditUntilRef = useRef(0);
+  const failedSyncPendingRef = useRef(false);
+  const [syncRevision, setSyncRevision] = useState(0);
+
+  const requestLocalSync = useCallback(() => {
+    setSyncRevision((revision) => revision + 1);
+  }, []);
+
+  const flushDeferredSync = useCallback(() => {
+    if (
+      !failedSyncPendingRef.current ||
+      activePointersRef.current > 0 ||
+      inFlightSendsRef.current > 0
+    ) {
+      return false;
+    }
+    failedSyncPendingRef.current = false;
+    localEditUntilRef.current = 0;
+    requestLocalSync();
+    return true;
+  }, [requestLocalSync]);
 
   // R12: increment op het element, maar decrement op window-niveau — een
   // pointerup die buiten het element landt (of verloren gaat door alt-tab)
@@ -53,10 +86,18 @@ export function LampControl({ device }: LampControlProps) {
 
   useEffect(() => {
     const releasePointer = () => {
+      const wasActive = activePointersRef.current > 0;
       activePointersRef.current = Math.max(0, activePointersRef.current - 1);
+      if (wasActive && activePointersRef.current === 0 && !flushDeferredSync()) {
+        requestLocalSync();
+      }
     };
     // Tab-switch mid-drag: er komt nooit meer een pointerup — teller resetten.
-    const resetPointers = () => { activePointersRef.current = 0; };
+    const resetPointers = () => {
+      const wasActive = activePointersRef.current > 0;
+      activePointersRef.current = 0;
+      if (wasActive && !flushDeferredSync()) requestLocalSync();
+    };
     window.addEventListener("pointerup", releasePointer);
     window.addEventListener("pointercancel", releasePointer);
     document.addEventListener("visibilitychange", resetPointers);
@@ -65,27 +106,60 @@ export function LampControl({ device }: LampControlProps) {
       window.removeEventListener("pointercancel", releasePointer);
       document.removeEventListener("visibilitychange", resetPointers);
     };
-  }, []);
+  }, [flushDeferredSync, requestLocalSync]);
 
   const isOn = state?.on ?? false;
 
-  const trackedSend = (cmd: DeviceCommand) => {
+  const trackedSend = (
+    cmd: DeviceCommand,
+    continuousKey?: "brightness" | "color-temperature" | "color",
+  ) => {
     // M7: bediening op een uitgeschakelde lamp zet hem ook aan — de backend
     // impliceert geen on:true bij brightness/kleur (zie lib/deviceCommands).
-    const effective: DeviceCommand = !isOn && cmd.on === undefined ? { ...cmd, on: true } : cmd;
+    const effective: DeviceCommand =
+      cmd.on === undefined && (continuousKey !== undefined || !isOn)
+        ? { ...cmd, on: true }
+        : cmd;
     inFlightSendsRef.current += 1;
-    sendCommand(
-      { id: device.id, cmd: effective },
-      { onSettled: () => { inFlightSendsRef.current = Math.max(0, inFlightSendsRef.current - 1); } }
-    );
+    void sendCommand({ id: device.id, cmd: effective, continuousKey })
+      .catch(() => {
+        // React Query has already rolled the failed optimistic operation back.
+        // This includes intentionally superseded drafts: defer a local sync
+        // until every newer send and active pointer interaction has finished.
+        localEditUntilRef.current = 0;
+        failedSyncPendingRef.current = true;
+      })
+      .finally(() => {
+        inFlightSendsRef.current = Math.max(0, inFlightSendsRef.current - 1);
+        if (inFlightSendsRef.current === 0 && !flushDeferredSync()) {
+          requestLocalSync();
+        }
+      });
   };
 
   const refresh = async () => {
+    const stateAtRequestStart = queryClient
+      .getQueryData<Device[]>(["devices"])
+      ?.find((cachedDevice) => cachedDevice.id === device.id)
+      ?.current_state;
     setRefreshing(true);
     try {
-      const fresh = await devicesApi.get(device.id);
+      const fresh = await runWithAbortTimeout(
+        (signal) => devicesApi.get(device.id, signal),
+        DEVICE_REFRESH_TIMEOUT_MS,
+      );
       queryClient.setQueryData(["devices"], (old: Device[] | undefined) =>
-        old?.map((d) => (d.id === device.id ? fresh : d))
+        old?.map((current) => {
+          if (current.id !== device.id) return current;
+          const stateChangedSinceStart =
+            stateAtRequestStart !== undefined &&
+            current.current_state !== stateAtRequestStart;
+          return mergeRefreshedDevice(
+            current,
+            fresh,
+            hasPendingCommands() || stateChangedSinceStart,
+          );
+        }),
       );
     } catch {
       // Dit haalt de laatst bekende serverstaat op (DB-rij), niet de lamp zelf —
@@ -113,12 +187,17 @@ export function LampControl({ device }: LampControlProps) {
   useEffect(() => {
     // Niet syncen terwijl de gebruiker sleept of een send onderweg is — anders
     // springt de slider terug naar de (nog niet bijgewerkte) serverwaarde.
-    if (
-      activePointersRef.current > 0 ||
-      inFlightSendsRef.current > 0 ||
-      Date.now() < localEditUntilRef.current
-    ) {
+    if (activePointersRef.current > 0 || inFlightSendsRef.current > 0) {
       return;
+    }
+
+    const graceRemaining = localEditUntilRef.current - Date.now();
+    if (graceRemaining > 0) {
+      const timer = window.setTimeout(
+        requestLocalSync,
+        graceRemaining + 1,
+      );
+      return () => window.clearTimeout(timer);
     }
 
     setLocalBrightness(state?.brightness ?? 100);
@@ -134,22 +213,57 @@ export function LampControl({ device }: LampControlProps) {
     } else {
       setMode("white");
     }
-  }, [state?.brightness, state?.color_temp, state?.r, state?.g, state?.b]);
+  }, [
+    requestLocalSync,
+    state?.on,
+    state?.brightness,
+    state?.color_temp,
+    state?.r,
+    state?.g,
+    state?.b,
+    syncRevision,
+  ]);
 
   // ─── Debounced API callers (200ms) ─────────────────────────────────────────
 
   const sendBrightness = useDebouncedCallback((v: number) => {
-    trackedSend({ brightness: v });
-  }, 200);
+    trackedSend({ brightness: v }, "brightness");
+  }, 200, { flushOnUnmount: false });
 
   const sendColorTemp = useDebouncedCallback((mireds: number) => {
-    trackedSend({ color_temp_mireds: mireds });
-  }, 200);
+    trackedSend({ color_temp_mireds: mireds }, "color-temperature");
+  }, 200, { flushOnUnmount: false });
 
   const sendColor = useDebouncedCallback((hex: string) => {
     const { r, g, b } = hexToRgb(hex);
-    trackedSend({ r, g, b });
-  }, 120);
+    trackedSend({ r, g, b }, "color");
+  }, 120, { flushOnUnmount: false });
+
+  // Barriers can originate in this panel, a LampCard, a room/global toggle or
+  // a scene. Cancel drafts synchronously when the transport reserves one so a
+  // near-expired debounce can never re-enable a lamp after power-off.
+  useEffect(
+    () =>
+      subscribeToBarriers(() => {
+        sendBrightness.cancel();
+        sendColorTemp.cancel();
+        sendColor.cancel();
+        localEditUntilRef.current = 0;
+        failedSyncPendingRef.current = true;
+      }),
+    [sendBrightness, sendColor, sendColorTemp, subscribeToBarriers],
+  );
+
+  useEffect(() => {
+    if (!isPending) flushDeferredSync();
+  }, [flushDeferredSync, isPending]);
+
+  useEffect(() => {
+    if (isOn) return;
+    sendBrightness.cancel();
+    sendColorTemp.cancel();
+    sendColor.cancel();
+  }, [isOn, sendBrightness, sendColor, sendColorTemp]);
 
   // ─── Handlers (local state + debounced API) ────────────────────────────────
 
@@ -176,8 +290,11 @@ export function LampControl({ device }: LampControlProps) {
   // volgt. Alleen als de lamp aan is — een tabwissel op een uitgeschakelde
   // lamp mag hem niet onverwacht aanzetten.
   const handleModeSwitch = (m: Mode) => {
-    if (m === mode) return;
+    if (m === mode || isPending) return;
     setMode(m);
+    sendBrightness.cancel();
+    sendColorTemp.cancel();
+    sendColor.cancel();
     if (!isOn) return;
     localEditUntilRef.current = Date.now() + 400;
     if (m === "white") {
@@ -189,7 +306,8 @@ export function LampControl({ device }: LampControlProps) {
   };
 
   // L5: los hex-invoerveld naast de picker (valideert #rrggbb).
-  const hexInputId = useId();
+  const generatedControlId = useId();
+  const hexInputId = `lamp-color-hex-${generatedControlId.replaceAll(":", "")}`;
   const hexInputRef = useRef<HTMLInputElement>(null);
   const [hexDraft, setHexDraft] = useState(localHex);
   useEffect(() => {
@@ -205,12 +323,26 @@ export function LampControl({ device }: LampControlProps) {
   };
 
   const kelvin = localMireds > 0 ? Math.round(1_000_000 / localMireds) : 2700;
+  const controlAccent = mode === "color" ? localHex : kelvinToHex(kelvin);
+  const controlStyle = {
+    ...createLampAmbientStyle(controlAccent, true),
+    "--control-brightness": `${localBrightness}%`,
+  } as CSSProperties;
 
   return (
-    <div className="p-4 space-y-5" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="space-y-5 p-4"
+      style={controlStyle}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {isPending && (
+        <p role="status" aria-live="polite" className="rounded-lg border border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-soft)] px-3 py-2 text-center text-xs text-[var(--lamp-text)]">
+          Wijziging wordt toegepast - de gewenste staat blijft zichtbaar tot bevestiging.
+        </p>
+      )}
       {/* M7: eerlijk zijn over de uit-staat — bediening zet de lamp aan */}
       {!isOn && (
-        <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-300/90">
+        <p className="rounded-lg border border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-soft)] px-3 py-2 text-center text-xs text-[var(--lamp-text)]">
           Lamp staat uit — bediening zet hem aan
         </p>
       )}
@@ -218,48 +350,47 @@ export function LampControl({ device }: LampControlProps) {
       {/* Helderheid + Refresh */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
             <Sun size={13} />
             <span>Helderheid</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-amber-400 font-mono">{localBrightness}%</span>
-            <button
+            <span className="font-mono text-xs text-[var(--lamp-text)]">{localBrightness}%</span>
+            <IconButton
               onClick={refresh}
-              disabled={refreshing}
-              aria-label="Serverstatus ophalen"
+              disabled={isPending}
+              loading={refreshing}
+              label="Serverstatus ophalen"
               title="Haal de laatst bekende serverstatus op"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white/5 hover:text-slate-400"
-            >
-              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} aria-hidden="true" />
-            </button>
+              icon={<RefreshCw size={13} />}
+            />
           </div>
         </div>
-        <input
-          type="range"
+        <Range
           min={10}
           max={100}
           value={localBrightness}
+          fillValue={localBrightness}
+          track="lamp"
           onChange={(e) => handleBrightness(+e.target.value)}
           aria-label="Helderheid"
           {...interactionProps}
-          style={{
-            background: `linear-gradient(to right, #f59e0b ${localBrightness}%, rgba(255,255,255,0.1) ${localBrightness}%)`,
-          }}
         />
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-2 rounded-xl p-1 bg-[rgba(255,255,255,0.05)]">
+      <div className="flex gap-2 rounded-xl bg-[var(--color-surface-hover)] p-1">
         {(["white", "color"] as Mode[]).map((m) => (
           <button
             key={m}
+            type="button"
             onClick={() => handleModeSwitch(m)}
+            disabled={isPending}
             aria-pressed={mode === m}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg transition-all ${
+            className={`flex min-h-[var(--touch-target)] flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs transition-[background-color,border-color,color,opacity] duration-[var(--motion-standard)] disabled:cursor-wait disabled:opacity-50 ${
               mode === m
-                ? "bg-[rgba(255,255,255,0.1)] text-white font-medium"
-                : "text-slate-500 hover:text-slate-300"
+                ? "border border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-medium)] font-medium text-[var(--lamp-text)]"
+                : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
             }`}
           >
             {m === "white" ? <Thermometer size={12} /> : <Palette size={12} />}
@@ -272,27 +403,23 @@ export function LampControl({ device }: LampControlProps) {
       {mode === "white" && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
               <Thermometer size={13} />
               <span>Kleurtemperatuur</span>
             </div>
-            <span className="text-xs text-slate-400 font-mono">{kelvin}K</span>
+            <span className="text-xs text-[var(--color-text-muted)] font-mono">{kelvin}K</span>
           </div>
-          <input
-            type="range"
+          <Range
             min={154}
             max={455}
             value={localMireds}
+            track="temperature"
             onChange={(e) => handleColorTemp(+e.target.value)}
             aria-label="Kleurtemperatuur"
+            aria-valuetext={`${kelvin} Kelvin`}
             {...interactionProps}
-            style={{
-              // Mireds schaal: laag = koel (6500K), hoog = warm (2200K)
-              // Slider gaat links (koel/blauw) → rechts (warm/oranje)
-              background: "linear-gradient(to right, #cce4ff, #fff4e6, #ff9329)",
-            }}
           />
-          <div className="flex justify-between mt-1 text-[10px] text-slate-600">
+          <div className="flex justify-between mt-1 text-micro text-[var(--color-text-subtle)]">
             <span>Koel 6500K</span>
             <span>Warm 2200K</span>
           </div>
@@ -307,14 +434,17 @@ export function LampControl({ device }: LampControlProps) {
             {COLOR_PRESETS.map(({ hex, label }) => (
               <button
                 key={hex}
+                type="button"
                 onClick={() => handleColor(hex)}
                 aria-label={label}
                 title={label}
-                className="w-full aspect-square rounded-lg border-2 transition-all hover:scale-110 active:scale-95"
-                style={{
-                  background: hex,
-                  borderColor: localHex.toLowerCase() === hex ? "white" : "transparent",
-                }}
+                className={cn(
+                  "aspect-square min-h-[var(--touch-target)] w-full rounded-lg border-2 bg-[var(--lamp-accent)] transition-[background-color,border-color,transform] duration-[var(--motion-standard)] hover:scale-105 active:scale-95 motion-reduce:transform-none",
+                  localHex.toLowerCase() === hex
+                    ? "border-[var(--color-text)]"
+                    : "border-transparent",
+                )}
+                style={createLampAmbientStyle(hex, true)}
               />
             ))}
           </div>
@@ -324,44 +454,38 @@ export function LampControl({ device }: LampControlProps) {
             <HexColorPicker
               color={localHex}
               onChange={handleColor}
-              style={{ width: "100%", height: 130 }}
+              className="!h-32 !w-full"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="h-7 min-w-0 flex-1 rounded-xl border border-[var(--color-border)]"
-              style={{ background: localHex, transition: "background 0.1s" }}
-            />
-            <label htmlFor={hexInputId} className="sr-only">
-              Hexkleur (#rrggbb)
-            </label>
-            <input
-              id={hexInputId}
-              ref={hexInputRef}
-              type="text"
-              autoComplete="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              maxLength={7}
-              placeholder="#ff8800"
-              value={hexDraft}
-              onChange={(e) => handleHexInput(e.target.value)}
-              onBlur={() => setHexDraft(localHex)}
-              aria-invalid={!hexDraftValid}
-              aria-describedby={!hexDraftValid ? `${hexInputId}-error` : undefined}
-              className={cn(
-                "w-24 shrink-0 rounded-lg border bg-[var(--color-surface)] px-2 py-1.5 text-center font-mono text-xs text-slate-300 outline-none transition-colors",
-                hexDraftValid
-                  ? "border-[var(--color-border)] focus:border-amber-500/50"
-                  : "border-rose-500/50 text-rose-300"
-              )}
-            />
-          </div>
-          {!hexDraftValid && (
-            <p id={`${hexInputId}-error`} role="alert" className="text-right text-[10px] text-rose-300">
-              Voer een geldige hexkleur in (#rrggbb).
-            </p>
-          )}
+          <FormField
+            id={hexInputId}
+            label="Hexkleur (#rrggbb)"
+            error={!hexDraftValid ? "Voer een geldige hexkleur in (#rrggbb)." : undefined}
+            visuallyHiddenLabel
+          >
+            {(controlProps) => (
+              <div className="flex items-center gap-2">
+                <div
+                  className="h-7 min-w-0 flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--lamp-accent)] transition-colors duration-[var(--motion-fast)]"
+                />
+                <Input
+                  {...controlProps}
+                  ref={hexInputRef}
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  maxLength={7}
+                  placeholder="#ff8800"
+                  value={hexDraft}
+                  onChange={(e) => handleHexInput(e.target.value)}
+                  onBlur={() => setHexDraft(localHex)}
+                  invalid={!hexDraftValid}
+                  className="w-24 shrink-0 text-center font-mono text-xs"
+                />
+              </div>
+            )}
+          </FormField>
         </div>
       )}
       </div>

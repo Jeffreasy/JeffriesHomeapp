@@ -1,9 +1,17 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
+import { FormField } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
-import { Loader2, Plus, Target } from "lucide-react";
-import { Modal, ModalCancelButton } from "@/components/ui/Modal";
+import { Plus, Target } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { ModalCancelButton } from "@/components/ui/ModalCancelButton";
 import type { CompanyItem, ContactItem, LeadForm } from "./LaventeCareTypes";
+
+const LEAD_FORM_ID = "laventecare-lead-form";
 
 export function LaventeCareLeadModal({
   isOpen,
@@ -35,7 +43,7 @@ export function LaventeCareLeadModal({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     if (!leadForm.titel.trim()) {
       setTitelError("Titel is verplicht");
-      window.setTimeout(() => document.getElementById("lead-form-titel")?.focus(), 0);
+      window.setTimeout(() => document.getElementById("lead-form-title")?.focus(), 0);
     } else {
       setTitelError("");
     }
@@ -48,146 +56,176 @@ export function LaventeCareLeadModal({
       onClose={onClose}
       dirty={dirty}
       title="Nieuwe lead kwalificeren"
-      icon={<Target size={18} className="text-sky-300" />}
-      theme="primary"
+      icon={<Target size={18} className="text-[var(--color-info)]" />}
+      tone="accent"
       maxWidth="2xl"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <ModalCancelButton onFallback={onClose} className="w-full sm:w-auto" />
+          <Button
+            type="submit"
+            form={LEAD_FORM_ID}
+            loading={savingLead}
+            loadingLabel="Opslaan…"
+            variant="primary"
+            className="w-full sm:w-auto"
+          >
+            <Plus size={16} aria-hidden="true" />
+            Opslaan
+          </Button>
+        </div>
+      }
     >
-      <form onSubmit={handleSubmit} noValidate className="grid gap-3 lg:grid-cols-6">
-        <label className="block lg:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">
-            Titel <span className="text-rose-300">*</span>
-          </span>
-          <input
-            id="lead-form-titel"
-            required
-            aria-invalid={Boolean(titelError)}
-            value={leadForm.titel}
-            onChange={(event) => setLeadForm((form) => ({ ...form, titel: event.target.value }))}
-            placeholder="Bijv. automatisering klantintake"
-            className={`mt-1 w-full rounded-lg border bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 ${
-              titelError
-                ? "border-rose-400/60 focus:border-rose-400/60"
-                : "border-[var(--color-border)] focus:border-[var(--color-primary)]"
-            }`}
-          />
-          {titelError ? (
-            <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
-              {titelError}
-            </p>
-          ) : null}
-        </label>
-        <label className="block lg:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Klantdossier</span>
-          <select
-            value={leadForm.companyId}
-            onChange={(event) => {
-              const selected = companies.find((company) => company.id === event.target.value);
-              setLeadForm((form) => ({
-                ...form,
-                companyId: event.target.value,
-                contactId: "",
-                companyName: selected ? selected.naam : form.companyName,
-                website: selected?.website ?? form.website,
-              }));
-            }}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)]"
-          >
-            <option value="">Nieuw of nog niet gekoppeld</option>
-            {companies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.naam}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block lg:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Contact</span>
-          <select
-            value={leadForm.contactId}
-            onChange={(event) => setLeadForm((form) => ({ ...form, contactId: event.target.value }))}
-            disabled={!leadForm.companyId || companyContacts.length === 0}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="">Geen contact</option>
-            {companyContacts.map((contact) => (
-              <option key={contact.id} value={contact.id}>
-                {contact.naam}
-                {contact.rol ? ` - ${contact.rol}` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block lg:col-span-3">
-          <span className="text-xs font-semibold text-slate-400">Klant/organisatie</span>
-          <input
-            value={leadForm.companyName}
-            disabled={dossierSelected}
-            onChange={(event) => setLeadForm((form) => ({ ...form, companyName: event.target.value }))}
-            placeholder="Naam van klant, organisatie of opdrachtgever"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          {dossierSelected ? (
-            <span className="mt-1 block text-[11px] text-slate-500">wordt overgenomen uit klantdossier</span>
-          ) : null}
-        </label>
-        <label className="block lg:col-span-3">
-          <span className="text-xs font-semibold text-slate-400">Website</span>
-          <input
-            value={leadForm.website}
-            disabled={dossierSelected}
-            onChange={(event) => setLeadForm((form) => ({ ...form, website: event.target.value }))}
-            placeholder="https://..."
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          {dossierSelected ? (
-            <span className="mt-1 block text-[11px] text-slate-500">wordt overgenomen uit klantdossier</span>
-          ) : null}
-        </label>
-        <label className="block lg:col-span-3">
-          <span className="text-xs font-semibold text-slate-400">Pijnpunt</span>
-          <textarea
-            value={leadForm.pijnpunt}
-            onChange={(event) => setLeadForm((form) => ({ ...form, pijnpunt: event.target.value }))}
-            placeholder="Welke workflow, foutkans of groeirem speelt er?"
-            rows={3}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
-          />
-        </label>
-        <label className="block lg:col-span-3">
-          <span className="text-xs font-semibold text-slate-400">Volgende stap</span>
-          <textarea
-            value={leadForm.volgendeStap}
-            onChange={(event) => setLeadForm((form) => ({ ...form, volgendeStap: event.target.value }))}
-            placeholder="Bijv. discovery-call plannen"
-            rows={3}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-[var(--color-primary)]"
-          />
-        </label>
-        <div className="mt-2 flex items-end justify-end gap-3 lg:col-span-6">
-          <label className="block max-w-[200px] flex-1">
-            <span className="text-xs font-semibold text-slate-400">Prioriteit</span>
-            <select
+      <form id={LEAD_FORM_ID} onSubmit={handleSubmit} noValidate className="grid gap-3 lg:grid-cols-6">
+        <FormField
+          id="lead-form-title"
+          label={<>Titel <span aria-hidden="true" className="text-[var(--color-danger)]">*</span></>}
+          error={titelError || undefined}
+          className="lg:col-span-2"
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              required
+              invalid={Boolean(titelError)}
+              value={leadForm.titel}
+              onChange={(event) => setLeadForm((form) => ({ ...form, titel: event.target.value }))}
+              placeholder="Bijv. automatisering klantintake"
+            />
+          )}
+        </FormField>
+        <FormField
+          id="lead-form-company"
+          label="Klantdossier"
+          className="lg:col-span-2"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
+              value={leadForm.companyId}
+              onChange={(event) => {
+                const selected = companies.find((company) => company.id === event.target.value);
+                setLeadForm((form) => ({
+                  ...form,
+                  companyId: event.target.value,
+                  contactId: "",
+                  companyName: selected ? selected.naam : form.companyName,
+                  website: selected?.website ?? form.website,
+                }));
+              }}
+            >
+              <option value="">Nieuw of nog niet gekoppeld</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.naam}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        <FormField
+          id="lead-form-contact"
+          label="Contact"
+          className="lg:col-span-2"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
+              value={leadForm.contactId}
+              onChange={(event) => setLeadForm((form) => ({ ...form, contactId: event.target.value }))}
+              disabled={!leadForm.companyId || companyContacts.length === 0}
+            >
+              <option value="">Geen contact</option>
+              {companyContacts.map((contact) => (
+                <option key={contact.id} value={contact.id}>
+                  {contact.naam}
+                  {contact.rol ? ` - ${contact.rol}` : ""}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        <FormField
+          id="lead-form-company-name"
+          label="Klant/organisatie"
+          description={dossierSelected ? "Wordt overgenomen uit klantdossier" : undefined}
+          className="lg:col-span-3"
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              value={leadForm.companyName}
+              disabled={dossierSelected}
+              onChange={(event) => setLeadForm((form) => ({ ...form, companyName: event.target.value }))}
+              placeholder="Naam van klant, organisatie of opdrachtgever"
+            />
+          )}
+        </FormField>
+        <FormField
+          id="lead-form-website"
+          label="Website"
+          description={dossierSelected ? "Wordt overgenomen uit klantdossier" : undefined}
+          className="lg:col-span-3"
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              value={leadForm.website}
+              disabled={dossierSelected}
+              onChange={(event) => setLeadForm((form) => ({ ...form, website: event.target.value }))}
+              placeholder="https://..."
+            />
+          )}
+        </FormField>
+        <FormField
+          id="lead-form-pain-point"
+          label="Pijnpunt"
+          className="lg:col-span-3"
+        >
+          {(controlProps) => (
+            <Textarea
+              {...controlProps}
+              value={leadForm.pijnpunt}
+              onChange={(event) => setLeadForm((form) => ({ ...form, pijnpunt: event.target.value }))}
+              placeholder="Welke workflow, foutkans of groeirem speelt er?"
+              rows={3}
+            />
+          )}
+        </FormField>
+        <FormField
+          id="lead-form-next-step"
+          label="Volgende stap"
+          className="lg:col-span-3"
+        >
+          {(controlProps) => (
+            <Textarea
+              {...controlProps}
+              value={leadForm.volgendeStap}
+              onChange={(event) => setLeadForm((form) => ({ ...form, volgendeStap: event.target.value }))}
+              placeholder="Bijv. discovery-call plannen"
+              rows={3}
+            />
+          )}
+        </FormField>
+        <FormField
+          id="lead-form-priority"
+          label="Prioriteit"
+          className="lg:col-span-2 lg:col-start-5"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
               value={leadForm.prioriteit}
               onChange={(event) =>
                 setLeadForm((form) => ({ ...form, prioriteit: event.target.value as LeadForm["prioriteit"] }))
               }
-              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-[var(--color-primary)]"
             >
               <option value="laag">Laag</option>
               <option value="normaal">Normaal</option>
               <option value="hoog">Hoog</option>
-            </select>
-          </label>
-          {/* R11: via de guarded close, zodat de dirty-guard ook hier geldt. */}
-          <ModalCancelButton
-            onFallback={onClose}
-            className="px-4 py-2 text-sm text-slate-300 transition-colors hover:text-white"
-          />
-          <button type="submit" disabled={savingLead} className="btn btn--primary max-w-[150px] flex-1 justify-center">
-            {savingLead ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-            Opslaan
-          </button>
-        </div>
+            </Select>
+          )}
+        </FormField>
       </form>
     </Modal>
   );

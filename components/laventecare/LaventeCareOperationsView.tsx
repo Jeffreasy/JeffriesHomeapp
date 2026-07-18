@@ -1,18 +1,25 @@
 "use client";
 
-import { FormEvent, type ReactNode, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/Badge";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { Button } from "@/components/ui/Button";
+import { FormField, type FormControlAccessibilityProps } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
+import { cloneElement, FormEvent, isValidElement, type ReactElement, type ReactNode, useId, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   ClipboardList,
   GitPullRequest,
-  Loader2,
   Plus,
   RotateCcw,
   ScrollText,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 import { cn } from "@/lib/utils";
 import { formatDate, label } from "./LaventeCareUtils";
 import { EmptyState, OperationCard } from "./LaventeCareCards";
@@ -48,11 +55,6 @@ type IncidentPayload = {
   reactie_deadline?: string;
   samenvatting?: string;
 };
-
-const inputClass =
-  "min-h-11 w-full rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition focus:border-amber-400/60 focus:ring-2 focus:ring-amber-400/10";
-
-const textareaClass = `${inputClass} min-h-24 resize-none`;
 
 export function LaventeCareOperationsView({
   recentDecisions,
@@ -195,16 +197,16 @@ export function LaventeCareOperationsView({
 
   return (
     <section className="space-y-4">
-      <div className="glass min-w-0 p-4 sm:p-5">
+      <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4 sm:p-5")}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Operatie</p>
-            <h2 className="mt-1 text-lg font-bold text-white">Governance registreren</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Operatie</p>
+            <h2 className="mt-1 text-lg font-bold text-[var(--color-text)]">Governance registreren</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--color-text-muted)]">
               Leg besluiten, scopewijzigingen en supportincidenten direct vast, zodat LaventeCare niet afhankelijk blijft van losse notities of chatgeschiedenis.
             </p>
           </div>
-          <ClipboardList size={20} className="hidden text-slate-400 lg:block" />
+          <ClipboardList size={20} className="hidden text-[var(--color-text-muted)] lg:block" />
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -219,8 +221,8 @@ export function LaventeCareOperationsView({
               <ProjectSelect value={decisionForm.projectId} projects={projectOptions} onChange={(value) => setDecisionForm((form) => ({ ...form, projectId: value }))} />
             </LabeledField>
             <LabeledField label="Titel" required>
-              <input
-                className={inputClass}
+              <Input
+
                 required
                 value={decisionForm.titel}
                 onChange={(event) => setDecisionForm((form) => ({ ...form, titel: event.target.value }))}
@@ -228,8 +230,8 @@ export function LaventeCareOperationsView({
               />
             </LabeledField>
             <LabeledField label="Besluit" required>
-              <textarea
-                className={textareaClass}
+              <Textarea
+                className="min-h-24 resize-none"
                 required
                 value={decisionForm.besluit}
                 onChange={(event) => setDecisionForm((form) => ({ ...form, besluit: event.target.value }))}
@@ -237,16 +239,16 @@ export function LaventeCareOperationsView({
               />
             </LabeledField>
             <LabeledField label="Reden">
-              <textarea
-                className={textareaClass}
+              <Textarea
+                className="min-h-24 resize-none"
                 value={decisionForm.reden}
                 onChange={(event) => setDecisionForm((form) => ({ ...form, reden: event.target.value }))}
                 placeholder="Waarom?"
               />
             </LabeledField>
             <LabeledField label="Impact">
-              <input
-                className={inputClass}
+              <Input
+
                 value={decisionForm.impact}
                 onChange={(event) => setDecisionForm((form) => ({ ...form, impact: event.target.value }))}
                 placeholder="Impact op klant, planning of scope"
@@ -254,23 +256,23 @@ export function LaventeCareOperationsView({
             </LabeledField>
             <div className="grid gap-3 sm:grid-cols-2">
               <LabeledField label="Besluitdatum">
-                <input
-                  className={inputClass}
+                <Input
+
                   type="date"
                   value={decisionForm.datum}
                   onChange={(event) => setDecisionForm((form) => ({ ...form, datum: event.target.value }))}
                 />
               </LabeledField>
               <LabeledField label="Status">
-                <select
-                  className={inputClass}
+                <Select
+
                   value={decisionForm.status}
                   onChange={(event) => setDecisionForm((form) => ({ ...form, status: event.target.value }))}
                 >
                   <option value="genomen">Genomen</option>
                   <option value="voorstel">Voorstel</option>
                   <option value="herzien">Herzien</option>
-                </select>
+                </Select>
               </LabeledField>
             </div>
             <SubmitButton busy={creatingDecision} disabled={busy || !decisionForm.titel.trim() || !decisionForm.besluit.trim()} label="Besluit vastleggen" />
@@ -283,8 +285,8 @@ export function LaventeCareOperationsView({
               <ProjectSelect value={changeForm.projectId} projects={projectOptions} onChange={(value) => setChangeForm((form) => ({ ...form, projectId: value }))} />
             </LabeledField>
             <LabeledField label="Titel" required>
-              <input
-                className={inputClass}
+              <Input
+
                 required
                 value={changeForm.titel}
                 onChange={(event) => setChangeForm((form) => ({ ...form, titel: event.target.value }))}
@@ -292,8 +294,8 @@ export function LaventeCareOperationsView({
               />
             </LabeledField>
             <LabeledField label="Impact" required>
-              <textarea
-                className={textareaClass}
+              <Textarea
+                className="min-h-24 resize-none"
                 required
                 value={changeForm.impact}
                 onChange={(event) => setChangeForm((form) => ({ ...form, impact: event.target.value }))}
@@ -301,24 +303,24 @@ export function LaventeCareOperationsView({
               />
             </LabeledField>
             <LabeledField label="Planning impact">
-              <textarea
-                className={textareaClass}
+              <Textarea
+                className="min-h-24 resize-none"
                 value={changeForm.planningImpact}
                 onChange={(event) => setChangeForm((form) => ({ ...form, planningImpact: event.target.value }))}
                 placeholder="Planning impact"
               />
             </LabeledField>
             <LabeledField label="Budget impact">
-              <input
-                className={inputClass}
+              <Input
+
                 value={changeForm.budgetImpact}
                 onChange={(event) => setChangeForm((form) => ({ ...form, budgetImpact: event.target.value }))}
                 placeholder="Budget impact"
               />
             </LabeledField>
             <LabeledField label="Status">
-              <select
-                className={inputClass}
+              <Select
+
                 value={changeForm.status}
                 onChange={(event) => setChangeForm((form) => ({ ...form, status: event.target.value }))}
               >
@@ -326,7 +328,7 @@ export function LaventeCareOperationsView({
                 <option value="beoordeeld">Beoordeeld</option>
                 <option value="goedgekeurd">Goedgekeurd</option>
                 <option value="afgewezen">Afgewezen</option>
-              </select>
+              </Select>
             </LabeledField>
             <SubmitButton busy={creatingChange} disabled={busy || !changeForm.titel.trim() || !changeForm.impact.trim()} label="Change registreren" />
           </form>
@@ -338,8 +340,8 @@ export function LaventeCareOperationsView({
               <ProjectSelect value={incidentForm.projectId} projects={projectOptions} onChange={(value) => setIncidentForm((form) => ({ ...form, projectId: value }))} />
             </LabeledField>
             <LabeledField label="Titel" required>
-              <input
-                className={inputClass}
+              <Input
+
                 required
                 value={incidentForm.titel}
                 onChange={(event) => setIncidentForm((form) => ({ ...form, titel: event.target.value }))}
@@ -348,8 +350,8 @@ export function LaventeCareOperationsView({
             </LabeledField>
             <div className="grid gap-3 sm:grid-cols-3 lg:col-span-2">
               <LabeledField label="Prioriteit">
-                <select
-                  className={inputClass}
+                <Select
+
                   value={incidentForm.prioriteit}
                   onChange={(event) => setIncidentForm((form) => ({ ...form, prioriteit: event.target.value }))}
                 >
@@ -357,11 +359,11 @@ export function LaventeCareOperationsView({
                   <option value="P2">P2 hoog</option>
                   <option value="P3">P3 normaal</option>
                   <option value="P4">P4 laag</option>
-                </select>
+                </Select>
               </LabeledField>
               <LabeledField label="Status">
-                <select
-                  className={inputClass}
+                <Select
+
                   value={incidentForm.status}
                   onChange={(event) => setIncidentForm((form) => ({ ...form, status: event.target.value }))}
                 >
@@ -369,11 +371,11 @@ export function LaventeCareOperationsView({
                   <option value="in_behandeling">In behandeling</option>
                   <option value="wacht_op_klant">Wacht op klant</option>
                   <option value="gesloten">Gesloten</option>
-                </select>
+                </Select>
               </LabeledField>
               <LabeledField label="Kanaal">
-                <select
-                  className={inputClass}
+                <Select
+
                   value={incidentForm.kanaal}
                   onChange={(event) => setIncidentForm((form) => ({ ...form, kanaal: event.target.value }))}
                 >
@@ -382,20 +384,20 @@ export function LaventeCareOperationsView({
                   <option value="telefoon">Telefoon</option>
                   <option value="telegram">Telegram</option>
                   <option value="klant">Klant</option>
-                </select>
+                </Select>
               </LabeledField>
             </div>
             <LabeledField label="Reactie-deadline">
-              <input
-                className={inputClass}
+              <Input
+
                 type="datetime-local"
                 value={incidentForm.reactieDeadline}
                 onChange={(event) => setIncidentForm((form) => ({ ...form, reactieDeadline: event.target.value }))}
               />
             </LabeledField>
             <LabeledField label="Samenvatting">
-              <textarea
-                className={textareaClass}
+              <Textarea
+                className="min-h-24 resize-none"
                 value={incidentForm.samenvatting}
                 onChange={(event) => setIncidentForm((form) => ({ ...form, samenvatting: event.target.value }))}
                 placeholder="Samenvatting, impact en eerste actie"
@@ -406,22 +408,22 @@ export function LaventeCareOperationsView({
         ) : null}
       </div>
 
-      <div className="glass min-w-0 p-4 sm:p-5">
+      <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4 sm:p-5")}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Audit trail</p>
-            <h2 className="mt-1 text-lg font-bold text-white">Besluiten, wijzigingen en SLA</h2>
+            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Audit trail</p>
+            <h2 className="mt-1 text-lg font-bold text-[var(--color-text)]">Besluiten, wijzigingen en SLA</h2>
           </div>
           <div className="flex flex-wrap gap-2 text-xs font-bold">
-            <span className="rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-sky-200">{recentDecisions.length} besluiten</span>
-            <span className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-amber-200">{openChanges.length} changes</span>
-            <span className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-rose-200">{openIncidents.length} incidenten</span>
+            <Badge tone="info">{recentDecisions.length} besluiten</Badge>
+            <Badge tone="accent">{openChanges.length} changes</Badge>
+            <Badge tone="danger">{openIncidents.length} incidenten</Badge>
           </div>
         </div>
         <div className="mt-4 grid gap-4 xl:grid-cols-3">
           <OperationColumn
             icon={ScrollText}
-            tone="sky"
+            tone="info"
             title="Decision log"
             emptyTitle="Geen besluiten"
             emptyBody="Leg keuzes vast zodra scope, aanpak, prijs of planning verandert."
@@ -437,7 +439,7 @@ export function LaventeCareOperationsView({
                 title={decision.titel}
                 meta={`${formatDate(decision.datum)} - ${label(decision.status)}`}
                 body={decision.besluit}
-                tone="sky"
+                tone="info"
                 actions={
                   <StatusActions
                     itemId={decision._id ?? decision.id}
@@ -457,7 +459,7 @@ export function LaventeCareOperationsView({
 
           <OperationColumn
             icon={GitPullRequest}
-            tone="amber"
+            tone="accent"
             title="Change requests"
             emptyTitle="Geen open changes"
             emptyBody="Scope-, planning- of budgetwijzigingen blijven hier zichtbaar tot ze zijn afgehandeld."
@@ -473,7 +475,7 @@ export function LaventeCareOperationsView({
                 title={change.titel}
                 meta={label(change.status)}
                 body={change.impact}
-                tone="amber"
+                tone="accent"
                 actions={
                   <StatusActions
                     itemId={change._id ?? change.id}
@@ -495,7 +497,7 @@ export function LaventeCareOperationsView({
 
           <OperationColumn
             icon={AlertTriangle}
-            tone="rose"
+            tone="danger"
             title="SLA incidenten"
             emptyTitle="Geen open incidenten"
             emptyBody="Support- of beheerissues die je vastlegt komen hier met prioriteit en kanaal terug."
@@ -511,7 +513,7 @@ export function LaventeCareOperationsView({
                 title={incident.titel}
                 meta={`${incident.prioriteit} - ${label(incident.status)} - ${label(incident.kanaal)}`}
                 body={incident.samenvatting ?? `Gemeld op ${formatDate(incident.gemeldOp)}`}
-                tone={incident.prioriteit === "P1" || incident.prioriteit === "P2" ? "rose" : "violet"}
+                tone={incident.prioriteit === "P1" || incident.prioriteit === "P2" ? "danger" : "info"}
                 actions={
                   <StatusActions
                     itemId={incident._id ?? incident.id}
@@ -546,14 +548,24 @@ function LabeledField({
   required?: boolean;
   children: ReactNode;
 }) {
+  const id = useId();
+
   return (
-    <label className="block min-w-0">
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-normal text-slate-500">
-        {fieldLabel}
-        {required ? <span className="text-rose-300"> *</span> : null}
-      </span>
-      {children}
-    </label>
+    <FormField
+      id={id}
+      label={
+        <>
+          {fieldLabel}
+          {required ? <span className="text-[var(--color-danger)]"> *</span> : null}
+        </>
+      }
+    >
+      {(controlProps) =>
+        isValidElement(children)
+          ? cloneElement(children as ReactElement<FormControlAccessibilityProps>, controlProps)
+          : children
+      }
+    </FormField>
   );
 }
 
@@ -572,17 +584,16 @@ function ModeButton({
 }) {
   const active = mode === activeMode;
   return (
-    <button
+    <Button
       type="button"
       onClick={() => onClick(mode)}
-      className={cn(
-        "flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-bold transition",
-        active ? "border-amber-500/30 bg-amber-500/12 text-amber-100" : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-white"
-      )}
+      variant={active ? "primary" : "secondary"}
+      aria-pressed={active}
+      fullWidth
     >
-      <Icon size={16} />
+      <Icon size={16} aria-hidden="true" />
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -614,16 +625,19 @@ function StatusActions({
         const key = `${itemType}:${itemId}:${action.status}`;
         const busy = processingOperation === key;
         return (
-          <button
+          <Button
             key={action.status}
             type="button"
+            size="sm"
+            variant="secondary"
             onClick={() => onUpdate(itemId, action.status)}
             disabled={itemBusy}
-            className="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 text-[11px] font-bold text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-55"
+            loading={busy}
+            loadingLabel={action.label}
           >
-            {busy ? <Loader2 size={13} className="animate-spin" /> : <Icon size={13} />}
+            <Icon size={13} aria-hidden="true" />
             {action.label}
-          </button>
+          </Button>
         );
       })}
     </>
@@ -631,36 +645,40 @@ function StatusActions({
 }
 
 function ProjectSelect({
+  id,
   value,
   projects,
   onChange,
 }: {
+  id?: string;
   value: string;
   projects: Array<{ id: string; label: string }>;
   onChange: (value: string) => void;
 }) {
   return (
-    <select className={inputClass} value={value} onChange={(event) => onChange(event.target.value)}>
+    <Select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
       <option value="">Geen project gekoppeld</option>
       {projects.map((project) => (
         <option key={project.id} value={project.id}>
           {project.label}
         </option>
       ))}
-    </select>
+    </Select>
   );
 }
 
 function SubmitButton({ busy, disabled, label }: { busy: boolean; disabled: boolean; label: string }) {
   return (
-    <button
+    <Button
       type="submit"
+      variant="primary"
       disabled={disabled}
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 text-sm font-black text-black transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+      loading={busy}
+      loadingLabel={label}
     >
-      {busy ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+      <Plus size={16} aria-hidden="true" />
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -677,7 +695,7 @@ function OperationColumn({
   children,
 }: {
   icon: LucideIcon;
-  tone: "sky" | "amber" | "rose";
+  tone: UiTone;
   title: string;
   emptyTitle: string;
   emptyBody: string;
@@ -688,24 +706,27 @@ function OperationColumn({
   noun?: string;
   children: ReactNode;
 }) {
-  const color = tone === "sky" ? "text-sky-300" : tone === "amber" ? "text-amber-300" : "text-rose-300";
+  const color = uiToneClasses[tone].icon;
   const empty = !children || (Array.isArray(children) && children.length === 0);
   return (
     <div>
       <div className="mb-3 flex items-center gap-2">
         <Icon size={16} className={color} />
-        <h3 className="text-sm font-bold text-slate-200">{title}</h3>
+        <h3 className="text-sm font-bold text-[var(--color-text)]">{title}</h3>
       </div>
       <div className="space-y-3">{empty ? <EmptyState title={emptyTitle} body={emptyBody} /> : children}</div>
       {typeof total === "number" && total > 4 && onToggle ? (
-        <button
+        <Button
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+          variant="ghost"
+          size="sm"
+          fullWidth
+          className="mt-2"
         >
           {expanded ? "Toon minder" : `Toon alle ${total} ${noun}`}
-        </button>
+        </Button>
       ) : null}
     </div>
   );

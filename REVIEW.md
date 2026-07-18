@@ -1,5 +1,10 @@
 # Code review — JeffriesBackend + JeffriesHomeapp
 
+> **Status 2026-07-17: historisch en superseded als actuele backlog.** Dit bestand bewaart de oorspronkelijke point-in-time bevindingen, impact en voorgestelde fixes. Sinds deze audit zijn meerdere genoemde problemen gewijzigd of opgelost; oude regelnummers en present-tense claims beschrijven dus niet automatisch de huidige code.
+>
+> Gebruik FRONTEND_ARCHITECTURE.md voor de actuele frontendarchitectuur, docs/backend-api-overview.md voor de huidige trust boundaries en docs/testing.md voor uitvoerbare verificatie. Herverifieer een individuele finding tegen de working tree voordat je haar als open of opgelost rapporteert.
+
+
 > Datum: 2026-06-19 · Scope: volledige stack (Go backend + Next.js frontend)
 > Methode: multi-agent review — 13 subsysteem-mappers, 7 review-dimensies, adversariële verificatie van elke bevinding (82 agents). 52 bevindingen bevestigd, 10 weerlegd.
 > Severities zijn de na-verificatie gecorrigeerde waarden. `userId`-IDOR is afgeschaald naar defense-in-depth omdat Clerk sign-up beperkt is tot de eigenaar (bevestigd door de auteur).

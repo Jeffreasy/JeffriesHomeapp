@@ -1,15 +1,7 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent as ReactKeyboardEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus } from "lucide-react";
 
 import { isPeriodSatisfied, useHabits, type HabitCreateData } from "@/hooks/useHabits";
 import { usePrivacy } from "@/hooks/usePrivacy";
@@ -18,7 +10,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 import { HabitForm } from "@/components/habits/HabitForm";
 import { HabitHeatmap } from "@/components/habits/HabitHeatmap";
-import { IncidentUndoSnackbar } from "@/components/habits/IncidentUndoSnackbar";
+import { IncidentUndoToast } from "@/components/habits/IncidentUndoToast";
 import { HabitStats } from "@/components/habits/HabitStats";
 import { BadgeShowcase } from "@/components/habits/BadgeShowcase";
 
@@ -32,7 +24,9 @@ import { HabitsHeader } from "@/components/habits/HabitsHeader";
 import { HabitsDashboardSummary } from "@/components/habits/HabitsDashboardSummary";
 import { HabitsVandaagTab } from "@/components/habits/HabitsVandaagTab";
 import { HabitsOverzichtTab } from "@/components/habits/HabitsOverzichtTab";
-import { cn } from "@/lib/utils";
+import { Tabs, tabPanelAttributes, tabPanelFocusClasses } from "@/components/ui/Tabs";
+import { AppPageShell, PageToolbar } from "@/components/layout/AppPageShell";
+import { formatLevel, formatXP } from "@/lib/habit-constants";
 
 export default function HabitsPage() {
   const [selectedDate, setSelectedDate] = useState("");
@@ -45,7 +39,7 @@ export default function HabitsPage() {
     datum: string;
     naam: string;
   } | null>(null);
-  const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("habits");
+  const { hidden: privacyOn, toggle: togglePrivacy, isServerUnknown: isPrivacyUnknown } = usePrivacy("habits");
   const { success, error: toastError } = useToast();
   const { openConfirm } = useConfirm();
 
@@ -250,44 +244,41 @@ export default function HabitsPage() {
 
   const resetDate = () => setSelectedDate(todayStr());
 
-  const handleTabKeyDown = (
-    e: ReactKeyboardEvent<HTMLButtonElement>,
-    id: TabId,
-  ) => {
-    const index = TABS.findIndex((t) => t.id === id);
-    if (index === -1) return;
-    let nextIndex: number | null = null;
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
-      nextIndex = (index + 1) % TABS.length;
-    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      nextIndex = (index - 1 + TABS.length) % TABS.length;
-    } else if (e.key === "Home") {
-      nextIndex = 0;
-    } else if (e.key === "End") {
-      nextIndex = TABS.length - 1;
-    }
-    if (nextIndex === null) return;
-    e.preventDefault();
-    const nextTab = TABS[nextIndex];
-    setActiveTab(nextTab.id);
-    document.getElementById(`habits-tab-${nextTab.id}`)?.focus();
-  };
-
   return (
-    <div className="text-slate-100">
+    <AppPageShell width="wide" className="text-[var(--color-text)]">
       {/* Polite live region: optimistische toggle-resultaten voor screenreaders. */}
       <span aria-live="polite" role="status" className="sr-only">
         {announcement}
       </span>
       <HabitsHeader
-        level={level}
-        stats={stats}
         privacyOn={privacyOn}
+        isPrivacyUnknown={isPrivacyUnknown}
         togglePrivacy={togglePrivacy}
         setShowForm={setShowForm}
       />
 
-      <main className="mx-auto max-w-7xl px-4 py-5 pb-28 sm:px-6">
+      <PageToolbar label="Habit niveau en voortgang" className="mt-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2 px-1">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+              Niveau
+            </span>
+            <strong className="truncate text-sm font-semibold text-[var(--color-text)]">
+              {privacyOn ? "Verborgen" : formatLevel(level.level, level.titel)}
+            </strong>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+              Ervaring
+            </span>
+            <strong className="text-sm font-semibold text-[var(--color-warning)]">
+              {privacyOn ? "••••" : formatXP(stats?.totaalXP ?? 0)}
+            </strong>
+          </div>
+        </div>
+      </PageToolbar>
+
+      <div className="mt-4">
         <HabitsDashboardSummary
           activeDate={activeDate}
           currentToday={currentToday}
@@ -303,56 +294,22 @@ export default function HabitsPage() {
           habits={habits}
         />
 
-        <div
-          role="tablist"
-          aria-label="Habit onderdelen"
-          className="mt-5 grid grid-cols-3 gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1"
-        >
-          {TABS.map(({ id, label, icon: Icon }) => {
-            const isActive = activeTab === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                id={`habits-tab-${id}`}
-                role="tab"
-                aria-selected={isActive}
-                aria-controls={`habits-tabpanel-${id}`}
-                tabIndex={isActive ? 0 : -1}
-                onClick={() => setActiveTab(id)}
-                onKeyDown={(e) => handleTabKeyDown(e, id)}
-                className={cn(
-                  "relative flex h-11 min-w-0 items-center justify-center gap-1.5 rounded-md px-2 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400/40 sm:gap-2 sm:text-sm",
-                  isActive
-                    ? "text-amber-200"
-                    : "text-slate-500 hover:text-slate-300",
-                )}
-              >
-                {isActive && (
-                  <motion.span
-                    layoutId="habits-tab"
-                    className="absolute inset-0 rounded-md border border-amber-500/20 bg-amber-500/10"
-                    transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                  />
-                )}
-                <span className="relative z-10 flex items-center gap-2">
-                  <Icon size={16} aria-hidden="true" />
-                  {label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <Tabs
+          items={TABS}
+          value={activeTab}
+          onValueChange={setActiveTab}
+          idPrefix="habits"
+          ariaLabel="Habit onderdelen"
+          appearance="contained"
+          className="mt-5"
+        />
 
         <AnimatePresence mode="wait">
           {activeTab === "vandaag" && (
             <motion.section
               key="vandaag"
-              id="habits-tabpanel-vandaag"
-              role="tabpanel"
-              aria-labelledby="habits-tab-vandaag"
-              tabIndex={0}
-              className="focus:outline-none"
+              {...tabPanelAttributes("habits", "vandaag")}
+              className={tabPanelFocusClasses}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -384,11 +341,8 @@ export default function HabitsPage() {
           {activeTab === "overzicht" && (
             <motion.section
               key="overzicht"
-              id="habits-tabpanel-overzicht"
-              role="tabpanel"
-              aria-labelledby="habits-tab-overzicht"
-              tabIndex={0}
-              className="focus:outline-none"
+              {...tabPanelAttributes("habits", "overzicht")}
+              className={tabPanelFocusClasses}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -419,14 +373,11 @@ export default function HabitsPage() {
           {activeTab === "stats" && (
             <motion.section
               key="stats"
-              id="habits-tabpanel-stats"
-              role="tabpanel"
-              aria-labelledby="habits-tab-stats"
-              tabIndex={0}
+              {...tabPanelAttributes("habits", "stats")}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="mt-5 grid gap-4 focus:outline-none xl:grid-cols-[minmax(0,420px)_1fr]"
+              className={`${tabPanelFocusClasses} mt-5 grid gap-4 xl:grid-cols-[minmax(0,420px)_1fr]`}
             >
               <div className="space-y-4">
                 <HabitStats masked={privacyOn} />
@@ -438,22 +389,9 @@ export default function HabitsPage() {
             </motion.section>
           )}
         </AnimatePresence>
-      </main>
+      </div>
 
-      <motion.button
-        type="button"
-        onClick={() => setShowForm(true)}
-        aria-label="Habit toevoegen"
-        title="Habit toevoegen"
-        className="fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-lg border border-amber-400/30 bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 transition-transform"
-        style={{ bottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}
-        whileTap={{ scale: 0.9 }}
-        whileHover={{ scale: 1.04 }}
-      >
-        <Plus size={24} />
-      </motion.button>
-
-      <IncidentUndoSnackbar
+      <IncidentUndoToast
         incident={lastIncident}
         masked={privacyOn}
         onUndo={handleUndoIncident}
@@ -474,6 +412,6 @@ export default function HabitsPage() {
           initial={editingInitial}
         />
       )}
-    </div>
+    </AppPageShell>
   );
 }

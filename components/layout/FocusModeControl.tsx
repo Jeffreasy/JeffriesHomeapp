@@ -2,8 +2,9 @@
 
 import { useEffect, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { AppIcon } from "@/components/ui/AppIcon";
-import { cn } from "@/lib/utils";
+import { NavigationIcon } from "@/components/layout/NavigationIcon";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 
 const FOCUS_AUTO_STORAGE_KEY = "homeapp_focus_auto_enabled";
 const FOCUS_AUTO_EVENT = "homeapp-focus-auto-change";
@@ -102,64 +103,56 @@ export function FocusModeShortcut({ variant = "sidebar" }: { variant?: "sidebar"
   if (variant === "mobile") {
     return (
       <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-        <button
-          type="button"
+        <Button
           onClick={() => router.push("/focus")}
-          className="flex min-h-12 min-w-0 items-center gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.12] px-3 text-left text-amber-100 transition-colors active:bg-amber-500/[0.18]"
+          variant="primary"
+          fullWidth
+          className="min-h-12 justify-start px-3 text-left"
         >
-          <AppIcon name="radar" tone="amber" size="sm" framed active />
+          <NavigationIcon name="radar" tone="accent" size="sm" framed active />
           <span className="min-w-0">
             <span className="block truncate text-sm font-bold">Focus mode</span>
-            <span className="block truncate text-[11px] text-amber-100/60">Tablet dashboard openen</span>
+            <span className="block truncate text-micro opacity-70">Tablet dashboard openen</span>
           </span>
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           onClick={() => setAutoEnabled(!autoEnabled)}
           aria-pressed={autoEnabled}
-          className={cn(
-            "flex min-h-12 min-w-[74px] flex-col items-center justify-center rounded-xl border px-2 text-xs font-bold transition-colors",
-            autoEnabled
-              ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-100"
-              : "border-white/10 bg-white/[0.035] text-slate-400",
-          )}
+          variant={autoEnabled ? "success" : "secondary"}
+          className="min-h-12 min-w-[74px] flex-col gap-0 px-2 text-xs"
         >
           Auto
-          <span className="text-[10px] font-semibold opacity-70">{autoEnabled ? "1m aan" : "1m uit"}</span>
-        </button>
+          <span className="text-micro font-semibold opacity-70">{autoEnabled ? "1m aan" : "1m uit"}</span>
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="mb-3 rounded-lg border border-white/10 bg-white/[0.035] p-2">
-      <button
-        type="button"
+    <Surface tone="subtle" radius="sm" padding="xs" className="mb-3">
+      <Button
         onClick={() => router.push("/focus")}
-        className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 text-left text-amber-100 transition-colors hover:bg-amber-500/15"
+        variant="primary"
+        fullWidth
+        className="justify-start px-3 text-left"
       >
-        <AppIcon name="radar" tone="amber" size="sm" />
+        <NavigationIcon name="radar" tone="accent" size="sm" />
         <span className="min-w-0">
           <span className="block truncate text-sm font-bold">Focus mode</span>
-          <span className="block truncate text-[10px] text-amber-100/55">Schermvullend dashboard</span>
+          <span className="block truncate text-micro opacity-70">Schermvullend dashboard</span>
         </span>
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
         onClick={() => setAutoEnabled(!autoEnabled)}
         aria-pressed={autoEnabled}
-        className={cn(
-          "mt-2 flex h-9 w-full items-center justify-between rounded-lg border px-3 text-xs font-bold transition-colors",
-          autoEnabled
-            ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-100"
-            : "border-white/10 bg-black/15 text-slate-400 hover:bg-white/[0.05]",
-        )}
+        variant={autoEnabled ? "success" : "secondary"}
+        size="sm"
+        fullWidth
+        className="mt-2 justify-between"
       >
         <span>Auto focus na 1 minuut</span>
-        <span className={cn("rounded-md px-2 py-0.5", autoEnabled ? "bg-emerald-400/15" : "bg-white/[0.06]")}>
-          {autoEnabled ? "Aan" : "Uit"}
-        </span>
-      </button>
-    </div>
+        <span className="rounded-md bg-current/10 px-2 py-0.5">{autoEnabled ? "Aan" : "Uit"}</span>
+      </Button>
+    </Surface>
   );
 }

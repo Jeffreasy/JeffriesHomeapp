@@ -7,12 +7,21 @@ import { useAutomations } from "@/hooks/useAutomations";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Surface } from "@/components/ui/Surface";
 import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
 import { AutomationCard } from "@/components/automations/AutomationCard";
 import { AutomationForm, type AutomationFormHandle } from "@/components/automations/AutomationForm";
 import { DienstWekkerSection } from "@/components/automations/DienstWekkerSection";
 import { type Automation, type DienstWekkerTimes, type ShiftType } from "@/lib/automations";
-import { cn } from "@/lib/utils";
+import {
+  AppPageHeader,
+  AppPageShell,
+} from "@/components/layout/AppPageShell";
 
 type ManagedShiftType = Exclude<ShiftType, "any">;
 
@@ -115,46 +124,28 @@ export default function AutomationsPage() {
   const disabled = automations.filter((a) => !a.enabled);
 
   return (
-    <div className="text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
-                <Activity size={20} className="text-amber-300" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Smart Home
-                </p>
-                <h1 className="mt-1 truncate text-2xl font-bold text-white">Automatisering</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  {enabled.length} actief · Engine elke 30s
-                </p>
-              </div>
-            </div>
+    <AppPageShell width="standard" className="space-y-5">
+      <AppPageHeader
+        eyebrow="Smart home"
+        title="Automatisering"
+        description={enabled.length + " actief · " + automations.length + " totaal"}
+        leading={
+          <AppIcon name="automations" tone="accent" size="lg" framed />
+        }
+        actions={
+          <Button
+            variant={editingId ? "secondary" : "warning"}
+            onClick={handleHeaderToggle}
+            aria-expanded={Boolean(editingId)}
+            aria-label={editingId ? "Formulier sluiten" : "Nieuwe automatisering toevoegen"}
+          >
+            {editingId ? <X size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
+            {editingId ? "Annuleren" : "Toevoegen"}
+          </Button>
+        }
+      />
 
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                onClick={handleHeaderToggle}
-                aria-expanded={!!editingId}
-                aria-label={editingId ? "Formulier sluiten" : "Nieuwe automatisering toevoegen"}
-                className={cn(
-                  "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors",
-                  editingId
-                    ? "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
-                    : "border-amber-500/30 bg-amber-500/15 text-amber-200 hover:bg-amber-500/20"
-                )}
-              >
-                {editingId ? <X size={16} /> : <Plus size={16} />}
-                <span className="hidden sm:inline">{editingId ? "Annuleren" : "Toevoegen"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+      <div className="space-y-5">
         <ErrorBoundary>
           <DienstWekkerSection
             automations={automations}
@@ -170,31 +161,31 @@ export default function AutomationsPage() {
 
           {/* Engine status — weerspiegelt de echte querystatus (M10) */}
           {isError ? (
-            <div className="glass rounded-xl p-4 flex items-center gap-3 border border-rose-500/20">
-              <div className="w-2 h-2 rounded-full bg-rose-400" aria-hidden="true" />
+            <Surface tone="danger" padding="sm" radius="md" className="flex items-center gap-3" role="status">
+              <AppIcon name="activity" tone="danger" size="sm" framed />
               <div className="flex-1">
-                <p className="text-xs font-medium text-rose-300">
+                <p className="text-xs font-medium text-[var(--color-danger)]">
                   Engine niet bereikbaar — status onbekend
                 </p>
-                <p className="text-[10px] text-slate-500 mt-0.5">
+                <p className="mt-0.5 text-micro text-[var(--color-text-muted)]">
                   De automatiseringen konden niet worden opgehaald · wekkers gaan mogelijk niet af
                 </p>
               </div>
-              <Activity size={15} className="text-rose-400 opacity-60" aria-hidden="true" />
-            </div>
+              <Badge tone="danger" size="sm">Onbekend</Badge>
+            </Surface>
           ) : (
-            <div className="glass rounded-xl p-4 flex items-center gap-3 border border-green-500/15">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" aria-hidden="true" />
+            <Surface tone="success" padding="sm" radius="md" className="flex items-center gap-3" role="status">
+              <AppIcon name="activity" tone="success" size="sm" framed />
               <div className="flex-1">
                 {/* L2: eerlijk claimen wat we écht weten — de API antwoordt;
                     of de engine-loop zelf draait, weten we hier niet. */}
-                <p className="text-xs font-medium text-green-400">Automations-API bereikbaar</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">
+                <p className="text-xs font-medium text-[var(--color-success)]">Automations-API bereikbaar</p>
+                <p className="mt-0.5 text-micro text-[var(--color-text-muted)]">
                   Engine draait 24/7 in de cloud (Render) · ook zonder open browser
                 </p>
               </div>
-              <Activity size={15} className="text-green-400 opacity-60" aria-hidden="true" />
-            </div>
+              <Badge tone="success" size="sm">Online</Badge>
+            </Surface>
           )}
 
           <AnimatePresence>
@@ -211,7 +202,7 @@ export default function AutomationsPage() {
 
           {enabled.length > 0 && (
             <section aria-label="Actieve automatiseringen">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-3">
+              <p className="text-micro text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
                 Actief ({enabled.length})
               </p>
               <div className="space-y-2">
@@ -233,7 +224,7 @@ export default function AutomationsPage() {
 
           {disabled.length > 0 && (
             <section aria-label="Uitgeschakelde automatiseringen">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-3">
+              <p className="text-micro text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
                 Uitgeschakeld ({disabled.length})
               </p>
               <div className="space-y-2">
@@ -263,28 +254,23 @@ export default function AutomationsPage() {
           ) : isLoading ? (
             <div className="space-y-2 py-4">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-16 animate-pulse rounded-xl bg-white/[0.03]" />
+                <Skeleton key={i} className="h-16" />
               ))}
             </div>
           ) : automations.length === 0 && !editingId ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
-                <Activity size={24} className="text-slate-600" />
-              </div>
-              <h3 className="text-sm font-semibold text-slate-300">Nog geen automatiseringen</h3>
-              <p className="text-xs text-slate-500 mt-1 mb-4">
-                Voeg een tijdschema toe om lampen automatisch te bedienen.
-              </p>
-              <button
-                onClick={() => setEditingId("new")}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 transition-colors"
-              >
-                <Plus size={13} />
-                Eerste automatisering
-              </button>
-            </div>
+            <FeedbackState
+              title="Nog geen automatiseringen"
+              description="Voeg een tijdschema toe om lampen automatisch te bedienen."
+              icon={Activity}
+              action={
+                <Button className="mt-4" variant="primary" onClick={() => setEditingId("new")}>
+                  <Plus size={13} aria-hidden="true" />
+                  Eerste automatisering
+                </Button>
+              }
+            />
           ) : null}
-      </main>
-    </div>
+      </div>
+    </AppPageShell>
   );
 }

@@ -6,11 +6,14 @@ import {
   ChevronRight,
   Flame,
   LayoutGrid,
-  ShieldCheck,
   Target,
 } from "lucide-react";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Progress } from "@/components/ui/Progress";
+import { Surface } from "@/components/ui/Surface";
+import { AppIcon } from "@/components/ui/AppIcon";
 import { formatDateLabel } from "./HabitsUtils";
 import { MetricCard } from "./HabitsCards";
 import type { HabitRecord } from "@/hooks/useHabits";
@@ -62,97 +65,79 @@ export function HabitsDashboardSummary({
   return (
     <>
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="glass p-3.5 sm:p-5">
+        <Surface padding="sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-500">
+              <p className="text-xs font-semibold uppercase text-[var(--color-text-subtle)]">
                 Dagstatus
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
+                <IconButton
                   onClick={() => moveDate(-1)}
-                  aria-label="Vorige dag"
-                  title="Vorige dag"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)]"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <button
-                  type="button"
+                  label="Vorige dag"
+                  icon={<ChevronLeft size={18} />}
+                  variant="secondary"
+                />
+                <Button
                   onClick={resetDate}
                   aria-label="Terug naar vandaag"
-                  className={cn(
-                    "inline-flex h-11 min-w-36 items-center justify-center rounded-lg border px-4 text-sm font-semibold transition-colors",
-                    isToday
-                      ? "border-amber-500/25 bg-amber-500/10 text-amber-200"
-                      : "border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 hover:bg-[rgba(255,255,255,0.06)]",
-                  )}
+                  variant={isToday ? "primary" : "secondary"}
+                  size="sm"
+                  className="min-w-36"
                 >
                   {formatDateLabel(activeDate, currentToday)}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => !disableNext && moveDate(1)}
+                </Button>
+                <IconButton
+                  onClick={() => moveDate(1)}
                   disabled={disableNext}
-                  aria-label="Volgende dag"
-                  title="Volgende dag"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] text-slate-300 transition-colors hover:bg-[rgba(255,255,255,0.06)] disabled:cursor-not-allowed disabled:opacity-35"
-                >
-                  <ChevronRight size={18} />
-                </button>
+                  label="Volgende dag"
+                  icon={<ChevronRight size={18} />}
+                  variant="secondary"
+                />
               </div>
             </div>
 
             <div className="min-w-0 lg:w-80">
               <div className="mb-2 flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-400">
+                <span className="font-semibold text-[var(--color-text-muted)]">
                   {todaySummary.completed}/{todaySummary.due} voltooid
                 </span>
                 <span
                   className={cn(
                     "font-bold",
                     completionPct === 100
-                      ? "text-emerald-300"
-                      : "text-amber-300",
+                      ? "text-[var(--color-success)]"
+                      : "text-[var(--color-warning)]",
                   )}
                 >
                   {completionPct}%
                 </span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-[rgba(255,255,255,0.06)]">
-                <motion.div
-                  className={cn(
-                    "h-full rounded-full",
-                    completionPct === 100 ? "bg-emerald-400" : "bg-amber-400",
-                  )}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${completionPct}%` }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                />
-              </div>
+              <Progress
+                value={completionPct}
+                label={`${todaySummary.completed} van ${todaySummary.due} habits voltooid`}
+                tone={completionPct === 100 ? "success" : "warning"}
+              />
             </div>
           </div>
-        </div>
+        </Surface>
 
-        <div className="hidden rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-4 md:block">
+        <Surface tone="info" radius="sm" padding="sm" className="hidden md:block">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-indigo-500/25 bg-indigo-500/15">
-              <ShieldCheck size={18} className="text-indigo-200" />
-            </div>
+<AppIcon name="shield" tone="accent" size="md" framed />
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-indigo-200/70">
+              <p className="text-xs font-semibold uppercase text-[var(--color-primary-hover)]">
                 Privacy
               </p>
-              <p className="mt-1 text-lg font-bold text-white">
+              <p className="mt-1 text-lg font-bold text-[var(--color-text)]">
                 {privacyOn ? "Verborgen" : "Zichtbaar"}
               </p>
-              <p className="mt-1 text-sm text-indigo-100/60">
+              <p className="mt-1 text-sm text-[var(--color-primary-hover)]">
                 {privacyOn ? "Privé modus actief" : "Details zichtbaar"}
               </p>
             </div>
           </div>
-        </div>
+        </Surface>
       </section>
 
       <section className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
@@ -160,25 +145,25 @@ export function HabitsDashboardSummary({
           icon={Target}
           label="Vandaag"
           value={`${todaySummary.completed}/${todaySummary.due}`}
-          tone="amber"
+          tone="accent"
         />
         <MetricCard
           icon={LayoutGrid}
           label="Actief"
           value={groupedHabits.actief.length.toString()}
-          tone="sky"
+          tone="info"
         />
         <MetricCard
           icon={AlertTriangle}
           label="Incidenten"
           value={dayHealth.incidents.toString()}
-          tone={dayHealth.incidents > 0 ? "rose" : "green"}
+          tone={dayHealth.incidents > 0 ? "danger" : "success"}
         />
         <MetricCard
           icon={Flame}
           label="Record"
           value={`${Math.max(0, ...habits.map((h) => h.langsteStreak))}d`}
-          tone="green"
+          tone="success"
         />
       </section>
     </>

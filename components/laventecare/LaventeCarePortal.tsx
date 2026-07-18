@@ -1,5 +1,9 @@
 "use client";
 
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Progress } from "@/components/ui/Progress";
+import { Surface, surfaceVariants } from "@/components/ui/Surface";
 import {
   AlertTriangle,
   ArrowRight,
@@ -26,6 +30,7 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 import { cn } from "@/lib/utils";
 import { StatChip } from "@/components/ui/StatChip";
 
@@ -45,10 +50,10 @@ export type PortalSection = {
   description: string;
   count: string;
   icon: LucideIcon;
-  tone: "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
+  tone: UiTone;
 };
 
-export type CapabilityStatus = "ready" | "attention" | "missing";
+export type CapabilityStatus = "ready" | "attention" | "missing" | "unknown";
 
 export type CapabilityRow = {
   label: string;
@@ -89,59 +94,63 @@ export function LaventeCarePortalHero({
   leads: number;
   workstreams: number;
   projects: number;
-  invoices: number;
+  invoices: number | null;
   documents: number;
   onOpenCapabilities: () => void;
 }) {
   const ready = capabilityRows.filter((row) => row.status === "ready").length;
   const attention = capabilityRows.filter((row) => row.status === "attention").length;
   const missing = capabilityRows.filter((row) => row.status === "missing").length;
+  const unknown = capabilityRows.filter((row) => row.status === "unknown").length;
+  const known = capabilityRows.length - unknown;
 
   return (
-    <section className="glass min-w-0 p-3 sm:p-4">
+    <section className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-3 sm:p-4")}>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 text-xs font-bold text-sky-200">
-              <BriefcaseBusiness size={14} />
+            <Badge tone="info" size="md">
+              <BriefcaseBusiness size={14} aria-hidden="true" />
               Bedrijfsportaal
-            </div>
-            <button
-              type="button"
+            </Badge>
+            <Button
+              size="sm"
+              variant="secondary"
               onClick={onOpenCapabilities}
-              className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-[11px] font-bold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
+              className="gap-1.5 px-2 text-micro"
             >
-              <Gauge size={13} />
-              {ready}/{capabilityRows.length} klaar
+              <Gauge size={13} aria-hidden="true" />
+              {ready}/{known} beoordeeld als klaar
               {attention + missing > 0 ? ` - ${attention + missing} focus` : ""}
-            </button>
+              {unknown > 0 ? ` - ${unknown} onbekend` : ""}
+            </Button>
           </div>
-          <h2 className="mt-2 text-xl font-bold tracking-tight text-white sm:text-2xl">
+          <h2 className="mt-2 text-xl font-bold tracking-tight text-[var(--color-text)] sm:text-2xl">
             LaventeCare cockpit
           </h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--color-text-muted)]">
             Klanten, opdrachten, projecten, mails, documenten en betalingen in een rustige bedrijfswerkruimte.
           </p>
         </div>
       </div>
 
       <details className="mt-3" open>
-        <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-normal text-slate-500 marker:hidden">
+        <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center rounded-lg text-micro font-semibold uppercase tracking-normal text-[var(--color-text-muted)] marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]">
           Kerncijfers
         </summary>
         <div className="mt-2 flex flex-wrap gap-2">
-          <StatChip icon={UsersRound} label="Klanten" value={String(companies)} meta={`${contacts} contacten`} tone="amber" />
-          <StatChip icon={Sparkles} label="Leads" value={String(leads)} meta="sales" tone="indigo" />
-          <StatChip icon={Workflow} label="Opdrachten" value={String(workstreams)} meta="werkbank" tone="indigo" />
-          <StatChip icon={FolderKanban} label="Projecten" value={String(projects)} meta="delivery" tone="green" />
-          <StatChip icon={Banknote} label="Facturen" value={String(invoices)} meta="bunq" tone="amber" />
-          <StatChip icon={BookOpenText} label="Docs" value={String(documents)} meta="templates" tone="sky" />
+          <StatChip icon={UsersRound} label="Klanten" value={String(companies)} meta={`${contacts} contacten`} tone="accent" />
+          <StatChip icon={Sparkles} label="Leads" value={String(leads)} meta="sales" tone="info" />
+          <StatChip icon={Workflow} label="Opdrachten" value={String(workstreams)} meta="werkbank" tone="info" />
+          <StatChip icon={FolderKanban} label="Projecten" value={String(projects)} meta="delivery" tone="success" />
+          <StatChip icon={Banknote} label="Facturen" value={invoices === null ? "?" : String(invoices)} meta="bunq" tone="accent" />
+          <StatChip icon={BookOpenText} label="Docs" value={String(documents)} meta="templates" tone="info" />
           <StatChip
             icon={Gauge}
             label="Vulling"
-            value={`${ready}/${capabilityRows.length}`}
-            meta={attention || missing ? `${attention + missing} focus` : "op orde"}
-            tone={attention || missing ? "rose" : "green"}
+            value={`${ready}/${known}`}
+            meta={attention || missing ? `${attention + missing} focus` : unknown ? `${unknown} onbekend` : "op orde"}
+            tone={attention || missing ? "danger" : unknown ? "info" : "success"}
           />
         </div>
       </details>
@@ -149,18 +158,18 @@ export function LaventeCarePortalHero({
       {(attention > 0 || missing > 0) && (
         <div className="mt-3 hidden gap-2 lg:grid lg:grid-cols-3">
           {capabilityRows
-            .filter((row) => row.status !== "ready")
+            .filter((row) => row.status === "attention" || row.status === "missing")
             .slice(0, 3)
             .map((row) => (
               <button
                 key={row.label}
                 type="button"
                 onClick={onOpenCapabilities}
-                className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-amber-500/15 bg-amber-500/[0.06] px-3 py-2 text-left transition hover:bg-amber-500/10"
+                className="flex min-h-11 min-w-0 items-center justify-between gap-3 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2 text-left transition-colors duration-[var(--motion-fast)] hover:bg-[var(--color-warning-border)]"
               >
                 <span className="min-w-0">
-                  <span className="block truncate text-xs font-bold text-amber-100">{row.label}</span>
-                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">{row.nextStep}</span>
+                  <span className="block truncate text-xs font-bold text-[var(--color-warning)]">{row.label}</span>
+                  <span className="mt-0.5 block truncate text-micro text-[var(--color-text-muted)]">{row.nextStep}</span>
                 </span>
                 <CapabilityBadge status={row.status} />
               </button>
@@ -181,7 +190,7 @@ export function PortalNavigation({
   onChange: (view: PortalView) => void;
 }) {
   return (
-    <nav className="relative z-20 -mx-4 border-y border-white/10 bg-[var(--color-background)]/92 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:sticky lg:top-[76px] lg:-mx-8 lg:px-8">
+    <nav className="relative z-[var(--layer-sticky)] -mx-4 border-y border-[var(--color-border)] bg-[var(--color-background)]/92 px-4 py-2 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:sticky lg:top-[76px] lg:-mx-8 lg:px-8">
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {sections.map((section) => {
           const Icon = section.icon;
@@ -192,19 +201,19 @@ export function PortalNavigation({
               type="button"
               onClick={() => onChange(section.id)}
               className={cn(
-                "flex min-w-[108px] items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition sm:min-w-[138px]",
+                "flex min-h-11 min-w-[108px] items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors duration-[var(--motion-fast)] sm:min-w-[138px]",
                 active
-                  ? "border-sky-500/30 bg-sky-500/10 text-white"
-                  : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-white"
+                  ? "border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-text)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
               )}
             >
-              <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border", active ? "border-sky-500/20 bg-sky-500/10 text-sky-200" : "border-white/10 bg-black/10")}>
+              <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border", active ? "border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)]" : "border-[var(--color-border)] bg-[var(--color-surface-active)]")}>
                 <Icon size={16} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold">{section.label}</span>
               </span>
-              <span className="rounded-full border border-white/10 bg-black/20 px-1.5 py-0.5 text-[11px] font-bold text-slate-300 sm:px-2 sm:text-xs">{section.count}</span>
+              <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-active)] px-1.5 py-0.5 text-micro font-bold text-[var(--color-text-muted)] sm:px-2 sm:text-xs">{section.count}</span>
             </button>
           );
         })}
@@ -229,18 +238,20 @@ export function PortalInsightRail({
   activeView: PortalView;
   signals: number;
   actions: number;
-  openInvoices: number;
+  openInvoices: number | null;
   openIncidents: number;
   onChange: (view: PortalView) => void;
 }) {
-  const attentionRows = capabilityRows.filter((row) => row.status !== "ready");
+  const attentionRows = capabilityRows.filter(
+    (row) => row.status === "attention" || row.status === "missing",
+  );
   const railRows = [...capabilityRows].sort((a, b) => statusWeight(a.status) - statusWeight(b.status));
   return (
     <aside className="space-y-4 xl:sticky xl:top-[168px] xl:self-start">
-      <div className="glass min-w-0 p-4">
+      <Surface padding="none" className="min-w-0 p-4">
         <div className="flex items-center gap-2">
-          <ShieldCheck size={17} className="text-emerald-300" />
-          <h3 className="text-sm font-bold text-white">Business dekking</h3>
+          <ShieldCheck size={17} className="text-[var(--color-success)]" />
+          <h3 className="text-sm font-bold text-[var(--color-text)]">Business dekking</h3>
         </div>
         <div className="mt-4 space-y-2">
           {railRows.slice(0, 6).map((row) => (
@@ -248,46 +259,42 @@ export function PortalInsightRail({
               key={row.label}
               type="button"
               onClick={() => onChange(row.view)}
-              className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition hover:bg-white/[0.06]"
+              className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-left transition-colors duration-[var(--motion-fast)] hover:bg-[var(--color-surface-hover)]"
             >
               <span className="min-w-0">
-                <span className="block truncate text-xs font-bold text-slate-200">{row.label}</span>
-                <span className="mt-0.5 block truncate text-[11px] text-slate-500">{row.score}% - {row.owner}</span>
+                <span className="block truncate text-xs font-bold text-[var(--color-text)]">{row.label}</span>
+                <span className="mt-0.5 block truncate text-micro text-[var(--color-text-muted)]">{row.status === "unknown" ? "Nog niet geladen" : `${row.score}% - ${row.owner}`}</span>
               </span>
               <CapabilityIcon status={row.status} />
             </button>
           ))}
         </div>
-      </div>
+      </Surface>
 
-      <div className="glass min-w-0 p-4">
+      <Surface padding="none" className="min-w-0 p-4">
         <div className="flex items-center gap-2">
-          <Gauge size={17} className="text-sky-300" />
-          <h3 className="text-sm font-bold text-white">Aandacht</h3>
+          <Gauge size={17} className="text-[var(--color-info)]" />
+          <h3 className="text-sm font-bold text-[var(--color-text)]">Aandacht</h3>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <RailMetric label="Signalen" value={signals} icon={Sparkles} tone="violet" />
-          <RailMetric label="Acties" value={actions} icon={ListChecks} tone="sky" />
-          <RailMetric label="Facturen" value={openInvoices} icon={ReceiptText} tone="amber" />
-          <RailMetric label="SLA" value={openIncidents} icon={LifeBuoy} tone={openIncidents > 0 ? "rose" : "slate"} />
+          <RailMetric label="Signalen" value={signals} icon={Sparkles} tone="info" />
+          <RailMetric label="Acties" value={actions} icon={ListChecks} tone="info" />
+          <RailMetric label="Facturen" value={openInvoices ?? "?"} icon={ReceiptText} tone="warning" />
+          <RailMetric label="SLA" value={openIncidents} icon={LifeBuoy} tone={openIncidents > 0 ? "danger" : "neutral"} />
         </div>
         {attentionRows.length > 0 ? (
-          <button
-            type="button"
-            onClick={() => onChange("overview")}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-200 transition hover:bg-rose-500/15"
-          >
-            <AlertTriangle size={14} />
+          <Button type="button" variant="danger" size="sm" fullWidth onClick={() => onChange("overview")} className="mt-3">
+            <AlertTriangle size={14} aria-hidden="true" />
             {attentionRows.length} functie(s) vullen
-          </button>
+          </Button>
         ) : null}
-      </div>
+      </Surface>
 
       <div className="hidden xl:block">
-        <div className="glass min-w-0 p-4">
+        <Surface padding="none" className="min-w-0 p-4">
           <div className="flex items-center gap-2">
-            <Search size={17} className="text-slate-400" />
-            <h3 className="text-sm font-bold text-white">Werkgebieden</h3>
+            <Search size={17} className="text-[var(--color-text-muted)]" />
+            <h3 className="text-sm font-bold text-[var(--color-text)]">Werkgebieden</h3>
           </div>
           <div className="mt-3 space-y-1.5">
             {sections.slice(0, 6).map((section) => (
@@ -296,8 +303,8 @@ export function PortalInsightRail({
                 type="button"
                 onClick={() => onChange(section.id)}
                 className={cn(
-                  "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-bold transition",
-                  section.id === activeView ? "bg-white/10 text-white" : "text-slate-500 hover:bg-white/[0.05] hover:text-slate-200"
+                  "flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-bold transition-colors duration-[var(--motion-fast)]",
+                  section.id === activeView ? "bg-[var(--color-surface-active)] text-[var(--color-text)]" : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
                 )}
               >
                 {section.label}
@@ -305,27 +312,20 @@ export function PortalInsightRail({
               </button>
             ))}
           </div>
-        </div>
+        </Surface>
       </div>
     </aside>
   );
 }
 
-function RailMetric({ label, value, icon: Icon, tone }: { label: string; value: number; icon: LucideIcon; tone: PortalSection["tone"] }) {
-  const toneClass = {
-    amber: "text-amber-300",
-    emerald: "text-emerald-300",
-    sky: "text-sky-300",
-    rose: "text-rose-300",
-    violet: "text-violet-300",
-    slate: "text-slate-400",
-  }[tone];
+function RailMetric({ label, value, icon: Icon, tone }: { label: string; value: number | string; icon: LucideIcon; tone: PortalSection["tone"] }) {
+  const toneClass = uiToneClasses[tone].icon;
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-      <Icon size={15} className={toneClass} />
-      <p className="mt-2 text-lg font-bold text-white">{value}</p>
-      <p className="mt-0.5 truncate text-[11px] font-semibold uppercase tracking-normal text-slate-500">{label}</p>
-    </div>
+    <Surface tone="subtle" radius="sm" padding="sm" className="min-h-11">
+      <Icon size={15} className={toneClass} aria-hidden="true" />
+      <p className="mt-2 text-lg font-bold text-[var(--color-text)]">{value}</p>
+      <p className="mt-0.5 truncate text-micro font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">{label}</p>
+    </Surface>
   );
 }
 
@@ -341,8 +341,12 @@ export function CapabilityMatrix({
   const ready = capabilityRows.filter((row) => row.status === "ready").length;
   const attention = capabilityRows.filter((row) => row.status === "attention").length;
   const missing = capabilityRows.filter((row) => row.status === "missing").length;
-  const maturity = Math.round(capabilityRows.reduce((sum, row) => sum + row.score, 0) / Math.max(1, capabilityRows.length));
-  const focusRows = capabilityRows.filter((row) => row.status !== "ready").sort((a, b) => statusWeight(a.status) - statusWeight(b.status));
+  const unknown = capabilityRows.filter((row) => row.status === "unknown").length;
+  const scoredRows = capabilityRows.filter((row) => row.status !== "unknown");
+  const maturity = Math.round(scoredRows.reduce((sum, row) => sum + row.score, 0) / Math.max(1, scoredRows.length));
+  const focusRows = capabilityRows
+    .filter((row) => row.status === "attention" || row.status === "missing")
+    .sort((a, b) => statusWeight(a.status) - statusWeight(b.status));
   const visibleRows = expanded
     ? capabilityRows
     : focusRows.length > 0
@@ -350,75 +354,90 @@ export function CapabilityMatrix({
       : capabilityRows.slice(0, 4);
 
   return (
-    <section className="glass min-w-0 p-3 sm:p-4">
+    <section className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-3 sm:p-4")}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Bedrijfsfunctionaliteit</p>
-          <h3 className="mt-1 text-lg font-bold text-white">{expanded ? "Dekking en inrichting" : "Bedrijfsgereedheid"}</h3>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Bedrijfsfunctionaliteit</p>
+          <h3 className="mt-1 text-lg font-bold text-[var(--color-text)]">{expanded ? "Dekking en inrichting" : "Bedrijfsgereedheid"}</h3>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
             Per bedrijfsfunctie zie je of de flow klaar is, gevuld moet worden of echt nog niet is ingericht.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 text-xs font-bold text-emerald-200">
-            <BadgeCheck size={14} />
+          <Badge tone="success" size="md" className="min-h-8 px-3">
+            <BadgeCheck size={14} aria-hidden="true" />
             {ready} klaar
-          </span>
-          <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 text-xs font-bold text-amber-200">
-            <CircleDashed size={14} />
+          </Badge>
+          <Badge tone="warning" size="md" className="min-h-8 px-3">
+            <CircleDashed size={14} aria-hidden="true" />
             {attention} inrichten
-          </span>
-          <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 text-xs font-bold text-rose-200">
-            <AlertTriangle size={14} />
+          </Badge>
+          {unknown > 0 ? (
+            <Badge tone="neutral" size="md" className="min-h-8 px-3">
+              <CircleDashed size={14} aria-hidden="true" />
+              {unknown} onbekend
+            </Badge>
+          ) : null}
+          <Badge tone="danger" size="md" className="min-h-8 px-3">
+            <AlertTriangle size={14} aria-hidden="true" />
             {missing} niet ingericht
-          </span>
+          </Badge>
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+        <Surface tone="subtle" radius="sm" padding="sm" className="min-h-11">
           <div className="flex items-center justify-between gap-3">
             <div>
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Functionele volwassenheid</p>
-              <p className="mt-1 text-2xl font-bold text-white">{maturity}%</p>
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Functionele volwassenheid</p>
+              <p className="mt-1 text-2xl font-bold text-[var(--color-text)]">{maturity}%</p>
             </div>
-            <Gauge size={24} className="text-sky-300" />
+            <Gauge size={24} className="text-[var(--color-info)]" />
           </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-gradient-to-r from-sky-400 via-emerald-300 to-amber-300" style={{ width: `${Math.max(6, maturity)}%` }} />
-          </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
+          <Progress value={maturity} label="Functionele volwassenheid" tone={maturity >= 80 ? "success" : maturity >= 50 ? "warning" : "danger"} className="mt-3" />
+          <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">
             {/* R3-11: alleen "alle kernflows zijn ingericht" beweren als dat écht zo is. */}
-            {attention + missing === 0
+            {attention + missing === 0 && unknown === 0
               ? "Alle kernflows zijn ingericht; de resterende signalen gaan over het vullen van echte bedrijfsdata en werkdiscipline."
-              : `${attention + missing} bedrijfsfunctie(s) vragen nog aandacht; richt die in en vul echte bedrijfsdata om de volwassenheid te verhogen.`}
+              : attention + missing > 0
+                ? `${attention + missing} bedrijfsfunctie(s) vragen nog aandacht; richt die in en vul echte bedrijfsdata om de volwassenheid te verhogen.`
+                : `${unknown} bedrijfsfunctie(s) worden pas beoordeeld wanneer je de bijbehorende werkruimte opent.`}
           </p>
-        </div>
+        </Surface>
 
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+        <Surface tone="subtle" radius="sm" padding="sm" className="min-h-11">
           <div className="flex items-center gap-2">
-            <AlertTriangle size={15} className="text-amber-300" />
-            <p className="text-sm font-bold text-white">Focus nu</p>
+            <AlertTriangle size={15} className="text-[var(--color-warning)]" />
+            <p className="text-sm font-bold text-[var(--color-text)]">Focus nu</p>
           </div>
           <div className="mt-3 space-y-2">
-            {focusRows.slice(0, 3).map((row, index) => (
-              <button
-                key={row.label}
-                type="button"
-                onClick={() => onOpenView?.(row.view)}
-                className="flex w-full items-start gap-2 rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-left transition hover:bg-white/[0.05]"
-              >
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-bold text-slate-300">
-                  {index + 1}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-xs font-bold text-white">{row.label}</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-slate-500">{row.nextStep}</span>
-                </span>
-              </button>
-            ))}
+            {focusRows.length > 0 ? (
+              focusRows.slice(0, 3).map((row, index) => (
+                <button
+                  key={row.label}
+                  type="button"
+                  onClick={() => onOpenView?.(row.view)}
+                  className="flex min-h-11 w-full items-start gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] px-3 py-2 text-left transition-colors duration-[var(--motion-fast)] hover:bg-[var(--color-surface-hover)]"
+                >
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-surface-active)] text-micro font-bold text-[var(--color-text-muted)]">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-bold text-[var(--color-text)]">{row.label}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-[var(--color-text-muted)]">{row.nextStep}</span>
+                  </span>
+                </button>
+              ))
+            ) : (
+              <Surface tone="subtle" radius="sm" padding="xs" className="min-h-11 bg-[var(--color-surface-active)] text-xs leading-5 text-[var(--color-text-muted)]">
+                {unknown > 0
+                  ? "Geen bekende actiepunten; open de overige werkruimtes voor een volledige beoordeling."
+                  : "Geen openstaande actiepunten."
+                }
+              </Surface>
+            )}
           </div>
-        </div>
+        </Surface>
       </div>
 
       <div className={cn("mt-4 grid gap-3", expanded ? "md:grid-cols-2 xl:grid-cols-3" : "md:grid-cols-2 xl:grid-cols-4")}>
@@ -427,33 +446,30 @@ export function CapabilityMatrix({
             key={row.label}
             type="button"
             onClick={() => onOpenView?.(row.view)}
-            className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-left transition hover:border-white/20 hover:bg-white/[0.06]"
+            className="min-h-11 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 text-left transition-colors duration-[var(--motion-fast)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-white">{row.label}</p>
-                <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{row.detail}</p>
+                <p className="truncate text-sm font-bold text-[var(--color-text)]">{row.label}</p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--color-text-muted)]">{row.detail}</p>
               </div>
               <CapabilityBadge status={row.status} />
             </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div
-                className={cn(
-                  "h-full rounded-full",
-                  row.status === "ready" ? "bg-emerald-300" : row.status === "attention" ? "bg-amber-300" : "bg-rose-300"
-                )}
-                style={{ width: `${Math.max(6, row.score)}%` }}
-              />
-            </div>
+            <Progress
+              value={row.score}
+              label={`${row.label} voortgang`}
+              tone={row.status === "ready" ? "success" : row.status === "attention" ? "warning" : row.status === "missing" ? "danger" : "accent"}
+              className="mt-3 h-1.5"
+            />
             <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-              <span className="inline-flex min-w-0 items-center gap-2 font-semibold text-slate-500">
+              <span className="inline-flex min-w-0 items-center gap-2 font-semibold text-[var(--color-text-muted)]">
                 <ClipboardList size={13} />
-                <span className="truncate">{row.owner} - {row.score}%</span>
+                <span className="truncate">{row.status === "unknown" ? `${row.owner} - nog niet geladen` : `${row.owner} - ${row.score}%`}</span>
               </span>
               <PriorityBadge priority={row.priority} />
             </div>
-            <p className="mt-3 text-xs leading-5 text-slate-400">{row.nextStep}</p>
-            <span className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-sky-200">
+            <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">{row.nextStep}</p>
+            <span className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-[var(--color-info)]">
               {row.actionLabel}
               <ArrowRight size={13} />
             </span>
@@ -480,7 +496,7 @@ export function PortalRoadmapPanel({
       body: "Offerteversies, declarabele uren, factuurhistorie, betaalstatus en periodieke omzetrapportage.",
       action: "Commercie",
       onClick: onOpenCommerce,
-      tone: "amber" as const,
+      tone: "accent" as const,
     },
     {
       icon: LifeBuoy,
@@ -488,7 +504,7 @@ export function PortalRoadmapPanel({
       body: "Incidenten, wijzigingsverzoeken, besluitvorming en klantafspraken als vaste operationele audit trail.",
       action: "Operations",
       onClick: onOpenOperations,
-      tone: "rose" as const,
+      tone: "danger" as const,
     },
     {
       icon: FileCheck2,
@@ -496,7 +512,7 @@ export function PortalRoadmapPanel({
       body: "Per klant zichtbaar maken welke documenten, contactmomenten, projecten en acties nog ontbreken.",
       action: "Kennisbank",
       onClick: onOpenKnowledge,
-      tone: "sky" as const,
+      tone: "info" as const,
     },
   ];
 
@@ -505,24 +521,20 @@ export function PortalRoadmapPanel({
       {rows.map((row) => {
         const Icon = row.icon;
         return (
-          <article key={row.title} className="glass min-w-0 p-4">
+          <article key={row.title} className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
-                <Icon size={18} className={row.tone === "amber" ? "text-amber-300" : row.tone === "rose" ? "text-rose-300" : "text-sky-300"} />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+                <Icon size={18} className={uiToneClasses[row.tone].icon} />
               </div>
               <div className="min-w-0">
-                <h4 className="text-sm font-bold text-white">{row.title}</h4>
-                <p className="mt-2 text-sm leading-6 text-slate-400">{row.body}</p>
+                <h4 className="text-sm font-bold text-[var(--color-text)]">{row.title}</h4>
+                <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{row.body}</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={row.onClick}
-              className="mt-4 inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-bold text-slate-200 transition hover:bg-white/[0.08]"
-            >
-              <ArrowRight size={14} />
+            <Button type="button" variant="secondary" size="sm" onClick={row.onClick} className="mt-4">
+              <ArrowRight size={14} aria-hidden="true" />
               {row.action}
-            </button>
+            </Button>
           </article>
         );
       })}
@@ -532,34 +544,27 @@ export function PortalRoadmapPanel({
 
 function CapabilityBadge({ status }: { status: CapabilityStatus }) {
   const config = {
-    ready: { label: "Klaar", className: "border-emerald-500/20 bg-emerald-500/10 text-emerald-200" },
-    attention: { label: "Inrichten", className: "border-amber-500/20 bg-amber-500/10 text-amber-200" },
-    missing: { label: "Niet ingericht", className: "border-rose-500/20 bg-rose-500/10 text-rose-200" },
+    ready: { label: "Klaar", tone: "success" as const },
+    attention: { label: "Inrichten", tone: "warning" as const },
+    missing: { label: "Niet ingericht", tone: "danger" as const },
+    unknown: { label: "Onbekend", tone: "neutral" as const },
   }[status];
-  return (
-    <span className={cn("inline-flex h-7 shrink-0 items-center rounded-full border px-2 text-[11px] font-bold", config.className)}>
-      {config.label}
-    </span>
-  );
+  return <Badge tone={config.tone}>{config.label}</Badge>;
 }
-
 function CapabilityIcon({ status }: { status: CapabilityStatus }) {
-  if (status === "ready") return <CheckCircle2 size={15} className="text-emerald-300" />;
-  if (status === "attention") return <CircleDashed size={15} className="text-amber-300" />;
-  return <AlertTriangle size={15} className="text-rose-300" />;
+  if (status === "ready") return <CheckCircle2 size={15} className="text-[var(--color-success)]" />;
+  if (status === "attention") return <CircleDashed size={15} className="text-[var(--color-warning)]" />;
+  if (status === "missing") return <AlertTriangle size={15} className="text-[var(--color-danger)]" />;
+  return <CircleDashed size={15} className="text-[var(--color-text-muted)]" />;
 }
 
 function PriorityBadge({ priority }: { priority: CapabilityRow["priority"] }) {
-  const config = {
-    hoog: "border-rose-500/20 bg-rose-500/10 text-rose-200",
-    middel: "border-amber-500/20 bg-amber-500/10 text-amber-200",
-    laag: "border-white/10 bg-white/[0.04] text-slate-300",
-  }[priority];
-  return <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold", config)}>{priority}</span>;
+  const tone = priority === "hoog" ? "danger" : priority === "middel" ? "warning" : "neutral";
+  return <Badge tone={tone}>{priority}</Badge>;
 }
-
 function statusWeight(status: CapabilityStatus) {
   if (status === "missing") return 0;
   if (status === "attention") return 1;
-  return 2;
+  if (status === "unknown") return 2;
+  return 3;
 }

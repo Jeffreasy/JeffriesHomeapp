@@ -1,43 +1,13 @@
 import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES, type Tone } from "./LaventeCareTypes";
+import { uiToneClasses } from "@/lib/ui/tones";
+import {
+  encodeLaventeCarePdfDossierContext,
+  getLaventeCarePdfDossierReferenceFromLink,
+  parseLaventeCarePdfDossierReference,
+  type LaventeCarePdfDossierLink,
+} from "@/lib/laventecare/pdf/context";
 
-export const toneClasses: Record<Tone, { border: string; surface: string; text: string; icon: string }> = {
-  amber: {
-    border: "border-amber-500/25",
-    surface: "bg-amber-500/10",
-    text: "text-amber-200",
-    icon: "text-amber-300",
-  },
-  emerald: {
-    border: "border-emerald-500/25",
-    surface: "bg-emerald-500/10",
-    text: "text-emerald-200",
-    icon: "text-emerald-300",
-  },
-  sky: {
-    border: "border-sky-500/25",
-    surface: "bg-sky-500/10",
-    text: "text-sky-200",
-    icon: "text-sky-300",
-  },
-  rose: {
-    border: "border-rose-500/25",
-    surface: "bg-rose-500/10",
-    text: "text-rose-200",
-    icon: "text-rose-300",
-  },
-  violet: {
-    border: "border-violet-500/25",
-    surface: "bg-violet-500/10",
-    text: "text-violet-200",
-    icon: "text-violet-300",
-  },
-  slate: {
-    border: "border-[var(--color-border)]",
-    surface: "bg-[var(--color-surface)]",
-    text: "text-slate-200",
-    icon: "text-slate-300",
-  },
-};
+export const toneClasses = uiToneClasses;
 
 export const optional = (value: string) => {
   const trimmed = value.trim();
@@ -95,10 +65,10 @@ export function projectStatusLabel(value?: string) {
 }
 
 export function fitTone(score?: number): Tone {
-  if (typeof score !== "number") return "slate";
-  if (score >= 75) return "emerald";
-  if (score >= 55) return "amber";
-  return "rose";
+  if (typeof score !== "number") return "neutral";
+  if (score >= 75) return "success";
+  if (score >= 55) return "warning";
+  return "danger";
 }
 
 // ─── Vervaldatum/overdue-helpers (N9) ────────────────────────────────────────
@@ -173,26 +143,30 @@ function normalizeDossierText(value: string) {
 }
 
 // ─── Dossierdocument-viewerlink met context (L2) ─────────────────────────────
-// De "Recent vastgelegd"/"Recent in dossiers"-lijsten openden de viewer ZONDER
-// de gelogde dossiercontext, waardoor een generiek document verscheen i.p.v.
-// het gepersonaliseerde document dat vastgelegd is. De context-queryparams
-// zitten al in de opgeslagen pdf_url — die nemen we over in de viewer-URL.
-export function dossierDocumentViewerHref(doc: {
-  document_key: string;
-  theme?: string | null;
-  pdf_url?: string | null;
-}): string {
+// Alleen de owner-scoped contextreferentie reist mee. Bestaande opgeslagen URLs
+// kunnen nog legacy dossierinhoud bevatten; die velden worden hier nooit gekopieerd.
+export function dossierDocumentViewerHref(
+  doc: {
+    document_key: string;
+    theme?: string | null;
+    pdf_url?: string | null;
+  } & LaventeCarePdfDossierLink,
+): string {
   const params = new URLSearchParams({ theme: doc.theme === "print" ? "print" : "screen" });
-  if (doc.pdf_url) {
+  let reference = getLaventeCarePdfDossierReferenceFromLink(doc);
+
+  if (!reference && doc.pdf_url) {
     try {
       const stored = new URL(doc.pdf_url, "https://placeholder.local");
-      stored.searchParams.forEach((value, key) => {
-        if (key === "theme" || key === "delivery") return;
-        params.set(key, value);
-      });
+      reference = parseLaventeCarePdfDossierReference(stored.searchParams);
     } catch {
       // Ongeldige opgeslagen URL: val terug op de kale viewer-link.
     }
   }
+
+  for (const [key, value] of Object.entries(encodeLaventeCarePdfDossierContext(reference))) {
+    params.set(key, value);
+  }
+
   return `/laventecare/documenten/${encodeURIComponent(doc.document_key)}?${params.toString()}`;
 }

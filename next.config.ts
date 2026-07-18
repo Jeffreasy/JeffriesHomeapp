@@ -4,14 +4,15 @@ import withSerwistInit from "@serwist/next";
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
+  // PwaRegistry owns registration and the update/offline lifecycle. Keeping
+  // Serwist auto-registration enabled would register the same worker twice.
+  register: false,
   disable: process.env.NODE_ENV === "development",
 });
 
 const nextConfig: NextConfig = {
-  // Give the persisted-cache buster (app/providers.tsx) a real per-build value.
-  // Evaluated at build time in the Node config context (not shipped to the
-  // client as a live call), so Date.now() is a fine last-resort fallback when
-  // no CI commit SHA is present.
+  // Attach a non-sensitive release identifier to allowlisted telemetry events.
+  // Evaluated at build time, so no live server or provider data is exposed.
   env: {
     NEXT_PUBLIC_BUILD_ID:
       process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.RENDER_GIT_COMMIT ?? String(Date.now()),

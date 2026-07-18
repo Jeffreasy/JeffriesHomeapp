@@ -8,6 +8,12 @@
 
 import { type Device, type DeviceCommand } from "@/lib/api";
 
+export interface LampBatchResult {
+  total: number;
+  succeeded: number;
+  failed: Device[];
+}
+
 /** Device-state incl. optioneel WiZ scene_id (niet in het basistype, wel in runtime-payloads). */
 type SimulatedState = Device["current_state"] & { scene_id?: number };
 

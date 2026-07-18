@@ -1,10 +1,23 @@
 "use client";
 
-import { FormEvent, type ChangeEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ExternalLink, Eye, FileText, Loader2, MailCheck, MailPlus, MessagesSquare, Paperclip, Pencil, Reply, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { scrollWindowTo } from "@/lib/ui/scroll";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/Badge";
+import { Surface, surfaceVariants } from "@/components/ui/Surface";
+import { cloneElement, FormEvent, isValidElement, type ChangeEvent, type ReactElement, type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ExternalLink, Eye, FileText, MailCheck, MailPlus, MessagesSquare, Paperclip, Pencil, Reply, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { ModalCancelButton } from "@/components/ui/ModalCancelButton";
+import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { FormField, type FormControlAccessibilityProps } from "@/components/ui/FormField";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 import type { LCMailAISuggestion } from "@/lib/api";
-import { extractLaventeCareMailAttachmentContext, type LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
+import type { LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
 import type {
   CompanyItem,
   ContactItem,
@@ -58,8 +71,6 @@ type SuggestPayload = Omit<SendPayload, "cc" | "bcc" | "send" | "attachments"> &
   attachments?: LaventeCareMailAttachmentContext[];
 };
 
-const inputClass =
-  "w-full min-w-0 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-sky-400/60 focus:ring-2 focus:ring-sky-500/20";
 const MAX_MAIL_ATTACHMENTS = 6;
 const MAX_MAIL_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 // L3: harde grens op het GEZAMENLIJKE bijlagegewicht — Graph weigert grote
@@ -415,7 +426,7 @@ export function LaventeCareMailboxView({
       setReplyContext(null);
     }
     setMailModal(null);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollWindowTo({ top: 0 });
   };
 
   const openOutbox = (item: MailOutboxItem) => {
@@ -451,7 +462,7 @@ export function LaventeCareMailboxView({
       conversationId: item.conversation_id ?? null,
     });
     setMailModal(null);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollWindowTo({ top: 0 });
   };
 
   const openInbox = (item: MailInboxItem) => {
@@ -508,7 +519,7 @@ export function LaventeCareMailboxView({
     });
     setThreadConv(null);
     setMailModal(null);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollWindowTo({ top: 0 });
   };
 
   const handleAttachmentFiles = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -559,25 +570,25 @@ export function LaventeCareMailboxView({
   return (
     <div className="min-w-0 space-y-4">
       <section className="grid min-w-0 gap-3 lg:grid-cols-4">
-        <MailboxMetric label="Gesprekken" value={conversations.length} detail={unreadCount ? `${unreadCount} ongelezen` : "geen ongelezen"} tone={unreadCount ? "warn" : "default"} />
+        <MailboxMetric label="Gesprekken" value={conversations.length} detail={unreadCount ? `${unreadCount} ongelezen` : "geen ongelezen"} tone={unreadCount ? "warning" : "neutral"} />
         {/* L12: value = all-time SQL-telling; het "mislukt"-detail komt uit de
             recent geladen outbox, dus expliciet "recent" om de mix duidelijk te
             maken. */}
-        <MailboxMetric label="Verzonden" value={mailbox?.summary.sent ?? 0} detail={failedCount ? `${failedCount} recent mislukt` : "bezorgd"} tone={failedCount ? "warn" : "default"} />
+        <MailboxMetric label="Verzonden" value={mailbox?.summary.sent ?? 0} detail={failedCount ? `${failedCount} recent mislukt` : "bezorgd"} tone={failedCount ? "warning" : "neutral"} />
         <MailboxMetric label="Concepten" value={mailbox?.summary.drafts ?? draftOutbox.length} detail="wachten op verzending" />
-        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
           <div className="flex items-start gap-3">
             {mailbox?.summary.configured ? (
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-success)]" />
             ) : (
-              <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+              <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-[var(--color-warning)]" />
             )}
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-slate-500">Mailafzender</p>
-              <p className="mt-1 truncate text-sm font-bold text-white">
+              <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Mailafzender</p>
+              <p className="mt-1 truncate text-sm font-bold text-[var(--color-text)]">
                 {mailbox?.summary.configured ? mailbox.summary.senderEmail || "Geconfigureerd" : "Nog niet live"}
               </p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{mailbox?.summary.nextStep ?? "Mailbox laden..."}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">{mailbox?.summary.nextStep ?? "Mailbox laden..."}</p>
             </div>
           </div>
         </div>
@@ -603,50 +614,47 @@ export function LaventeCareMailboxView({
               event.preventDefault();
             }
           }}
-          className="glass min-w-0 max-w-full overflow-hidden p-4 sm:p-5"
+ className={cn(surfaceVariants({ padding: "none" }), "min-w-0 max-w-full overflow-hidden p-4 sm:p-5")}
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-500">Sjabloonmail</p>
-              <h3 className="mt-1 text-lg font-bold text-white">Nieuwe klantmail</h3>
-              <p className="mt-1 text-sm leading-6 text-slate-400">
+              <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Sjabloonmail</p>
+              <h3 className="mt-1 text-lg font-bold text-[var(--color-text)]">Nieuwe klantmail</h3>
+              <p className="mt-1 text-sm leading-6 text-[var(--color-text-muted)]">
                 Render een vaste LaventeCare-template met klant, contact en extra variabelen. Concepten blijven in de outbox staan.
               </p>
             </div>
-            <MailPlus className="hidden h-8 w-8 shrink-0 text-sky-300 sm:block" />
+            <MailPlus className="hidden h-8 w-8 shrink-0 text-[var(--color-info)] sm:block" />
           </div>
 
           {/* M-E: zichtbare reply-context; het kruisje maakt er weer een
               losse nieuwe mail van. */}
           {replyContext ? (
-            <div className="mt-3 flex items-start gap-2 rounded-lg border border-sky-400/25 bg-sky-500/[0.08] px-3 py-2">
-              <Reply size={14} className="mt-0.5 shrink-0 text-sky-300" />
-              <p className="min-w-0 flex-1 text-xs leading-5 text-sky-100">
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] px-3 py-2">
+              <Reply size={14} className="mt-0.5 shrink-0 text-[var(--color-info)]" />
+              <p className="min-w-0 flex-1 text-xs leading-5 text-[var(--color-info)]">
                 Antwoord in bestaande conversatie — onderwerp wordt{" "}
                 <span className="font-bold">{replyContext.subject}</span>
                 {replyContext.conversationId ? " en het bericht groepeert in dezelfde thread." : "."}
               </p>
-              <button
-                type="button"
+              <IconButton
                 onClick={() => setReplyContext(null)}
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
-                aria-label="Reply-context verwijderen"
-              >
-                <X size={13} />
-              </button>
+                label="Reply-context verwijderen"
+                icon={<X size={13} />}
+              />
             </div>
           ) : null}
 
           <div className="mt-4 grid min-w-0 gap-3 md:grid-cols-2">
             <Field label="Template">
-              <select value={selectedTemplate?.id ?? ""} onChange={(event) => setTemplateId(event.target.value)} className={inputClass}>
+              <Select value={selectedTemplate?.id ?? ""} onChange={(event) => setTemplateId(event.target.value)}>
                 {activeTemplates.map((template) => (
                   <option key={template.id} value={template.id}>{template.name}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Klant">
-              <select
+              <Select
                 value={effectiveCompanyId ?? ""}
                 onChange={(event) => {
                   const nextCompanyId = event.target.value;
@@ -656,16 +664,16 @@ export function LaventeCareMailboxView({
                     setInvoiceId("");
                   }
                 }}
-                className={inputClass}
+
               >
                 <option value="">Geen klant gekoppeld</option>
                 {companies.map((company) => (
                   <option key={company._id ?? company.id} value={company._id ?? company.id}>{company.naam}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Contactpersoon">
-              <select
+              <Select
                 value={contactId}
                 onChange={(event) => {
                   setContactId(event.target.value);
@@ -676,7 +684,7 @@ export function LaventeCareMailboxView({
                   setEmailEdited(false);
                   setNameEdited(false);
                 }}
-                className={inputClass}
+
               >
                 <option value="">Handmatige ontvanger</option>
                 {companyContacts.map((contact) => (
@@ -684,10 +692,10 @@ export function LaventeCareMailboxView({
                     {contact.naam}{contact.email ? ` - ${contact.email}` : ""}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Ontvanger">
-              <input
+              <Input
                 type="email"
                 value={displayEmail}
                 onChange={(event) => {
@@ -695,22 +703,22 @@ export function LaventeCareMailboxView({
                   setEmailEdited(true);
                 }}
                 placeholder="naam@bedrijf.nl"
-                className={inputClass}
+
               />
             </Field>
             <Field label="Naam ontvanger">
-              <input
+              <Input
                 value={displayName}
                 onChange={(event) => {
                   setToName(event.target.value);
                   setNameEdited(true);
                 }}
                 placeholder="Voornaam achternaam"
-                className={inputClass}
+
               />
             </Field>
             <Field label="Project">
-              <select
+              <Select
                 value={effectiveProjectId ?? ""}
                 onChange={(event) => {
                   const nextProjectId = event.target.value;
@@ -719,16 +727,16 @@ export function LaventeCareMailboxView({
                     setInvoiceId("");
                   }
                 }}
-                className={inputClass}
+
               >
                 <option value="">Geen project</option>
                 {activeProjects.map((project) => (
                   <option key={project._id ?? project.id} value={project._id ?? project.id}>{project.naam}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Opdracht">
-              <select
+              <Select
                 value={effectiveWorkstreamId ?? ""}
                 onChange={(event) => {
                   const nextWorkstreamId = event.target.value;
@@ -737,16 +745,16 @@ export function LaventeCareMailboxView({
                     setInvoiceId("");
                   }
                 }}
-                className={inputClass}
+
               >
                 <option value="">Geen opdracht</option>
                 {activeWorkstreams.map((workstream) => (
                   <option key={workstream._id ?? workstream.id} value={workstream._id ?? workstream.id}>{workstream.titel}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field label="Factuur / Bunq">
-              <select value={invoiceId} onChange={(event) => setInvoiceId(event.target.value)} className={inputClass}>
+              <Select value={invoiceId} onChange={(event) => setInvoiceId(event.target.value)}>
                 <option value="">Geen factuur gekoppeld</option>
                 {filteredInvoices.map((invoice) => (
                   <option key={invoice.id} value={invoice.id}>
@@ -754,56 +762,53 @@ export function LaventeCareMailboxView({
                     {invoice.payment_url ? " - bunq link" : ""}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </div>
 
           <InvoiceMailStatus invoice={selectedInvoice} template={selectedTemplate} />
 
-          <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+          <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <Paperclip className="h-4 w-4 text-slate-300" />
-                  <p className="text-xs font-semibold uppercase text-slate-500">Bijlagen</p>
+                  <Paperclip className="h-4 w-4 text-[var(--color-text-muted)]" />
+                  <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Bijlagen</p>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-slate-400">
+                <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
                   Voeg klant-PDF-bestanden toe bij direct versturen. De AI leest de tekstextractie mee voordat hij de mail invult.
                 </p>
               </div>
-              <label className="inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-sm font-bold text-slate-200 transition hover:bg-white/[0.08]">
+              <label className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 text-sm font-bold text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)]">
                 <Paperclip size={15} />
                 {attachmentsReading ? "PDF lezen..." : "PDF kiezen"}
                 <input type="file" accept="application/pdf,.pdf" multiple className="sr-only" onChange={handleAttachmentFiles} />
               </label>
             </div>
-            {attachmentError ? <p className="mt-2 text-xs font-semibold text-rose-300">{attachmentError}</p> : null}
+            {attachmentError ? <p className="mt-2 text-xs font-semibold text-[var(--color-danger)]">{attachmentError}</p> : null}
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {attachments.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500 sm:col-span-2">
+                <div className="rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs leading-5 text-[var(--color-text-muted)] sm:col-span-2">
                   {selectedCompany
                     ? `Nog geen bijlagen. Voeg hier de PDF-documenten voor ${selectedCompany.naam} toe (bijv. handleiding, afspraken of vrijgave).`
                     : "Nog geen bijlagen. Voeg hier de klant-PDF-documenten toe die met deze mail mee moeten."}
                 </div>
               ) : (
                 attachments.map((attachment, index) => (
-                  <div key={`${attachment.name}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-                    <FileText className="h-4 w-4 shrink-0 text-sky-200" />
+                  <div key={`${attachment.name}-${index}`} className="flex min-w-0 items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2">
+                    <FileText className="h-4 w-4 shrink-0 text-[var(--color-info)]" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-bold text-white">{attachment.name}</p>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="truncate text-xs font-bold text-[var(--color-text)]">{attachment.name}</p>
+                      <p className="text-micro text-[var(--color-text-muted)]">
                         {formatFileSize(attachment.size)} - {attachment.pages || "?"} pag. - {attachmentStatusLabel(attachment.extraction_status)}
                       </p>
-                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">{attachment.summary}</p>
+                      <p className="mt-0.5 line-clamp-2 text-micro leading-4 text-[var(--color-text-muted)]">{attachment.summary}</p>
                     </div>
-                    <button
-                      type="button"
+                    <IconButton
                       onClick={() => setAttachments((current) => current.filter((_, currentIndex) => currentIndex !== index))}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
-                      aria-label={`${attachment.name} verwijderen`}
-                    >
-                      <X size={14} />
-                    </button>
+                      label={`${attachment.name} verwijderen`}
+                      icon={<X size={14} />}
+                    />
                   </div>
                 ))
               )}
@@ -811,23 +816,23 @@ export function LaventeCareMailboxView({
           </div>
 
           <Field label="Variabelen overschrijven (optioneel)" className="mt-3">
-            <textarea
+            <Textarea
               value={variables}
               onChange={(event) => setVariables(event.target.value)}
               rows={6}
               placeholder="bijv. next_step=Ik bel je donderdag"
-              className={`${inputClass} min-h-36 resize-y leading-6`}
+              className="min-h-36 leading-6"
             />
           </Field>
-          <p className="mt-1 text-[11px] leading-4 text-slate-500">
-            Eén per regel als <span className="font-mono text-slate-400">sleutel=waarde</span>. De meeste velden vullen automatisch uit klant, opdracht en AI —
+          <p className="mt-1 text-micro leading-4 text-[var(--color-text-muted)]">
+            Eén per regel als <span className="font-mono text-[var(--color-text-muted)]">sleutel=waarde</span>. De meeste velden vullen automatisch uit klant, opdracht en AI —
             vul hier alleen wat je wilt overschrijven. Klik een veld bij &ldquo;Template context&rdquo; hieronder om het toe te voegen.
           </p>
           {/* L7: sleutels die deze template niet kent — vaak een typfout of
               restant van een andere template; ze doen in de mail niets. */}
           {unknownVariableKeys.length > 0 ? (
-            <p className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-2.5 py-1.5 text-[11px] leading-4 text-amber-100">
-              <TriangleAlert size={12} className="mt-0.5 shrink-0 text-amber-300" />
+            <p className="mt-1.5 flex items-start gap-1.5 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-2.5 py-1.5 text-micro leading-4 text-[var(--color-warning)]">
+              <TriangleAlert size={12} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
               <span className="min-w-0">
                 {unknownVariableKeys.length === 1 ? "Sleutel" : "Sleutels"}{" "}
                 <span className="font-mono">{unknownVariableKeys.slice(0, 6).join(", ")}</span>
@@ -837,67 +842,70 @@ export function LaventeCareMailboxView({
             </p>
           ) : null}
 
-          <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/[0.06] p-3">
+          <div className="mt-3 rounded-lg border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] p-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-sky-200" />
-                  <p className="text-xs font-semibold uppercase text-sky-100">AI context vullen</p>
+                  <Sparkles className="h-4 w-4 text-[var(--color-info)]" />
+                  <p className="text-xs font-semibold uppercase text-[var(--color-info)]">AI context vullen</p>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-slate-400">
+                <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
                   Gebruikt gekoppelde klant, opdracht, project, notities, agenda, rooster, dossier en billing-context. Verstuurt niets automatisch.
                 </p>
               </div>
-              <button
+              <Button
                 type="button"
-                disabled={aiSuggesting || attachmentsReading || !selectedTemplate}
+                variant="primary"
+                disabled={attachmentsReading || !selectedTemplate}
+                loading={aiSuggesting || attachmentsReading}
+                loadingLabel={attachmentsReading ? "PDF's lezen..." : "AI leest context..."}
                 onClick={() => void handleSuggest()}
-                className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-sky-300 px-3 text-sm font-bold text-sky-950 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+                className="shrink-0"
               >
-                <Sparkles size={15} />
-                {attachmentsReading ? "PDF's lezen..." : aiSuggesting ? "AI leest context..." : "AI vullen"}
-              </button>
+                <Sparkles size={15} aria-hidden="true" />
+                AI vullen
+              </Button>
             </div>
             <div className="mt-3 grid min-w-0 gap-2 md:grid-cols-[minmax(0,1fr)_220px]">
-              <input
+              <Input
                 value={aiIntent}
                 onChange={(event) => setAiIntent(event.target.value)}
-                className={inputClass}
+
                 placeholder="Doel van deze mail"
               />
-              <select value={aiTone} onChange={(event) => setAiTone(event.target.value)} className={inputClass}>
+              <Select value={aiTone} onChange={(event) => setAiTone(event.target.value)}>
                 <option value="professioneel, warm en concreet">Professioneel warm</option>
                 <option value="kort, duidelijk en actiegericht">Kort en actiegericht</option>
                 <option value="zorgvuldig, adviserend en strategisch">Adviserend strategisch</option>
                 <option value="vriendelijk, informeel en helder">Vriendelijk informeel</option>
-              </select>
+              </Select>
             </div>
             {aiSuggestion ? (
-              <div className="mt-3 rounded-lg border border-white/10 bg-black/25 p-3">
+              <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Interne AI briefing</p>
-                    <p className="mt-1 text-sm leading-6 text-slate-200">{aiSuggestion.briefing}</p>
+                    <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Interne AI briefing</p>
+                    <p className="mt-1 text-sm leading-6 text-[var(--color-text)]">{aiSuggestion.briefing}</p>
                     {aiSuggestion.subject_hint ? (
-                      <p className="mt-2 text-xs font-semibold text-sky-100">Onderwerp hint: {aiSuggestion.subject_hint}</p>
+                      <p className="mt-2 text-xs font-semibold text-[var(--color-info)]">Onderwerp hint: {aiSuggestion.subject_hint}</p>
                     ) : null}
-                    <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Niet meegestuurd naar de klant</p>
+                    <p className="mt-2 text-micro font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">Niet meegestuurd naar de klant</p>
                   </div>
-                  <span className={`w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold ${confidenceClass(aiSuggestion.confidence)}`}>
+                  <Badge tone={confidenceTone(aiSuggestion.confidence)}>
                     {label(aiSuggestion.confidence)}
-                  </span>
+                  </Badge>
                 </div>
-                <p className="mt-3 text-xs font-semibold uppercase text-slate-500">Bronnen voor jouw controle</p>
+                <p className="mt-3 text-xs font-semibold uppercase text-[var(--color-text-muted)]">Bronnen voor jouw controle</p>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {aiSuggestion.sources.slice(0, 6).map((source, index) => (
-                    <div key={`${source.type}-${source.title}-${index}`} className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
+                    <div key={`${source.type}-${source.title}-${index}`} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-xs font-bold text-white">{source.title}</p>
-                        <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                        <p className="truncate text-xs font-bold text-[var(--color-text)]">{source.title}</p>
+                        <Badge tone="neutral" size="sm" className="shrink-0">
                           {sourceTypeLabel(source.type)}
-                        </span>
+                        </Badge>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">
+                      <p className="mt-1 line-clamp-2 text-micro leading-4 text-[var(--color-text-muted)]">
                         {[source.date, source.summary].filter(Boolean).join(" - ")}
                       </p>
                     </div>
@@ -908,67 +916,70 @@ export function LaventeCareMailboxView({
           </div>
 
           <div className="mt-4 grid min-w-0 gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <p className="text-xs font-semibold uppercase text-slate-500">Template context</p>
-              <p className="mt-2 text-sm font-bold text-white">{selectedTemplate?.subject_template ?? "Geen template"}</p>
-              <p className="mt-2 line-clamp-4 text-xs leading-5 text-slate-400">{stripHtml(selectedTemplate?.body_html ?? "")}</p>
-              {selectedCompany ? <p className="mt-2 text-xs text-slate-500">Klantcontext: {selectedCompany.naam}</p> : null}
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3">
+              <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Template context</p>
+              <p className="mt-2 text-sm font-bold text-[var(--color-text)]">{selectedTemplate?.subject_template ?? "Geen template"}</p>
+              <p className="mt-2 line-clamp-4 text-xs leading-5 text-[var(--color-text-muted)]">{stripHtml(selectedTemplate?.body_html ?? "")}</p>
+              {selectedCompany ? <p className="mt-2 text-xs text-[var(--color-text-muted)]">Klantcontext: {selectedCompany.naam}</p> : null}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {variableHints.slice(0, 18).map((hint) => (
-                  <button
+                  <Button
                     key={hint}
                     type="button"
+                    size="sm"
+                    variant="secondary"
                     onClick={() => insertVariable(hint)}
                     title="Klik om te overschrijven in het variabelenveld"
-                    className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-1 text-[11px] font-semibold text-sky-100 transition hover:border-sky-400/40 hover:bg-sky-500/20"
+                    className="rounded-full border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)]"
                   >
                     {hint}
-                  </button>
+                  </Button>
                 ))}
                 {variableHints.length > 18 ? (
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-semibold text-slate-400">
+                  <Badge tone="neutral" size="sm">
                     +{variableHints.length - 18}
-                  </span>
+                  </Badge>
                 ) : null}
               </div>
             </div>
-            <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-100">
-              <div className="flex items-center justify-between border-b border-slate-200 bg-white px-3 py-2">
-                <p className="text-xs font-bold uppercase text-slate-500">Voorbeeld</p>
-                <button
+            <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-document-preview-surface-muted)]">
+              <div className="flex items-center justify-between border-b border-[var(--color-document-preview-border)] bg-[var(--color-document-preview-surface)] px-3 py-2">
+                <p className="text-xs font-bold uppercase text-[var(--color-document-preview-text-muted)]">Voorbeeld</p>
+                <Button
                   type="button"
+                  size="sm"
                   onClick={openPreview}
                   disabled={!selectedTemplate}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="border-[var(--color-document-preview-border)] bg-[var(--color-document-preview-surface-muted)] text-[var(--color-document-preview-text)] hover:bg-[var(--color-document-preview-surface-muted)]"
                 >
-                  <Eye size={12} /> Vergroten
-                </button>
+                  <Eye size={12} aria-hidden="true" /> Vergroten
+                </Button>
               </div>
               <iframe
                 title="LaventeCare mail preview"
                 sandbox=""
                 srcDoc={previewHTML}
-                className="h-64 w-full bg-slate-100"
+                className="h-64 w-full bg-[var(--color-document-preview-surface-muted)]"
               />
             </div>
-            <div className="rounded-lg border border-white/10 bg-black/20 p-3 lg:col-span-2">
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3 lg:col-span-2">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase text-slate-500">Interne verzendcheck</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">Controle voor jou. Deze regels worden niet in de mail gezet.</p>
+                  <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Interne verzendcheck</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">Controle voor jou. Deze regels worden niet in de mail gezet.</p>
                 </div>
-                <span className={`w-fit rounded-full border px-2.5 py-1 text-[11px] font-bold ${readinessBadgeClass(sendReadiness.status)}`}>
+                <Badge tone={readinessTone(sendReadiness.status)}>
                   {sendReadiness.status === "ok" ? "Klaar om te versturen" : sendReadiness.status === "warn" ? "Controleer" : "Niet klaar"}
-                </span>
+                </Badge>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                 {sendReadiness.items.map((item) => (
-                  <div key={item.label} className="rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+                  <div key={item.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2.5">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-bold text-white">{item.label}</p>
-                      <span className={`h-2.5 w-2.5 rounded-full ${readinessDotClass(item.status)}`} />
+                      <p className="truncate text-xs font-bold text-[var(--color-text)]">{item.label}</p>
+                      <span className={cn("h-2.5 w-2.5 rounded-full", uiToneClasses[readinessTone(item.status)].dot)} aria-hidden="true" />
                     </div>
-                    <p className="mt-1 text-[11px] leading-4 text-slate-500">{item.detail}</p>
+                    <p className="mt-1 text-micro leading-4 text-[var(--color-text-muted)]">{item.detail}</p>
                   </div>
                 ))}
               </div>
@@ -976,28 +987,32 @@ export function LaventeCareMailboxView({
           </div>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
-            <button
+            <Button
               type="submit"
+              variant="secondary"
+              fullWidth
               disabled={sending || !selectedTemplate || !resolvedEmail}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-bold text-slate-200 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <MailCheck size={16} />
+              <MailCheck size={16} aria-hidden="true" />
               Concept maken
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              disabled={sending || !selectedTemplate || !resolvedEmail}
+              variant="success"
+              fullWidth
+              disabled={!selectedTemplate || !resolvedEmail}
+              loading={sending}
+              loadingLabel="Verwerken..."
               onClick={openSendConfirm}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-bold text-emerald-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Send size={16} />
-              {sending ? "Verwerken..." : "Versturen..."}
-            </button>
+              <Send size={16} aria-hidden="true" />
+              Versturen
+            </Button>
           </div>
           {justSent ? (
             <p
               role="status"
-              className="mt-2 flex items-center gap-2 rounded-lg border border-emerald-400/25 bg-emerald-400/10 px-3 py-2 text-sm font-semibold text-emerald-100"
+              className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--color-success-border)] bg-[var(--color-success-subtle)] px-3 py-2 text-sm font-semibold text-[var(--color-success)]"
             >
               <CheckCircle2 size={15} className="shrink-0" />
               Verzonden — de opsteller is leeggemaakt voor de volgende mail.
@@ -1006,53 +1021,55 @@ export function LaventeCareMailboxView({
         </form>
 
         <aside className="min-w-0 space-y-4">
-          <section className="glass min-w-0 p-4">
+          <section className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
             <div className="flex items-center justify-between gap-2">
-              <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase text-slate-500">
+              <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase text-[var(--color-text-muted)]">
                 <MessagesSquare size={13} /> Gesprekken
-                {conversations.length > 0 ? <span className="text-slate-600">({conversations.length})</span> : null}
+                {conversations.length > 0 ? <span className="text-[var(--color-text-subtle)]">({conversations.length})</span> : null}
               </p>
-              <button
+              <Button
                 type="button"
+                size="sm"
+                variant="secondary"
                 onClick={() => { void onSyncInbox(); }}
-                disabled={syncingInbox}
-                className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-sky-500/25 bg-sky-500/10 px-2.5 text-[11px] font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                loading={syncingInbox}
+                loadingLabel="Synchroniseren..."
               >
-                {syncingInbox ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                <RefreshCw size={12} aria-hidden="true" />
                 Sync inbox
-              </button>
+              </Button>
             </div>
             {/* M15/R8: de Mail.Read-melding alléén als een sync dat expliciet
                 meldde — een gewone lege inbox betekent niet dat de machtiging
                 nog "pending" is. */}
             {inboundBlocked ? (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-400/25 bg-amber-400/[0.08] px-3 py-2">
-                <TriangleAlert size={14} className="mt-0.5 shrink-0 text-amber-300" />
-                <p className="text-xs leading-5 text-amber-100">
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2">
+                <TriangleAlert size={14} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
+                <p className="text-xs leading-5 text-[var(--color-warning)]">
                   Inkomende mail wacht op Microsoft-machtiging (Mail.Read). Verzonden mail werkt wel.
                 </p>
               </div>
             ) : null}
             {/* R8: fout van de laatste inbox-sync uit de payload zelf. */}
             {!inboundBlocked && inboxError ? (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-rose-400/25 bg-rose-400/[0.08] px-3 py-2">
-                <TriangleAlert size={14} className="mt-0.5 shrink-0 text-rose-300" />
-                <p className="text-xs leading-5 text-rose-100">
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-3 py-2">
+                <TriangleAlert size={14} className="mt-0.5 shrink-0 text-[var(--color-danger)]" />
+                <p className="text-xs leading-5 text-[var(--color-danger)]">
                   Inbox-sync meldde een fout: {inboxError}
                 </p>
               </div>
             ) : null}
             {/* R8: neutrale lege-inbox-melding voor het gewone geen-mail-geval. */}
             {!inboundBlocked && !inboxError && !mailboxLoading && inbox.length === 0 ? (
-              <p className="mt-3 rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-3 py-2 text-xs leading-5 text-slate-500">
+              <p className="mt-3 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs leading-5 text-[var(--color-text-muted)]">
                 Nog geen inkomende mail. Gebruik &ldquo;Sync inbox&rdquo; om nieuwe berichten op te halen.
               </p>
             ) : null}
             <div className="mt-3 space-y-2">
               {mailboxLoading ? (
-                <p className="text-sm text-slate-500">Mailbox laden...</p>
+                <p className="text-sm text-[var(--color-text-muted)]">Mailbox laden...</p>
               ) : conversations.length === 0 ? (
-                <p className="text-sm leading-6 text-slate-500">Nog geen gesprekken. Verzonden mail verschijnt hier direct.</p>
+                <p className="text-sm leading-6 text-[var(--color-text-muted)]">Nog geen gesprekken. Verzonden mail verschijnt hier direct.</p>
               ) : (
                 (showAllConversations ? conversations : conversations.slice(0, 10)).map((conversation) => (
                   <ConversationRow key={conversation.key} conversation={conversation} onOpen={openThread} />
@@ -1060,57 +1077,71 @@ export function LaventeCareMailboxView({
               )}
             </div>
             {conversations.length > 10 ? (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
+                fullWidth
+                aria-expanded={showAllConversations}
                 onClick={() => setShowAllConversations((value) => !value)}
-                className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+                className="mt-2"
               >
                 {showAllConversations ? "Toon minder" : `Toon alle ${conversations.length} gesprekken`}
-              </button>
+              </Button>
             ) : null}
           </section>
 
           {draftOutbox.length > 0 ? (
-            <section className="glass min-w-0 p-4">
-              <p className="text-xs font-semibold uppercase text-slate-500">Concepten &amp; mislukt</p>
+            <section className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
+              <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Concepten &amp; mislukt</p>
               <div className="mt-3 space-y-2">
                 {(showAllDrafts ? draftOutbox : draftOutbox.slice(0, 6)).map((item) => (
                   <OutboxRow key={item.id} item={item} onOpen={openOutbox} />
                 ))}
               </div>
               {draftOutbox.length > 6 ? (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  fullWidth
+                  aria-expanded={showAllDrafts}
                   onClick={() => setShowAllDrafts((value) => !value)}
-                  className="mt-2 w-full rounded-lg border border-white/10 bg-white/[0.02] py-1.5 text-[11px] font-semibold text-slate-400 transition hover:bg-white/[0.05]"
+                  className="mt-2"
                 >
                   {showAllDrafts ? "Toon minder" : `Toon alle ${draftOutbox.length} concepten`}
-                </button>
+                </Button>
               ) : null}
             </section>
           ) : null}
 
-          <section className="glass min-w-0 p-4">
-            <p className="text-xs font-semibold uppercase text-slate-500">Templatebibliotheek</p>
+          <section className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
+            <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Templatebibliotheek</p>
             <div className="mt-3 space-y-2">
               {/* L12: alleen actieve templates — een inactieve aanklikken zette
                   templateId op een id die niet in de select-lijst zit, waardoor
                   de selectie leeg leek. */}
               {activeTemplates.map((template) => (
-                <button
+                <Button
                   key={template.id}
                   type="button"
+                  variant="secondary"
+                  fullWidth
+                  aria-pressed={template.id === selectedTemplate?.id}
                   onClick={() => setTemplateId(template.id)}
-                  className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition hover:bg-white/[0.06]"
+                  className={cn(
+                    "h-auto flex-col items-stretch gap-0 p-3 text-left",
+                    template.id === selectedTemplate?.id && "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]",
+                  )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-bold text-white">{template.name}</p>
-                    <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-200">
+                    <p className="truncate text-sm font-bold text-[var(--color-text)]">{template.name}</p>
+                    <Badge tone="info" size="sm">
                       {label(template.category)}
-                    </span>
+                    </Badge>
                   </div>
-                  <p className="mt-1 truncate text-xs text-slate-500">{template.subject_template}</p>
-                </button>
+                  <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">{template.subject_template}</p>
+                </Button>
               ))}
             </div>
           </section>
@@ -1128,22 +1159,28 @@ export function LaventeCareMailboxView({
   );
 }
 
-function Field({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
+function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  const id = useId();
+
   return (
-    <label className={`block min-w-0 ${className}`}>
-      <span className="mb-1.5 block text-xs font-semibold uppercase text-slate-500">{label}</span>
-      {children}
-    </label>
+    <FormField id={id} label={label} className={className}>
+      {(controlProps) =>
+        isValidElement(children)
+          ? cloneElement(children as ReactElement<FormControlAccessibilityProps>, controlProps)
+          : children
+      }
+    </FormField>
   );
 }
 
-function MailboxMetric({ label, value, detail, tone = "default" }: { label: string; value: number | string; detail: string; tone?: "default" | "warn" }) {
+function MailboxMetric({ label, value, detail, tone = "neutral" }: { label: string; value: number | string; detail: string; tone?: UiTone }) {
+  const toneClass = uiToneClasses[tone];
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-white">{value}</p>
-      <p className={`mt-1 text-xs ${tone === "warn" ? "font-semibold text-amber-300" : "text-slate-500"}`}>{detail}</p>
-    </div>
+    <Surface tone={tone === "neutral" ? "subtle" : tone} padding="none" className="p-4">
+      <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-[var(--color-text)]">{value}</p>
+      <p className={cn("mt-1 text-xs", tone !== "neutral" && "font-semibold", tone === "neutral" ? "text-[var(--color-text-muted)]" : toneClass.text)}>{detail}</p>
+    </Surface>
   );
 }
 
@@ -1153,42 +1190,38 @@ function InvoiceMailStatus({ invoice, template }: { invoice?: InvoiceItem; templ
 
   if (!invoice) {
     return (
-      <div className="mt-3 rounded-lg border border-amber-400/20 bg-amber-400/[0.07] p-3">
-        <p className="text-xs font-semibold uppercase text-amber-100">Factuurcontext nodig</p>
-        <p className="mt-1 text-sm leading-5 text-slate-300">
+      <Surface tone="warning" padding="none" className="mt-3 p-3">
+        <p className="text-xs font-semibold uppercase text-[var(--color-warning)]">Factuurcontext nodig</p>
+        <p className="mt-1 text-sm leading-5 text-[var(--color-text-muted)]">
           Deze template gebruikt factuurvelden. Selecteer een factuur zodat bedrag, vervaldatum en Bunq-link uit de backend komen.
         </p>
-      </div>
+      </Surface>
     );
   }
 
   const hasPaymentURL = Boolean(invoice.payment_url);
+  const invoiceTone: UiTone = hasPaymentURL ? "success" : "warning";
   return (
-    <div className={`mt-3 rounded-lg border p-3 ${hasPaymentURL ? "border-emerald-400/20 bg-emerald-400/[0.07]" : "border-amber-400/20 bg-amber-400/[0.07]"}`}>
+    <Surface tone={invoiceTone} padding="none" className="mt-3 p-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className={`text-xs font-semibold uppercase ${hasPaymentURL ? "text-emerald-100" : "text-amber-100"}`}>Factuur gekoppeld</p>
-          <p className="mt-1 text-sm font-bold text-white">
+          <p className={cn("text-xs font-semibold uppercase", uiToneClasses[invoiceTone].text)}>Factuur gekoppeld</p>
+          <p className="mt-1 text-sm font-bold text-[var(--color-text)]">
             {invoice.invoice_number} - {formatCents(invoice.total_cents)} - {label(invoice.status)}
           </p>
-          <p className="mt-1 text-sm leading-5 text-slate-300">
+          <p className="mt-1 text-sm leading-5 text-[var(--color-text-muted)]">
             {hasPaymentURL
               ? "Bunq betaal-URL staat klaar en wordt in factuurtemplates gebruikt."
               : "Nog geen Bunq-link. Maak in Commercie eerst een betaalverzoek en bevestig de pending action via Settings of Telegram."}
           </p>
         </div>
         {invoice.payment_url ? (
-          <a
-            href={invoice.payment_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex min-h-9 shrink-0 items-center justify-center rounded-lg border border-emerald-300/20 bg-emerald-300/10 px-3 text-xs font-bold text-emerald-100 transition hover:bg-emerald-300/15"
-          >
+          <ButtonLink href={invoice.payment_url} target="_blank" rel="noreferrer" variant="success" size="sm" className="shrink-0">
             Link testen
-          </a>
+          </ButtonLink>
         ) : null}
       </div>
-    </div>
+    </Surface>
   );
 }
 
@@ -1276,135 +1309,113 @@ type MailModalState = {
 // message (read-only + reply). The iframe is sandboxed and renders exactly the escaped
 // HTML that gets sent — preview == artifact.
 function MailPreviewModal({ state, onClose }: { state: MailModalState | null; onClose: () => void }) {
-  // L12-a11y: focus-trap + focus-restore rond de preview/bevestig-modal.
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  useFocusTrap(Boolean(state), dialogRef);
-  useEffect(() => {
-    if (!state) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [state, onClose]);
-
   if (!state) return null;
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        className="glass flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">{state.title}</p>
-            {state.subtitle ? <p className="mt-0.5 truncate text-xs text-slate-400">{state.subtitle}</p> : null}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={state.title}
+      subtitle={state.subtitle}
+      maxWidth="3xl"
+      tone="surface"
+      dataAppModal="laventecare-mail-preview"
+      className="max-h-[92dvh]"
+      contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+      footer={
+        state.primaryAction || state.externalLink ? (
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+            {state.externalLink ? (
+              <ButtonLink
+                href={state.externalLink.href}
+                target="_blank"
+                rel="noreferrer"
+                variant="secondary"
+                className="w-full sm:mr-auto sm:w-auto"
+              >
+                <ExternalLink size={15} aria-hidden="true" />
+                {state.externalLink.label}
+              </ButtonLink>
+            ) : null}
+            <ModalCancelButton onFallback={onClose} className="w-full sm:w-auto">
+              {state.primaryAction?.variant === "send" ? "Annuleren" : "Sluiten"}
+            </ModalCancelButton>
+            {state.primaryAction ? (
+              <Button
+                type="button"
+                variant={state.primaryAction.variant === "send" ? "primary" : "secondary"}
+                disabled={state.primaryAction.disabled}
+                loading={state.primaryAction.loading}
+                loadingLabel="Verwerken..."
+                onClick={state.primaryAction.onClick}
+                className="w-full sm:w-auto"
+              >
+                {state.primaryAction.icon}
+                {state.primaryAction.label}
+              </Button>
+            ) : null}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-slate-300 transition hover:bg-white/[0.08]"
-          >
-            <X size={16} />
-          </button>
-        </div>
+        ) : undefined
+      }
+    >
         {state.meta && state.meta.length ? (
-          <div className="flex flex-wrap gap-x-5 gap-y-1.5 border-b border-white/10 bg-white/[0.02] px-4 py-2.5 sm:px-5">
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)] px-4 py-2.5 sm:px-5">
             {state.meta.map((entry) => (
               <div key={entry.label} className="min-w-0">
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{entry.label}</span>
-                <p className="truncate text-xs font-medium text-slate-200">{entry.value}</p>
+                <span className="text-micro font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">{entry.label}</span>
+                <p className="truncate text-xs font-medium text-[var(--color-text)]">{entry.value}</p>
               </div>
             ))}
           </div>
         ) : null}
-        <div className="min-h-0 flex-1 overflow-auto bg-slate-100">
+        <div className="min-h-0 flex-1 overflow-auto bg-[var(--color-document-preview-surface-muted)]">
           {state.html ? (
-            <iframe title="LaventeCare mail" sandbox="" srcDoc={state.html} className="h-[60vh] min-h-[320px] w-full bg-slate-100" />
+            <iframe title="LaventeCare mail" sandbox="" srcDoc={state.html} className="h-[60vh] min-h-[320px] w-full bg-[var(--color-document-preview-surface-muted)]" />
           ) : (
-            <div className="whitespace-pre-wrap p-5 text-sm leading-6 text-slate-800">{state.text || "Geen inhoud beschikbaar."}</div>
+            <div className="whitespace-pre-wrap p-5 text-sm leading-6 text-[var(--color-document-preview-text)]">{state.text || "Geen inhoud beschikbaar."}</div>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3 sm:px-5">
-          {state.externalLink ? (
-            <a
-              href={state.externalLink.href}
-              target="_blank"
-              rel="noreferrer"
-              className="mr-auto inline-flex items-center gap-1.5 text-xs font-semibold text-sky-300 hover:underline"
-            >
-              <ExternalLink size={13} /> {state.externalLink.label}
-            </a>
-          ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.08]"
-          >
-            Sluiten
-          </button>
-          {state.primaryAction ? (
-            <button
-              type="button"
-              disabled={state.primaryAction.disabled || state.primaryAction.loading}
-              onClick={state.primaryAction.onClick}
-              className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                state.primaryAction.variant === "send"
-                  ? "bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
-                  : "border border-sky-500/30 bg-sky-500/15 text-sky-100 hover:bg-sky-500/25"
-              }`}
-            >
-              {state.primaryAction.loading ? <Loader2 size={15} className="animate-spin" /> : state.primaryAction.icon}
-              {state.primaryAction.loading ? "Verwerken..." : state.primaryAction.label}
-            </button>
-          ) : null}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
 function ConversationRow({ conversation, onOpen }: { conversation: MailConversation; onOpen: (c: MailConversation) => void }) {
   const c = conversation;
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
+      fullWidth
       onClick={() => onOpen(c)}
-      className={`w-full rounded-lg border px-3 py-2 text-left transition hover:bg-white/[0.06] ${c.hasUnread ? "border-sky-500/25 bg-sky-500/[0.05]" : "border-white/10 bg-white/[0.03]"}`}
+      className={cn(
+        "h-auto flex-col items-stretch gap-0 p-3 text-left",
+        c.hasUnread && "border-[var(--color-info-border)] bg-[var(--color-info-subtle)]",
+      )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold text-white">{c.party}</p>
-        <span className="shrink-0 text-[10px] text-slate-500">{formatDate(c.latestAt)}</span>
+        <p className="min-w-0 truncate text-sm font-semibold text-[var(--color-text)]">{c.party}</p>
+        <span className="shrink-0 text-micro text-[var(--color-text-muted)]">{formatDate(c.latestAt)}</span>
       </div>
       <div className="mt-0.5 flex items-center gap-1.5">
         {c.latestKind === "in" ? (
-          <ArrowDownLeft size={12} className="shrink-0 text-emerald-300" />
+          <ArrowDownLeft size={12} className="shrink-0 text-[var(--color-success)]" />
         ) : (
-          <ArrowUpRight size={12} className="shrink-0 text-sky-300" />
+          <ArrowUpRight size={12} className="shrink-0 text-[var(--color-info)]" />
         )}
-        <p className="min-w-0 truncate text-xs font-medium text-slate-300">{c.subject}</p>
+        <p className="min-w-0 truncate text-xs font-medium text-[var(--color-text-muted)]">{c.subject}</p>
       </div>
       {c.count > 1 || c.hasUnread ? (
         <div className="mt-1.5 flex items-center gap-2">
           {c.count > 1 ? (
-            <span className="rounded-full border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">{c.count} berichten</span>
+            <Badge tone="neutral" size="sm">{c.count} berichten</Badge>
           ) : null}
           {c.hasUnread ? (
-            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-sky-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-sky-400" /> ongelezen
+            <span className="inline-flex items-center gap-1 text-micro font-semibold text-[var(--color-info)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-info)]" /> ongelezen
             </span>
           ) : null}
         </div>
       ) : null}
-    </button>
+    </Button>
   );
 }
 
@@ -1412,39 +1423,43 @@ function ThreadEntryCard({ entry, onOpen }: { entry: ThreadEntry; onOpen: () => 
   if (entry.kind === "in") {
     const m = entry.inbox;
     return (
-      <button
+      <Button
         type="button"
+        variant="success"
+        fullWidth
         onClick={onOpen}
-        className="w-full rounded-lg border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2 text-left transition hover:bg-emerald-500/[0.09]"
+        className="h-auto flex-col items-stretch gap-0 p-3 text-left"
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+          <span className="inline-flex items-center gap-1 text-micro font-bold uppercase tracking-wide text-[var(--color-success)]">
             <ArrowDownLeft size={11} /> Ontvangen
           </span>
-          <span className="text-[10px] text-slate-500">{formatDate(m.received_at)}</span>
+          <span className="text-micro text-[var(--color-text-muted)]">{formatDate(m.received_at)}</span>
         </div>
-        <p className="mt-1 truncate text-xs font-semibold text-white">{m.from_name || m.from_email}</p>
-        <p className="truncate text-xs text-slate-400">{m.subject || "(geen onderwerp)"}</p>
-        {m.body_preview ? <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{m.body_preview}</p> : null}
-      </button>
+        <p className="mt-1 truncate text-xs font-semibold text-[var(--color-text)]">{m.from_name || m.from_email}</p>
+        <p className="truncate text-xs text-[var(--color-text-muted)]">{m.subject || "(geen onderwerp)"}</p>
+        {m.body_preview ? <p className="mt-1 line-clamp-2 text-micro leading-4 text-[var(--color-text-muted)]">{m.body_preview}</p> : null}
+      </Button>
     );
   }
   const m = entry.outbox;
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
+      fullWidth
       onClick={onOpen}
-      className="w-full rounded-lg border border-sky-500/20 bg-sky-500/[0.05] px-3 py-2 text-left transition hover:bg-sky-500/[0.09]"
+      className="h-auto flex-col items-stretch gap-0 border-[var(--color-info-border)] bg-[var(--color-info-subtle)] p-3 text-left"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-sky-300">
+        <span className="inline-flex items-center gap-1 text-micro font-bold uppercase tracking-wide text-[var(--color-info)]">
           <ArrowUpRight size={11} /> Verzonden{m.status === "failed" ? " · mislukt" : ""}
         </span>
-        <span className="text-[10px] text-slate-500">{formatDate(m.sent_at ?? m.created_at)}</span>
+        <span className="text-micro text-[var(--color-text-muted)]">{formatDate(m.sent_at ?? m.created_at)}</span>
       </div>
-      <p className="mt-1 truncate text-xs font-semibold text-white">Aan {m.to_name || m.to_email}</p>
-      <p className="truncate text-xs text-slate-400">{m.subject}</p>
-    </button>
+      <p className="mt-1 truncate text-xs font-semibold text-[var(--color-text)]">Aan {m.to_name || m.to_email}</p>
+      <p className="truncate text-xs text-[var(--color-text-muted)]">{m.subject}</p>
+    </Button>
   );
 }
 
@@ -1459,97 +1474,61 @@ function MailThreadModal({
   onOpenEntry: (entry: ThreadEntry) => void;
   onReply: (conversation: MailConversation) => void;
 }) {
-  // L12-a11y: focus-trap + focus-restore rond de thread-modal.
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  useFocusTrap(Boolean(conversation), dialogRef);
-  useEffect(() => {
-    if (!conversation) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [conversation, onClose]);
-
   if (!conversation) return null;
   const ordered = [...conversation.entries].reverse();
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
-      onClick={onClose}
-    >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        className="glass flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">{conversation.party}</p>
-            <p className="mt-0.5 truncate text-xs text-slate-400">
-              {conversation.count} bericht{conversation.count === 1 ? "" : "en"} · {conversation.subject}
-            </p>
-          </div>
-          <button
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={conversation.party}
+      subtitle={`${conversation.count} bericht${conversation.count === 1 ? "" : "en"} · ${conversation.subject}`}
+      maxWidth="2xl"
+      tone="surface"
+      dataAppModal="laventecare-mail-thread"
+      className="max-h-[92dvh]"
+      contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <ModalCancelButton onFallback={onClose} className="w-full sm:w-auto">
+            Sluiten
+          </ModalCancelButton>
+          <Button
             type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-slate-300 transition hover:bg-white/[0.08]"
+            variant="primary"
+            onClick={() => onReply(conversation)}
+            className="w-full sm:w-auto"
           >
-            <X size={16} />
-          </button>
+            <Reply size={15} aria-hidden="true" />
+            Beantwoorden
+          </Button>
         </div>
+      }
+    >
         <div className="min-h-0 flex-1 space-y-2 overflow-auto p-4 sm:p-5">
           {ordered.map((entry, idx) => (
             <ThreadEntryCard key={`${entry.kind}-${idx}`} entry={entry} onOpen={() => onOpenEntry(entry)} />
           ))}
         </div>
-        <div className="flex items-center justify-end gap-2 border-t border-white/10 px-4 py-3 sm:px-5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-slate-200 transition hover:bg-white/[0.08]"
-          >
-            Sluiten
-          </button>
-          <button
-            type="button"
-            onClick={() => onReply(conversation)}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-sky-500/30 bg-sky-500/15 px-4 text-sm font-bold text-sky-100 transition hover:bg-sky-500/25"
-          >
-            <Reply size={15} /> Beantwoorden
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
 function OutboxRow({ item, onOpen }: { item: MailOutboxItem; onOpen: (item: MailOutboxItem) => void }) {
-  const statusClass =
-    item.status === "sent"
-      ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
-      : item.status === "failed"
-        ? "border-rose-500/20 bg-rose-500/10 text-rose-200"
-        : item.status === "sending"
-          ? "border-sky-500/20 bg-sky-500/10 text-sky-200"
-          : "border-amber-500/20 bg-amber-500/10 text-amber-200";
   return (
-    <button
+    <Button
       type="button"
+      variant="secondary"
+      fullWidth
       onClick={() => onOpen(item)}
-      className="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-left transition hover:bg-white/[0.06]"
+      className="h-auto flex-col items-stretch gap-0 p-3 text-left"
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-bold text-white">{item.subject}</p>
-        <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold ${statusClass}`}>{label(item.status)}</span>
+        <p className="min-w-0 truncate text-sm font-bold text-[var(--color-text)]">{item.subject}</p>
+        <Badge tone={outboxTone(item.status)} size="sm" className="shrink-0">{label(item.status)}</Badge>
       </div>
-      <p className="mt-1 truncate text-xs text-slate-500">Aan {item.to_email} · {formatDate(item.sent_at ?? item.created_at)}</p>
-      {item.error_message ? <p className="mt-1 line-clamp-2 text-xs text-rose-300">{item.error_message}</p> : null}
-    </button>
+      <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">Aan {item.to_email} · {formatDate(item.sent_at ?? item.created_at)}</p>
+      {item.error_message ? <p className="mt-1 line-clamp-2 text-xs text-[var(--color-danger)]">{item.error_message}</p> : null}
+    </Button>
   );
 }
 
@@ -1763,6 +1742,10 @@ async function readMailAttachment(file: File): Promise<MailAttachment> {
   if (!contentBytes) {
     throw new Error(`${file.name} bevat geen leesbare inhoud.`);
   }
+  // PDF.js stays outside the mailbox bundle until a validated PDF is actually read.
+  const { extractLaventeCareMailAttachmentContext } = await import(
+    "@/lib/laventecare/mail-attachments"
+  );
   const context = await extractLaventeCareMailAttachmentContext(file);
   return {
     name: file.name,
@@ -1821,26 +1804,10 @@ function formatFileSize(value: number) {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function readinessBadgeClass(value: ReadinessStatus) {
-  switch (value) {
-    case "ok":
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-100";
-    case "warn":
-      return "border-amber-400/20 bg-amber-400/10 text-amber-100";
-    default:
-      return "border-rose-400/20 bg-rose-400/10 text-rose-100";
-  }
-}
-
-function readinessDotClass(value: ReadinessStatus) {
-  switch (value) {
-    case "ok":
-      return "bg-emerald-300";
-    case "warn":
-      return "bg-amber-300";
-    default:
-      return "bg-rose-300";
-  }
+function readinessTone(value: ReadinessStatus): UiTone {
+  if (value === "ok") return "success";
+  if (value === "warn") return "warning";
+  return "danger";
 }
 
 // Keys whose value is trusted, server-built HTML and must NOT be escaped — mirrors
@@ -1910,15 +1877,17 @@ function extractPlaceholders(template?: MailTemplateItem) {
   return Array.from(new Set(Array.from(matches, (match) => match[1]))).sort();
 }
 
-function confidenceClass(value: string) {
-  switch (value) {
-    case "hoog":
-      return "border-emerald-400/20 bg-emerald-400/10 text-emerald-100";
-    case "normaal":
-      return "border-sky-400/20 bg-sky-400/10 text-sky-100";
-    default:
-      return "border-amber-400/20 bg-amber-400/10 text-amber-100";
-  }
+function confidenceTone(value: string): UiTone {
+  if (value === "hoog") return "success";
+  if (value === "normaal") return "info";
+  return "warning";
+}
+
+function outboxTone(value: string): UiTone {
+  if (value === "sent") return "success";
+  if (value === "failed") return "danger";
+  if (value === "sending") return "info";
+  return "warning";
 }
 
 function sourceTypeLabel(value: string) {

@@ -1,59 +1,70 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import type { UiTone } from "@/lib/ui/tones";
+import { reducedMotionTransition, uiMotion } from "@/lib/ui/motion";
 import { cn } from "@/lib/utils";
 
-interface CollapsibleSectionProps {
+type HeadingLevel = 2 | 3 | 4 | 5 | 6;
+
+export interface CollapsibleSectionProps {
   title: string;
   subtitle?: string;
-  icon?: React.ReactNode;
-  children: React.ReactNode;
+  icon?: ReactNode;
+  children: ReactNode;
   defaultOpen?: boolean;
-  theme?: "primary" | "sky" | "emerald" | "rose" | "violet" | "amber" | "slate";
+  tone?: UiTone;
+  headingLevel?: HeadingLevel;
   className?: string;
   contentClassName?: string;
   keepMounted?: boolean;
 }
 
-const themeClasses = {
-  primary: {
-    header: "hover:bg-[var(--color-primary-subtle)] border-transparent hover:border-[var(--color-primary-border)]",
+const collapsibleToneClasses: Record<
+  UiTone,
+  { header: string; icon: string; activeBorder: string }
+> = {
+  neutral: {
+    header: "border-transparent hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]",
+    icon: "text-[var(--color-text-muted)]",
+    activeBorder: "border-[var(--color-border-strong)]",
+  },
+  accent: {
+    header: "border-transparent hover:border-[var(--color-primary-border)] hover:bg-[var(--color-primary-subtle)]",
     icon: "text-[var(--color-primary)]",
     activeBorder: "border-[var(--color-primary-border)]",
   },
-  sky: {
-    header: "hover:bg-sky-500/10 border-transparent hover:border-sky-500/20",
-    icon: "text-sky-400",
-    activeBorder: "border-sky-500/20",
+  info: {
+    header: "border-transparent hover:border-[var(--color-info-border)] hover:bg-[var(--color-info-subtle)]",
+    icon: "text-[var(--color-info)]",
+    activeBorder: "border-[var(--color-info-border)]",
   },
-  emerald: {
-    header: "hover:bg-emerald-500/10 border-transparent hover:border-emerald-500/20",
-    icon: "text-emerald-400",
-    activeBorder: "border-emerald-500/20",
+  success: {
+    header: "border-transparent hover:border-[var(--color-success-border)] hover:bg-[var(--color-success-subtle)]",
+    icon: "text-[var(--color-success)]",
+    activeBorder: "border-[var(--color-success-border)]",
   },
-  violet: {
-    header: "hover:bg-violet-500/10 border-transparent hover:border-violet-500/20",
-    icon: "text-violet-400",
-    activeBorder: "border-violet-500/20",
+  warning: {
+    header: "border-transparent hover:border-[var(--color-warning-border)] hover:bg-[var(--color-warning-subtle)]",
+    icon: "text-[var(--color-warning)]",
+    activeBorder: "border-[var(--color-warning-border)]",
   },
-  amber: {
-    header: "hover:bg-amber-500/10 border-transparent hover:border-amber-500/20",
-    icon: "text-amber-400",
-    activeBorder: "border-amber-500/20",
-  },
-  rose: {
-    header: "hover:bg-rose-500/10 border-transparent hover:border-rose-500/20",
-    icon: "text-rose-400",
-    activeBorder: "border-rose-500/20",
-  },
-  slate: {
-    header: "hover:bg-slate-500/10 border-transparent hover:border-slate-500/20",
-    icon: "text-slate-400",
-    activeBorder: "border-slate-500/20",
+  danger: {
+    header: "border-transparent hover:border-[var(--color-danger-border)] hover:bg-[var(--color-danger-subtle)]",
+    icon: "text-[var(--color-danger)]",
+    activeBorder: "border-[var(--color-danger-border)]",
   },
 };
+
+const headingTags = {
+  2: "h2",
+  3: "h3",
+  4: "h4",
+  5: "h5",
+  6: "h6",
+} as const;
 
 export function CollapsibleSection({
   title,
@@ -61,78 +72,99 @@ export function CollapsibleSection({
   icon,
   children,
   defaultOpen = false,
-  theme = "primary",
+  tone = "accent",
+  headingLevel = 3,
   className,
   contentClassName,
   keepMounted = false,
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const contentId = useId();
-  const currentTheme = themeClasses[theme];
+  const currentTone = collapsibleToneClasses[tone];
+  const HeadingTag = headingTags[headingLevel];
   const reduceMotion = useReducedMotion();
   // Under prefers-reduced-motion, collapse the height/opacity spring to a
   // near-instant tween so the section just snaps open/closed (R3).
-  const expandTransition = reduceMotion
-    ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 300, damping: 25, mass: 0.8 };
-  const chevronTransition = reduceMotion
-    ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 300, damping: 20 };
+  const expandTransition = reduceMotion ? reducedMotionTransition : uiMotion.spring.disclosure;
+  const chevronTransition = reduceMotion ? reducedMotionTransition : uiMotion.spring.disclosureIcon;
 
   return (
     <div
       className={cn(
-        "flex flex-col overflow-hidden rounded-lg border bg-[var(--color-surface)]/40 backdrop-blur-md transition-colors duration-300",
-        isOpen ? currentTheme.activeBorder : "border-white/5",
-        className
+        "flex flex-col overflow-hidden rounded-lg border bg-[var(--color-surface-muted)] shadow-[var(--shadow-surface)] transition-colors duration-[var(--motion-standard)] motion-reduce:duration-0",
+        isOpen ? currentTone.activeBorder : "border-[var(--color-border)]",
+        className,
       )}
     >
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        aria-expanded={isOpen}
-        aria-controls={contentId}
-        className={cn(
-          "flex w-full items-center justify-between gap-3 border p-4 text-left transition-all duration-300 sm:px-6",
-          isOpen ? "bg-white/[0.02] border-transparent" : currentTheme.header
-        )}
-      >
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-          {icon && (
-            <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5", currentTheme.icon)}>
-              {icon}
-            </div>
+      <HeadingTag className="m-0">
+        <button
+          type="button"
+          onClick={() => setIsOpen((open) => !open)}
+          aria-expanded={isOpen}
+          aria-controls={contentId}
+          className={cn(
+            "flex w-full items-center justify-between gap-3 border p-4 text-left transition-[background-color,border-color,color] duration-[var(--motion-fast)] motion-reduce:duration-0 sm:px-6",
+            isOpen
+              ? "border-transparent bg-[var(--color-surface-hover)]"
+              : currentTone.header,
           )}
-          <div className="flex min-w-0 flex-col">
-            <h3 className="truncate text-base font-semibold tracking-tight text-white">{title}</h3>
-            {subtitle && (
-              <p className="mt-0.5 line-clamp-1 text-xs text-slate-400">{subtitle}</p>
+        >
+          <span className="flex min-w-0 items-center gap-3 sm:gap-4">
+            {icon ? (
+              <span
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]",
+                  currentTone.icon,
+                )}
+              >
+                {icon}
+              </span>
+            ) : null}
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-base font-semibold tracking-tight text-[var(--color-text)]">
+                {title}
+              </span>
+              {subtitle ? (
+                <span className="mt-0.5 line-clamp-1 text-xs font-normal text-[var(--color-text-muted)]">
+                  {subtitle}
+                </span>
+              ) : null}
+            </span>
+          </span>
+
+          <span
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-colors duration-[var(--motion-fast)] motion-reduce:duration-0",
+              isOpen && "bg-[var(--color-surface-active)] text-[var(--color-text)]",
             )}
-          </div>
-        </div>
-        
-        <div className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors",
-          isOpen ? "bg-white/10 text-white" : "text-slate-400"
-        )}>
-          <motion.div
-            animate={{ rotate: isOpen ? 180 : 0 }}
-            transition={chevronTransition}
           >
-            <ChevronDown size={18} />
-          </motion.div>
-        </div>
-      </button>
+            <motion.span
+              animate={{ rotate: isOpen ? 180 : 0 }}
+              transition={chevronTransition}
+            >
+              <ChevronDown size={18} aria-hidden="true" />
+            </motion.span>
+          </span>
+        </button>
+      </HeadingTag>
 
       {keepMounted ? (
         <motion.div
           id={contentId}
+          aria-hidden={!isOpen}
+          inert={isOpen ? undefined : true}
           initial={false}
           animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
           transition={expandTransition}
           className="overflow-hidden"
         >
-          <div className={cn("p-4 sm:px-6 sm:pb-6 pt-2 border-t border-white/5", contentClassName, !isOpen && "pointer-events-none")}>
+          <div
+            className={cn(
+              "border-t border-[var(--color-border)] p-4 pt-2 sm:px-6 sm:pb-6",
+              contentClassName,
+              !isOpen && "pointer-events-none",
+            )}
+          >
             {children}
           </div>
         </motion.div>
@@ -147,7 +179,9 @@ export function CollapsibleSection({
               transition={expandTransition}
               className="overflow-hidden"
             >
-              <div className={cn("p-4 sm:px-6 sm:pb-6 pt-2 border-t border-white/5", contentClassName)}>
+              <div
+                className={cn("border-t border-[var(--color-border)] p-4 pt-2 sm:px-6 sm:pb-6", contentClassName)}
+              >
                 {children}
               </div>
             </motion.div>
