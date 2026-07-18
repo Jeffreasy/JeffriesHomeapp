@@ -47,7 +47,7 @@ In productie is BACKEND_API_URL verplicht. Er is geen Render-default. Een ontbre
 
 proxy.ts is een navigatie- en UX-gate:
 
-- alleen /sign-in en /sign-up zijn publiek;
+- alleen /sign-in en /access-denied zijn publiek; /sign-up kan geen enrollmentflow starten en verwijst terug naar /sign-in;
 - een niet-ingelogde pagina wordt naar /sign-in gestuurd;
 - een niet-ingelogd /api-verzoek krijgt JSON 401;
 - proxy.ts gebruikt geen createRouteMatcher meer.

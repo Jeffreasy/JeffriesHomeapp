@@ -57,7 +57,7 @@ Nieuwe routepagina's gebruiken `AppPageShell`. Bewust chromeless routes zijn bep
 | Geldige sessie, geen owner | Redirect naar access-denied | JSON `403` |
 | Owner | Toestaan | Toestaan |
 
-`/sign-up` maakt geen tweede accountflow en verwijst naar sign-in. Een return-URL bevat uitsluitend een veilige same-origin pathname; query- en fragmentdata worden nooit naar de identityprovider doorgestuurd.
+`/sign-up` maakt geen tweede accountflow en verwijst naar sign-in. De Clerk sign-incomponent verbergt enrollment en schakelt overdracht van een mislukte sign-in naar sign-up uit; de provider verwijst ieder resterend sign-updoel terug naar `/sign-in`. Een return-URL bevat uitsluitend een veilige same-origin pathname; query- en fragmentdata worden nooit naar de identityprovider doorgestuurd. Het uitschakelen van self-service registratie in de Clerk-tenant blijft daarnaast de externe beheergrens die voorkomt dat buiten deze app om accounts worden aangemaakt.
 
 Proxycontrole is UX én eerste verdedigingslaag, niet de enige trust boundary. De backend-BFF, telemetryroute, PDF-byte-route en server-side dossierlookup controleren zelf opnieuw de owner.
 

@@ -174,7 +174,7 @@ function IdentityScopedProviders({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-in">
       <PwaRegistry />
       <IdentityScopedProviders>{children}</IdentityScopedProviders>
     </ClerkProvider>

@@ -69,6 +69,12 @@ export default function SignInPage() {
 
         {/* Clerk SignIn component — styled to match dark theme */}
         <SignIn
+          // This is a private, single-owner application. Disabling both the
+          // sign-up UI and transfer prevents an unknown identity from turning
+          // a failed sign-in attempt into a Clerk enrollment flow.
+          withSignUp={false}
+          transferable={false}
+          signUpUrl="/sign-in"
           appearance={{
             variables: {
               colorPrimary: "#f59e0b",

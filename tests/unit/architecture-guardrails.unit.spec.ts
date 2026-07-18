@@ -156,3 +156,15 @@ test("heavy optional workspaces and PDF parsers stay behind interaction boundari
 test("the existing components/ui layer is not duplicated by a parallel core tree", () => {
   expect(existsSync(resolve(repositoryRoot, "components", "core"))).toBe(false);
 });
+
+test("the single-owner sign-in surface cannot start an enrollment flow", () => {
+  const signInPage = readSource("app/sign-in/[[...sign-in]]/page.tsx");
+  const providers = readSource("app/providers.tsx");
+  const signUpPage = readSource("app/sign-up/[[...sign-up]]/page.tsx");
+
+  expect(signInPage).toContain("withSignUp={false}");
+  expect(signInPage).toContain("transferable={false}");
+  expect(signInPage).toContain('signUpUrl="/sign-in"');
+  expect(providers).toContain('signUpUrl="/sign-in"');
+  expect(signUpPage).toContain('redirect("/sign-in")');
+});
