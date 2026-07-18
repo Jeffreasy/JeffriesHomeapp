@@ -16,7 +16,7 @@ npm run check:performance
 npm run test:e2e
 ~~~
 
-Gebruik Node.js 22 om lokaal dezelfde majorversie als CI te testen. De productiebuild heeft de serverconfiguratie uit de sectie **Buildconfiguratie** nodig.
+Gebruik Node.js 24 om lokaal dezelfde majorversie als CI en Vercel-productie te testen. De productiebuild heeft de serverconfiguratie uit de sectie **Buildconfiguratie** nodig.
 
 ## Wat de suites bewijzen
 
@@ -116,7 +116,9 @@ De storage-statebestanden bevatten sessiemateriaal. Commit ze nooit, deel ze nie
 
 ### Geauthenticeerde CI-gate
 
-De job `authenticated-e2e` is opt-in en gebruikt de protected GitHub Environment `homeapp-e2e`. De job draait alleen wanneer repository variable `HOMEAPP_AUTH_E2E_ENABLED` exact `true` is en een pull request niet uit een fork komt.
+De job `authenticated-e2e` gebruikt de protected GitHub Environment `homeapp-e2e`. De suite draait wanneer repository variable `HOMEAPP_AUTH_E2E_ENABLED` exact `true` is en een pull request niet uit een fork komt.
+
+De afzonderlijke job `authenticated-e2e-gate` draait fail-closed voor iedere pull request en iedere push naar `master` of `main`. De gate accepteert uitsluitend een succesvolle `authenticated-e2e`-conclusie; een ontbrekende opt-in, fork zonder testtenanttoegang, overgeslagen suite of mislukte suite faalt daarmee de releasegate in plaats van stilzwijgend groen te worden.
 
 Configureer in die Environment uitsluitend test-tenantsecrets:
 
@@ -126,7 +128,7 @@ Configureer in die Environment uitsluitend test-tenantsecrets:
 - `E2E_CLERK_OWNER_USER_ID`;
 - `E2E_CLERK_NON_OWNER_EMAIL`.
 
-De job bouwt opnieuw met de test-tenant, handhaaft de performancebudgetten en draait daarna de drie read-only ownerprojecten plus de non-owner-toegangstest. Environment approvals en branch protection bepalen wanneer deze kostbare gate verplicht wordt.
+De job bouwt opnieuw met de test-tenant, handhaaft de performancebudgetten en draait daarna de drie read-only ownerprojecten plus de non-owner-toegangstest. Environment approvals begrenzen toegang tot de testtenant; branch protection verplicht de fail-closed gate voor iedere merge.
 
 ### Performance
 

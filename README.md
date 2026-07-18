@@ -23,7 +23,7 @@ Deze repository is een Next.js App Router-app. Een root-index.html hoort er niet
 
 ## Vereisten
 
-- Node.js 22, gelijk aan CI;
+- Node.js 24, gelijk aan CI en Vercel-productie;
 - npm;
 - een Clerk-app voor lokaal inloggen;
 - een draaiende JeffriesBackend voor geauthenticeerde dataflows.
