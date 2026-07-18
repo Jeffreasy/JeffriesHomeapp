@@ -115,7 +115,7 @@ export default function SignInPage() {
                 color: "#0a0a0f",
                 fontWeight: "700",
               },
-              footerActionLink: { color: "#f59e0b" },
+              footerAction: { display: "none" },
               identityPreviewText: { color: "#f1f5f9" },
               identityPreviewEditButton: { color: "#f59e0b" },
             },

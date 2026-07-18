@@ -164,6 +164,7 @@ test("the single-owner sign-in surface cannot start an enrollment flow", () => {
 
   expect(signInPage).toContain("withSignUp={false}");
   expect(signInPage).toContain("transferable={false}");
+  expect(signInPage).toContain('footerAction: { display: "none" }');
   expect(signInPage).toContain('signUpUrl="/sign-in"');
   expect(providers).toContain('signUpUrl="/sign-in"');
   expect(signUpPage).toContain('redirect("/sign-in")');
