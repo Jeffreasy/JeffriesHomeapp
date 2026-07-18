@@ -190,10 +190,17 @@ test.describe("enterprise application shell", () => {
         expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
       }
 
-      const moreButton = page.getByRole("button", { name: "Meer", exact: true });
+      const moreButton = page.locator(
+        'nav[aria-label="Mobiele hoofdnavigatie"] button[aria-haspopup="dialog"]',
+      );
       await moreButton.focus();
       await moreButton.click();
       const moreSheet = page.getByRole("dialog", { name: "Meer onderdelen" });
+      await expect(moreSheet).toBeVisible();
+      await page.keyboard.press("Escape");
+      // Exercise a state-driven reopen before AnimatePresence removes the exiting layer.
+      await moreButton.dispatchEvent("click");
+      await expect(moreButton).toHaveAttribute("aria-expanded", "true");
       await expect(moreSheet).toBeVisible();
       await page.keyboard.press("Escape");
       await expect(moreSheet).not.toBeVisible();
@@ -211,7 +218,8 @@ test.describe("enterprise application shell", () => {
     await page.goto("/automations", { waitUntil: "domcontentloaded" });
     await expect(page.locator("[data-app-page]")).toBeVisible();
     await waitForReadOnlyPage();
-    await page.getByRole("button", { name: "Nieuwe automatisering toevoegen" }).click();
+    const automationTrigger = page.getByRole("button", { name: "Nieuwe automatisering toevoegen" });
+    await automationTrigger.click();
 
     const automationDialog = page.getByRole("dialog", { name: "Nieuwe automatisering" });
     await expect(automationDialog).toBeVisible();
@@ -223,6 +231,7 @@ test.describe("enterprise application shell", () => {
     ).toEqual([]);
     await page.keyboard.press("Escape");
     await expect(automationDialog).not.toBeVisible();
+    await expect(automationTrigger).toBeFocused();
 
     await page.goto("/lampen", { waitUntil: "domcontentloaded" });
     await expect(page.locator("[data-app-page]")).toBeVisible();
@@ -241,5 +250,6 @@ test.describe("enterprise application shell", () => {
     ).toEqual([]);
     await page.keyboard.press("Escape");
     await expect(lampDialog).not.toBeVisible();
+    await expect(lampDetails).toBeFocused();
   });
 });

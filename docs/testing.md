@@ -115,7 +115,7 @@ De geauthenticeerde suite:
 - controleert met dezelfde non-owner-sessie dat `/api/backend/health` JSON 403 retourneert;
 - faalt op first-party page errors, console errors, 5xx-responses en onverwachte request failures.
 
-Runtime-evidence bevat alleen categorie, HTTP-methode/status en resource-type. Het bevat geen URL, querystring, request/responsebody, consolebericht of stacktrace. Axe-fouten worden teruggebracht tot rule-id, impact en aantal nodes; selectors, HTML en rendered ownerdata komen niet in de assertionoutput. Voor de setup, teardown en alle auth-projecten zijn trace, screenshots en video uitgeschakeld, omdat browserartefacts sessiemateriaal kunnen bevatten.
+Runtime-evidence bevat alleen categorie, HTTP-methode/status, resource-type en veilige fout-, bron- en stackcategorieën. Vrije consoleberichten, URL's en paden, querystrings, request/responsebodies en stackregels worden nooit opgeslagen. Er worden maximaal twintig unieke diagnostics bewaard; gededupliceerde en afgekapte issues blijven uitsluitend als teller zichtbaar. Axe-fouten worden teruggebracht tot rule-id, impact en aantal nodes; selectors, HTML en rendered ownerdata komen niet in de assertionoutput. Voor de setup, teardown en alle auth-projecten zijn trace, screenshots en video uitgeschakeld, omdat browserartefacts sessiemateriaal kunnen bevatten.
 
 De storage-statebestanden bevatten sessiemateriaal. Commit ze nooit, deel ze niet en upload geen browserartefacten van authenticated tests zonder expliciete veiligheidsreview.
 

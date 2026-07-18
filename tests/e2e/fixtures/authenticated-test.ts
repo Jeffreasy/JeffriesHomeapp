@@ -5,6 +5,10 @@ import {
   type Request,
   type Route,
 } from "@playwright/test";
+import {
+  sanitizeRuntimeDiagnostic,
+  type SafeRuntimeDiagnostic,
+} from "../support/runtime-evidence";
 
 type SafeErrorType =
   | "Error"
@@ -13,13 +17,69 @@ type SafeErrorType =
   | "RangeError"
   | "SyntaxError";
 
+type SafeHttpMethod =
+  | "GET"
+  | "HEAD"
+  | "POST"
+  | "PUT"
+  | "PATCH"
+  | "DELETE"
+  | "OPTIONS"
+  | "OTHER";
+
+type SafeResourceType =
+  | "document"
+  | "stylesheet"
+  | "image"
+  | "media"
+  | "font"
+  | "script"
+  | "texttrack"
+  | "xhr"
+  | "fetch"
+  | "eventsource"
+  | "websocket"
+  | "manifest"
+  | "other";
+
 type RuntimeIssue =
-  | { kind: "application-console" }
-  | { kind: "page-error"; errorType: SafeErrorType }
-  | { kind: "first-party-5xx"; method: string; status: number; resourceType: string }
-  | { kind: "first-party-request-failed"; method: string; resourceType: string }
+  | { kind: "application-console"; diagnostic: SafeRuntimeDiagnostic }
+  | { kind: "page-error"; errorType: SafeErrorType; diagnostic: SafeRuntimeDiagnostic }
+  | {
+      kind: "first-party-5xx";
+      method: SafeHttpMethod;
+      status: number;
+      resourceType: SafeResourceType;
+    }
+  | {
+      kind: "first-party-request-failed";
+      method: SafeHttpMethod;
+      resourceType: SafeResourceType;
+    }
   | { kind: "backend-read-settle-timeout" }
-  | { kind: "backend-mutation-blocked"; method: string };
+  | { kind: "backend-mutation-blocked"; method: SafeHttpMethod };
+
+type RuntimeIssueCollector = {
+  issues: RuntimeIssue[];
+  fingerprints: Set<string>;
+  droppedIssueCount: number;
+};
+
+const MAX_CAPTURED_RUNTIME_ISSUES = 20;
+
+function recordRuntimeIssue(collector: RuntimeIssueCollector, issue: RuntimeIssue) {
+  const fingerprint = JSON.stringify(issue);
+  if (
+    collector.fingerprints.has(fingerprint) ||
+    collector.issues.length >= MAX_CAPTURED_RUNTIME_ISSUES
+  ) {
+    collector.droppedIssueCount += 1;
+    return;
+  }
+
+  collector.fingerprints.add(fingerprint);
+  collector.issues.push(issue);
+}
 
 type AuthenticatedFixtures = {
   waitForReadOnlyPage: () => Promise<void>;
@@ -33,7 +93,7 @@ if (process.env.E2E_EXTERNAL_SERVER === "1") {
   );
 }
 
-async function guardReadOnlyBackendRequest(route: Route, issues: RuntimeIssue[]) {
+async function guardReadOnlyBackendRequest(route: Route, collector: RuntimeIssueCollector) {
   const method = route.request().method().toUpperCase();
 
   if (method === "OPTIONS") {
@@ -46,7 +106,10 @@ async function guardReadOnlyBackendRequest(route: Route, issues: RuntimeIssue[])
     return;
   }
 
-  issues.push({ kind: "backend-mutation-blocked", method });
+  recordRuntimeIssue(collector, {
+    kind: "backend-mutation-blocked",
+    method: normalizeHttpMethod(method),
+  });
   await route.fulfill({
     status: 405,
     contentType: "application/json",
@@ -65,6 +128,42 @@ function safeErrorType(name: string): SafeErrorType {
   }
   return "Error";
 }
+
+function normalizeHttpMethod(value: string): SafeHttpMethod {
+  if (
+    value === "GET" ||
+    value === "HEAD" ||
+    value === "POST" ||
+    value === "PUT" ||
+    value === "PATCH" ||
+    value === "DELETE" ||
+    value === "OPTIONS"
+  ) {
+    return value;
+  }
+  return "OTHER";
+}
+
+function normalizeResourceType(value: string): SafeResourceType {
+  if (
+    value === "document" ||
+    value === "stylesheet" ||
+    value === "image" ||
+    value === "media" ||
+    value === "font" ||
+    value === "script" ||
+    value === "texttrack" ||
+    value === "xhr" ||
+    value === "fetch" ||
+    value === "eventsource" ||
+    value === "websocket" ||
+    value === "manifest"
+  ) {
+    return value;
+  }
+  return "other";
+}
+
 function isReadOnlyBackendRequest(request: Request, firstPartyOrigin: string): boolean {
   const method = request.method().toUpperCase();
   if (method !== "GET" && method !== "HEAD") return false;
@@ -100,7 +199,11 @@ async function waitForBackendRequestsToSettle(
 
 export const test = base.extend<AuthenticatedFixtures>({
   page: async ({ page }, providePage, testInfo) => {
-    const issues: RuntimeIssue[] = [];
+    const collector: RuntimeIssueCollector = {
+      issues: [],
+      fingerprints: new Set(),
+      droppedIssueCount: 0,
+    };
     const firstPartyOrigin = new URL(
       process.env.E2E_BASE_URL ?? "http://localhost:3000",
     ).origin;
@@ -108,7 +211,7 @@ export const test = base.extend<AuthenticatedFixtures>({
     pendingBackendRequestsByPage.set(page, pendingBackendRequests);
 
     await page.route("**/api/backend/**", (route) =>
-      guardReadOnlyBackendRequest(route, issues),
+      guardReadOnlyBackendRequest(route, collector),
     );
 
     page.on("console", (message) => {
@@ -121,11 +224,26 @@ export const test = base.extend<AuthenticatedFixtures>({
           return;
         }
       }
-      issues.push({ kind: "application-console" });
+      recordRuntimeIssue(collector, {
+        kind: "application-console",
+        diagnostic: sanitizeRuntimeDiagnostic({
+          message: message.text(),
+          sourceUrl: location || undefined,
+          firstPartyOrigin,
+        }),
+      });
     });
 
     page.on("pageerror", (error) => {
-      issues.push({ kind: "page-error", errorType: safeErrorType(error.name) });
+      recordRuntimeIssue(collector, {
+        kind: "page-error",
+        errorType: safeErrorType(error.name),
+        diagnostic: sanitizeRuntimeDiagnostic({
+          message: error.message,
+          stack: error.stack,
+          firstPartyOrigin,
+        }),
+      });
     });
 
     page.on("request", (request) => {
@@ -145,11 +263,11 @@ export const test = base.extend<AuthenticatedFixtures>({
       } catch {
         return;
       }
-      issues.push({
+      recordRuntimeIssue(collector, {
         kind: "first-party-5xx",
-        method: response.request().method(),
+        method: normalizeHttpMethod(response.request().method().toUpperCase()),
         status: response.status(),
-        resourceType: response.request().resourceType(),
+        resourceType: normalizeResourceType(response.request().resourceType()),
       });
     });
 
@@ -161,22 +279,28 @@ export const test = base.extend<AuthenticatedFixtures>({
         return;
       }
       if (request.failure()?.errorText.includes("ERR_ABORTED")) return;
-      issues.push({
+      recordRuntimeIssue(collector, {
         kind: "first-party-request-failed",
-        method: request.method(),
-        resourceType: request.resourceType(),
+        method: normalizeHttpMethod(request.method().toUpperCase()),
+        resourceType: normalizeResourceType(request.resourceType()),
       });
     });
 
     await providePage(page);
 
     if (!(await waitForBackendRequestsToSettle(pendingBackendRequests))) {
-      issues.push({ kind: "backend-read-settle-timeout" });
+      recordRuntimeIssue(collector, { kind: "backend-read-settle-timeout" });
     }
-    if (issues.length > 0 || testInfo.status !== testInfo.expectedStatus) {
+    if (collector.issues.length > 0 || testInfo.status !== testInfo.expectedStatus) {
       await testInfo.attach("sanitized-runtime-evidence", {
         body: Buffer.from(
-          JSON.stringify({ schemaVersion: 1, issueCount: issues.length, issues }),
+          JSON.stringify({
+            schemaVersion: 2,
+            issueCount: collector.issues.length + collector.droppedIssueCount,
+            capturedIssueCount: collector.issues.length,
+            droppedIssueCount: collector.droppedIssueCount,
+            issues: collector.issues,
+          }),
           "utf8",
         ),
         contentType: "application/json",
@@ -184,7 +308,7 @@ export const test = base.extend<AuthenticatedFixtures>({
     }
 
     expect(
-      issues,
+      collector.issues,
       "Authenticated E2E must stay read-only and free of first-party runtime errors.",
     ).toEqual([]);
   },

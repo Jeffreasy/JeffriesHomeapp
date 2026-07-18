@@ -7,6 +7,8 @@ const pwaSource = readFileSync(
   resolve(process.cwd(), "components/pwa/PwaRegistry.tsx"),
   "utf8",
 );
+const nextConfigSource = readFileSync(resolve(process.cwd(), "next.config.ts"), "utf8");
+const rootLayoutSource = readFileSync(resolve(process.cwd(), "app/layout.tsx"), "utf8");
 
 test.describe("provider architecture", () => {
   test("creates a query client per authenticated identity without persistence", () => {
@@ -25,10 +27,15 @@ test.describe("provider architecture", () => {
   });
 
   test("hydrates connectivity and service-worker state defensively", () => {
+    expect(nextConfigSource).toMatch(/register:\s*false/);
     expect(pwaSource).toContain("useState(false)");
     expect(pwaSource).toContain("setIsOffline(!window.navigator.onLine)");
     expect(pwaSource).toContain("const registerServiceWorker = async () => {");
     expect(pwaSource).toContain('await navigator.serviceWorker.register("/sw.js")');
     expect(pwaSource).toContain("if (cancelled || !nextRegistration) return;");
+  });
+
+  test("loads Vercel speed insights only in the Vercel runtime", () => {
+    expect(rootLayoutSource).toContain('process.env.VERCEL === "1"');
   });
 });

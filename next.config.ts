@@ -4,6 +4,9 @@ import withSerwistInit from "@serwist/next";
 const withSerwist = withSerwistInit({
   swSrc: "app/sw.ts",
   swDest: "public/sw.js",
+  // PwaRegistry owns registration and the update/offline lifecycle. Keeping
+  // Serwist auto-registration enabled would register the same worker twice.
+  register: false,
   disable: process.env.NODE_ENV === "development",
 });
 

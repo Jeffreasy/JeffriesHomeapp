@@ -11,6 +11,8 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { ClientShell } from "@/components/layout/ClientShell";
 
+const shouldCollectSpeedInsights = process.env.VERCEL === "1";
+
 export const viewport = {
   themeColor: "#0a0a0f",
   viewportFit: "cover" as const,
@@ -50,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </Providers>
         <div id="app-toast-root" data-app-toast-root="" />
         <div id="app-overlay-root" data-overlay-root="" />
-        <SpeedInsights />
+        {shouldCollectSpeedInsights ? <SpeedInsights /> : null}
       </body>
     </html>
   );
