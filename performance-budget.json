@@ -1,0 +1,22 @@
+{
+  "rootMainGzipKiB": 135,
+  "globalCssGzipKiB": 32,
+  "defaultRouteClientGzipKiB": 235,
+  "maxChunkRawKiB": 375,
+  "maxChunkGzipKiB": 115,
+  "routeClientGzipKiB": {
+    "/": 190,
+    "/lampen": 205,
+    "/automations": 205,
+    "/finance": 212,
+    "/focus": 216,
+    "/settings": 216,
+    "/contacten": 216,
+    "/agenda": 220,
+    "/habits": 223,
+    "/notities": 226,
+    "/laventecare": 235,
+    "/laventecare/documenten/[documentKey]": 235,
+    "/rooster": 220
+  }
+}

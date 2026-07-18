@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { ArrowLeft, Download, ExternalLink, FileText, FolderOpen, Printer } from "lucide-react";
 import {
+  createLaventeCarePdfDossierReference,
   getLaventeCarePdfDocument,
   getLaventeCarePdfDossierContextLabel,
+  getLaventeCarePdfDossierReferenceFromLink,
   getLaventeCarePdfFilename,
   getLaventeCarePdfUrl,
   isLaventeCarePdfTheme,
-  parseLaventeCarePdfDossierContext,
+  parseLaventeCarePdfDossierReference,
+  type LaventeCarePdfDossierContext,
+  type LaventeCarePdfResolvableDossierKind,
   type LaventeCarePdfTheme,
 } from "@/lib/laventecare";
 import { getBackendApiKey, getBackendBaseUrl } from "@/lib/server/backend-config";
@@ -17,7 +22,9 @@ import {
   selectExactDossierDocument,
 } from "@/lib/laventecare/dossier-document-lookup";
 import { isOwnerUserId } from "@/lib/server/owner-config";
+import { resolveLaventeCarePdfDossierContextResult } from "@/lib/server/laventecare-pdf-context";
 
+import { getAllowedExternalPdfUrl } from "@/lib/server/external-pdf-source";
 type PageProps = {
   params: Promise<{
     documentKey: string;
@@ -45,12 +52,17 @@ type DossierDocument = {
   created_at: string;
 };
 
+type DossierDocumentLookup =
+  | { status: "resolved"; document: DossierDocument }
+  | { status: "not_found"; document: null }
+  | { status: "unavailable"; document: null };
+
 type ViewerData =
   | {
       kind: "pdf";
       document: NonNullable<ReturnType<typeof getLaventeCarePdfDocument>>;
       theme: LaventeCarePdfTheme;
-      context: ReturnType<typeof parseLaventeCarePdfDossierContext>;
+      context: LaventeCarePdfDossierContext | null;
       pdfUrl: string;
       screenDownloadUrl: string;
       printDownloadUrl: string;
@@ -59,29 +71,33 @@ type ViewerData =
       kind: "dossier";
       dossier: DossierDocument;
       theme: LaventeCarePdfTheme;
-      context: ReturnType<typeof parseLaventeCarePdfDossierContext>;
+      context: LaventeCarePdfDossierContext | null;
     }
   | {
       kind: "missing";
       documentKey: string;
       theme: LaventeCarePdfTheme;
-      context: ReturnType<typeof parseLaventeCarePdfDossierContext>;
+      context: LaventeCarePdfDossierContext | null;
+    }
+  | {
+      kind: "unavailable";
+      documentKey: string;
+      theme: LaventeCarePdfTheme;
+      context: LaventeCarePdfDossierContext | null;
     };
 
 
 
-// This route renders with a file-extension documentKey (e.g. "foo.pdf"), which
-// the Clerk middleware matcher skips — so it can be reached without a session.
-// Real customer dossier documents must therefore be gated by an explicit
-// owner-identity check here, independent of middleware.
-async function isOwner() {
+// The page repeats the owner check before every backend lookup. Proxy routing
+// remains a UX guard and is never the only protection for dossier content.
+const getOwnerUserId = cache(async () => {
   try {
     const { userId } = await auth();
-    return isOwnerUserId(userId);
+    return isOwnerUserId(userId) ? userId : null;
   } catch {
-    return false;
+    return null;
   }
-}
+});
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -101,7 +117,7 @@ function toUrlSearchParams(params: Record<string, string | string[] | undefined>
   return search;
 }
 
-async function getDossierDocument(documentKey: string) {
+async function getDossierDocument(documentKey: string): Promise<DossierDocumentLookup> {
   try {
     const headers = new Headers({ "Content-Type": "application/json" });
     const apiKey = getBackendApiKey();
@@ -109,40 +125,96 @@ async function getDossierDocument(documentKey: string) {
 
     const response = await fetch(
       createDossierDocumentLookupUrl(getBackendBaseUrl(), documentKey),
-      { cache: "no-store", headers },
+      { cache: "no-store", headers, signal: AbortSignal.timeout(10_000) },
     );
-    if (!response.ok) return null;
+    if (!response.ok) return { status: "unavailable", document: null };
 
-    const documents = (await response.json()) as DossierDocument[];
-    return selectExactDossierDocument(documents, documentKey);
+    const payload: unknown = await response.json();
+    if (!Array.isArray(payload)) return { status: "unavailable", document: null };
+    if (payload.length === 0) return { status: "not_found", document: null };
+    if (payload.length !== 1) return { status: "unavailable", document: null };
+    const document = selectExactDossierDocument(payload as DossierDocument[], documentKey);
+    return document
+      ? { status: "resolved", document }
+      : { status: "unavailable", document: null };
+  } catch {
+    return { status: "unavailable", document: null };
+  }
+}
+
+function getCanonicalInternalPdfUrl(
+  dossier: DossierDocument,
+  theme: LaventeCarePdfTheme,
+) {
+  try {
+    const stored = new URL(dossier.pdf_url, "https://homeapp.invalid");
+    const prefix = "/api/laventecare/pdf/";
+    if (!stored.pathname.startsWith(prefix)) return null;
+
+    const storedDocumentKey = decodeURIComponent(stored.pathname.slice(prefix.length));
+    if (
+      storedDocumentKey.includes("/") ||
+      storedDocumentKey !== dossier.document_key ||
+      !getLaventeCarePdfDocument(storedDocumentKey)
+    ) {
+      return null;
+    }
+
+    return getLaventeCarePdfUrl({
+      documentKey: storedDocumentKey,
+      theme,
+      delivery: "inline",
+      context: getLaventeCarePdfDossierReferenceFromLink(dossier),
+    });
   } catch {
     return null;
   }
 }
 
-function isHttpUrl(value: string) {
-  return /^https?:\/\//i.test(value);
-}
+const getViewerData = cache(async (
+  documentKey: string,
+  theme: LaventeCarePdfTheme,
+  referenceKind: LaventeCarePdfResolvableDossierKind | null,
+  referenceId: string | null,
+): Promise<ViewerData> => {
+  const ownerUserId = await getOwnerUserId();
+  if (!ownerUserId) {
+    return { kind: "missing", documentKey, theme, context: null };
+  }
 
-function isEmbeddableUrl(value: string) {
-  return value.startsWith("/api/") || /^https?:\/\/.+\.pdf(?:[?#].*)?$/i.test(value);
-}
-
-async function getViewerData({ params, searchParams }: PageProps): Promise<ViewerData> {
-  const [{ documentKey }, rawSearchParams] = await Promise.all([params, searchParams]);
   const document = getLaventeCarePdfDocument(documentKey);
+  const dossierLookup: DossierDocumentLookup = document
+    ? { status: "not_found", document: null }
+    : await getDossierDocument(documentKey);
+  if (!document && dossierLookup.status === "unavailable") {
+    return { kind: "unavailable", documentKey, theme, context: null };
+  }
+  const dossier = dossierLookup.status === "resolved" ? dossierLookup.document : null;
+  const explicitReference = createLaventeCarePdfDossierReference(referenceKind, referenceId);
+  const reference =
+    explicitReference ?? (dossier ? getLaventeCarePdfDossierReferenceFromLink(dossier) : null);
+  const contextResolution = await resolveLaventeCarePdfDossierContextResult(
+    reference,
+    ownerUserId,
+  );
 
-  const themeParam = firstParam(rawSearchParams.theme);
-  const theme: LaventeCarePdfTheme =
-    themeParam && isLaventeCarePdfTheme(themeParam) ? themeParam : "screen";
-  const context = parseLaventeCarePdfDossierContext(toUrlSearchParams(rawSearchParams));
+  if (reference && contextResolution.status === "unavailable") {
+    return { kind: "unavailable", documentKey, theme, context: null };
+  }
+  if (reference && contextResolution.status === "not_found") {
+    return { kind: "missing", documentKey, theme, context: null };
+  }
+
+  const context =
+    contextResolution.status === "resolved" ? contextResolution.context : null;
 
   if (!document) {
-    // Only the authenticated owner may resolve real dossier documents; everyone
-    // else gets the generic "not found" view without any backend fetch.
-    const dossier = (await isOwner()) ? await getDossierDocument(documentKey) : null;
-    return dossier ? { kind: "dossier", dossier, theme, context } : { kind: "missing", documentKey, theme, context };
+    return dossier
+      ? { kind: "dossier", dossier, theme, context }
+      : { kind: "missing", documentKey, theme, context };
   }
+
+  const contextReference = context ?? reference;
 
   return {
     kind: "pdf",
@@ -153,25 +225,40 @@ async function getViewerData({ params, searchParams }: PageProps): Promise<Viewe
       documentKey: document.key,
       theme,
       delivery: "inline",
-      context,
+      context: contextReference,
     }),
     screenDownloadUrl: getLaventeCarePdfUrl({
       documentKey: document.key,
       theme: "screen",
       delivery: "download",
-      context,
+      context: contextReference,
     }),
     printDownloadUrl: getLaventeCarePdfUrl({
       documentKey: document.key,
       theme: "print",
       delivery: "download",
-      context,
+      context: contextReference,
     }),
   };
+});
+
+async function getViewerDataFromProps({ params, searchParams }: PageProps) {
+  const [{ documentKey }, rawSearchParams] = await Promise.all([params, searchParams]);
+  const themeParam = firstParam(rawSearchParams.theme);
+  const theme: LaventeCarePdfTheme =
+    themeParam && isLaventeCarePdfTheme(themeParam) ? themeParam : "screen";
+  const reference = parseLaventeCarePdfDossierReference(toUrlSearchParams(rawSearchParams));
+
+  return getViewerData(
+    documentKey,
+    theme,
+    reference?.kind ?? null,
+    reference?.id ?? null,
+  );
 }
 
 export async function generateMetadata(props: PageProps): Promise<Metadata> {
-  const data = await getViewerData(props);
+  const data = await getViewerDataFromProps(props);
 
   return {
     title:
@@ -179,15 +266,27 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
         ? `${data.document.title} - LaventeCare PDF`
         : data.kind === "dossier"
           ? `${data.dossier.titel} - LaventeCare dossier`
-          : "LaventeCare document niet gevonden",
+          : data.kind === "unavailable"
+            ? "LaventeCare document tijdelijk niet beschikbaar"
+            : "LaventeCare document niet gevonden",
   };
 }
 
 export default async function LaventeCarePdfViewerPage(props: PageProps) {
-  const data = await getViewerData(props);
+  const data = await getViewerDataFromProps(props);
 
   if (data.kind === "dossier") {
     return <DossierDocumentView dossier={data.dossier} theme={data.theme} contextLabel={getLaventeCarePdfDossierContextLabel(data.context)} />;
+  }
+
+  if (data.kind === "unavailable") {
+    return (
+      <MissingDocumentView
+        documentKey={data.documentKey}
+        contextLabel={getLaventeCarePdfDossierContextLabel(data.context)}
+        unavailable
+      />
+    );
   }
 
   if (data.kind === "missing") {
@@ -279,9 +378,16 @@ function DossierDocumentView({
   theme: LaventeCarePdfTheme;
   contextLabel: string;
 }) {
-  const sourceUrl = dossier.pdf_url.trim();
-  const canOpenSource = isHttpUrl(sourceUrl);
-  const canEmbed = isEmbeddableUrl(sourceUrl);
+  const internalSourceUrl = getCanonicalInternalPdfUrl(dossier, theme);
+  const externalSourceUrl = internalSourceUrl
+    ? null
+    : getAllowedExternalPdfUrl(dossier.pdf_url.trim());
+  const sourceUrl = internalSourceUrl ?? externalSourceUrl;
+  const sourceLabel = internalSourceUrl
+    ? "Homeapp PDF"
+    : externalSourceUrl
+      ? new URL(externalSourceUrl).hostname
+      : "Afgeschermde bron";
 
   return (
     <div className="flex min-h-dvh min-w-0 flex-col overflow-x-clip bg-[var(--color-bg)] text-slate-100">
@@ -304,7 +410,7 @@ function DossierDocumentView({
             </div>
           </div>
 
-          {canOpenSource ? (
+          {sourceUrl ? (
             <a
               href={sourceUrl}
               target="_blank"
@@ -319,7 +425,7 @@ function DossierDocumentView({
       </header>
 
       <main className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pt-5">
-        {canEmbed ? (
+        {internalSourceUrl ? (
           <section className="glass flex min-h-96 flex-1 flex-col overflow-hidden border border-white/10 bg-[var(--color-surface)]">
             <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 sm:px-4">
               <div className="flex min-w-0 items-center gap-2">
@@ -333,7 +439,7 @@ function DossierDocumentView({
               </span>
             </div>
             <iframe
-              src={sourceUrl}
+              src={internalSourceUrl}
               title={`${dossier.titel} PDF`}
               className="block min-h-96 w-full flex-1 bg-white"
             />
@@ -349,7 +455,7 @@ function DossierDocumentView({
                 <h2 className="mt-1 text-xl font-bold text-white">{dossier.titel}</h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
                   Dit dossierstuk verwijst naar een interne of lokale bron en is daarom niet als browser-PDF te embedden.
-                  De registratie blijft wel beschikbaar in LaventeCare, inclusief context, notities en bronpad.
+                  De registratie blijft wel beschikbaar in LaventeCare, inclusief context, notities en bronregistratie.
                 </p>
               </div>
             </div>
@@ -358,7 +464,7 @@ function DossierDocumentView({
               <InfoItem label="Template" value={dossier.template_label ?? "Dossierstuk"} />
               <InfoItem label="Context" value={dossier.context_title ?? dossier.context_type} />
               <InfoItem label="Aangemaakt" value={formatDate(dossier.created_at)} />
-              <InfoItem label="Bron" value={sourceUrl} mono />
+              <InfoItem label="Bron" value={sourceLabel} />
             </dl>
 
             {dossier.notes ? (
@@ -374,7 +480,15 @@ function DossierDocumentView({
   );
 }
 
-function MissingDocumentView({ documentKey, contextLabel }: { documentKey: string; contextLabel: string }) {
+function MissingDocumentView({
+  documentKey,
+  contextLabel,
+  unavailable = false,
+}: {
+  documentKey: string;
+  contextLabel: string;
+  unavailable?: boolean;
+}) {
   return (
     <main className="min-h-dvh overflow-x-clip bg-[var(--color-bg)] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-slate-100">
       <div className="mx-auto max-w-2xl rounded-2xl border border-white/10 bg-[var(--color-surface)] p-5 shadow-2xl shadow-black/30">
@@ -385,8 +499,14 @@ function MissingDocumentView({ documentKey, contextLabel }: { documentKey: strin
           <ArrowLeft size={16} />
           Terug naar LaventeCare
         </Link>
-        <p className="mt-6 text-xs font-bold uppercase text-amber-300/80">Document niet gevonden</p>
-        <h1 className="mt-2 text-2xl font-bold text-white">Dit LaventeCare document bestaat niet meer in de catalogus of het dossier.</h1>
+        <p className="mt-6 text-xs font-bold uppercase text-amber-300/80">
+          {unavailable ? "Tijdelijk niet beschikbaar" : "Document niet gevonden"}
+        </p>
+        <h1 className="mt-2 text-2xl font-bold text-white">
+          {unavailable
+            ? "De dossiercontext kon niet veilig worden opgehaald. Probeer het later opnieuw."
+            : "Dit LaventeCare document bestaat niet meer in de catalogus of het dossier."}
+        </h1>
         <p className="mt-3 text-sm leading-6 text-slate-400">
           Documentkey: <span className="font-mono text-slate-300">{documentKey}</span>
           <br />

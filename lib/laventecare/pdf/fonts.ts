@@ -13,7 +13,7 @@ let activeFontFamilies: LaventeCarePdfFontFamilies = LAVENTECARE_PDF_FONTS;
 type LaventeCarePdfFontRegistration = {
   families: LaventeCarePdfFontFamilies;
   source: "custom" | "standard";
-  missingFiles: string[];
+  missingFileCount: number;
 };
 
 function resolveFontPath(packageName: string, fileName: string) {
@@ -27,8 +27,8 @@ function fontFile(packageName: string, fileName: string, fontWeight: number) {
   };
 }
 
-function missingFontFiles(fonts: Array<{ src: string }>) {
-  return fonts.filter((font) => !fs.existsSync(font.src)).map((font) => path.basename(font.src));
+function countMissingFontFiles(fonts: Array<{ src: string }>) {
+  return fonts.filter((font) => !fs.existsSync(font.src)).length;
 }
 
 export function registerLaventeCarePdfFonts(): LaventeCarePdfFontRegistration {
@@ -36,7 +36,7 @@ export function registerLaventeCarePdfFonts(): LaventeCarePdfFontRegistration {
     return {
       families: activeFontFamilies,
       source: activeFontFamilies === LAVENTECARE_PDF_FONTS ? "custom" : "standard",
-      missingFiles: [],
+      missingFileCount: 0,
     };
   }
 
@@ -51,22 +51,24 @@ export function registerLaventeCarePdfFonts(): LaventeCarePdfFontRegistration {
     fontFile("inter", "inter-latin-600-normal.woff", 600),
     fontFile("inter", "inter-latin-700-normal.woff", 700),
   ];
-  const missingFiles = missingFontFiles([...outfitFonts, ...interFonts]);
+  const missingFileCount = countMissingFontFiles([...outfitFonts, ...interFonts]);
 
   Font.registerHyphenationCallback((word) => [word]);
 
-  if (missingFiles.length > 0) {
+  if (missingFileCount > 0) {
     activeFontFamilies = LAVENTECARE_PDF_STANDARD_FONTS;
     fontsRegistered = true;
 
-    console.warn("laventecare pdf custom fonts missing, using standard fonts", {
-      missingFiles,
-    });
+    console.warn(JSON.stringify({
+      level: "warn",
+      event: "laventecare_pdf_fonts_unavailable",
+      missingFileCount,
+    }));
 
     return {
       families: activeFontFamilies,
       source: "standard",
-      missingFiles,
+      missingFileCount,
     };
   }
 
@@ -87,20 +89,23 @@ export function registerLaventeCarePdfFonts(): LaventeCarePdfFontRegistration {
     return {
       families: activeFontFamilies,
       source: "custom",
-      missingFiles: [],
+      missingFileCount: 0,
     };
   } catch (error) {
     activeFontFamilies = LAVENTECARE_PDF_STANDARD_FONTS;
     fontsRegistered = true;
 
-    console.warn("laventecare pdf custom font registration failed, using standard fonts", {
-      error,
-    });
+    console.warn(JSON.stringify({
+      level: "warn",
+      event: "laventecare_pdf_font_registration_failed",
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      missingFileCount,
+    }));
 
     return {
       families: activeFontFamilies,
       source: "standard",
-      missingFiles,
+      missingFileCount,
     };
   }
 }

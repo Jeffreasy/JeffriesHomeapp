@@ -3,6 +3,7 @@ import type { LaventeCareDocument } from "../types";
 import {
   encodeLaventeCarePdfDossierContext,
   type LaventeCarePdfDossierContext,
+  type LaventeCarePdfDossierReference,
 } from "./context";
 import type { LaventeCarePdfTheme } from "./theme";
 
@@ -64,7 +65,7 @@ export function getLaventeCarePdfUrl({
   documentKey: string;
   theme?: LaventeCarePdfTheme;
   delivery?: LaventeCarePdfDelivery;
-  context?: LaventeCarePdfDossierContext | null;
+  context?: LaventeCarePdfDossierContext | LaventeCarePdfDossierReference | null;
 }) {
   const params = new URLSearchParams({
     theme,
@@ -86,7 +87,7 @@ export function getLaventeCarePdfViewerUrl({
 }: {
   documentKey: string;
   theme?: LaventeCarePdfTheme;
-  context?: LaventeCarePdfDossierContext | null;
+  context?: LaventeCarePdfDossierContext | LaventeCarePdfDossierReference | null;
 }) {
   const params = new URLSearchParams({ theme });
   const contextParams = encodeLaventeCarePdfDossierContext(context);

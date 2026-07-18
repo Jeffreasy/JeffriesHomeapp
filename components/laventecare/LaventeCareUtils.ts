@@ -1,4 +1,10 @@
 import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES, type Tone } from "./LaventeCareTypes";
+import {
+  encodeLaventeCarePdfDossierContext,
+  getLaventeCarePdfDossierReferenceFromLink,
+  parseLaventeCarePdfDossierReference,
+  type LaventeCarePdfDossierLink,
+} from "@/lib/laventecare/pdf/context";
 
 export const toneClasses: Record<Tone, { border: string; surface: string; text: string; icon: string }> = {
   amber: {
@@ -173,26 +179,30 @@ function normalizeDossierText(value: string) {
 }
 
 // ─── Dossierdocument-viewerlink met context (L2) ─────────────────────────────
-// De "Recent vastgelegd"/"Recent in dossiers"-lijsten openden de viewer ZONDER
-// de gelogde dossiercontext, waardoor een generiek document verscheen i.p.v.
-// het gepersonaliseerde document dat vastgelegd is. De context-queryparams
-// zitten al in de opgeslagen pdf_url — die nemen we over in de viewer-URL.
-export function dossierDocumentViewerHref(doc: {
-  document_key: string;
-  theme?: string | null;
-  pdf_url?: string | null;
-}): string {
+// Alleen de owner-scoped contextreferentie reist mee. Bestaande opgeslagen URLs
+// kunnen nog legacy dossierinhoud bevatten; die velden worden hier nooit gekopieerd.
+export function dossierDocumentViewerHref(
+  doc: {
+    document_key: string;
+    theme?: string | null;
+    pdf_url?: string | null;
+  } & LaventeCarePdfDossierLink,
+): string {
   const params = new URLSearchParams({ theme: doc.theme === "print" ? "print" : "screen" });
-  if (doc.pdf_url) {
+  let reference = getLaventeCarePdfDossierReferenceFromLink(doc);
+
+  if (!reference && doc.pdf_url) {
     try {
       const stored = new URL(doc.pdf_url, "https://placeholder.local");
-      stored.searchParams.forEach((value, key) => {
-        if (key === "theme" || key === "delivery") return;
-        params.set(key, value);
-      });
+      reference = parseLaventeCarePdfDossierReference(stored.searchParams);
     } catch {
       // Ongeldige opgeslagen URL: val terug op de kale viewer-link.
     }
   }
+
+  for (const [key, value] of Object.entries(encodeLaventeCarePdfDossierContext(reference))) {
+    params.set(key, value);
+  }
+
   return `/laventecare/documenten/${encodeURIComponent(doc.document_key)}?${params.toString()}`;
 }

@@ -4,7 +4,7 @@ import { FormEvent, type ChangeEvent, type ReactNode, useEffect, useMemo, useSta
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ExternalLink, Eye, FileText, Loader2, MailCheck, MailPlus, MessagesSquare, Paperclip, Pencil, Reply, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import type { LCMailAISuggestion } from "@/lib/api";
-import { extractLaventeCareMailAttachmentContext, type LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
+import type { LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
 import type {
   CompanyItem,
   ContactItem,
@@ -1705,6 +1705,10 @@ async function readMailAttachment(file: File): Promise<MailAttachment> {
   if (!contentBytes) {
     throw new Error(`${file.name} bevat geen leesbare inhoud.`);
   }
+  // PDF.js stays outside the mailbox bundle until a validated PDF is actually read.
+  const { extractLaventeCareMailAttachmentContext } = await import(
+    "@/lib/laventecare/mail-attachments"
+  );
   const context = await extractLaventeCareMailAttachmentContext(file);
   return {
     name: file.name,

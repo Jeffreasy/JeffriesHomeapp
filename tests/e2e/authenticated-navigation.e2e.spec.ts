@@ -1,16 +1,31 @@
-import { expect, test } from "@playwright/test";
-
-const authState = process.env.E2E_AUTH_STATE;
-if (authState) test.use({ storageState: authState });
+import { expect, test } from "./fixtures/authenticated-test";
 
 test("an authenticated owner can open the automation builder without mutating data", async ({ page }) => {
-  test.skip(!authState, "Set E2E_AUTH_STATE to run owner-only browser flows.");
-
   await page.goto("/automations");
-  await expect(page.getByRole("heading", { name: "Automatiseringen" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Automatisering" })).toBeVisible();
 
   await page.getByRole("button", { name: /Nieuwe|Toevoegen/i }).first().click();
-  await expect(page.getByRole("heading", { name: "Nieuwe automatisering" })).toBeVisible();
+  const builder = page.getByRole("dialog", { name: "Nieuwe automatisering" });
+  await expect(builder).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("heading", { name: "Nieuwe automatisering" })).not.toBeVisible();
+  await expect(builder).not.toBeVisible();
+});
+
+test("lamp details use the shared responsive overlay without sending commands", async ({
+  page,
+}) => {
+  await page.goto("/lampen", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("region", { name: "Individuele lampbediening" })).toBeVisible();
+
+  const detailsButton = page.getByRole("button", {
+    name: "Woonkamer testlamp details openen",
+  });
+  await detailsButton.focus();
+  await detailsButton.click();
+
+  const panel = page.getByRole("dialog", { name: "Woonkamer testlamp" });
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(panel).not.toBeVisible();
+  await expect(detailsButton).toBeFocused();
 });

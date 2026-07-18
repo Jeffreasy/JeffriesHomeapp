@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
-import { parseLoonstrookPDFs, type ParseResult } from "@/lib/loonstrook-pdf";
+import type { ParseResult } from "@/lib/loonstrook-pdf";
 import { getGetLoonstrokenQueryKey, usePostLoonstrokenImport } from "@/lib/api/generated/loonstroken/loonstroken";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/nextjs";
@@ -43,6 +43,9 @@ export function LoonstrookUploader() {
     setErrorMsg(null);
 
     try {
+      // PDF.js is a large browser dependency. Load it only after the user has
+      // selected a valid PDF instead of adding it to every roster visit.
+      const { parseLoonstrookPDFs } = await import("@/lib/loonstrook-pdf");
       const result = await parseLoonstrookPDFs(pdfs);
       if (result.items.length === 0 && result.errors.length > 0) {
         setErrorMsg(result.errors.join("\n"));

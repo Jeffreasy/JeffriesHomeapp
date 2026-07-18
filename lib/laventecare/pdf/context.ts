@@ -1,5 +1,12 @@
 export type LaventeCarePdfDossierKind = "company" | "lead" | "workstream" | "project" | "manual";
 
+export type LaventeCarePdfResolvableDossierKind = Exclude<LaventeCarePdfDossierKind, "manual">;
+
+export type LaventeCarePdfDossierReference = {
+  kind: LaventeCarePdfResolvableDossierKind;
+  id: string;
+};
+
 export type LaventeCarePdfDossierContext = {
   kind: LaventeCarePdfDossierKind;
   id?: string;
@@ -17,35 +24,65 @@ export type LaventeCarePdfDossierContext = {
   dueDate?: string;
 };
 
-const contextParamKeys = [
-  "ctx",
-  "ctxId",
-  "ctxTitle",
-  "ctxCompany",
-  "ctxStatus",
-  "ctxPriority",
-  "ctxPhase",
-  "ctxScore",
-  "ctxValue",
-  "ctxSource",
-  "ctxSummary",
-  "ctxPain",
-  "ctxNext",
-  "ctxDue",
-] as const;
+export type LaventeCarePdfDossierLink = {
+  context_type?: string | null;
+  context_id?: string | null;
+  company_id?: string | null;
+  lead_id?: string | null;
+  project_id?: string | null;
+  workstream_id?: string | null;
+};
 
-function cleanContextValue(value?: string | null, maxLength = 180) {
-  const trimmed = value?.trim();
-  if (!trimmed) return undefined;
-  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength - 1)}...` : trimmed;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const KIND_ALIASES: Record<string, LaventeCarePdfResolvableDossierKind> = {
+  company: "company",
+  klant: "company",
+  klantdossier: "company",
+  laventecare_company: "company",
+  lead: "lead",
+  laventecare_lead: "lead",
+  project: "project",
+  laventecare_project: "project",
+  workstream: "workstream",
+  opdracht: "workstream",
+  laventecare_workstream: "workstream",
+};
+
+function normalizeDossierKind(value?: string | null): LaventeCarePdfResolvableDossierKind | null {
+  const normalized = value?.trim().toLowerCase();
+  return normalized ? (KIND_ALIASES[normalized] ?? null) : null;
 }
 
-function readContextParam(params: URLSearchParams, key: string, maxLength?: number) {
-  return cleanContextValue(params.get(key), maxLength);
+function normalizeOpaqueDossierId(value?: string | null): string | null {
+  const normalized = value?.trim();
+  return normalized && UUID_PATTERN.test(normalized) ? normalized.toLowerCase() : null;
 }
 
-function isDossierKind(value: string | undefined): value is LaventeCarePdfDossierKind {
-  return value === "company" || value === "lead" || value === "workstream" || value === "project" || value === "manual";
+export function createLaventeCarePdfDossierReference(
+  kind?: string | null,
+  id?: string | null,
+): LaventeCarePdfDossierReference | null {
+  const normalizedKind = normalizeDossierKind(kind);
+  const normalizedId = normalizeOpaqueDossierId(id);
+  return normalizedKind && normalizedId ? { kind: normalizedKind, id: normalizedId } : null;
+}
+
+export function getLaventeCarePdfDossierReferenceFromLink(
+  link: LaventeCarePdfDossierLink,
+): LaventeCarePdfDossierReference | null {
+  const directReference = createLaventeCarePdfDossierReference(
+    link.context_type,
+    link.context_id,
+  );
+  if (directReference) return directReference;
+
+  return (
+    createLaventeCarePdfDossierReference("lead", link.lead_id) ??
+    createLaventeCarePdfDossierReference("project", link.project_id) ??
+    createLaventeCarePdfDossierReference("workstream", link.workstream_id) ??
+    createLaventeCarePdfDossierReference("company", link.company_id)
+  );
 }
 
 export function getLaventeCarePdfDossierKindLabel(kind: LaventeCarePdfDossierKind) {
@@ -76,57 +113,23 @@ export function getLaventeCarePdfDossierContextLabel(context?: LaventeCarePdfDos
   return `${context.title} (${parts.join(" - ")})`;
 }
 
+/**
+ * URLs carry an owner-scoped reference, never customer or dossier content.
+ * The authenticated server resolves this reference to presentation context.
+ */
 export function encodeLaventeCarePdfDossierContext(
-  context?: LaventeCarePdfDossierContext | null
+  context?: Pick<LaventeCarePdfDossierContext, "kind" | "id"> | LaventeCarePdfDossierReference | null,
 ): Record<string, string> {
-  if (!context?.title.trim()) return {};
-
-  return {
-    ctx: context.kind,
-    ...(context.id ? { ctxId: context.id } : {}),
-    ctxTitle: context.title,
-    ...(context.company ? { ctxCompany: context.company } : {}),
-    ...(context.status ? { ctxStatus: context.status } : {}),
-    ...(context.priority ? { ctxPriority: context.priority } : {}),
-    ...(context.phase ? { ctxPhase: context.phase } : {}),
-    ...(typeof context.score === "number" ? { ctxScore: String(context.score) } : {}),
-    ...(context.valueLabel ? { ctxValue: context.valueLabel } : {}),
-    ...(context.source ? { ctxSource: context.source } : {}),
-    ...(context.summary ? { ctxSummary: context.summary } : {}),
-    ...(context.painPoint ? { ctxPain: context.painPoint } : {}),
-    ...(context.nextStep ? { ctxNext: context.nextStep } : {}),
-    ...(context.dueDate ? { ctxDue: context.dueDate } : {}),
-  };
+  const reference = createLaventeCarePdfDossierReference(context?.kind, context?.id);
+  return reference ? { ctx: reference.kind, ctxId: reference.id } : {};
 }
 
-export function parseLaventeCarePdfDossierContext(
-  params: URLSearchParams
-): LaventeCarePdfDossierContext | null {
-  const kindParam = readContextParam(params, "ctx", 24);
-  const title = readContextParam(params, "ctxTitle", 120);
-  if (!isDossierKind(kindParam) || !title) return null;
-
-  const scoreParam = readContextParam(params, "ctxScore", 12);
-  const parsedScore = scoreParam === undefined ? undefined : Number(scoreParam);
-
-  return {
-    kind: kindParam,
-    id: readContextParam(params, "ctxId", 80),
-    title,
-    company: readContextParam(params, "ctxCompany", 120),
-    status: readContextParam(params, "ctxStatus", 48),
-    priority: readContextParam(params, "ctxPriority", 48),
-    phase: readContextParam(params, "ctxPhase", 48),
-    score: Number.isFinite(parsedScore) ? parsedScore : undefined,
-    valueLabel: readContextParam(params, "ctxValue", 80),
-    source: readContextParam(params, "ctxSource", 80),
-    summary: readContextParam(params, "ctxSummary", 260),
-    painPoint: readContextParam(params, "ctxPain", 260),
-    nextStep: readContextParam(params, "ctxNext", 220),
-    dueDate: readContextParam(params, "ctxDue", 80),
-  };
+export function parseLaventeCarePdfDossierReference(
+  params: URLSearchParams,
+): LaventeCarePdfDossierReference | null {
+  return createLaventeCarePdfDossierReference(params.get("ctx"), params.get("ctxId"));
 }
 
 export function hasLaventeCarePdfDossierContextParams(params: URLSearchParams) {
-  return contextParamKeys.some((key) => params.has(key));
+  return parseLaventeCarePdfDossierReference(params) !== null;
 }

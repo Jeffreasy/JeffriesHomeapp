@@ -1,83 +1,110 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from "@playwright/test";
+import {
+  clerkNonOwnerStateFile,
+  clerkOwnerStateFile,
+} from "./tests/e2e/support/clerk-state";
 
-const e2eBaseURL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
-const useExternalServer = process.env.E2E_EXTERNAL_SERVER === '1';
+const e2eBaseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const useExternalServer = process.env.E2E_EXTERNAL_SERVER === "1";
+const authenticatedSpecs = /(?:authenticated-navigation|enterprise-shell)\.e2e\.spec\.ts/;
+const protectedBrowserPolicy = {
+  serviceWorkers: "block",
+  screenshot: "off",
+  trace: "off",
+  video: "off",
+} as const;
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
-
-/**
- * See https://playwright.dev/docs/test-configuration.
- */
 export default defineConfig({
-  testDir: './tests/e2e',
-  testMatch: '**/*.e2e.spec.ts',
-  /* Run tests in files in parallel */
+  testDir: "./tests/e2e",
   fullyParallel: true,
-  /* Fail the build on CI if you accidentally left test.only in the source code. */
-  forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
+  forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
-  /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: process.env.CI ? 'github' : 'html',
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
+  reporter: process.env.CI ? "github" : "html",
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: e2eBaseURL,
-
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    trace: "on-first-retry",
   },
-
-  /* Configure projects for major browsers */
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: "security-chromium",
+      testMatch: /security\.e2e\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
     },
-
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: "clerk-owner-setup",
+      testMatch: /[\\/]auth\.setup\.ts$/,
+      teardown: "clerk-owner-teardown",
+      use: {
+        ...devices["Desktop Chrome"],
+        ...protectedBrowserPolicy,
+      },
     },
-
     {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      name: "clerk-owner-teardown",
+      testMatch: /[\\/]auth\.teardown\.ts$/,
+      use: protectedBrowserPolicy,
     },
-
     {
-      name: 'mobile-chromium',
-      use: { ...devices['Pixel 5'] },
+      name: "clerk-non-owner-setup",
+      testMatch: /[\\/]non-owner-auth\.setup\.ts$/,
+      teardown: "clerk-non-owner-teardown",
+      use: {
+        ...devices["Desktop Chrome"],
+        ...protectedBrowserPolicy,
+      },
     },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
+    {
+      name: "clerk-non-owner-teardown",
+      testMatch: /[\\/]non-owner-auth\.teardown\.ts$/,
+      use: protectedBrowserPolicy,
+    },
+    {
+      name: "auth-desktop",
+      testMatch: authenticatedSpecs,
+      dependencies: ["clerk-owner-setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        ...protectedBrowserPolicy,
+        storageState: clerkOwnerStateFile,
+      },
+    },
+    {
+      name: "auth-tablet",
+      testMatch: authenticatedSpecs,
+      dependencies: ["clerk-owner-setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 834, height: 1194 },
+        ...protectedBrowserPolicy,
+        storageState: clerkOwnerStateFile,
+      },
+    },
+    {
+      name: "auth-mobile",
+      testMatch: authenticatedSpecs,
+      dependencies: ["clerk-owner-setup"],
+      use: {
+        ...devices["Pixel 5"],
+        ...protectedBrowserPolicy,
+        storageState: clerkOwnerStateFile,
+      },
+    },
+    {
+      name: "auth-non-owner",
+      testMatch: /non-owner-access\.e2e\.spec\.ts/,
+      dependencies: ["clerk-non-owner-setup"],
+      use: {
+        ...devices["Desktop Chrome"],
+        ...protectedBrowserPolicy,
+        storageState: clerkNonOwnerStateFile,
+      },
+    },
   ],
-
-  /* Run your local dev server before starting the tests */
   webServer: useExternalServer
     ? undefined
     : {
-        command: process.env.CI ? 'npm run start' : 'npm run dev',
+        command: process.env.CI ? "npm run start" : "npm run dev",
         url: `${e2eBaseURL}/sign-in`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

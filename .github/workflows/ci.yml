@@ -54,6 +54,8 @@ jobs:
           BACKEND_API_KEY: ci-only-not-a-real-secret
           HOMEAPP_OWNER_USER_ID: user_ci_owner
         run: npm run build
+      - name: Enforce performance budgets
+        run: npm run check:performance
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Security E2E
@@ -62,3 +64,40 @@ jobs:
           BACKEND_API_KEY: ci-only-not-a-real-secret
           HOMEAPP_OWNER_USER_ID: user_ci_owner
         run: npm run test:e2e
+
+  authenticated-e2e:
+    if: ${{ vars.HOMEAPP_AUTH_E2E_ENABLED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: homeapp-e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Build with the isolated Clerk test tenant
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          HOMEAPP_OWNER_USER_ID: ${{ secrets.E2E_CLERK_OWNER_USER_ID }}
+          BACKEND_API_URL: http://127.0.0.1:18080/api/v1
+          BACKEND_API_KEY: authenticated-e2e-read-only
+        run: npm run build
+      - name: Enforce performance budgets
+        run: npm run check:performance
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Authenticated owner and non-owner read-only E2E
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.E2E_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.E2E_CLERK_SECRET_KEY }}
+          E2E_CLERK_OWNER_EMAIL: ${{ secrets.E2E_CLERK_OWNER_EMAIL }}
+          E2E_CLERK_NON_OWNER_EMAIL: ${{ secrets.E2E_CLERK_NON_OWNER_EMAIL }}
+          HOMEAPP_OWNER_USER_ID: ${{ secrets.E2E_CLERK_OWNER_USER_ID }}
+          BACKEND_API_URL: http://127.0.0.1:18080/api/v1
+          BACKEND_API_KEY: authenticated-e2e-read-only
+        run: npm run test:e2e:authenticated

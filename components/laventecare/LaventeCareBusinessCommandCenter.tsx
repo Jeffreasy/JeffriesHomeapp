@@ -432,6 +432,12 @@ export function LaventeCareBusinessCommandCenter({
                     document_key: item.document_key,
                     theme,
                     pdf_url: item.pdf_url,
+                    context_type: item.context_type,
+                    context_id: item.context_id,
+                    company_id: item.company_id,
+                    lead_id: item.lead_id,
+                    project_id: item.project_id,
+                    workstream_id: item.workstream_id,
                   });
 
                   return (

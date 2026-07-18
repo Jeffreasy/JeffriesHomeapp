@@ -10,8 +10,6 @@ import { usePersonalEvents, type PersonalEvent } from "@/hooks/usePersonalEvents
 import { useToast } from "@/components/ui/Toast";
 import { syncApi } from "@/lib/api";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
-import { StatsView } from "@/components/schedule/StatsView";
-import { SalarisView } from "@/components/salary/SalarisView";
 import { AfsprakenView } from "@/components/schedule/AfsprakenView";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { calcTotalHours, getHistory, getUpcoming, shiftBreakdown, teamBreakdown } from "@/lib/schedule";
@@ -30,6 +28,35 @@ import {
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { StatChip } from "@/components/ui/StatChip";
+
+function DeferredRosterPanel({ label }: { label: string }) {
+  return (
+    <div
+      role="status"
+      className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] text-sm text-slate-400"
+    >
+      <RefreshCw aria-hidden className="h-4 w-4 animate-spin" />
+      {label}
+    </div>
+  );
+}
+
+const LazyStatsView = dynamic(
+  () => import("@/components/schedule/StatsView").then((module) => module.StatsView),
+  {
+    ssr: false,
+    loading: () => <DeferredRosterPanel label="Statistieken laden..." />,
+  },
+);
+
+const LazySalarisView = dynamic(
+  () => import("@/components/salary/SalarisView").then((module) => module.SalarisView),
+  {
+    ssr: false,
+    loading: () => <DeferredRosterPanel label="Salarisoverzicht laden..." />,
+  },
+);
+
 const LazyCreateEventModal = dynamic(
   () => import("@/components/schedule/CreateEventModal").then((module) => module.CreateEventModal),
   { ssr: false },
@@ -572,7 +599,7 @@ export default function RoosterPage() {
                 className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
               >
                 <ErrorBoundary>
-                  <StatsView diensten={diensten} />
+                  <LazyStatsView diensten={diensten} />
                 </ErrorBoundary>
               </div>
             )}
@@ -586,7 +613,7 @@ export default function RoosterPage() {
                 className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
               >
                 <ErrorBoundary>
-                  <SalarisView diensten={diensten} />
+                  <LazySalarisView diensten={diensten} />
                 </ErrorBoundary>
               </div>
             )}

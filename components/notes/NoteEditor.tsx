@@ -100,15 +100,15 @@ type EventOptionGroup = {
 };
 
 // ── Draft persistence (FH9) ──────────────────────────────────────────────────
-// A tab-reload, PWA-kill or Android back press must never destroy a long
+// A tab reload, browser crash or Android back press must not destroy a long
 // unsaved note. While dirty, a snapshot of title+content is debounced into
-// localStorage (per note id; "new-note" for a fresh editor) and offered back
+// sessionStorage (per note id; "new-note" for a fresh editor) and offered back
 // via an inline restore banner on the next open.
 type NoteDraft = {
   titel: string;
   inhoud: string;
   savedAt: number;
-  // Uitgebreid (low): ook tags/deadline/kleur overleven een hard kill.
+  // Uitgebreid (low): ook tags/deadline/kleur overleven een reload in deze tabsessie.
   tags?: string[];
   deadline?: string;
   kleur?: string;
@@ -122,7 +122,7 @@ const DRAFT_KEY_PREFIX = "note-editor-draft:";
 // has a unique id).
 function draftStorageKey(noteId?: string | null, userId?: string | null) {
   // Eén herstelbak per gebruiker voor een nieuwe notitie. De context zelf zit
-  // in de draft, zodat een contactconcept na een PWA-kill ook via de gewone
+  // in de draft, zodat een contactconcept binnen dezelfde tabsessie ook via de gewone
   // 'Nieuwe notitie'-knop teruggevonden kan worden.
   const scope = noteId ?? `new-note:${userId ?? "anon"}`;
   return `${DRAFT_KEY_PREFIX}${scope}`;
@@ -131,7 +131,7 @@ function draftStorageKey(noteId?: string | null, userId?: string | null) {
 function readDraft(key: string): NoteDraft | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = window.sessionStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<NoteDraft>;
     if (typeof parsed.inhoud !== "string" || typeof parsed.savedAt !== "number") return null;
@@ -159,7 +159,7 @@ function readDraft(key: string): NoteDraft | null {
 
 function clearStoredDraft(key: string) {
   try {
-    window.localStorage.removeItem(key);
+    window.sessionStorage.removeItem(key);
   } catch {}
 }
 
@@ -292,7 +292,7 @@ export function NoteEditor({
     initialBusinessContext,
   }));
 
-  // FH9c: draft snapshot in localStorage. On open, offer restore when a draft
+  // FH9c: draft snapshot in sessionStorage. On open, offer restore when a draft
   // exists that is newer than the note's last save and differs from what the
   // editor already shows.
   const draftKey = draftStorageKey(note?.id, userId);
@@ -712,7 +712,7 @@ export function NoteEditor({
         businessContextTitle: enriched.businessContext?.title || (isEditing ? "" : undefined),
       }, overwrite);
       setBaseline(currentSnapshot);
-      // Successful save — the localStorage draft is now stale (FH9c).
+      // Successful save — the sessionStorage draft is now stale (FH9c).
       clearStoredDraft(draftKey);
       setConflict({ open: false, freshNote: null });
       consumeHistorySentinel();
@@ -777,8 +777,8 @@ export function NoteEditor({
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
 
-  // FH9c: while dirty, debounce a title/content snapshot into localStorage so
-  // a hard kill (PWA swipe-away, crash) can still be recovered.
+  // FH9c: while dirty, debounce a title/content snapshot into sessionStorage so
+  // a reload or crash can be recovered without durable cross-session storage.
   useEffect(() => {
     if (!isDirty) return;
     const timer = window.setTimeout(() => {
@@ -792,7 +792,7 @@ export function NoteEditor({
           kleur: kleur || undefined,
           businessContext: normalizeBusinessContext(businessContext),
         };
-        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+        window.sessionStorage.setItem(draftKey, JSON.stringify(draft));
       } catch {}
     }, 1000);
     return () => window.clearTimeout(timer);
@@ -1723,7 +1723,7 @@ export function NoteEditor({
                       applySnapshot(freshSnapshot);
                       setBaseline(freshSnapshot);
                     }
-                    // Draft blijft in localStorage → de herstelbanner biedt het
+                    // Draft blijft in sessionStorage → de herstelbanner biedt het
                     // concept nog aan; alleen de conflict-UI sluit.
                     setConflict({ open: false, freshNote: null });
                   }}

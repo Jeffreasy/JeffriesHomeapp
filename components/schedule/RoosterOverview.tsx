@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Calendar, CalendarClock, CalendarDays, CheckCircle2, ChevronDown, Clock3, FileSpreadsheet, History, List, Zap } from "lucide-react";
@@ -14,6 +15,7 @@ import { WeekBlock } from "./RoosterTimeline";
 import { formatHours, formatMetaDate, pluralize } from "./RoosterUtils";
 import { DienstItem } from "./DienstItem";
 import { PersonalEventItem } from "./PersonalEventItem";
+import { ContractWidget } from "./ContractWidget";
 import { cn } from "@/lib/utils";
 
 export function OverviewPanel({
@@ -119,8 +121,20 @@ export function OverviewPanel({
   );
 }
 
-import { ContractWidget } from "./ContractWidget";
-import { MonthBalanceChart } from "./MonthBalanceChart";
+const LazyMonthBalanceChart = dynamic(
+  () => import("./MonthBalanceChart").then((module) => module.MonthBalanceChart),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        role="status"
+        className="flex min-h-48 items-center justify-center rounded-xl border border-white/8 bg-white/[0.025] text-sm text-slate-400"
+      >
+        Maandbalans laden...
+      </div>
+    ),
+  },
+);
 
 export function OverviewTab({
   unifiedWeeks,
@@ -172,7 +186,7 @@ export function OverviewTab({
       <div className="space-y-4">
         <div className="space-y-4">
           <ContractWidget />
-          <MonthBalanceChart />
+          <LazyMonthBalanceChart />
         </div>
         <Panel>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

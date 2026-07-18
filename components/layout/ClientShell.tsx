@@ -6,7 +6,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { FocusModeAutoRedirect } from "@/components/layout/FocusModeControl";
 
 const AUTH_ROUTE_PREFIXES = ["/sign-in", "/sign-up"];
-const CHROMELESS_ROUTE_PREFIXES = ["/focus", "/laventecare/documenten"];
+const CHROMELESS_ROUTE_PREFIXES = ["/access-denied", "/focus", "/laventecare/documenten"];
 
 function matchesRoutePrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);

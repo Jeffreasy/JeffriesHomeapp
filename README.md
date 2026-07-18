@@ -40,6 +40,7 @@ Kopieer .env.example naar .env.local en vul minimaal de Clerk- en ownerconfigura
 | BACKEND_API_KEY | Server-only X-API-Key voor JeffriesBackend. |
 | HOMEAPP_OWNER_USER_ID | Enige Clerk-user die private data mag benaderen. |
 
+| LAVENTECARE_PDF_SOURCE_HOSTS | Optionele server-only komma-lijst met exacte hostnames voor klikbare externe PDF-bronnen; leeg blijft fail-closed. |
 Productie faalt gesloten wanneer BACKEND_API_URL, een backendkey of HOMEAPP_OWNER_USER_ID ontbreekt. Er is geen productie- of Renderfallback. Development mag zonder BACKEND_API_URL terugvallen op http://127.0.0.1:8000/api/v1; expliciet configureren via .env.local blijft aanbevolen.
 
 ## Lokaal ontwikkelen
@@ -59,10 +60,11 @@ npm run typecheck
 npm run lint
 npm run test:unit
 npm run build
+npm run check:performance
 npm run test:e2e
 ~~~
 
-De security-E2E draait zonder geauthenticeerde storage state. Zet E2E_AUTH_STATE naar een Playwright storage-statebestand om ook de niet-muterende ownernavigatie te testen. Zie [docs/testing.md](docs/testing.md).
+De altijd actieve security-E2E draait zonder sessie. `npm run test:e2e:authenticated` maakt via afhankelijke Clerk setup-projecten afzonderlijke ignored owner- en non-ownerstates, controleert de read-only desktop-, tablet- en mobiele ownerflows plus de echte 403-grens en verwijdert beide states via teardowns. Gebruik daarvoor uitsluitend een Clerk testtenant; zie [docs/testing.md](docs/testing.md).
 
 ## LaventeCare intakebridge
 
