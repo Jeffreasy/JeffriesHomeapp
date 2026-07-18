@@ -48,7 +48,7 @@ export type PortalSection = {
   tone: "amber" | "emerald" | "sky" | "rose" | "violet" | "slate";
 };
 
-export type CapabilityStatus = "ready" | "attention" | "missing";
+export type CapabilityStatus = "ready" | "attention" | "missing" | "unknown";
 
 export type CapabilityRow = {
   label: string;
@@ -89,13 +89,15 @@ export function LaventeCarePortalHero({
   leads: number;
   workstreams: number;
   projects: number;
-  invoices: number;
+  invoices: number | null;
   documents: number;
   onOpenCapabilities: () => void;
 }) {
   const ready = capabilityRows.filter((row) => row.status === "ready").length;
   const attention = capabilityRows.filter((row) => row.status === "attention").length;
   const missing = capabilityRows.filter((row) => row.status === "missing").length;
+  const unknown = capabilityRows.filter((row) => row.status === "unknown").length;
+  const known = capabilityRows.length - unknown;
 
   return (
     <section className="glass min-w-0 p-3 sm:p-4">
@@ -112,8 +114,9 @@ export function LaventeCarePortalHero({
               className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2 text-[11px] font-bold text-slate-300 transition hover:bg-white/[0.06] hover:text-white"
             >
               <Gauge size={13} />
-              {ready}/{capabilityRows.length} klaar
+              {ready}/{known} beoordeeld als klaar
               {attention + missing > 0 ? ` - ${attention + missing} focus` : ""}
+              {unknown > 0 ? ` - ${unknown} onbekend` : ""}
             </button>
           </div>
           <h2 className="mt-2 text-xl font-bold tracking-tight text-white sm:text-2xl">
@@ -134,14 +137,14 @@ export function LaventeCarePortalHero({
           <StatChip icon={Sparkles} label="Leads" value={String(leads)} meta="sales" tone="indigo" />
           <StatChip icon={Workflow} label="Opdrachten" value={String(workstreams)} meta="werkbank" tone="indigo" />
           <StatChip icon={FolderKanban} label="Projecten" value={String(projects)} meta="delivery" tone="green" />
-          <StatChip icon={Banknote} label="Facturen" value={String(invoices)} meta="bunq" tone="amber" />
+          <StatChip icon={Banknote} label="Facturen" value={invoices === null ? "?" : String(invoices)} meta="bunq" tone="amber" />
           <StatChip icon={BookOpenText} label="Docs" value={String(documents)} meta="templates" tone="sky" />
           <StatChip
             icon={Gauge}
             label="Vulling"
-            value={`${ready}/${capabilityRows.length}`}
-            meta={attention || missing ? `${attention + missing} focus` : "op orde"}
-            tone={attention || missing ? "rose" : "green"}
+            value={`${ready}/${known}`}
+            meta={attention || missing ? `${attention + missing} focus` : unknown ? `${unknown} onbekend` : "op orde"}
+            tone={attention || missing ? "rose" : unknown ? "sky" : "green"}
           />
         </div>
       </details>
@@ -149,7 +152,7 @@ export function LaventeCarePortalHero({
       {(attention > 0 || missing > 0) && (
         <div className="mt-3 hidden gap-2 lg:grid lg:grid-cols-3">
           {capabilityRows
-            .filter((row) => row.status !== "ready")
+            .filter((row) => row.status === "attention" || row.status === "missing")
             .slice(0, 3)
             .map((row) => (
               <button
@@ -229,11 +232,13 @@ export function PortalInsightRail({
   activeView: PortalView;
   signals: number;
   actions: number;
-  openInvoices: number;
+  openInvoices: number | null;
   openIncidents: number;
   onChange: (view: PortalView) => void;
 }) {
-  const attentionRows = capabilityRows.filter((row) => row.status !== "ready");
+  const attentionRows = capabilityRows.filter(
+    (row) => row.status === "attention" || row.status === "missing",
+  );
   const railRows = [...capabilityRows].sort((a, b) => statusWeight(a.status) - statusWeight(b.status));
   return (
     <aside className="space-y-4 xl:sticky xl:top-[168px] xl:self-start">
@@ -252,7 +257,7 @@ export function PortalInsightRail({
             >
               <span className="min-w-0">
                 <span className="block truncate text-xs font-bold text-slate-200">{row.label}</span>
-                <span className="mt-0.5 block truncate text-[11px] text-slate-500">{row.score}% - {row.owner}</span>
+                <span className="mt-0.5 block truncate text-[11px] text-slate-500">{row.status === "unknown" ? "Nog niet geladen" : `${row.score}% - ${row.owner}`}</span>
               </span>
               <CapabilityIcon status={row.status} />
             </button>
@@ -268,7 +273,7 @@ export function PortalInsightRail({
         <div className="mt-4 grid grid-cols-2 gap-2">
           <RailMetric label="Signalen" value={signals} icon={Sparkles} tone="violet" />
           <RailMetric label="Acties" value={actions} icon={ListChecks} tone="sky" />
-          <RailMetric label="Facturen" value={openInvoices} icon={ReceiptText} tone="amber" />
+          <RailMetric label="Facturen" value={openInvoices ?? "?"} icon={ReceiptText} tone="amber" />
           <RailMetric label="SLA" value={openIncidents} icon={LifeBuoy} tone={openIncidents > 0 ? "rose" : "slate"} />
         </div>
         {attentionRows.length > 0 ? (
@@ -311,7 +316,7 @@ export function PortalInsightRail({
   );
 }
 
-function RailMetric({ label, value, icon: Icon, tone }: { label: string; value: number; icon: LucideIcon; tone: PortalSection["tone"] }) {
+function RailMetric({ label, value, icon: Icon, tone }: { label: string; value: number | string; icon: LucideIcon; tone: PortalSection["tone"] }) {
   const toneClass = {
     amber: "text-amber-300",
     emerald: "text-emerald-300",
@@ -341,8 +346,12 @@ export function CapabilityMatrix({
   const ready = capabilityRows.filter((row) => row.status === "ready").length;
   const attention = capabilityRows.filter((row) => row.status === "attention").length;
   const missing = capabilityRows.filter((row) => row.status === "missing").length;
-  const maturity = Math.round(capabilityRows.reduce((sum, row) => sum + row.score, 0) / Math.max(1, capabilityRows.length));
-  const focusRows = capabilityRows.filter((row) => row.status !== "ready").sort((a, b) => statusWeight(a.status) - statusWeight(b.status));
+  const unknown = capabilityRows.filter((row) => row.status === "unknown").length;
+  const scoredRows = capabilityRows.filter((row) => row.status !== "unknown");
+  const maturity = Math.round(scoredRows.reduce((sum, row) => sum + row.score, 0) / Math.max(1, scoredRows.length));
+  const focusRows = capabilityRows
+    .filter((row) => row.status === "attention" || row.status === "missing")
+    .sort((a, b) => statusWeight(a.status) - statusWeight(b.status));
   const visibleRows = expanded
     ? capabilityRows
     : focusRows.length > 0
@@ -368,6 +377,12 @@ export function CapabilityMatrix({
             <CircleDashed size={14} />
             {attention} inrichten
           </span>
+          {unknown > 0 ? (
+            <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-bold text-slate-300">
+              <CircleDashed size={14} />
+              {unknown} onbekend
+            </span>
+          ) : null}
           <span className="inline-flex h-8 items-center gap-2 rounded-lg border border-rose-500/20 bg-rose-500/10 px-3 text-xs font-bold text-rose-200">
             <AlertTriangle size={14} />
             {missing} niet ingericht
@@ -389,9 +404,11 @@ export function CapabilityMatrix({
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-500">
             {/* R3-11: alleen "alle kernflows zijn ingericht" beweren als dat écht zo is. */}
-            {attention + missing === 0
+            {attention + missing === 0 && unknown === 0
               ? "Alle kernflows zijn ingericht; de resterende signalen gaan over het vullen van echte bedrijfsdata en werkdiscipline."
-              : `${attention + missing} bedrijfsfunctie(s) vragen nog aandacht; richt die in en vul echte bedrijfsdata om de volwassenheid te verhogen.`}
+              : attention + missing > 0
+                ? `${attention + missing} bedrijfsfunctie(s) vragen nog aandacht; richt die in en vul echte bedrijfsdata om de volwassenheid te verhogen.`
+                : `${unknown} bedrijfsfunctie(s) worden pas beoordeeld wanneer je de bijbehorende werkruimte opent.`}
           </p>
         </div>
 
@@ -401,22 +418,31 @@ export function CapabilityMatrix({
             <p className="text-sm font-bold text-white">Focus nu</p>
           </div>
           <div className="mt-3 space-y-2">
-            {focusRows.slice(0, 3).map((row, index) => (
-              <button
-                key={row.label}
-                type="button"
-                onClick={() => onOpenView?.(row.view)}
-                className="flex w-full items-start gap-2 rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-left transition hover:bg-white/[0.05]"
-              >
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-bold text-slate-300">
-                  {index + 1}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-xs font-bold text-white">{row.label}</span>
-                  <span className="mt-0.5 block text-xs leading-5 text-slate-500">{row.nextStep}</span>
-                </span>
-              </button>
-            ))}
+            {focusRows.length > 0 ? (
+              focusRows.slice(0, 3).map((row, index) => (
+                <button
+                  key={row.label}
+                  type="button"
+                  onClick={() => onOpenView?.(row.view)}
+                  className="flex w-full items-start gap-2 rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-left transition hover:bg-white/[0.05]"
+                >
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-bold text-slate-300">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-xs font-bold text-white">{row.label}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">{row.nextStep}</span>
+                  </span>
+                </button>
+              ))
+            ) : (
+              <p className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-xs leading-5 text-slate-400">
+                {unknown > 0
+                  ? "Geen bekende actiepunten; open de overige werkruimtes voor een volledige beoordeling."
+                  : "Geen openstaande actiepunten."
+                }
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -440,7 +466,13 @@ export function CapabilityMatrix({
               <div
                 className={cn(
                   "h-full rounded-full",
-                  row.status === "ready" ? "bg-emerald-300" : row.status === "attention" ? "bg-amber-300" : "bg-rose-300"
+                  row.status === "ready"
+                    ? "bg-emerald-300"
+                    : row.status === "attention"
+                      ? "bg-amber-300"
+                      : row.status === "missing"
+                        ? "bg-rose-300"
+                        : "bg-slate-500"
                 )}
                 style={{ width: `${Math.max(6, row.score)}%` }}
               />
@@ -448,7 +480,7 @@ export function CapabilityMatrix({
             <div className="mt-3 flex items-center justify-between gap-3 text-xs">
               <span className="inline-flex min-w-0 items-center gap-2 font-semibold text-slate-500">
                 <ClipboardList size={13} />
-                <span className="truncate">{row.owner} - {row.score}%</span>
+                <span className="truncate">{row.status === "unknown" ? `${row.owner} - nog niet geladen` : `${row.owner} - ${row.score}%`}</span>
               </span>
               <PriorityBadge priority={row.priority} />
             </div>
@@ -535,6 +567,7 @@ function CapabilityBadge({ status }: { status: CapabilityStatus }) {
     ready: { label: "Klaar", className: "border-emerald-500/20 bg-emerald-500/10 text-emerald-200" },
     attention: { label: "Inrichten", className: "border-amber-500/20 bg-amber-500/10 text-amber-200" },
     missing: { label: "Niet ingericht", className: "border-rose-500/20 bg-rose-500/10 text-rose-200" },
+    unknown: { label: "Onbekend", className: "border-white/10 bg-white/[0.04] text-slate-300" },
   }[status];
   return (
     <span className={cn("inline-flex h-7 shrink-0 items-center rounded-full border px-2 text-[11px] font-bold", config.className)}>
@@ -546,7 +579,8 @@ function CapabilityBadge({ status }: { status: CapabilityStatus }) {
 function CapabilityIcon({ status }: { status: CapabilityStatus }) {
   if (status === "ready") return <CheckCircle2 size={15} className="text-emerald-300" />;
   if (status === "attention") return <CircleDashed size={15} className="text-amber-300" />;
-  return <AlertTriangle size={15} className="text-rose-300" />;
+  if (status === "missing") return <AlertTriangle size={15} className="text-rose-300" />;
+  return <CircleDashed size={15} className="text-slate-400" />;
 }
 
 function PriorityBadge({ priority }: { priority: CapabilityRow["priority"] }) {
@@ -561,5 +595,6 @@ function PriorityBadge({ priority }: { priority: CapabilityRow["priority"] }) {
 function statusWeight(status: CapabilityStatus) {
   if (status === "missing") return 0;
   if (status === "attention") return 1;
-  return 2;
+  if (status === "unknown") return 2;
+  return 3;
 }

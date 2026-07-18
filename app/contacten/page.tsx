@@ -17,6 +17,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   Star,
   StickyNote,
   Tag,
@@ -24,6 +25,13 @@ import {
   X,
 } from "lucide-react";
 import { AppIcon } from "@/components/ui/AppIcon";
+import {
+  AppPageHeader,
+  AppPageShell,
+  PageToolbar,
+} from "@/components/layout/AppPageShell";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useContacten, useContact, useLabels } from "@/hooks/useContacten";
@@ -32,6 +40,7 @@ import type { NoteRecord } from "@/hooks/useNotes";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { contactenApi, laventecareApi, DuplicateContactError, type Contact, type ContactLabel } from "@/lib/api";
 import { LABEL_COLOR_KEYS, labelChipClasses, labelDotClasses } from "@/lib/contacten/labelColors";
+import { laventeCareQueryKeys } from "@/lib/laventecare/query-keys";
 import { formatDayMonth, RELATIONSHIP_TYPES } from "@/lib/contacten/contact-display";
 import {
   BulkBar,
@@ -64,6 +73,7 @@ export default function ContactenPage() {
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [labelManagerOpen, setLabelManagerOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Contextbadges uit Notities landen op /contacten?contact=<id>. Client-side
   // lezen houdt deze interactieve pagina build-safe zonder extra Suspense-laag.
@@ -202,156 +212,70 @@ export default function ContactenPage() {
     setFormOpen(true);
   };
 
+  const activeFilterCount =
+    (typeFilter ? 1 : 0) +
+    labelFilter.length +
+    (showArchived ? 1 : 0) +
+    (groupByLabel ? 1 : 0) +
+    (sortBy === "name" ? 0 : 1);
+
+  const clearContactFilters = () => {
+    setTypeFilter(null);
+    setLabelFilter([]);
+    setLabelMatchAll(false);
+    setShowArchived(false);
+    setGroupByLabel(false);
+    setSortBy("name");
+  };
+
   return (
-    <div className="text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#0a0a0f]/92 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div className="mx-auto max-w-5xl px-4 py-3 sm:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <AppIcon name="relations" tone="amber" size="md" framed active />
-              <div className="min-w-0">
-                <h1 className="text-base font-semibold text-white sm:text-lg">Contacten</h1>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {isLoading ? "laden…" : `${contacts.length} relatie${contacts.length === 1 ? "" : "s"}`}
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setLabelManagerOpen(true)}
-                aria-label="Labels beheren"
-                className="flex h-9 items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
-              >
-                <Tag size={14} />
-                <span className="hidden sm:inline">Labels</span>
-              </button>
-              <button
-                type="button"
-                onClick={openNew}
-                className="flex h-9 items-center gap-1.5 rounded-lg border border-amber-500/25 bg-amber-500/12 px-3 text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-500/18"
-              >
-                <Plus size={14} />
-                <span className="hidden sm:inline">Nieuw</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3">
-            <Search size={15} className="shrink-0 text-slate-500" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Zoek op naam, e-mail of notitie…"
-              aria-label="Zoek contacten"
-              className="min-h-[40px] min-w-0 flex-1 bg-transparent text-base text-slate-100 outline-none placeholder:text-slate-600 sm:text-sm"
-            />
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-1.5 pb-0.5">
-            <FilterChip label="Alle" active={typeFilter === null} onClick={() => setTypeFilter(null)} />
-            {RELATIONSHIP_TYPES.map((t) => (
-              <FilterChip
-                key={t.value}
-                label={t.label}
-                active={typeFilter === t.value}
-                onClick={() => setTypeFilter(typeFilter === t.value ? null : t.value)}
-              />
-            ))}
-          </div>
-
-          {labels.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pb-0.5">
-              {labels.map((l) => {
-                const active = labelFilter.includes(l.id);
-                return (
-                  <button
-                    key={l.id}
-                    type="button"
-                    onClick={() => toggleLabelFilter(l.id)}
-                    aria-pressed={active}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-opacity ${labelChipClasses(
-                      l.color,
-                    )} ${active ? "ring-1 ring-white/40" : "opacity-70 hover:opacity-100"}`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${labelDotClasses(l.color)}`} />
-                    {l.name}
-                  </button>
-                );
-              })}
-              {labelFilter.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setLabelMatchAll((v) => !v)}
-                  aria-pressed={labelMatchAll}
-                  title={labelMatchAll ? "Alle geselecteerde labels" : "Een van de geselecteerde labels"}
-                  className="rounded-full border border-[var(--color-border)] px-2 py-1 text-[11px] font-semibold text-slate-300 hover:bg-[var(--color-surface-hover)]"
-                >
-                  {labelMatchAll ? "alle labels" : "een van"}
-                </button>
-              )}
-              {labelFilter.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setLabelFilter([])}
-                  className="rounded-full px-2 py-1 text-[11px] font-semibold text-slate-500 hover:text-slate-300"
-                >
-                  wis labels
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl px-4 py-5 pb-24 sm:px-6">
-        {!isError && !isLoading && contacts.length > 0 && (
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1.5 text-xs text-slate-500">
-              <span className="hidden sm:inline">Sorteer</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortKey)}
-                aria-label="Sorteren"
-                className="min-h-[34px] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-xs text-slate-200 outline-none [color-scheme:dark]"
-              >
-                <option value="name">Naam (A-Z)</option>
-                <option value="recent">Laatst gesproken</option>
-                <option value="added">Recent toegevoegd</option>
-              </select>
-            </label>
+    <AppPageShell width="narrow" className="text-slate-100">
+      <AppPageHeader
+        className="!flex-row !items-start !justify-between gap-3"
+        leading={<AppIcon name="relations" tone="amber" size="md" framed active />}
+        title="Contacten"
+        description={
+          isLoading
+            ? "Relaties laden…"
+            : `${contacts.length} relatie${contacts.length === 1 ? "" : "s"} in je persoonlijke netwerk`
+        }
+        actions={
+          <>
             <button
               type="button"
-              onClick={() => setGroupByLabel((v) => !v)}
-              aria-pressed={groupByLabel}
-              className={`min-h-[34px] rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
-                groupByLabel
-                  ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
-                  : "border-[var(--color-border)] text-slate-400 hover:bg-[var(--color-surface-hover)]"
-              }`}
+              onClick={() => setLabelManagerOpen(true)}
+              aria-label="Labels beheren"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
             >
-              Groepeer op label
+              <Tag size={16} aria-hidden="true" />
+              <span className="hidden sm:inline">Labels</span>
             </button>
             <button
               type="button"
-              onClick={() => setShowArchived((v) => !v)}
-              aria-pressed={showArchived}
-              className={`min-h-[34px] rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
-                showArchived
-                  ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
-                  : "border-[var(--color-border)] text-slate-400 hover:bg-[var(--color-surface-hover)]"
-              }`}
+              onClick={openNew}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
             >
-              Gearchiveerd
+              <Plus size={16} aria-hidden="true" />
+              <span>Nieuw</span>
             </button>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-xs text-slate-600">{sorted.length}</span>
+          </>
+        }
+      />
+
+      <PageToolbar
+        label="Contacten zoeken en beheren"
+        className="mt-4"
+        trailing={
+          <>
+            <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline" aria-live="polite">
+              {sorted.length} zichtbaar
+            </span>
+            {!isError && !isLoading && contacts.length > 0 ? (
               <button
                 type="button"
                 onClick={selectMode ? exitSelectMode : () => setSelectMode(true)}
                 aria-pressed={selectMode}
-                className={`min-h-[34px] rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
+                className={`inline-flex h-11 items-center justify-center rounded-xl border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 ${
                   selectMode
                     ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
                     : "border-[var(--color-border)] text-slate-300 hover:bg-[var(--color-surface-hover)]"
@@ -359,10 +283,49 @@ export default function ContactenPage() {
               >
                 {selectMode ? "Klaar" : "Selecteren"}
               </button>
-            </div>
-          </div>
-        )}
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={filtersOpen}
+              className="relative inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+            >
+              <SlidersHorizontal size={16} aria-hidden="true" />
+              Filters
+              {activeFilterCount > 0 ? (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[11px] font-bold text-slate-950">
+                  {activeFilterCount}
+                </span>
+              ) : null}
+            </button>
+          </>
+        }
+      >
+        <div className="flex h-11 w-full min-w-56 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-3 focus-within:border-amber-500/45">
+          <Search size={16} className="shrink-0 text-slate-500" aria-hidden="true" />
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Zoek op naam, e-mail of notitie…"
+            aria-label="Zoek contacten"
+            className="min-w-0 flex-1 bg-transparent text-base text-slate-100 outline-none placeholder:text-slate-600 sm:text-sm"
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              aria-label="Zoekopdracht wissen"
+              className="-mr-2 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+      </PageToolbar>
 
+      <section className="mt-4">
         {isError ? (
           <EmptyBox
             title="Contacten konden niet worden geladen"
@@ -446,8 +409,140 @@ export default function ContactenPage() {
             {hasMore && <LoadMoreSentinel onVisible={loadMore} />}
           </>
         )}
-      </main>
+      </section>
 
+      <BottomSheet
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Contacten filteren"
+        closeLabel="Filters sluiten"
+        contentClassName="p-5"
+      >
+        <div className="space-y-6">
+          <section aria-labelledby="contact-filter-relationship">
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="contact-filter-relationship" className="text-sm font-semibold text-white">
+                Relatietype
+              </h2>
+              <span className="text-xs text-[var(--color-text-muted)]">
+                {typeFilter ? "1 gekozen" : "Alle typen"}
+              </span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <FilterChip label="Alle" active={typeFilter === null} onClick={() => setTypeFilter(null)} />
+              {RELATIONSHIP_TYPES.map((type) => (
+                <FilterChip
+                  key={type.value}
+                  label={type.label}
+                  active={typeFilter === type.value}
+                  onClick={() => setTypeFilter(typeFilter === type.value ? null : type.value)}
+                />
+              ))}
+            </div>
+          </section>
+
+          {labels.length > 0 ? (
+            <section aria-labelledby="contact-filter-labels">
+              <div className="flex items-center justify-between gap-3">
+                <h2 id="contact-filter-labels" className="text-sm font-semibold text-white">
+                  Labels
+                </h2>
+                {labelFilter.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setLabelMatchAll((value) => !value)}
+                    aria-pressed={labelMatchAll}
+                    className="inline-flex h-11 items-center rounded-xl border border-[var(--color-border)] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
+                  >
+                    {labelMatchAll ? "Match alle labels" : "Match één label"}
+                  </button>
+                ) : null}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {labels.map((label) => {
+                  const active = labelFilter.includes(label.id);
+                  return (
+                    <button
+                      key={label.id}
+                      type="button"
+                      onClick={() => toggleLabelFilter(label.id)}
+                      aria-pressed={active}
+                      className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-3 text-xs font-semibold transition-opacity ${labelChipClasses(
+                        label.color,
+                      )} ${active ? "ring-1 ring-white/50" : "opacity-70 hover:opacity-100"}`}
+                    >
+                      <span className={`h-2 w-2 rounded-full ${labelDotClasses(label.color)}`} aria-hidden="true" />
+                      {label.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          <section aria-labelledby="contact-filter-view">
+            <h2 id="contact-filter-view" className="text-sm font-semibold text-white">
+              Weergave
+            </h2>
+            <label className="mt-3 block text-xs font-medium text-[var(--color-text-muted)]">
+              Sortering
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as SortKey)}
+                className="mt-1.5 h-11 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] px-3 text-sm text-slate-200 outline-none [color-scheme:dark] focus-visible:ring-2 focus-visible:ring-amber-400/70"
+              >
+                <option value="name">Naam (A-Z)</option>
+                <option value="recent">Laatst gesproken</option>
+                <option value="added">Recent toegevoegd</option>
+              </select>
+            </label>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setGroupByLabel((value) => !value)}
+                aria-pressed={groupByLabel}
+                className={`inline-flex h-11 items-center justify-center rounded-xl border px-3 text-sm font-semibold transition-colors ${
+                  groupByLabel
+                    ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
+                    : "border-[var(--color-border)] text-slate-300 hover:bg-[var(--color-surface-hover)]"
+                }`}
+              >
+                Groepeer op label
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowArchived((value) => !value)}
+                aria-pressed={showArchived}
+                className={`inline-flex h-11 items-center justify-center rounded-xl border px-3 text-sm font-semibold transition-colors ${
+                  showArchived
+                    ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
+                    : "border-[var(--color-border)] text-slate-300 hover:bg-[var(--color-surface-hover)]"
+                }`}
+              >
+                Inclusief gearchiveerd
+              </button>
+            </div>
+          </section>
+
+          <div className="grid grid-cols-2 gap-2 border-t border-[var(--color-border)] pt-4">
+            <button
+              type="button"
+              onClick={clearContactFilters}
+              disabled={activeFilterCount === 0}
+              className="h-11 rounded-xl border border-[var(--color-border)] text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Wissen
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(false)}
+              className="h-11 rounded-xl bg-amber-500 text-sm font-semibold text-slate-950 transition-colors hover:bg-amber-400"
+            >
+              {sorted.length} tonen
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
       {selectMode && effectiveSelected.length > 0 && (
         <BulkBar
           count={effectiveSelected.length}
@@ -506,7 +601,7 @@ export default function ContactenPage() {
       )}
 
       {labelManagerOpen && <LabelManagerModal onClose={() => setLabelManagerOpen(false)} />}
-    </div>
+    </AppPageShell>
   );
 }
 
@@ -1334,7 +1429,7 @@ function OrganizationsEditor({
   const orgs = contact.organizations ?? [];
 
   const companiesQuery = useQuery({
-    queryKey: ["laventecare", "companies", "picker", companyQuery],
+    queryKey: laventeCareQueryKeys.companies.picker(companyQuery),
     queryFn: () => laventecareApi.listCompanies({ q: companyQuery || undefined, limit: 8 }),
     enabled: adding,
     staleTime: 30_000,

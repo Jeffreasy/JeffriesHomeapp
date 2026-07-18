@@ -5,6 +5,7 @@ JeffriesHomeapp is de Next.js single-owner frontend voor JeffriesBackend: smart 
 Lees vóór architectuur- of securitywerk:
 
 - [FRONTEND_ARCHITECTURE.md](FRONTEND_ARCHITECTURE.md) voor de actuele frontend- en trust-boundarykaart;
+- [docs/interface-system.md](docs/interface-system.md) voor het enterprise layout-, overlay- en interactioncontract;
 - [docs/backend-api-overview.md](docs/backend-api-overview.md) voor het BFF/backendcontract;
 - [docs/testing.md](docs/testing.md) voor de uitvoerbare verificatie.
 

@@ -5,40 +5,46 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { FocusModeAutoRedirect } from "@/components/layout/FocusModeControl";
 
-const AUTH_ROUTES = ["/sign-in", "/sign-up"];
-// /laventecare/documenten/[documentKey] is an immersive document/PDF viewer with
-// its own back-link — render it shell-free so the bottom nav doesn't overlap it.
-const CHROMELESS_ROUTES = ["/focus", "/laventecare/documenten"];
+const AUTH_ROUTE_PREFIXES = ["/sign-in", "/sign-up"];
+const CHROMELESS_ROUTE_PREFIXES = ["/focus", "/laventecare/documenten"];
+
+function matchesRoutePrefix(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
 
 /**
- * ClientShell — layout wrapper.
- * - Auth pages: no chrome.
- * - Desktop (md+): left cockpit sidebar.
- * - Mobile (< md): bottom navigation with a More sheet.
- *   The main content gets bottom padding to clear the nav bar.
+ * Owns application chrome, responsive navigation offsets and the single main
+ * landmark. Route pages only own their content width and internal composition.
  */
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAuthPage = AUTH_ROUTES.some((r) => pathname.startsWith(r));
-  const isChromelessPage = CHROMELESS_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+  const isAuthPage = AUTH_ROUTE_PREFIXES.some((prefix) => matchesRoutePrefix(pathname, prefix));
+  const isChromelessPage = CHROMELESS_ROUTE_PREFIXES.some((prefix) =>
+    matchesRoutePrefix(pathname, prefix),
+  );
 
   if (isAuthPage || isChromelessPage) return <>{children}</>;
 
   return (
-    <div className="flex min-h-screen w-full overflow-x-hidden bg-[var(--color-background)]">
-      <FocusModeAutoRedirect />
+    <>
+      <a href="#main" className="app-skip-link">
+        Naar inhoud
+      </a>
+      <div className="app-shell flex w-full overflow-x-hidden bg-[var(--color-background)]">
+        <FocusModeAutoRedirect />
 
-      {/* Desktop sidebar — hidden on mobile */}
-      <Sidebar />
+        <Sidebar />
 
-      {/* Main content — min-w-0 prevents flex overflow bug on mobile.
-          id="main" is the skip-link target from app/layout.tsx (M8). */}
-      <div id="main" className="flex-1 min-w-0 pb-28 md:ml-64 md:pb-0">
-        {children}
+        <main
+          id="main"
+          tabIndex={-1}
+          className="app-main app-content-container min-w-0 flex-1"
+        >
+          {children}
+        </main>
+
+        <BottomNav />
       </div>
-
-      {/* Mobile bottom nav — hidden on desktop */}
-      <BottomNav />
-    </div>
+    </>
   );
 }

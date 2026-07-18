@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
-import { createPortal } from "react-dom";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { useState, type RefObject } from "react";
 import { Columns3, FolderOpen, LayoutGrid, Pencil, RotateCcw, Search, Settings2, SlidersHorizontal, Tag, Trash2, X } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import {
   type BoardMode,
@@ -279,23 +278,6 @@ function TagManagerModal({
   const [renameValue, setRenameValue] = useState("");
   const [busyTag, setBusyTag] = useState<string | null>(null);
   const [progress, setProgress] = useState("");
-  // R3-15: keep Tab focus inside the dialog + restore focus on close (the modal
-  // rolled its own dialog without a trap).
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(true, dialogRef);
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || busyTag) return;
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-    };
-    // Capture-fase zodat de pagina-shortcuts ("n") deze Escape niet zien.
-    window.addEventListener("keydown", handler, true);
-    return () => window.removeEventListener("keydown", handler, true);
-  }, [busyTag, onClose]);
-
   const onProgress = (index: number, total: number) => setProgress(`${index} van ${total}…`);
 
   const runRename = async (tag: string) => {
@@ -324,33 +306,19 @@ function TagManagerModal({
     }
   };
 
-  const modal = (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={() => { if (!busyTag) onClose(); }}
-      />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Tags beheren"
-        className="relative flex max-h-[min(80dvh,560px)] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl sm:max-w-md sm:rounded-2xl"
-      >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3">
-          <h2 className="text-sm font-bold text-slate-200">Tags beheren</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={Boolean(busyTag)}
-            aria-label="Tagbeheer sluiten"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200 disabled:opacity-45"
-          >
-            <X size={16} />
-          </button>
-        </header>
-
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto p-3">
+  return (
+    <Modal
+      isOpen
+      onClose={() => { if (!busyTag) onClose(); }}
+      title="Tags beheren"
+      maxWidth="md"
+      theme="surface"
+      closeDisabled={Boolean(busyTag)}
+      ariaBusy={Boolean(busyTag)}
+      dataAppModal="note-tag-manager"
+      className="max-h-[min(80dvh,560px)]"
+      contentClassName="space-y-1.5 p-3"
+    >
           {tags.length === 0 && (
             <p className="px-1 py-4 text-center text-sm text-[var(--color-text-muted)]">
               Geen tags gevonden.
@@ -434,10 +402,6 @@ function TagManagerModal({
               </div>
             );
           })}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
-
-  return typeof document === "undefined" ? modal : createPortal(modal, document.body);
 }

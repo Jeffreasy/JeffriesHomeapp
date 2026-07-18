@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -16,7 +17,6 @@ import {
 
 import { useUser } from "@clerk/nextjs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence } from "framer-motion";
 import { useSchedule } from "@/hooks/useSchedule";
 import { useNotes, type NoteCreateData, type NoteRecord } from "@/hooks/useNotes";
 import { syncApi, type SyncStatusResult } from "@/lib/api";
@@ -27,10 +27,8 @@ import {
   type PersonalEvent,
 } from "@/hooks/usePersonalEvents";
 import { PersonalEventItem } from "@/components/schedule/PersonalEventItem";
-import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { AgendaCalendar } from "@/components/schedule/AgendaCalendar";
 import { NextShiftCard } from "@/components/schedule/NextShiftCard";
-import { NoteEditor } from "@/components/notes/NoteEditor";
 import { getDisplayTitle } from "@/components/notes/NotesUtils";
 import { groupNotesByDate, groupNotesByEventId } from "@/components/notes/NoteAgendaUtils";
 import { useToast } from "@/components/ui/Toast";
@@ -53,6 +51,20 @@ import {
 import { TabBar, tabBarPanelId, tabBarTabId } from "@/components/schedule/TabBar";
 import { compareAllDayFirst, shortSyncError, getShiftAppointments } from "@/components/schedule/scheduleUtils";
 import { StatChip } from "@/components/ui/StatChip";
+import {
+  AppPageHeader,
+  AppPageShell,
+  PageToolbar,
+} from "@/components/layout/AppPageShell";
+const LazyCreateEventModal = dynamic(
+  () => import("@/components/schedule/CreateEventModal").then((module) => module.CreateEventModal),
+  { ssr: false },
+);
+const LazyNoteEditor = dynamic(
+  () => import("@/components/notes/NoteEditor").then((module) => module.NoteEditor),
+  { ssr: false },
+);
+
 
 type AgendaView = "today" | "upcoming" | "pending" | "history";
 type CalendarMode = "month" | "week";
@@ -416,44 +428,51 @@ export default function AgendaPage() {
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="text-slate-100">
+    <AppPageShell width="standard" className="space-y-5 text-slate-100">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[#0a0a0f]/92 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-base font-semibold text-white sm:text-lg">Agenda</h1>
-              <p className="mt-0.5 truncate text-xs text-slate-500">
-                {formatDateLabel(todayIso)}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
+      <div className="sticky top-0 z-30 space-y-2 bg-[var(--color-background)]/95 pb-3 backdrop-blur-xl">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <AppPageHeader
+              title="Agenda"
+              description={
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <span>{formatDateLabel(todayIso)}</span>
+                  <StatusPill status={syncStatus?.status} />
+                </span>
+              }
+              className="min-w-0 flex-1"
+            />
+            <div className="flex shrink-0 items-center gap-2">
               <button
+                type="button"
                 onClick={handleSync}
                 disabled={syncing}
                 aria-label="Synchroniseer met Google Calendar"
                 aria-busy={syncing}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--color-border)] bg-white/[0.03] text-slate-400 hover:text-sky-300 hover:border-sky-500/20 transition-colors disabled:opacity-40 cursor-pointer"
                 title="Sync met Google Calendar"
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:border-sky-500/20 hover:text-sky-300 disabled:cursor-wait disabled:opacity-50"
               >
-                {syncing ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <RefreshCw size={15} aria-hidden="true" />}
+                {syncing ? (
+                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <RefreshCw size={16} aria-hidden="true" />
+                )}
               </button>
-
-              <StatusPill status={syncStatus?.status} />
-
               <button
+                type="button"
                 onClick={() => openNewEvent()}
-                aria-label="Nieuwe afspraak"
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-500/12 border border-emerald-500/25 px-3 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/18 transition-colors cursor-pointer"
+                className="inline-flex h-11 items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/12 px-3 text-sm font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/18"
               >
-                <Plus size={14} />
-                <span className="hidden sm:inline">Nieuw</span>
+                <Plus size={16} aria-hidden="true" />
+                <span className="hidden min-[390px]:inline">Nieuwe afspraak</span>
+                <span className="min-[390px]:hidden">Nieuw</span>
               </button>
             </div>
           </div>
 
+          <PageToolbar label="Agenda-weergaven">
           <TabBar
             tabs={viewTabs}
             active={activeView}
@@ -461,13 +480,14 @@ export default function AgendaPage() {
             idPrefix="agenda"
             ariaLabel="Agenda-weergave"
             tone="sky"
-            className="mt-3 pb-0.5"
+            className="w-full"
           />
+          </PageToolbar>
         </div>
-      </header>
+      </div>
 
       {/* ── Main ───────────────────────────────────────────────────────── */}
-      <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 lg:py-7">
+      <div className="space-y-5">
         <div className="mb-4">
           <AgendaCalendar
             events={calendarEvents}
@@ -804,26 +824,27 @@ export default function AgendaPage() {
             )}
           </aside>
         </div>
-      </main>
+      </div>
 
       {/* ── Modal ──────────────────────────────────────────────────────── */}
-      <CreateEventModal
-        open={modalOpen}
-        editEvent={editEvent}
-        initialDate={eventInitialDate}
-        initialTime={eventInitialTime}
-        onSuccess={() => refetchEvents()}
-        onClose={() => {
-          setModalOpen(false);
-          setEditEvent(null);
-          setEventInitialDate(undefined);
-          setEventInitialTime(undefined);
-        }}
-      />
+      {modalOpen && (
+        <LazyCreateEventModal
+          open={modalOpen}
+          editEvent={editEvent}
+          initialDate={eventInitialDate}
+          initialTime={eventInitialTime}
+          onSuccess={() => refetchEvents()}
+          onClose={() => {
+            setModalOpen(false);
+            setEditEvent(null);
+            setEventInitialDate(undefined);
+            setEventInitialTime(undefined);
+          }}
+        />
+      )}
 
-      <AnimatePresence>
         {noteEditorOpen && (
-          <NoteEditor
+          <LazyNoteEditor
             key={editNote?.id ?? [
               noteDefaults.linkedEventId ?? "new-note",
               noteDefaults.deadline ?? "",
@@ -854,7 +875,6 @@ export default function AgendaPage() {
             initialBusinessContext={noteDefaults.businessContext}
           />
         )}
-      </AnimatePresence>
-    </div>
+    </AppPageShell>
   );
 }

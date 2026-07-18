@@ -1,17 +1,41 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sun, Moon, Sunset, Popcorn, Zap, Coffee,
   ChevronDown, Sparkles, Palette, X, Send,
 } from "lucide-react";
-import { HexColorPicker } from "react-colorful";
-import { useDevices, useLampCommand } from "@/hooks/useHomeapp";
 import { useToast } from "@/components/ui/Toast";
 import { CUSTOM_SCENES, WIZ_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
 import { cn, hexToRgb } from "@/lib/utils";
-import { type Device } from "@/lib/api";
+import type { Device, DeviceCommand } from "@/lib/api";
+import type { LampBatchResult } from "@/lib/deviceCommands";
+
+const LazyHexColorPicker = dynamic(
+  () => import("react-colorful").then((module) => module.HexColorPicker),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="h-[130px] w-full animate-pulse rounded-xl bg-white/[0.04]"
+        aria-hidden="true"
+      />
+    ),
+  },
+);
+
+type SendLampBatch = (
+  targets: readonly Device[],
+  command: DeviceCommand,
+) => Promise<LampBatchResult>;
+
+interface SceneBarProps {
+  devices: Device[];
+  sendBatch: SendLampBatch;
+  isPending: boolean;
+}
 
 // ─── Icon map — by scene ID, not fragile index ────────────────────────────────
 
@@ -26,10 +50,13 @@ const SCENE_ICONS: Record<string, React.ElementType> = {
 
 // ─── Inline color picker pill (replaces GlobalColorPicker in header) ──────────
 
-function ColorPill({ devices }: { devices: Device[] }) {
+function ColorPill({
+  devices,
+  sendBatch,
+  isPending,
+}: SceneBarProps) {
   const [open, setOpen] = useState(false);
   const [hex, setHex]   = useState("#ff8800");
-  const { sendBatch, isPending } = useLampCommand();
   const { success } = useToast();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -118,7 +145,11 @@ function ColorPill({ devices }: { devices: Device[] }) {
                 <X size={13} />
               </button>
             </div>
-            <HexColorPicker color={hex} onChange={setHex} style={{ width: "100%", height: 130 }} />
+            <LazyHexColorPicker
+              color={hex}
+              onChange={setHex}
+              className="!h-[130px] !w-full"
+            />
             <div
               className="w-full h-6 rounded-lg mt-2 border border-[var(--color-border)]"
               style={{ background: hex, transition: "background 0.1s" }}
@@ -142,9 +173,7 @@ function ColorPill({ devices }: { devices: Device[] }) {
 
 // ─── SceneBar ─────────────────────────────────────────────────────────────────
 
-export function SceneBar() {
-  const { data: devices = [] } = useDevices();
-  const { sendBatch, isPending } = useLampCommand();
+export function SceneBar({ devices, sendBatch, isPending }: SceneBarProps) {
   const { success } = useToast();
   const [showWiz, setShowWiz] = useState(false);
 
@@ -245,7 +274,11 @@ export function SceneBar() {
         <div className="w-px h-5 bg-[var(--color-border)] mx-0.5 flex-shrink-0" aria-hidden="true" />
 
         {/* Color picker pill — replaces GlobalColorPicker from header */}
-        <ColorPill devices={onlineDevices} />
+        <ColorPill
+          devices={onlineDevices}
+          sendBatch={sendBatch}
+          isPending={isPending}
+        />
       </div>
 
       {/* ─── WiZ native scenes ────────────────────────────────────────────── */}

@@ -13,6 +13,8 @@ import { useToast } from "@/components/ui/Toast";
 import { sortedCopy } from "@/lib/collections";
 import { LampCommandJournal, replaceDeviceInCollection } from "@/lib/lampCommandJournal";
 import { uniqueDevicesById } from "@/lib/lighting";
+import type { LampBatchResult } from "@/lib/deviceCommands";
+export type { LampBatchResult } from "@/lib/deviceCommands";
 import {
   LampCommandTransport,
   isLampCommandSupersededError,
@@ -170,11 +172,6 @@ function reserveCommand(transport: LampCommandTransport, input: LampCommandInput
   return { ...input, deadlineAt, reservation: transport.reserve(input.id, options) };
 }
 
-export interface LampBatchResult {
-  total: number;
-  succeeded: number;
-  failed: Device[];
-}
 
 /**
  * Shared lamp mutation hook. Supplying a device id scopes `isPending` to that

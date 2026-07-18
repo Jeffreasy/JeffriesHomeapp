@@ -2,6 +2,8 @@
 
 > **Status: actueel op 2026-07-17.** Dit document beschrijft de huidige working tree. De oudere review- en auditbestanden blijven als historisch bewijsmateriaal bestaan, maar zijn geen actuele backlog zonder herverificatie.
 
+Het uitvoerbare layout-, overlay- en interactiecontract staat in [docs/interface-system.md](docs/interface-system.md).
+
 ## 1. Doel en runtime
 
 JeffriesHomeapp is een persoonlijke single-owner webapp voor smart-homebediening, agenda en rooster, notities, habits, financiën en het LaventeCare CRM. De runtime bestaat uit:

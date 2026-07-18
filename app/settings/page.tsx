@@ -54,6 +54,7 @@ import { EmptyState, MetricCard, Panel, RouteTile, SectionHeader, StatusRow } fr
 import { SettingsRuntime, SettingsPendingActions, SettingsBridge } from "@/components/settings/SettingsRuntime";
 import { SettingsIntegrations } from "@/components/settings/SettingsIntegrations";
 import { SettingsSync } from "@/components/settings/SettingsSync";
+import { AppPageHeader, AppPageShell } from "@/components/layout/AppPageShell";
 
 // Dutch labels for the privacy-center scope buttons (L9) — the raw English
 // scope keys ("finance", "notes") are API identifiers, not UI copy.
@@ -72,12 +73,11 @@ export default function SettingsPage() {
   const { openConfirm } = useConfirm();
   const { success, error: toastError } = useToast();
   const { user, isLoaded: userLoaded } = useUser();
-  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("account");
+  const { hidden: privacyOn, toggle: togglePrivacy, mask, isServerUnknown: isPrivacyUnknown } = usePrivacy("account");
   const queryClient = useQueryClient();
 
   const {
     data: overview,
-    isLoading: overviewLoading,
     isError: overviewFailed,
     refetch: refetchOverview,
   } = useQuery({
@@ -173,7 +173,6 @@ export default function SettingsPage() {
     overviewDevices.total === 0
       ? 0
       : Math.round((overviewDevices.online / overviewDevices.total) * 100);
-  const isLoading = devicesLoading || roomsLoading || overviewLoading;
   const accountName = user?.fullName ?? overview?.account?.name ?? "Jeffries Home";
   const accountEmail = user?.primaryEmailAddress?.emailAddress ?? overview?.account?.email ?? "Clerk account";
   const localApiHost = "Next.js proxy -> Render backend";
@@ -373,7 +372,7 @@ export default function SettingsPage() {
   // (cached) overview at all — stale data beats a hard error screen.
   if (overviewFailed && !overview) {
     return (
-      <div className="px-4 py-12 text-slate-100">
+      <AppPageShell width="narrow" className="py-12 text-slate-100">
         <div className="mx-auto max-w-lg rounded-lg border border-rose-500/20 bg-rose-500/[0.06] p-6 text-center">
           <TriangleAlert size={34} className="mx-auto text-rose-300" />
           <h1 className="mt-4 text-xl font-bold text-white">Instellingen laden mislukt</h1>
@@ -389,64 +388,55 @@ export default function SettingsPage() {
             Opnieuw proberen
           </button>
         </div>
-      </div>
+      </AppPageShell>
     );
   }
 
   return (
-    <div className="text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:px-8">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 sm:h-11 sm:w-11">
-              <Settings size={19} className="text-amber-300" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-slate-500">Systeemoverzicht</p>
-              <h1 className="mt-0.5 truncate text-xl font-bold text-white sm:mt-1 sm:text-2xl">Instellingen</h1>
-              <p className="mt-0.5 line-clamp-1 text-sm text-slate-500 sm:mt-1">
-                {isLoading
-                  ? "Configuratie laden"
-                  : `${plural(overviewDevices.total, "lamp", "lampen")} - ${plural(overviewRooms.total, "kamer", "kamers")} - ${
-                      // "Go API live" may only be claimed when the overview
-                      // query actually succeeded (L8) — with a stale cached
-                      // overview after a failure we genuinely don't know.
-                      overview && !overviewFailed ? "Go API live" : "Go API status onbekend"
-                    }`}
-              </p>
-            </div>
+    <AppPageShell width="standard" className="space-y-5 text-slate-100">
+      <AppPageHeader
+        eyebrow="Systeem"
+        title="Instellingen"
+        description="Beheer je account, privacy, integraties en gekoppelde apparaten."
+        leading={
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10">
+            <Settings size={19} className="text-amber-300" aria-hidden="true" />
           </div>
-
-          <div className="flex shrink-0 items-center gap-2">
+        }
+        actions={
+          <>
             <button
               type="button"
               onClick={togglePrivacy}
-              title={privacyOn ? "Details tonen" : "Details verbergen"}
-              aria-label={privacyOn ? "Details tonen" : "Details verbergen"}
+              disabled={isPrivacyUnknown}
+              title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Details tonen" : "Details verbergen"}
+              aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Details tonen" : "Details verbergen"}
+              aria-pressed={privacyOn}
+              aria-busy={isPrivacyUnknown}
               className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
+                "inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
                 privacyOn
                   ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
               )}
             >
-              {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}
-              <span className="hidden sm:inline">{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
+              {isPrivacyUnknown ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+              <span className="hidden sm:inline">{isPrivacyUnknown ? "Laden" : privacyOn ? "Verborgen" : "Zichtbaar"}</span>
             </button>
             <button
               type="button"
               onClick={handleAllSync}
               disabled={syncing !== null}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <RefreshCw size={16} className={syncing === "all" ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">Sync</span>
+              <RefreshCw size={16} className={syncing === "all" ? "animate-spin" : ""} aria-hidden="true" />
+              <span className="hidden sm:inline">Synchroniseren</span>
             </button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 pb-24 pt-5 sm:px-6 sm:py-6 lg:px-8">
+      <div className="flex flex-col gap-6">
         <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <SettingsRuntime
             overview={overview}
@@ -463,16 +453,21 @@ export default function SettingsPage() {
               <button
                 type="button"
                 onClick={togglePrivacy}
+                disabled={isPrivacyUnknown}
+                aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Accountdetails tonen" : "Accountdetails verbergen"}
+                aria-pressed={privacyOn}
+                aria-busy={isPrivacyUnknown}
+                title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Accountdetails tonen" : "Accountdetails verbergen"}
                 className={cn(
-                  "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition-colors",
+                  "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition-colors disabled:cursor-wait disabled:opacity-60",
                   privacyOn
                     ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-100"
                     : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
                 )}
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}
-                  <span className="text-sm font-semibold">{privacyOn ? "Privacy aan" : "Privacy uit"}</span>
+                  {isPrivacyUnknown ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                  <span className="text-sm font-semibold">{isPrivacyUnknown ? "Privacy laden" : privacyOn ? "Privacy aan" : "Privacy uit"}</span>
                 </span>
                 <ArrowRight size={15} className="shrink-0 text-slate-500" />
               </button>
@@ -682,7 +677,11 @@ export default function SettingsPage() {
                     key={scope}
                     type="button"
                     onClick={() => togglePrivacyScope(scope)}
-                    disabled={!privacySettings}
+                    disabled={!privacySettings || isPrivacyUnknown}
+                    aria-busy={!privacySettings || isPrivacyUnknown}
+                    aria-pressed={privacySettings?.[scope] ?? false}
+                    aria-label={!privacySettings || isPrivacyUnknown ? `${PRIVACY_SCOPE_LABELS[scope]} privacyvoorkeur wordt geladen` : `${PRIVACY_SCOPE_LABELS[scope]}: ${privacySettings[scope] ? "maskering uitzetten" : "maskering aanzetten"}`}
+                    title={!privacySettings || isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : `${PRIVACY_SCOPE_LABELS[scope]}: ${privacySettings[scope] ? "maskering uitzetten" : "maskering aanzetten"}`}
                     className={cn(
                       "rounded-lg border px-3 py-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
                       privacySettings?.[scope] ?? false
@@ -692,7 +691,7 @@ export default function SettingsPage() {
                   >
                     <span className="block text-xs font-bold uppercase">{PRIVACY_SCOPE_LABELS[scope]}</span>
                     <span className="mt-1 block text-sm font-semibold">
-                      {(privacySettings?.[scope] ?? false) ? "Maskeren" : "Zichtbaar"}
+                      {!privacySettings || isPrivacyUnknown ? "Laden" : privacySettings[scope] ? "Maskeren" : "Zichtbaar"}
                     </span>
                   </button>
 
@@ -728,7 +727,7 @@ export default function SettingsPage() {
             </div>
           </div>
         ) : null}
-      </main>
-    </div>
+      </div>
+    </AppPageShell>
   );
 }

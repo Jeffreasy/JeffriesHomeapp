@@ -198,13 +198,13 @@ export default async function LaventeCarePdfViewerPage(props: PageProps) {
   const filename = getLaventeCarePdfFilename(document, theme);
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-slate-100">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#090d16]/95 px-3 py-3 backdrop-blur-xl sm:px-5">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-h-dvh min-w-0 flex-col overflow-x-clip bg-[var(--color-bg)] text-slate-100">
+      <header className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-slate-950/95 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-5 sm:pb-3 sm:pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/laventecare"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition-colors hover:bg-white/[0.08] hover:text-white"
               aria-label="Terug naar LaventeCare"
             >
               <ArrowLeft size={18} />
@@ -218,26 +218,26 @@ export default async function LaventeCarePdfViewerPage(props: PageProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 sm:flex sm:shrink-0 sm:items-center">
+          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:shrink-0 sm:items-center sm:gap-2">
             <a
               href={pdfUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 sm:text-sm"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 sm:text-sm"
             >
               <ExternalLink size={15} />
               <span>Open</span>
             </a>
             <a
               href={screenDownloadUrl}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08] sm:text-sm"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08] sm:text-sm"
             >
               <Download size={15} />
               <span>Screen</span>
             </a>
             <a
               href={printDownloadUrl}
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 sm:text-sm"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 sm:text-sm"
             >
               <Printer size={15} />
               <span>Print</span>
@@ -246,8 +246,8 @@ export default async function LaventeCarePdfViewerPage(props: PageProps) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-3 py-3 pb-28 sm:px-5 sm:py-5">
-        <section className="glass overflow-hidden border border-white/10 bg-[var(--color-surface)]">
+      <main className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pt-5">
+        <section className="glass flex min-h-96 flex-1 flex-col overflow-hidden border border-white/10 bg-[var(--color-surface)]">
           <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 sm:px-4">
             <div className="flex min-w-0 items-center gap-2">
               <FileText size={16} className="shrink-0 text-amber-300" />
@@ -262,7 +262,7 @@ export default async function LaventeCarePdfViewerPage(props: PageProps) {
           <iframe
             src={pdfUrl}
             title={`${document.title} PDF`}
-            className="block h-[calc(100dvh-14.5rem)] min-h-[420px] w-full bg-white sm:h-[calc(100dvh-12rem)] sm:min-h-[640px]"
+            className="block min-h-96 w-full flex-1 bg-white"
           />
         </section>
       </main>
@@ -284,13 +284,13 @@ function DossierDocumentView({
   const canEmbed = isEmbeddableUrl(sourceUrl);
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--color-bg)] text-slate-100">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#090d16]/95 px-3 py-3 backdrop-blur-xl sm:px-5">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-h-dvh min-w-0 flex-col overflow-x-clip bg-[var(--color-bg)] text-slate-100">
+      <header className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-slate-950/95 px-3 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-5 sm:pb-3 sm:pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/laventecare"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-slate-300 transition-colors hover:bg-white/[0.08] hover:text-white"
               aria-label="Terug naar LaventeCare"
             >
               <ArrowLeft size={18} />
@@ -309,7 +309,7 @@ function DossierDocumentView({
               href={sourceUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 sm:text-sm"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 text-xs font-semibold text-sky-200 transition-colors hover:bg-sky-500/15 sm:text-sm"
             >
               <ExternalLink size={15} />
               <span>Open bron</span>
@@ -318,9 +318,9 @@ function DossierDocumentView({
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-3 py-3 pb-28 sm:px-5 sm:py-5">
+      <main className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pt-5">
         {canEmbed ? (
-          <section className="glass overflow-hidden border border-white/10 bg-[var(--color-surface)]">
+          <section className="glass flex min-h-96 flex-1 flex-col overflow-hidden border border-white/10 bg-[var(--color-surface)]">
             <div className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2 sm:px-4">
               <div className="flex min-w-0 items-center gap-2">
                 <FileText size={16} className="shrink-0 text-amber-300" />
@@ -335,7 +335,7 @@ function DossierDocumentView({
             <iframe
               src={sourceUrl}
               title={`${dossier.titel} PDF`}
-              className="block h-[calc(100dvh-14.5rem)] min-h-[420px] w-full bg-white sm:h-[calc(100dvh-12rem)] sm:min-h-[640px]"
+              className="block min-h-96 w-full flex-1 bg-white"
             />
           </section>
         ) : (
@@ -376,11 +376,11 @@ function DossierDocumentView({
 
 function MissingDocumentView({ documentKey, contextLabel }: { documentKey: string; contextLabel: string }) {
   return (
-    <div className="min-h-[100dvh] bg-[var(--color-bg)] px-4 py-6 text-slate-100">
+    <main className="min-h-dvh overflow-x-clip bg-[var(--color-bg)] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))] text-slate-100">
       <div className="mx-auto max-w-2xl rounded-2xl border border-white/10 bg-[var(--color-surface)] p-5 shadow-2xl shadow-black/30">
         <Link
           href="/laventecare"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.08] hover:text-white"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.08] hover:text-white"
         >
           <ArrowLeft size={16} />
           Terug naar LaventeCare
@@ -393,7 +393,7 @@ function MissingDocumentView({ documentKey, contextLabel }: { documentKey: strin
           Context: {contextLabel}
         </p>
       </div>
-    </div>
+    </main>
   );
 }
 

@@ -1,136 +1,87 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useId } from "react";
 import { X } from "lucide-react";
-import { createPortal } from "react-dom";
 import { useSwipe } from "@/hooks/useSwipe";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { OverlaySurface } from "@/components/ui/OverlaySurface";
+import { cn } from "@/lib/utils";
 
 interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
   title?: string;
+  ariaLabel?: string;
+  closeLabel?: string;
+  className?: string;
+  contentClassName?: string;
   children: React.ReactNode;
 }
 
-/**
- * Mobile-first BottomSheet.
- * - Slides up from the bottom of the screen.
- * - Swipe-down to dismiss.
- * - focus-trapped while open.
- * - Respects iOS safe-area-inset-bottom.
- */
-export function BottomSheet({ open, onClose, title, children }: BottomSheetProps) {
-  const sheetRef = useRef<HTMLDivElement>(null);
+export function BottomSheet({
+  open,
+  onClose,
+  title,
+  ariaLabel = "Paneel",
+  closeLabel = "Paneel sluiten",
+  className,
+  contentClassName,
+  children,
+}: BottomSheetProps) {
   const titleId = useId();
-
   const { onTouchStart, onTouchEnd, onTouchCancel } = useSwipe({
     onSwipeDown: onClose,
     threshold: 80,
   });
 
-  // Focus trap: move focus into the sheet, cycle Tab within it, and restore
-  // focus to the trigger on close (shared with Modal/ConfirmDialog).
-  useFocusTrap(open, sheetRef);
-
-  // Close on Escape key
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
-  // Prevent body scroll while sheet is open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  const sheet = (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm"
-            onClick={onClose}
-            aria-hidden="true"
-          />
-
-          {/* Sheet */}
-          <motion.div
-            ref={sheetRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-label={title ? undefined : "Lampbediening"}
-            aria-labelledby={title ? titleId : undefined}
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[81] flex max-h-[min(88dvh,720px)] flex-col rounded-t-[20px] border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-24px_70px_rgba(0,0,0,0.45)] focus:outline-none"
-            style={{
-              paddingBottom: "env(safe-area-inset-bottom, 16px)",
-            }}
-          >
-            {/* Drag handle + header */}
-            <div
-              className="flex-shrink-0"
-              onTouchStart={onTouchStart}
-              onTouchEnd={onTouchEnd}
-              onTouchCancel={onTouchCancel}
-            >
-              {/* Drag pill */}
-              <div className="flex justify-center pt-3 pb-2">
-                <div
-                  className="w-10 h-1 rounded-full"
-                  style={{ background: "rgba(255,255,255,0.2)" }}
-                  aria-hidden="true"
-                />
-              </div>
-
-              {/* Title bar */}
-              {title && (
-                <div
-                  className="flex items-center justify-between px-5 pb-3 border-b border-[var(--color-border)]"
-                >
-                  <h2 id={titleId} className="min-w-0 truncate text-base font-semibold text-white">{title}</h2>
-                  <button
-                    onClick={onClose}
-                    aria-label="Sheet sluiten"
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-300 transition-colors bg-[var(--color-surface-hover)]"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto overscroll-contain">
-              {children}
-            </div>
-          </motion.div>
-        </>
+  return (
+    <OverlaySurface
+      open={open}
+      onClose={onClose}
+      presentation="sheet"
+      maxWidth="lg"
+      ariaLabel={title ? undefined : ariaLabel}
+      ariaLabelledBy={title ? titleId : undefined}
+      className={cn(
+        "max-h-[min(88dvh,720px)] border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-24px_70px_rgba(0,0,0,0.45)] sm:rounded-t-2xl",
+        className,
       )}
-    </AnimatePresence>
-  );
+    >
+      <div
+        className="shrink-0"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchCancel}
+      >
+        <div className="flex justify-center pb-2 pt-3" aria-hidden="true">
+          <div className="h-1 w-10 rounded-full bg-white/20" />
+        </div>
+        <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[var(--color-border)] px-5 pb-3">
+          {title ? (
+            <h2 id={titleId} className="min-w-0 truncate text-base font-semibold text-white">
+              {title}
+            </h2>
+          ) : (
+            <span className="sr-only">{ariaLabel}</span>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={closeLabel}
+            className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-hover)] text-slate-400 transition-colors hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+      </div>
 
-  if (typeof document === "undefined") return null;
-  return createPortal(sheet, document.body);
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom,0px)]",
+          contentClassName,
+        )}
+      >
+        {children}
+      </div>
+    </OverlaySurface>
+  );
 }

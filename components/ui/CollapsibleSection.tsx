@@ -127,6 +127,8 @@ export function CollapsibleSection({
       {keepMounted ? (
         <motion.div
           id={contentId}
+          aria-hidden={!isOpen}
+          inert={isOpen ? undefined : true}
           initial={false}
           animate={{ height: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0 }}
           transition={expandTransition}

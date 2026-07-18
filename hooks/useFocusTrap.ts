@@ -8,8 +8,32 @@ const FOCUSABLE_SELECTOR = [
   "textarea:not([disabled])",
   "input:not([disabled])",
   "select:not([disabled])",
+  '[contenteditable="true"]',
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
+
+interface FocusTrapOptions {
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  restoreFocus?: boolean;
+}
+
+function isActuallyFocusable(element: HTMLElement) {
+  if (
+    element.hidden ||
+    element.getAttribute("aria-hidden") === "true" ||
+    element.getAttribute("aria-disabled") === "true" ||
+    element.closest("[inert], [aria-hidden='true']")
+  ) {
+    return false;
+  }
+
+  const style = window.getComputedStyle(element);
+  return (
+    style.display !== "none" &&
+    style.visibility !== "hidden" &&
+    element.getClientRects().length > 0
+  );
+}
 
 /**
  * useFocusTrap — accessibility helper for dialogs/drawers (Modal, ConfirmDialog,
@@ -22,7 +46,8 @@ const FOCUSABLE_SELECTOR = [
  */
 export function useFocusTrap<T extends HTMLElement>(
   active: boolean,
-  containerRef: RefObject<T | null>
+  containerRef: RefObject<T | null>,
+  { initialFocusRef, restoreFocus = true }: FocusTrapOptions = {},
 ) {
   const previousFocus = useRef<HTMLElement | null>(null);
 
@@ -34,44 +59,53 @@ export function useFocusTrap<T extends HTMLElement>(
     previousFocus.current = document.activeElement as HTMLElement | null;
 
     const getFocusable = () =>
-      Array.from(
-        container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        isActuallyFocusable,
+      );
 
-    // Move focus into the dialog on open — unless something inside is already
-    // focused (e.g. an element with autoFocus), which we leave as-is.
-    if (!container.contains(document.activeElement)) {
-      const initial = getFocusable();
-      (initial[0] ?? container).focus();
-    }
+    const focusFrame = window.requestAnimationFrame(() => {
+      if (!container.isConnected || container.contains(document.activeElement)) return;
+      const requestedTarget = initialFocusRef?.current;
+      const target =
+        requestedTarget && container.contains(requestedTarget) && isActuallyFocusable(requestedTarget)
+          ? requestedTarget
+          : getFocusable()[0] ?? container;
+      target.focus({ preventScroll: true });
+    });
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "Tab") return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
       const items = getFocusable();
       if (items.length === 0) {
-        e.preventDefault();
+        event.preventDefault();
         container.focus();
         return;
       }
+
       const first = items[0];
       const last = items[items.length - 1];
-      const activeEl = document.activeElement;
-      if (e.shiftKey) {
-        if (activeEl === first || !container.contains(activeEl)) {
-          e.preventDefault();
+      const activeElement = document.activeElement;
+      if (event.shiftKey) {
+        if (activeElement === first || !container.contains(activeElement)) {
+          event.preventDefault();
           last.focus();
         }
-      } else if (activeEl === last || !container.contains(activeEl)) {
-        e.preventDefault();
+      } else if (activeElement === last || !container.contains(activeElement)) {
+        event.preventDefault();
         first.focus();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown, true);
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       document.removeEventListener("keydown", handleKeyDown, true);
-      // Restore focus to whatever was focused before the dialog opened.
-      previousFocus.current?.focus?.();
+      if (!restoreFocus) return;
+      const target = previousFocus.current;
+      window.requestAnimationFrame(() => {
+        if (!target?.isConnected || target.closest("[inert], [aria-hidden='true']")) return;
+        target.focus({ preventScroll: true });
+      });
     };
-  }, [active, containerRef]);
+  }, [active, containerRef, initialFocusRef, restoreFocus]);
 }

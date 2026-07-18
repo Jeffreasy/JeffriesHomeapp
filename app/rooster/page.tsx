@@ -1,7 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Briefcase, Calendar, CalendarClock, Clock3, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Briefcase, Calendar, CalendarClock, Clock3, MoreHorizontal, Plus, RefreshCw, Trash2, Upload } from "lucide-react";
 
 import { useUser } from "@clerk/nextjs";
 import { useSchedule } from "@/hooks/useSchedule";
@@ -12,7 +13,6 @@ import { NextShiftCard } from "@/components/schedule/NextShiftCard";
 import { StatsView } from "@/components/schedule/StatsView";
 import { SalarisView } from "@/components/salary/SalarisView";
 import { AfsprakenView } from "@/components/schedule/AfsprakenView";
-import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { calcTotalHours, getHistory, getUpcoming, shiftBreakdown, teamBreakdown } from "@/lib/schedule";
 import { generateUnifiedTimeline } from "@/lib/unified";
@@ -22,7 +22,19 @@ import { shortSyncError, getShiftAppointments } from "@/components/schedule/sche
 import { EmptyRoster } from "@/components/schedule/RoosterCards";
 import { OverviewPanel, OverviewTab } from "@/components/schedule/RoosterOverview";
 import { TabBar, tabBarPanelId, tabBarTabId } from "@/components/schedule/TabBar";
+import {
+  AppPageHeader,
+  AppPageShell,
+  PageToolbar,
+} from "@/components/layout/AppPageShell";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { StatChip } from "@/components/ui/StatChip";
+const LazyCreateEventModal = dynamic(
+  () => import("@/components/schedule/CreateEventModal").then((module) => module.CreateEventModal),
+  { ssr: false },
+);
+
 
 const tabId = (id: Tab) => tabBarTabId("rooster", id);
 const tabPanelId = (id: Tab) => tabBarPanelId("rooster", id);
@@ -100,6 +112,7 @@ export default function RoosterPage() {
 
   const { success, error: toastError, toast } = useToast();
   const { user } = useUser();
+  const { openConfirm } = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [todayIso, setTodayIso] = useState<string | null>(null);
@@ -108,7 +121,7 @@ export default function RoosterPage() {
   const [tab, setTab] = useState<Tab>("overzicht");
   const [showHistory, setShowHistory] = useState(false);
   const [weekOverrides, setWeekOverrides] = useState<Record<string, boolean>>({});
-  const [confirmClear, setConfirmClear] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
   // Eén gedeelde sync-vlag (audit F9): header-Sync én "Verwerk nu" op de
   // Beheer-tab lezen/schrijven deze — geen dubbele gelijktijdige sync meer.
@@ -117,17 +130,6 @@ export default function RoosterPage() {
   const [pendingSyncError, setPendingSyncError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [compactTimeline, setCompactTimeline] = useState(false);
-  // Timeout van de "Wissen?"-bevestiging, zodat die geannuleerd kan worden bij
-  // bevestigen/annuleren/unmount (audit L13).
-  const confirmClearTimeoutRef = useRef<number | null>(null);
-  const cancelConfirmClearTimeout = () => {
-    if (confirmClearTimeoutRef.current !== null) {
-      window.clearTimeout(confirmClearTimeoutRef.current);
-      confirmClearTimeoutRef.current = null;
-    }
-  };
-  useEffect(() => cancelConfirmClearTimeout, []);
-
   useEffect(() => {
     const updateToday = () => setTodayIso(getAmsterdamTodayIso());
     const timeout = window.setTimeout(updateToday, 0);
@@ -237,13 +239,20 @@ export default function RoosterPage() {
 
   const handleClearSchedule = async () => {
     if (clearing) return;
-    // Bevestiging is gegeven — de 3,5s-auto-reset mag de knoppen niet meer
-    // onder de cursor vandaan trekken (audit L13).
-    cancelConfirmClearTimeout();
+    const confirmed = await openConfirm({
+      title: "Rooster wissen?",
+      message:
+        "Alle geimporteerde diensten en synchronisatiemetadata worden verwijderd. Deze actie kan niet ongedaan worden gemaakt.",
+      confirmLabel: "Rooster wissen",
+      cancelLabel: "Annuleren",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
+    setActionsOpen(false);
     setClearing(true);
     try {
       await clear();
-      setConfirmClear(false);
       success("Rooster gewist");
     } catch (err) {
       const message = err instanceof Error ? err.message : "onbekende fout";
@@ -280,123 +289,78 @@ export default function RoosterPage() {
   };
 
   return (
-    <div className="text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/90 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 sm:h-11 sm:w-11">
-                <Calendar size={20} className="text-amber-300" />
+    <AppPageShell width="standard" className="space-y-6 text-slate-100">
+      <div className="sticky top-0 z-30 space-y-2 bg-[var(--color-background)]/95 pb-3 backdrop-blur-xl">
+        <div className="flex items-center justify-between gap-2">
+          <AppPageHeader
+            eyebrow="Planning"
+            title="Rooster"
+            description={
+              meta
+                ? `${meta.totalRows} diensten · ${formatMetaDate(meta.importedAt)}`
+                : "Nog niet gesynchroniseerd"
+            }
+            leading={
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-300">
+                <Calendar size={19} aria-hidden="true" />
               </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Planning
-                </p>
-                <h1 className="mt-1 truncate text-xl font-bold text-white sm:text-2xl">Rooster</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  {meta
-                    ? `${meta.totalRows} diensten - gesynct ${formatMetaDate(meta.importedAt)}`
-                    : "Nog geen rooster gesynchroniseerd"}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 sm:flex sm:flex-wrap sm:items-center">
-              {meta && (
-                confirmClear ? (
-                  // Zodra een toetsenbordgebruiker Ja/Nee focust vervalt de 3,5s
-                  // auto-reset — anders verdwijnen de knoppen onder de focus
-                  // vandaan (audit L13 a11y).
-                  <div
-                    onFocusCapture={cancelConfirmClearTimeout}
-                    className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-3 sm:col-span-1"
-                  >
-                    <span className="text-xs font-semibold text-rose-300">{clearing ? "Wissen..." : "Wissen?"}</span>
-                    <button
-                      type="button"
-                      onClick={handleClearSchedule}
-                      disabled={clearing}
-                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold text-rose-200 hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {clearing && <RefreshCw size={12} className="animate-spin" />}
-                      Ja
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        cancelConfirmClearTimeout();
-                        setConfirmClear(false);
-                      }}
-                      disabled={clearing}
-                      className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-400 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Nee
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    aria-label="Rooster wissen"
-                    onClick={() => {
-                      // Timeout-id bewaren zodat bevestigen/annuleren/unmount
-                      // hem kan annuleren (audit L13).
-                      cancelConfirmClearTimeout();
-                      setConfirmClear(true);
-                      confirmClearTimeoutRef.current = window.setTimeout(() => {
-                        confirmClearTimeoutRef.current = null;
-                        setConfirmClear(false);
-                      }, 3500);
-                    }}
-                    className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-400 transition-colors hover:border-rose-500/25 hover:bg-rose-500/10 hover:text-rose-300"
-                  >
-                    <Trash2 size={15} />
-                    <span className="hidden sm:inline">Wissen</span>
-                  </button>
-                )
-              )}
-
-              <button
-                type="button"
-                aria-label="CSV rooster importeren"
-                aria-busy={importing}
-                onClick={() => fileRef.current?.click()}
-                disabled={isLoading || importing}
-                className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm font-medium text-slate-300 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Upload size={16} className={importing ? "animate-pulse" : ""} />
-                <span className="hidden sm:inline">{importing ? "Importeren" : "CSV"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCalendarSync}
-                disabled={calSyncing}
-                aria-busy={calSyncing}
-                className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw size={16} className={calSyncing ? "animate-spin" : ""} />
-                <span>{calSyncing ? "Synchroniseren…" : "Sync"}</span>
-              </button>
-
-              <button
-                type="button"
-                aria-label="Nieuwe afspraak"
-                onClick={openNewEvent}
-                className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-3 text-sm font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/15"
-              >
-                <Plus size={16} />
-                <span className="hidden sm:inline">Afspraak</span>
-              </button>
-              <input ref={fileRef} type="file" accept=".csv" onChange={handleFile} disabled={importing} className="hidden" />
-            </div>
+            }
+            className="min-w-0 flex-1"
+          />
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={handleCalendarSync}
+              disabled={calSyncing}
+              aria-busy={calSyncing}
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-wait disabled:opacity-50"
+            >
+              <RefreshCw
+                size={16}
+                className={calSyncing ? "animate-spin" : ""}
+                aria-hidden="true"
+              />
+              <span className="hidden sm:inline">
+                {calSyncing ? "Synchroniseren…" : "Synchroniseren"}
+              </span>
+              <span className="sm:hidden">Sync</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActionsOpen(true)}
+              aria-label="Meer roosteracties"
+              aria-haspopup="dialog"
+              aria-expanded={actionsOpen}
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-white"
+            >
+              <MoreHorizontal size={18} aria-hidden="true" />
+            </button>
           </div>
-
-          <TabBar tabs={TABS} active={tab} onChange={setTab} idPrefix="rooster" ariaLabel="Rooster onderdelen" tone="amber" />
         </div>
-      </header>
 
-      {/* Bottom padding komt van ClientShell (pb-28 op mobiel) — hier niet dupliceren. */}
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+        <PageToolbar label="Roosteronderdelen">
+          <TabBar
+            tabs={TABS}
+            active={tab}
+            onChange={setTab}
+            idPrefix="rooster"
+            ariaLabel="Rooster onderdelen"
+            tone="amber"
+            className="w-full"
+          />
+        </PageToolbar>
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".csv"
+        onChange={handleFile}
+        disabled={importing}
+        className="hidden"
+      />
+
+      <div className="space-y-6">
         {isLoading && hasScheduleData && (
           <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-500">
             <Clock3 size={13} className="text-sky-300" />
@@ -654,18 +618,89 @@ export default function RoosterPage() {
             )}
           </>
         )}
-      </main>
+      </div>
 
-      <CreateEventModal
-        open={modalOpen}
-        onSuccess={() => refetchEvents()}
-        onClose={() => {
-          setModalOpen(false);
-          setEditEvent(null);
-        }}
-        editEvent={editEvent}
-      />
-    </div>
+      <BottomSheet
+        open={actionsOpen}
+        onClose={() => setActionsOpen(false)}
+        title="Roosteracties"
+        closeLabel="Roosteracties sluiten"
+      >
+        <div className="space-y-2 p-4 sm:p-5">
+          <button
+            type="button"
+            onClick={() => {
+              fileRef.current?.click();
+              setActionsOpen(false);
+            }}
+            disabled={isLoading || importing}
+            className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-left text-sm font-semibold text-slate-200 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-wait disabled:opacity-50"
+          >
+            <Upload
+              size={18}
+              className={importing ? "animate-pulse text-amber-300" : "text-slate-400"}
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block">{importing ? "Importeren…" : "CSV importeren"}</span>
+              <span className="mt-0.5 block text-xs font-normal text-slate-500">
+                Voeg diensten toe vanuit een roosterbestand
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActionsOpen(false);
+              openNewEvent();
+            }}
+            className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] px-4 text-left text-sm font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/10"
+          >
+            <Plus size={18} aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block">Nieuwe afspraak</span>
+              <span className="mt-0.5 block text-xs font-normal text-indigo-300/70">
+                Plan een persoonlijk agenda-item
+              </span>
+            </span>
+          </button>
+
+          {meta && (
+            <button
+              type="button"
+              onClick={() => void handleClearSchedule()}
+              disabled={clearing}
+              className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 text-left text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/10 disabled:cursor-wait disabled:opacity-50"
+            >
+              {clearing ? (
+                <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Trash2 size={18} aria-hidden="true" />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block">{clearing ? "Wissen…" : "Rooster wissen"}</span>
+                <span className="mt-0.5 block text-xs font-normal text-rose-300/70">
+                  Verwijder alle geïmporteerde diensten
+                </span>
+              </span>
+            </button>
+          )}
+        </div>
+      </BottomSheet>
+
+      {modalOpen && (
+        <LazyCreateEventModal
+          open={modalOpen}
+          onSuccess={() => refetchEvents()}
+          onClose={() => {
+            setModalOpen(false);
+            setEditEvent(null);
+          }}
+          editEvent={editEvent}
+        />
+      )}
+    </AppPageShell>
   );
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -7,7 +8,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
-import { CreateEventModal } from "@/components/schedule/CreateEventModal";
 import { DailyChecklist } from "@/components/habits/DailyChecklist";
 import { useDevices, useLampCommand } from "@/hooks/useDevices";
 import { getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
@@ -31,6 +31,11 @@ import {
 import type { DienstRow } from "@/lib/schedule";
 import { CUSTOM_SCENES, OFF_SCENE, detectActiveScene, type ScenePreset } from "@/lib/scenes";
 import { cn } from "@/lib/utils";
+const LazyCreateEventModal = dynamic(
+  () => import("@/components/schedule/CreateEventModal").then((module) => module.CreateEventModal),
+  { ssr: false },
+);
+
 
 /*
  * Kiosk-designtaal (R4-redesign):
@@ -146,15 +151,15 @@ function Header({
   // een echte fout, amber wanneer de data ouder is dan ~2 refresh-intervallen.
   const timestampClass = summaryError ? "text-rose-300" : stale ? "text-amber-300" : "text-slate-500";
   return (
-    <header className="relative flex shrink-0 flex-col gap-3 border-b border-white/[0.07] bg-black/25 px-4 py-3 backdrop-blur-xl sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+    <header className="relative flex shrink-0 flex-col gap-2 border-b border-white/[0.07] bg-black/25 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-xl sm:px-6 lg:flex-row lg:items-center lg:justify-between">
       {/* Dunne accentlijn onderaan de header — geeft de kiosk een as. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-amber-400/40 to-transparent"
       />
-      <div className="flex min-w-0 items-end gap-5">
+      <div className="flex min-w-0 items-end gap-3 sm:gap-5">
         <div
-          className="font-mono text-5xl font-semibold leading-none tracking-tight text-white sm:text-6xl"
+          className="shrink-0 font-mono text-4xl font-semibold leading-none tracking-tight text-white sm:text-6xl"
           style={{
             // Alleen transform (geen reflow); verschuift elke paar minuten 1-2px.
             transform: `translate(${jitter?.x ?? 0}px, ${jitter?.y ?? 0}px)`,
@@ -164,14 +169,14 @@ function Header({
           {time ?? "--:--"}
         </div>
         <div className="min-w-0 pb-1">
-          <p className="truncate text-base font-semibold capitalize text-slate-100">{today ?? "Focus laden"}</p>
-          <p className={`mt-0.5 text-xs ${timestampClass}`}>
+          <p className="truncate text-sm font-semibold capitalize text-slate-100 sm:text-base">{today ?? "Focus laden"}</p>
+          <p className={`mt-0.5 truncate text-xs ${timestampClass}`}>
             Bijgewerkt {formatGeneratedAt(generatedAt)}
             {summaryError ? " · verversen mislukt" : stale ? " · verouderd" : ""}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 lg:flex lg:w-auto">
         <HeaderPill
           icon="radar"
           label={attentionCount === 0 ? "Alles rustig" : `${attentionCount} aandacht`}
@@ -180,7 +185,7 @@ function Header({
         <HeaderPill icon={bridgeOnline ? "wifi" : "wifiOff"} label={bridgeOnline ? "Bridge live" : "Bridge offline"} tone={bridgeOnline ? "ok" : "warn"} />
         <Link
           href="/"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
         >
           <AppIcon name="dashboard" size="xs" />
           App
@@ -194,7 +199,7 @@ function HeaderPill({ icon, label, tone }: { icon: "radar" | "wifi" | "wifiOff";
   return (
     <div
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-semibold",
+        "inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-xl border px-2.5 text-xs font-semibold sm:px-3.5",
         tone === "ok"
           ? "border-emerald-400/20 bg-emerald-500/[0.08] text-emerald-200"
           : "border-amber-400/30 bg-amber-500/10 text-amber-200",
@@ -463,13 +468,13 @@ function AttentionPanel({
             );
             if (inPlace) {
               return (
-                <button key={item.id} type="button" onClick={() => onOpen(item)} className="block w-full text-left transition-opacity hover:opacity-85">
+                <button key={item.id} type="button" onClick={() => onOpen(item)} className="block min-h-11 w-full text-left transition-opacity hover:opacity-85">
                   {content}
                 </button>
               );
             }
             return item.href ? (
-              <Link key={item.id} href={item.href} className="block transition-opacity hover:opacity-85">
+              <Link key={item.id} href={item.href} className="block min-h-11 transition-opacity hover:opacity-85">
                 {content}
               </Link>
             ) : (
@@ -543,7 +548,7 @@ function SystemPanel({
                 aria-label={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
                 title={finance.hidden ? "Financiën tonen" : "Financiën verbergen"}
                 className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                  "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors",
                   finance.hidden
                     ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
                     : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.07] hover:text-slate-200",
@@ -629,7 +634,7 @@ function FocusLightControls() {
           onClick={() => void applyCommand(toggleLabel, allOff ? { on: true, brightness: 70 } : { on: false })}
           disabled={!canSend || isPending}
           className={cn(
-            "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
+            "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border px-3.5 text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-45",
             allOff
               ? "border-amber-400/25 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15"
               : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]",
@@ -891,7 +896,7 @@ function ModalFooter({ href, hrefLabel, onClose }: { href: string; hrefLabel: st
     <div className="mt-5 flex items-center justify-end gap-2 border-t border-white/[0.06] pt-4">
       <Link
         href={href}
-        className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-white/[0.08]"
       >
         {hrefLabel}
         <span aria-hidden>→</span>
@@ -899,7 +904,7 @@ function ModalFooter({ href, hrefLabel, onClose }: { href: string; hrefLabel: st
       <button
         type="button"
         onClick={onClose}
-        className="inline-flex h-10 items-center rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-500/15"
+        className="inline-flex h-11 items-center rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 text-xs font-bold text-amber-100 transition-colors hover:bg-amber-500/15"
       >
         Sluiten
       </button>
@@ -1176,7 +1181,7 @@ function LcActionsModal({ open, todayIso, onClose }: { open: boolean; todayIso?:
                     aria-label={`${action.title} afronden`}
                     title="Afronden"
                     className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                      "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border transition-colors",
                       pending
                         ? "cursor-wait border-white/10 bg-white/[0.04] text-slate-500"
                         : "border-emerald-400/25 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20",
@@ -1284,7 +1289,7 @@ export default function FocusPage() {
 
   return (
     <div
-      className="min-h-dvh overflow-y-auto text-slate-100 xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden"
+      className="min-h-dvh min-w-0 overflow-x-clip overflow-y-auto text-slate-100 xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden"
       style={{
         // Gelaagde achtergrond: vlak zwart → nachtblauw met twee zachte glows.
         background:
@@ -1310,8 +1315,8 @@ export default function FocusPage() {
        * grid met vaste row-fracties kapte het Netto-paneel en de onderste rij af).
        * Onder xl stapelt alles in prioriteitsvolgorde en scrollt de pagina.
        */}
-      <main className="grid gap-3 p-3 sm:p-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(310px,0.98fr)_minmax(430px,1.35fr)_minmax(310px,0.98fr)]">
-        <div className="order-1 flex min-h-0 flex-col gap-3 xl:order-none">
+      <main className="grid min-w-0 gap-3 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:px-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(310px,0.98fr)_minmax(430px,1.35fr)_minmax(310px,0.98fr)] xl:pb-4">
+        <div className="order-1 flex min-h-0 min-w-0 flex-col gap-3 xl:order-none">
           <HeroPanel item={focus.nextItem} todayIso={todayIso} clock={focus.clock} isLoading={focus.isLoading} onOpen={openTimelineItem} />
           <SystemPanel
             devices={focus.devices}
@@ -1322,7 +1327,7 @@ export default function FocusPage() {
           />
         </div>
 
-        <div className="order-3 flex min-h-0 flex-col gap-3 xl:order-none">
+        <div className="order-3 flex min-h-0 min-w-0 flex-col gap-3 xl:order-none">
           <TimelinePanel items={focus.timeline} heroId={focus.nextItem?.id} todayIso={todayIso} isLoading={focus.isLoading} onOpen={openTimelineItem} />
           <HabitNotePanel
             habits={focus.habitItems}
@@ -1336,7 +1341,7 @@ export default function FocusPage() {
           />
         </div>
 
-        <div className="order-2 flex min-h-0 flex-col gap-3 xl:order-none">
+        <div className="order-2 flex min-h-0 min-w-0 flex-col gap-3 xl:order-none">
           <AttentionPanel items={focus.attention} isLoading={focus.isLoading} inPlaceIds={attentionInPlaceIds} onOpen={openAttentionItem} />
           <BusinessPanel business={focus.business} summaryError={focus.summaryError} />
         </div>
@@ -1344,12 +1349,14 @@ export default function FocusPage() {
 
       {/* Kiosk-modals: details openen in-place; navigatie is de secundaire
           uitgang in de modal-footer (of de fallback als de rij niet geladen is). */}
-      <CreateEventModal
-        open={Boolean(eventModal)}
-        editEvent={eventModal}
-        onClose={() => setEventModal(null)}
-        onSuccess={() => void focus.refetchPersonal()}
-      />
+      {eventModal && (
+        <LazyCreateEventModal
+          open
+          editEvent={eventModal}
+          onClose={() => setEventModal(null)}
+          onSuccess={() => void focus.refetchPersonal()}
+        />
+      )}
       <DienstDetailModal dienst={dienstModal} todayIso={todayIso} onClose={() => setDienstModal(null)} />
       <NoteViewModal noteId={noteModalId} onClose={() => setNoteModalId(null)} />
 

@@ -9,7 +9,6 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Plus } from "lucide-react";
 
 import { isPeriodSatisfied, useHabits, type HabitCreateData } from "@/hooks/useHabits";
 import { usePrivacy } from "@/hooks/usePrivacy";
@@ -33,6 +32,8 @@ import { HabitsDashboardSummary } from "@/components/habits/HabitsDashboardSumma
 import { HabitsVandaagTab } from "@/components/habits/HabitsVandaagTab";
 import { HabitsOverzichtTab } from "@/components/habits/HabitsOverzichtTab";
 import { cn } from "@/lib/utils";
+import { AppPageShell, PageToolbar } from "@/components/layout/AppPageShell";
+import { formatLevel, formatXP } from "@/lib/habit-constants";
 
 export default function HabitsPage() {
   const [selectedDate, setSelectedDate] = useState("");
@@ -45,7 +46,7 @@ export default function HabitsPage() {
     datum: string;
     naam: string;
   } | null>(null);
-  const { hidden: privacyOn, toggle: togglePrivacy } = usePrivacy("habits");
+  const { hidden: privacyOn, toggle: togglePrivacy, isServerUnknown: isPrivacyUnknown } = usePrivacy("habits");
   const { success, error: toastError } = useToast();
   const { openConfirm } = useConfirm();
 
@@ -274,20 +275,40 @@ export default function HabitsPage() {
   };
 
   return (
-    <div className="text-slate-100">
+    <AppPageShell width="wide" className="text-slate-100">
       {/* Polite live region: optimistische toggle-resultaten voor screenreaders. */}
       <span aria-live="polite" role="status" className="sr-only">
         {announcement}
       </span>
       <HabitsHeader
-        level={level}
-        stats={stats}
         privacyOn={privacyOn}
+        isPrivacyUnknown={isPrivacyUnknown}
         togglePrivacy={togglePrivacy}
         setShowForm={setShowForm}
       />
 
-      <main className="mx-auto max-w-7xl px-4 py-5 pb-28 sm:px-6">
+      <PageToolbar label="Habit niveau en voortgang" className="mt-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2 px-1">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+              Niveau
+            </span>
+            <strong className="truncate text-sm font-semibold text-white">
+              {privacyOn ? "Verborgen" : formatLevel(level.level, level.titel)}
+            </strong>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
+              Ervaring
+            </span>
+            <strong className="text-sm font-semibold text-amber-200">
+              {privacyOn ? "••••" : formatXP(stats?.totaalXP ?? 0)}
+            </strong>
+          </div>
+        </div>
+      </PageToolbar>
+
+      <div className="mt-4">
         <HabitsDashboardSummary
           activeDate={activeDate}
           currentToday={currentToday}
@@ -438,20 +459,7 @@ export default function HabitsPage() {
             </motion.section>
           )}
         </AnimatePresence>
-      </main>
-
-      <motion.button
-        type="button"
-        onClick={() => setShowForm(true)}
-        aria-label="Habit toevoegen"
-        title="Habit toevoegen"
-        className="fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-lg border border-amber-400/30 bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 transition-transform"
-        style={{ bottom: "calc(80px + env(safe-area-inset-bottom, 0px))" }}
-        whileTap={{ scale: 0.9 }}
-        whileHover={{ scale: 1.04 }}
-      >
-        <Plus size={24} />
-      </motion.button>
+      </div>
 
       <IncidentUndoSnackbar
         incident={lastIncident}
@@ -474,6 +482,6 @@ export default function HabitsPage() {
           initial={editingInitial}
         />
       )}
-    </div>
+    </AppPageShell>
   );
 }

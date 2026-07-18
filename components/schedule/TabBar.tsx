@@ -111,7 +111,7 @@ export function TabBar<T extends string>({
               onClick={() => onChange(id)}
               onKeyDown={handleKeyDown}
               className={cn(
-                "inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2 cursor-pointer",
+                "inline-flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors focus:outline-none focus-visible:ring-2",
                 toneClasses.ring,
                 selected
                   ? toneClasses.active
@@ -123,7 +123,7 @@ export function TabBar<T extends string>({
               {typeof count === "number" && (
                 <span
                   className={cn(
-                    "rounded-md px-1.5 py-0.5 text-[11px] tabular-nums",
+                    "rounded-md px-1.5 py-0.5 text-xs tabular-nums",
                     selected ? toneClasses.badgeActive : "bg-white/[0.04] text-slate-500",
                   )}
                 >
@@ -139,12 +139,12 @@ export function TabBar<T extends string>({
       {showLeftFade && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[#0a0a0f] to-transparent sm:hidden"
+          className="pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-[var(--color-background)] to-transparent sm:hidden"
         />
       )}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-[#0a0a0f] to-transparent sm:hidden"
+        className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-[var(--color-background)] to-transparent sm:hidden"
       />
     </div>
   );

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
+import { laventeCareQueryKeys } from "@/lib/laventecare/query-keys";
 import type { LCActivityEventCreate } from "@/lib/api";
 import {
   emptyAccessCredentialForm,
@@ -215,13 +216,13 @@ export function LaventeCareCustomerDossier({
   // uit de timeline/credentials verdringt). Alleen actief zolang het dossier
   // open is.
   const { data: companyActivityData } = useQuery({
-    queryKey: ["laventecare", "activity", "company", companyId],
+    queryKey: laventeCareQueryKeys.companyActivity.detail(companyId),
     queryFn: () => laventecareApi.listActivityEvents({ companyId, limit: 250 }),
     enabled: isOpen && Boolean(companyId),
     staleTime: 15_000,
   });
   const { data: companyAccessData } = useQuery({
-    queryKey: ["laventecare", "access-credentials", "company", companyId],
+    queryKey: laventeCareQueryKeys.companyAccessCredentials.detail(companyId),
     queryFn: () => laventecareApi.listAccessCredentials({ companyId, limit: 250 }),
     enabled: isOpen && Boolean(companyId),
     staleTime: 15_000,

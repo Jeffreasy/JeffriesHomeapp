@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, type ChangeEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, type ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, CheckCircle2, ExternalLink, Eye, FileText, Loader2, MailCheck, MailPlus, MessagesSquare, Paperclip, Pencil, Reply, RefreshCw, Send, Sparkles, TriangleAlert, X } from "lucide-react";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { Modal } from "@/components/ui/Modal";
 import type { LCMailAISuggestion } from "@/lib/api";
 import { extractLaventeCareMailAttachmentContext, type LaventeCareMailAttachmentContext } from "@/lib/laventecare/mail-attachments";
 import type {
@@ -1276,46 +1276,19 @@ type MailModalState = {
 // message (read-only + reply). The iframe is sandboxed and renders exactly the escaped
 // HTML that gets sent — preview == artifact.
 function MailPreviewModal({ state, onClose }: { state: MailModalState | null; onClose: () => void }) {
-  // L12-a11y: focus-trap + focus-restore rond de preview/bevestig-modal.
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  useFocusTrap(Boolean(state), dialogRef);
-  useEffect(() => {
-    if (!state) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [state, onClose]);
-
   if (!state) return null;
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
-      onClick={onClose}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={state.title}
+      subtitle={state.subtitle}
+      maxWidth="3xl"
+      theme="surface"
+      dataAppModal="laventecare-mail-preview"
+      className="max-h-[92dvh]"
+      contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
     >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        className="glass flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">{state.title}</p>
-            {state.subtitle ? <p className="mt-0.5 truncate text-xs text-slate-400">{state.subtitle}</p> : null}
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-slate-300 transition hover:bg-white/[0.08]"
-          >
-            <X size={16} />
-          </button>
-        </div>
         {state.meta && state.meta.length ? (
           <div className="flex flex-wrap gap-x-5 gap-y-1.5 border-b border-white/10 bg-white/[0.02] px-4 py-2.5 sm:px-5">
             {state.meta.map((entry) => (
@@ -1367,8 +1340,7 @@ function MailPreviewModal({ state, onClose }: { state: MailModalState | null; on
             </button>
           ) : null}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1459,49 +1431,20 @@ function MailThreadModal({
   onOpenEntry: (entry: ThreadEntry) => void;
   onReply: (conversation: MailConversation) => void;
 }) {
-  // L12-a11y: focus-trap + focus-restore rond de thread-modal.
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  useFocusTrap(Boolean(conversation), dialogRef);
-  useEffect(() => {
-    if (!conversation) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [conversation, onClose]);
-
   if (!conversation) return null;
   const ordered = [...conversation.entries].reverse();
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
-      onClick={onClose}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={conversation.party}
+      subtitle={`${conversation.count} bericht${conversation.count === 1 ? "" : "en"} · ${conversation.subject}`}
+      maxWidth="2xl"
+      theme="surface"
+      dataAppModal="laventecare-mail-thread"
+      className="max-h-[92dvh]"
+      contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
     >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        className="glass flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">{conversation.party}</p>
-            <p className="mt-0.5 truncate text-xs text-slate-400">
-              {conversation.count} bericht{conversation.count === 1 ? "" : "en"} · {conversation.subject}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] p-1.5 text-slate-300 transition hover:bg-white/[0.08]"
-          >
-            <X size={16} />
-          </button>
-        </div>
         <div className="min-h-0 flex-1 space-y-2 overflow-auto p-4 sm:p-5">
           {ordered.map((entry, idx) => (
             <ThreadEntryCard key={`${entry.kind}-${idx}`} entry={entry} onOpen={() => onOpenEntry(entry)} />
@@ -1523,8 +1466,7 @@ function MailThreadModal({
             <Reply size={15} /> Beantwoorden
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

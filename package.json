@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit --incremental false",
     "test": "npm run test:unit",
     "test:unit": "playwright test --config=playwright.unit.config.ts",
-    "test:e2e": "playwright test --project=chromium",
+    "test:e2e": "playwright test --project=chromium --project=mobile-chromium",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
     "lint": "eslint"

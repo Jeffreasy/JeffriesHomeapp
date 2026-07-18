@@ -1,8 +1,7 @@
 "use client";
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { Check, X, Plus, Loader2 } from "lucide-react";
+import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Check, Plus, Loader2 } from "lucide-react";
 import {
   type Automation,
   type AutomationAction,
@@ -14,8 +13,8 @@ import {
   SCENE_DEFINITIONS,
   type ShiftType,
 } from "@/lib/automations";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 
 interface AutomationFormProps {
@@ -62,8 +61,6 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(true, dialogRef);
   const { openConfirm } = useConfirm();
   const confirmingRef = useRef(false);
 
@@ -98,15 +95,6 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
 
   // Stel dezelfde dirty-guarded sluiting beschikbaar aan de parent (fix 7).
   useImperativeHandle(ref, () => ({ requestClose: () => void requestClose() }), [requestClose]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape" || confirmingRef.current) return;
-      void requestClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [requestClose]);
 
   const toggleDay = (d: number) =>
     setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
@@ -189,43 +177,22 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
     color: "Kleur",
   };
 
+  const modalTitle = initialData ? "Automatisering bewerken" : "Nieuwe automatisering";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={() => void requestClose()}
-        aria-hidden="true"
-      />
-
-      <motion.div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={initialData ? "Automatisering bewerken" : "Nieuwe automatisering"}
-        tabIndex={-1}
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className="relative w-full max-w-md glass rounded-2xl p-6 space-y-5 border border-amber-500/20 shadow-2xl max-h-[90vh] overflow-y-auto"
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            {initialData ? null : <Plus size={16} className="text-amber-400" />}
-          {initialData ? "Automatisering bewerken" : "Nieuwe automatisering"}
-        </h3>
-        <button
-          onClick={() => void requestClose()}
-          aria-label="Formulier sluiten"
-          className="text-slate-500 hover:text-slate-300"
-        >
-          <X size={15} />
-        </button>
-      </div>
-
+    <Modal
+      isOpen
+      onClose={() => void requestClose()}
+      title={modalTitle}
+      icon={initialData ? undefined : <Plus size={17} className="text-amber-400" />}
+      maxWidth="md"
+      theme="amber"
+      presentation="dialog"
+      closeDisabled={saving}
+      ariaBusy={saving}
+      dataAppModal="automation-form"
+      contentClassName="space-y-5"
+    >
       <div>
         <label htmlFor="auto-name" className="mb-1 block text-xs font-semibold text-slate-300">
           Naam <span className="text-amber-400" aria-hidden="true">*</span>
@@ -497,7 +464,6 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
           <p className="mt-1.5 text-center text-[11px] text-slate-500">{validationHint}</p>
         )}
       </div>
-      </motion.div>
-    </div>
+    </Modal>
   );
 });

@@ -1,50 +1,75 @@
 "use client";
 
-import { ArrowRight, Calendar, Clock3, Lightbulb, Wallet, type LucideIcon } from "lucide-react";
+import { ArrowRight, Calendar, Clock3, Wallet, type LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { type Tone, toneClasses, formatEventMeta, formatRelativeDateLabel } from "./DashboardUtils";
-import { Panel } from "./DashboardPrimitives";
-import type { useSchedule } from "@/hooks/useSchedule";
 import type { PersonalEvent } from "@/hooks/usePersonalEvents";
+import type { useSchedule } from "@/hooks/useSchedule";
+import { Panel } from "./DashboardPrimitives";
+import {
+  formatEventMeta,
+  formatRelativeDateLabel,
+  type Tone,
+  toneClasses,
+} from "./DashboardUtils";
 
-export function OverviewCell({
+interface OverviewCellProps {
+  icon: LucideIcon;
+  tone: Tone;
+  label: string;
+  value: string;
+  sub: string;
+  href: string;
+}
+
+function OverviewCell({
   icon: Icon,
   tone,
   label,
   value,
   sub,
   href,
-}: {
-  icon: LucideIcon;
-  tone: Tone;
-  label: string;
-  value: string;
-  sub: string;
-  /** H3: de cellen zijn echte links naar hun module — met hover/focus-affordance. */
-  href: string;
-}) {
+}: OverviewCellProps) {
   const classes = toneClasses[tone];
 
   return (
     <Link
       href={href}
-      className="group block min-h-[116px] min-w-0 bg-[#0f0f16]/95 p-3 transition-colors hover:bg-[#16161f] focus-visible:bg-[#16161f] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-400/70 sm:min-h-[132px] sm:p-5"
+      className="group flex min-h-[76px] min-w-0 items-center gap-3 bg-[var(--color-surface)] p-3 transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-400/70 sm:min-h-[124px] sm:block sm:p-4"
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className={`flex h-8 w-8 items-center justify-center rounded-xl border sm:h-9 sm:w-9 ${classes.border} ${classes.surface}`}>
-          <Icon size={16} className={classes.icon} />
-        </div>
-        <ArrowRight
-          size={14}
-          aria-hidden="true"
-          className="mt-1 text-slate-700 transition-colors group-hover:text-slate-300 group-focus-visible:text-slate-300"
-        />
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${classes.border} ${classes.surface}`}>
+        <Icon size={16} className={classes.icon} aria-hidden="true" />
       </div>
-      <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:mt-4">{label}</p>
-      <p className={`mt-1 line-clamp-2 break-words text-sm font-bold leading-tight sm:text-base ${classes.text}`}>{value}</p>
-      <p className="mt-1 line-clamp-2 break-words text-[11px] leading-4 text-slate-500 sm:text-xs">{sub}</p>
+      <div className="min-w-0 flex-1 sm:mt-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
+          {label}
+        </p>
+        <p className={`mt-0.5 truncate text-sm font-bold ${classes.text}`}>{value}</p>
+        <p className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">{sub}</p>
+      </div>
+      <ArrowRight
+        size={14}
+        aria-hidden="true"
+        className="shrink-0 text-slate-700 transition-colors group-hover:text-slate-300 sm:float-right sm:-mt-16"
+      />
     </Link>
   );
+}
+
+interface OverviewPanelProps {
+  nextDienst: ReturnType<typeof useSchedule>["nextDienst"];
+  nextEvent: PersonalEvent | null;
+  nettoLabel: string;
+  nettoValue: string;
+  nettoSub: string;
+  conflicts: number;
+  hardConflicts: number;
+  todayIso?: string;
+  appointmentsLoading?: boolean;
+  appointmentsFailed?: boolean;
+  scheduleLoading?: boolean;
+  scheduleFailed?: boolean;
+  financeLoading?: boolean;
+  financeFailed?: boolean;
 }
 
 export function OverviewPanel({
@@ -53,9 +78,6 @@ export function OverviewPanel({
   nettoLabel,
   nettoValue,
   nettoSub,
-  lampsOn,
-  lampsTotal,
-  devicesOnline,
   conflicts,
   hardConflicts,
   todayIso,
@@ -63,36 +85,16 @@ export function OverviewPanel({
   appointmentsFailed,
   scheduleLoading,
   scheduleFailed,
-  devicesLoading,
-  devicesFailed,
   financeLoading,
   financeFailed,
-}: {
-  nextDienst: ReturnType<typeof useSchedule>["nextDienst"];
-  nextEvent: PersonalEvent | null;
-  nettoLabel: string;
-  nettoValue: string;
-  nettoSub: string;
-  lampsOn: number;
-  lampsTotal: number;
-  devicesOnline: number;
-  conflicts: number;
-  hardConflicts: number;
-  todayIso?: string;
-  appointmentsLoading?: boolean;
-  appointmentsFailed?: boolean;
-  scheduleLoading?: boolean;
-  scheduleFailed?: boolean;
-  devicesLoading?: boolean;
-  devicesFailed?: boolean;
-  financeLoading?: boolean;
-  financeFailed?: boolean;
-}) {
-  const conflictLabel = hardConflicts > 0 ? `${hardConflicts} harde overlap` : `${conflicts} aandachtspunt(en)`;
+}: OverviewPanelProps) {
+  const conflictLabel =
+    hardConflicts > 0
+      ? `${hardConflicts} harde overlap`
+      : `${conflicts} aandachtspunt(en)`;
 
-  // H5/DEEL2#1: laden ≠ leeg ≠ mislukt — elke cel kent zijn drie toestanden.
   const dienstValue = scheduleLoading
-    ? "Laden…"
+    ? "Laden..."
     : scheduleFailed
       ? "Kon niet laden"
       : nextDienst
@@ -107,7 +109,7 @@ export function OverviewPanel({
         : "Rooster rustig";
 
   const eventValue = appointmentsLoading
-    ? "Laden…"
+    ? "Laden..."
     : appointmentsFailed
       ? "Kon niet laden"
       : nextEvent?.titel ?? "Geen afspraak";
@@ -121,40 +123,16 @@ export function OverviewPanel({
           ? conflictLabel
           : "Agenda rustig";
 
-  const lampValue = devicesLoading
-    ? "Laden…"
-    : devicesFailed
-      ? "Kon niet laden"
-      : lampsTotal === 0
-        ? "Geen lampen"
-        : `${lampsOn}/${lampsTotal} aan`;
-  const lampSub = devicesLoading
-    ? "Lampen worden geladen"
-    : devicesFailed
-      ? "Lampen niet beschikbaar"
-      : `${devicesOnline} online`;
-
   return (
     <Panel className="overflow-hidden p-0">
-      <div className="border-b border-[var(--color-border)] px-4 py-4 sm:px-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Control center
-            </p>
-            <h2 className="mt-1 text-xl font-bold text-white">Vandaag in een oogopslag</h2>
-          </div>
-          <Link
-            href="/agenda"
-            className="btn btn--ghost btn--sm w-full justify-center sm:w-auto"
-          >
-            Agenda
-            <ArrowRight size={14} />
-          </Link>
-        </div>
+      <div className="border-b border-[var(--color-border)] px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
+          Vandaag
+        </p>
+        <h2 className="mt-0.5 text-base font-bold text-white">Werk, agenda en finance</h2>
       </div>
 
-      <div className="grid grid-cols-2 gap-px bg-[var(--color-border)] xl:grid-cols-4">
+      <div className="grid gap-px bg-[var(--color-border)] sm:grid-cols-3">
         <OverviewCell
           icon={Clock3}
           tone={scheduleFailed ? "rose" : "indigo"}
@@ -173,21 +151,11 @@ export function OverviewPanel({
         />
         <OverviewCell
           icon={Wallet}
-          // DEEL2/finance-cel: laden/fout/waarde — spiegel de rose fout-tone
-          // van de dienst/afspraak/lampen-cellen; niet permanent hardcoded groen.
           tone={financeFailed ? "rose" : financeLoading ? "slate" : "green"}
           label={nettoLabel}
           value={nettoValue}
           sub={nettoSub}
           href="/finance"
-        />
-        <OverviewCell
-          icon={Lightbulb}
-          tone={devicesFailed ? "rose" : lampsOn > 0 ? "amber" : "slate"}
-          label="Woning"
-          value={lampValue}
-          sub={lampSub}
-          href="/lampen"
         />
       </div>
     </Panel>

@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
 import { useUser } from "@clerk/nextjs";
 import { applyEventRowToCache, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Modal } from "@/components/ui/Modal";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
 import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
@@ -99,8 +99,6 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   // verloren gaat (audit H1). Zolang gezet, gedraagt de modal zich alsof hij
   // open staat met deze rij als "editEvent".
   const [recoveryDraft, setRecoveryDraft] = useState<PersonalEvent | null>(null);
-  const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions();
-
   // Zodra de parent de modal expliciet (opnieuw) opent, vervalt een eventuele
   // hangende herstel-rij — de parent-intentie wint.
   useEffect(() => {
@@ -110,6 +108,9 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   // De modal staat open als de parent hem opent óf als er een mislukte rij
   // hersteld moet worden.
   const isOpen = open || recoveryDraft !== null;
+  const { options: laventeCareContextOptions } = useLaventeCareBusinessContextOptions({
+    enabled: isOpen,
+  });
   // Prefill-bron: parent-editEvent, of de herstelde mislukte rij.
   const prefillEvent = editEvent ?? recoveryDraft;
 
@@ -136,15 +137,6 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
     }
     return businessContext;
   }, [automaticBusinessContext, businessContext, businessContextTouched]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -291,17 +283,6 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
     }
   }, [handleClose, isDirty, openConfirm]);
 
-  // Accessibility: trap focus in the dialog, restore focus on close, close on Escape.
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useFocusTrap(isOpen, dialogRef);
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") void handleCloseAttempt();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen, handleCloseAttempt]);
 
   const handleCategoryChange = (nextCategory: CategoryId) => {
     setCategoryTouched(true);
@@ -417,51 +398,21 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
   };
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Overlay */}
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            data-app-modal="agenda-event"
-            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
-            onClick={() => void handleCloseAttempt()}
-          />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 16 }}
-            animate={{ opacity: 1, scale: 1,    y: 0   }}
-            exit={{   opacity: 0, scale: 0.95, y: 16  }}
-            transition={{ duration: 0.2 }}
-            data-app-modal="agenda-event"
-            className="fixed inset-x-0 bottom-0 z-[101] mx-auto max-w-lg sm:inset-x-4 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2"
-          >
-            <div
-              ref={dialogRef}
-              tabIndex={-1}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="agenda-event-title"
-              className="glass flex max-h-[calc(100dvh-0.5rem)] flex-col overflow-hidden rounded-t-2xl border border-[var(--color-border)] shadow-2xl focus:outline-none sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
-            >
-
-              {/* Header */}
-              <div className="flex shrink-0 items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
-                <h2 id="agenda-event-title" className="text-sm font-semibold text-white flex items-center gap-2">
-                  <AppIcon name="agenda" tone="indigo" size="sm" />
-                  {editEvent ? "Afspraak wijzigen" : "Nieuwe afspraak"}
-                </h2>
-                <button
-                  type="button"
-                  aria-label="Afspraakmodal sluiten"
-                  onClick={() => void handleCloseAttempt()}
-                  className="text-slate-500 hover:text-slate-300 transition-colors cursor-pointer">
-                  <AppIcon name="close" tone="slate" size="sm" />
-                </button>
-              </div>
-
-              {/* Form */}
+    <Modal
+      isOpen={isOpen}
+      onClose={() => void handleCloseAttempt()}
+      title={prefillEvent ? "Afspraak wijzigen" : "Nieuwe afspraak"}
+      icon={<AppIcon name="agenda" tone="indigo" size="sm" />}
+      maxWidth="lg"
+      theme="surface"
+      closeDisabled={loading}
+      closeOnBackdrop={!loading}
+      closeOnEscape={!loading}
+      ariaBusy={loading}
+      dataAppModal="agenda-event"
+      className="max-h-[calc(100dvh-0.5rem)] sm:max-h-[calc(100dvh-2rem)]"
+      contentClassName="overflow-hidden p-0"
+    >
               <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 {/* overflow-x-hidden: a scroll box with overflow-y:auto computes
                     overflow-x to `auto` too, so any over-wide child (e.g. the
@@ -667,11 +618,7 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                   </button>
                 </div>
               </form>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    </Modal>
   );
 }
 

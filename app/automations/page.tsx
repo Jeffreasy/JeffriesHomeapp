@@ -13,6 +13,10 @@ import { AutomationForm, type AutomationFormHandle } from "@/components/automati
 import { DienstWekkerSection } from "@/components/automations/DienstWekkerSection";
 import { type Automation, type DienstWekkerTimes, type ShiftType } from "@/lib/automations";
 import { cn } from "@/lib/utils";
+import {
+  AppPageHeader,
+  AppPageShell,
+} from "@/components/layout/AppPageShell";
 
 type ManagedShiftType = Exclude<ShiftType, "any">;
 
@@ -115,46 +119,36 @@ export default function AutomationsPage() {
   const disabled = automations.filter((a) => !a.enabled);
 
   return (
-    <div className="text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
-                <Activity size={20} className="text-amber-300" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Smart Home
-                </p>
-                <h1 className="mt-1 truncate text-2xl font-bold text-white">Automatisering</h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  {enabled.length} actief · Engine elke 30s
-                </p>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                onClick={handleHeaderToggle}
-                aria-expanded={!!editingId}
-                aria-label={editingId ? "Formulier sluiten" : "Nieuwe automatisering toevoegen"}
-                className={cn(
-                  "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors",
-                  editingId
-                    ? "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
-                    : "border-amber-500/30 bg-amber-500/15 text-amber-200 hover:bg-amber-500/20"
-                )}
-              >
-                {editingId ? <X size={16} /> : <Plus size={16} />}
-                <span className="hidden sm:inline">{editingId ? "Annuleren" : "Toevoegen"}</span>
-              </button>
-            </div>
+    <AppPageShell width="standard" className="space-y-5 text-slate-100">
+      <AppPageHeader
+        eyebrow="Smart home"
+        title="Automatisering"
+        description={enabled.length + " actief · " + automations.length + " totaal"}
+        leading={
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10">
+            <Activity size={20} className="text-amber-300" aria-hidden="true" />
           </div>
-        </div>
-      </header>
+        }
+        actions={
+          <button
+            type="button"
+            onClick={handleHeaderToggle}
+            aria-expanded={Boolean(editingId)}
+            aria-label={editingId ? "Formulier sluiten" : "Nieuwe automatisering toevoegen"}
+            className={cn(
+              "inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors",
+              editingId
+                ? "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                : "border-amber-500/30 bg-amber-500/15 text-amber-200 hover:bg-amber-500/20",
+            )}
+          >
+            {editingId ? <X size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />}
+            {editingId ? "Annuleren" : "Toevoegen"}
+          </button>
+        }
+      />
 
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
+      <div className="space-y-5">
         <ErrorBoundary>
           <DienstWekkerSection
             automations={automations}
@@ -284,7 +278,7 @@ export default function AutomationsPage() {
               </button>
             </div>
           ) : null}
-      </main>
-    </div>
+      </div>
+    </AppPageShell>
   );
 }

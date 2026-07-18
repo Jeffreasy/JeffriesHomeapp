@@ -1,6 +1,7 @@
 import type { AppIconName } from "@/lib/symbols";
 
 export type NavigationSectionId = "start" | "planning" | "persoonlijk" | "relaties" | "bedrijf" | "systeem";
+export type NavigationPrefetchPolicy = "automatic" | "intent";
 
 export interface NavigationItem {
   href: string;
@@ -10,6 +11,11 @@ export interface NavigationItem {
   icon: AppIconName;
   section: NavigationSectionId;
   mobile: "primary" | "more";
+  /**
+   * Heavy workspaces are only prefetched after pointer or keyboard intent.
+   * This keeps the persistent navigation from eagerly downloading every route.
+   */
+  prefetch: NavigationPrefetchPolicy;
 }
 
 export const NAVIGATION_SECTIONS: Array<{ id: NavigationSectionId; label: string }> = [
@@ -30,6 +36,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "home",
     section: "start",
     mobile: "primary",
+    prefetch: "automatic",
   },
   {
     href: "/lampen",
@@ -39,6 +46,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "lights",
     section: "start",
     mobile: "primary",
+    prefetch: "automatic",
   },
   {
     href: "/rooster",
@@ -48,6 +56,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "roster",
     section: "planning",
     mobile: "primary",
+    prefetch: "intent",
   },
   {
     href: "/agenda",
@@ -57,6 +66,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "agenda",
     section: "planning",
     mobile: "primary",
+    prefetch: "intent",
   },
   {
     href: "/automations",
@@ -66,6 +76,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "automations",
     section: "planning",
     mobile: "more",
+    prefetch: "intent",
   },
   {
     href: "/finance",
@@ -75,6 +86,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "finance",
     section: "persoonlijk",
     mobile: "more",
+    prefetch: "intent",
   },
   {
     href: "/notities",
@@ -84,6 +96,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "notes",
     section: "persoonlijk",
     mobile: "more",
+    prefetch: "intent",
   },
   {
     href: "/habits",
@@ -93,6 +106,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "habit",
     section: "persoonlijk",
     mobile: "more",
+    prefetch: "intent",
   },
   {
     href: "/contacten",
@@ -102,6 +116,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "relations",
     section: "relaties",
     mobile: "more",
+    prefetch: "intent",
   },
   {
     href: "/laventecare",
@@ -111,6 +126,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "business",
     section: "bedrijf",
     mobile: "more",
+    prefetch: "intent",
   },
   {
     href: "/settings",
@@ -120,6 +136,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     icon: "settings",
     section: "systeem",
     mobile: "more",
+    prefetch: "intent",
   },
 ];
 

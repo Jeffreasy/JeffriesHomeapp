@@ -32,10 +32,13 @@ import {
 import { getNotesSearch } from "@/lib/api/generated/notes/notes";
 import type { NoteCreateData, NoteRecord, NoteRevisionRecord } from "@/hooks/useNotes";
 import { formatDateRange, getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
+import { NoteConflictError } from "@/lib/noteConflict";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { useOverlayLifecycle } from "@/hooks/useOverlayLifecycle";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
 import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
+import { getOverlayPortalRoot } from "@/lib/overlays/overlay-manager";
 import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
 import {
   isGenericLaventeCareBusinessContext,
@@ -62,6 +65,18 @@ import {
   PRIORITEITEN,
   type NoteTemplate,
 } from "@/components/notes/NoteEditorTemplates";
+
+const NOTE_EDITOR_LAYER_CLASSES = [
+  "z-[100]",
+  "z-[102]",
+  "z-[104]",
+  "z-[106]",
+  "z-[108]",
+  "z-[110]",
+  "z-[112]",
+  "z-[114]",
+] as const;
+
 type LinkSearchItem = {
   id?: string;
   titel?: string | null;
@@ -152,19 +167,6 @@ type EditorPanel = "details" | "style" | "history";
 type PendingEditorAction = "archive" | "complete" | "delete" | "pin" | null;
 type NoteAction = (id: string) => void | Promise<void>;
 
-/**
- * H2 (R3): thrown by the page's save handler on a 409, carrying the refetched
- * note (or null if the refetch failed). The editor catches it to show an inline
- * reload-vs-overwrite choice instead of an eternal retry loop.
- */
-export class NoteConflictError extends Error {
-  freshNote: NoteRecord | null;
-  constructor(freshNote: NoteRecord | null) {
-    super("Notitie is elders gewijzigd");
-    this.name = "NoteConflictError";
-    this.freshNote = freshNote;
-  }
-}
 
 type NoteEditorSnapshot = {
   titel: string;
@@ -228,6 +230,18 @@ export function NoteEditor({
   // re-add them, otherwise removing a context tag is impossible.
   const removedTagsRef = useRef<Set<string>>(new Set());
   const { openConfirm } = useConfirm();
+  const { isTopMost, layerIndex, overlayId } = useOverlayLifecycle(
+    true,
+    modalRef,
+    {
+      initialFocusRef: textRef,
+      priority: "standard",
+    },
+  );
+  const overlayLayerClass =
+    NOTE_EDITOR_LAYER_CLASSES[
+      Math.min(Math.max(layerIndex, 0), NOTE_EDITOR_LAYER_CLASSES.length - 1)
+    ];
 
   const [saving, setSaving] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingEditorAction>(null);
@@ -469,9 +483,6 @@ export function NoteEditor({
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (typeof window !== "undefined" && window.innerWidth >= 640) {
-        textRef.current?.focus();
-      }
       autoResize();
     }, 120);
     return () => clearTimeout(timer);
@@ -521,13 +532,6 @@ export function NoteEditor({
     }
   }, [primaryContext, symbol, symbolTouched]);
 
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, []);
 
   // Keyboard-aware sizing (iOS): the layout viewport does NOT shrink when the
   // soft keyboard opens, so a `fixed inset-0` overlay keeps its bottom — and
@@ -988,50 +992,13 @@ export function NoteEditor({
     }
   }, [applySnapshot, note?.id, onRestoreRevision, runGuardedConfirm, reloadRevisions]);
 
-  // R3-11: keep the actual key handling in a ref so the window listener can be
-  // registered exactly once (mount-only). Previously handleSave/handleCloseAttempt
-  // in the deps got a new identity per keystroke, re-running this effect — which
-  // re-captured `previousFocus` as the textarea and re-registered the listener.
+  // Keep editor-specific shortcuts in one stable listener. Focus trapping and
+  // restoration belong to the central lifecycle; this code only runs topmost.
+  // Escape stays local so editor popups can close before the editor itself.
   const keydownRef = useRef<(event: KeyboardEvent) => void>(() => {});
   keydownRef.current = (event: KeyboardEvent) => {
-    // H4: while ANY confirm dialog is open the editor shortcuts must not fire —
-    // Escape would cancel the confirm AND close the editor; Tab would let the
-    // trap steal focus from the dialog.
-    if (confirmOpenRef.current) return;
-
-    if (event.key === "Tab") {
-      const modal = modalRef.current;
-      if (!modal) return;
-
-      const focusable = Array.from(
-        modal.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
-        ),
-      ).filter(isFocusableElement);
-
-      if (focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const activeElement = document.activeElement;
-
-      if (!activeElement || !modal.contains(activeElement)) {
-        event.preventDefault();
-        first.focus();
-        return;
-      }
-
-      if (event.shiftKey && activeElement === first) {
-        event.preventDefault();
-        last.focus();
-        return;
-      }
-
-      if (!event.shiftKey && activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
+    // Nested overlays own keyboard input; editor shortcuts only run while topmost.
+    if (!isTopMost || confirmOpenRef.current) return;
 
     if (event.key === "Escape") {
       event.preventDefault();
@@ -1055,15 +1022,9 @@ export function NoteEditor({
   };
 
   useEffect(() => {
-    // Capture the trigger ONCE on mount so focus returns to the originating
-    // card/button on close — not to whatever was focused on the last keystroke.
-    const previousFocus = document.activeElement as HTMLElement | null;
     const handler = (event: KeyboardEvent) => keydownRef.current(event);
     window.addEventListener("keydown", handler);
-    return () => {
-      window.removeEventListener("keydown", handler);
-      previousFocus?.focus?.();
-    };
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   const insertChecklist = () => prefixSelectedLines("- [ ] ");
@@ -1145,15 +1106,21 @@ export function NoteEditor({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       data-app-modal="note-editor"
-      className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4"
+      data-overlay-layer={overlayId}
+      aria-hidden={isTopMost ? undefined : true}
+      inert={isTopMost ? undefined : true}
+      className={`fixed inset-0 flex items-end justify-center sm:items-center sm:p-4 ${overlayLayerClass} ${
+        isTopMost ? "" : "pointer-events-none"
+      }`}
     >
       <div
         className="absolute inset-0 cursor-pointer bg-black/65 backdrop-blur-sm"
-        onClick={() => void handleCloseAttempt()}
+        onClick={isTopMost ? () => void handleCloseAttempt() : undefined}
       />
 
       <motion.div
         ref={modalRef}
+        tabIndex={-1}
         initial={{ opacity: 0, y: 48, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 48, scale: 0.98 }}
@@ -1874,18 +1841,9 @@ export function NoteEditor({
     </motion.div>
   );
 
-  return typeof document === "undefined" ? editorModal : createPortal(editorModal, document.body);
+  return typeof document === "undefined" ? editorModal : createPortal(editorModal, getOverlayPortalRoot());
 }
 
-function isFocusableElement(element: HTMLElement) {
-  const style = window.getComputedStyle(element);
-  return (
-    style.display !== "none" &&
-    style.visibility !== "hidden" &&
-    element.getBoundingClientRect().width > 0 &&
-    element.getBoundingClientRect().height > 0
-  );
-}
 
 function EventLinkPicker({
   groups,

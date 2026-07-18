@@ -61,7 +61,7 @@ export function SectionHeader({
           <RenderIcon icon={icon} size={16} className="text-amber-300" />
         </div>
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">{label}</p>
           <h2 className="truncate text-base font-bold text-white">{title}</h2>
         </div>
       </div>
@@ -104,9 +104,9 @@ export function RouteTile({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-white">{label}</p>
-          <p className="mt-1 truncate text-xs text-slate-500">{sub}</p>
+          <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">{sub}</p>
         </div>
-        <ChevronRight size={15} className="shrink-0 text-slate-600 transition-colors group-hover:text-slate-300" />
+        <ChevronRight size={15} className="shrink-0 text-[var(--color-text-subtle)] transition-colors group-hover:text-slate-300" />
       </div>
     </Link>
   );
@@ -141,9 +141,9 @@ export function StatusRow({
 export function EmptyState({ icon, title, text }: { icon: IconSource; title: string; text: string }) {
   return (
     <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-4 py-6 text-center">
-      <RenderIcon icon={icon} size={22} className="text-slate-600" />
+      <RenderIcon icon={icon} size={22} className="text-[var(--color-text-subtle)]" />
       <p className="mt-3 text-sm font-semibold text-slate-300">{title}</p>
-      <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{text}</p>
+      <p className="mt-1 max-w-sm text-xs leading-5 text-[var(--color-text-muted)]">{text}</p>
     </div>
   );
 }

@@ -44,7 +44,8 @@ npm run test:unit gebruikt playwright.unit.config.ts, start geen webserver en te
 
 ### E2E
 
-npm run test:e2e gebruikt de Chromium-projectconfiguratie en start lokaal npm run dev. In CI wordt eerst gebouwd en daarna npm run start gebruikt.
+npm run test:e2e draait dezelfde suite in Desktop Chrome en de mobiele Pixel 5-Chromiumconfiguratie. Lokaal start Playwright npm run dev; in CI wordt eerst gebouwd en daarna npm run start gebruikt.
+Daardoor blijven redirect-, BFF- en layoutcontracten ook op een echte mobiele viewport bewaakt.
 
 De altijd actieve securitychecks bewijzen dat:
 

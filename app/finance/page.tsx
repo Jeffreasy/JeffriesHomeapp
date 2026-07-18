@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import dynamic from "next/dynamic";
 import {
   AlertTriangle,
   CalendarDays,
@@ -14,9 +15,9 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
   Upload,
 } from "lucide-react";
-import { CsvUploader } from "@/components/finance/CsvUploader";
 import { TransactionList } from "@/components/finance/TransactionList";
 import { FilterPanel } from "@/components/finance/FilterPanel";
 import { SearchBar } from "@/components/finance/SearchBar";
@@ -24,6 +25,7 @@ import { useTransactions, EXPORT_MAX_ROWS, type TransactionFilter } from "@/hook
 import { useLoonstroken } from "@/hooks/useLoonstroken";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { useToast } from "@/components/ui/Toast";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
 import { eur, eurExact, ibanLabel } from "@/lib/finance-constants";
@@ -37,12 +39,22 @@ import {
 } from "@/components/finance/FinanceUtils";
 import { SegmentedButton, SectionTitle } from "@/components/finance/FinanceCards";
 import { FinanceMetricsGrid } from "@/components/finance/FinanceMetricsGrid";
-import { FinanceCharts } from "@/components/finance/FinanceCharts";
-import { FinanceInsights } from "@/components/finance/FinanceInsights";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
+import { AppPageHeader, AppPageShell, PageToolbar } from "@/components/layout/AppPageShell";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 
 type ChartView = "saldo" | "inuit";
+
+const CsvUploader = dynamic(() =>
+  import("@/components/finance/CsvUploader").then((module) => module.CsvUploader),
+);
+const FinanceCharts = dynamic(() =>
+  import("@/components/finance/FinanceCharts").then((module) => module.FinanceCharts),
+);
+const FinanceInsights = dynamic(() =>
+  import("@/components/finance/FinanceInsights").then((module) => module.FinanceInsights),
+);
 
 export default function FinancePage() {
   const [ibanFilter, setIbanFilter] = useState<string | undefined>();
@@ -50,9 +62,11 @@ export default function FinancePage() {
   const [chartView, setChartView] = useState<ChartView>("saldo");
   const [jaarFilter, setJaarFilter] = useState<string>("2026");
   const [filters, setFilters] = useState<TransactionFilter>(DEFAULT_FILTERS);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const hasDesktopControls = useMediaQuery("(min-width: 1024px)");
 
   const loonstroken = useLoonstroken();
-  const { hidden: privacyOn, toggle: togglePrivacy, mask } = usePrivacy("finance");
+  const { hidden: privacyOn, toggle: togglePrivacy, mask, isServerUnknown: isPrivacyUnknown } = usePrivacy("finance");
   const { error: toastError } = useToast();
   const { openConfirm } = useConfirm();
   const {
@@ -279,186 +293,236 @@ export default function FinancePage() {
   const selectedFilterCount = activeFilterCount(filters);
   const hasData = Boolean(stats && totalCount > 0);
 
-  return (
-    <div className="finance-dashboard-shell text-slate-100">
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0f]/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10">
-              <Landmark size={20} className="text-amber-300" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-slate-500">Finance cockpit</p>
-              <h1 className="mt-1 truncate text-2xl font-bold text-white">Finance</h1>
-              <p className="mt-1 text-sm text-slate-500">
-                {stats
-                  ? `${totalCount.toLocaleString("nl-NL")} transacties · ${stats.maanden.length} maanden · ${stats.aantalCategorieen} categorieën`
-                  : "Transacties en cashflow laden"}
+  const periodControls = (
+    <div className="flex flex-col gap-5 [&_button]:min-h-11">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-white">Periode</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {jaarFilter ? "Analyse voor " + jaarFilter : "Alle beschikbare jaren"}
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-slate-400">
+            <ShieldCheck size={14} aria-hidden="true" />
+            Veilig opgeslagen
+          </div>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {yearOptions.map((year) => (
+            <SegmentedButton
+              key={year || "all"}
+              active={jaarFilter === year}
+              onClick={() => handleJaarFilter(year)}
+            >
+              <CalendarDays size={15} aria-hidden="true" />
+              {year || "Alles"}
+            </SegmentedButton>
+          ))}
+        </div>
+      </div>
+
+      {stats && stats.ibannen.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-white">Rekeningen</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {ibanFilter ? ibanLabel(ibanFilter) : "Alle rekeningen samengevoegd"}
               </p>
             </div>
+            <span className="text-xs font-semibold text-amber-200">
+              {formatPrivateEuro(stats.huidigSaldo)}
+            </span>
           </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <SegmentedButton
+              active={!ibanFilter}
+              onClick={() => handleIbanTab(undefined)}
+            >
+              <CreditCard size={15} aria-hidden="true" />
+              Alle rekeningen
+            </SegmentedButton>
+            {stats.ibannen.map((iban: string) => (
+              <SegmentedButton
+                key={iban}
+                active={ibanFilter === iban}
+                onClick={() => handleIbanTab(iban)}
+              >
+                <CreditCard size={15} aria-hidden="true" />
+                <span className="flex flex-col items-start leading-tight">
+                  <span>{ibanLabel(iban)}</span>
+                  {stats.huidigSaldoPerIban[iban] !== undefined && (
+                    <span className="text-xs opacity-80">
+                      {formatPrivateEuro(stats.huidigSaldoPerIban[iban])} ·{" "}
+                      {formatShortDate(stats.saldoPeildatumPerIban?.[iban])}
+                    </span>
+                  )}
+                </span>
+              </SegmentedButton>
+            ))}
+          </div>
+        </div>
+      )}
 
-          <div className="flex shrink-0 items-center gap-2">
+      {recentMonths.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white">Snelle maandselectie</p>
+              {(stats?.maanden?.length ?? 0) > recentMonths.length && (
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Laatste {recentMonths.length} maanden; oudere maanden staan in de lijstfilters.
+                </p>
+              )}
+            </div>
+            {filters.maandFilter && (
+              <button
+                type="button"
+                onClick={() => updateFilters({ maandFilter: undefined })}
+                className="min-h-11 shrink-0 rounded-lg px-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/10 hover:text-amber-100"
+              >
+                Wissen
+              </button>
+            )}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {recentMonths.map((month) => (
+              <button
+                key={month}
+                type="button"
+                onClick={() =>
+                  updateFilters({
+                    maandFilter: filters.maandFilter === month ? undefined : month,
+                  })
+                }
+                className={cn(
+                  "min-h-11 shrink-0 rounded-lg border px-3 text-sm font-semibold transition-colors",
+                  filters.maandFilter === month
+                    ? "border-sky-500/35 bg-sky-500/15 text-sky-200"
+                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200",
+                )}
+              >
+                {formatMonth(month)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <AppPageShell width="wide" className="finance-dashboard-shell space-y-5 text-slate-100">
+      <AppPageHeader
+        eyebrow="Finance cockpit"
+        title="Finance"
+        description={
+          stats
+            ? totalCount.toLocaleString("nl-NL") + " transacties · " + stats.maanden.length + " maanden"
+            : "Transacties en cashflow laden"
+        }
+        leading={
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10">
+            <Landmark size={20} className="text-amber-300" aria-hidden="true" />
+          </div>
+        }
+        actions={
+          <>
             <button
               type="button"
               onClick={togglePrivacy}
-              title={privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
-              aria-label={privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
+              disabled={isPrivacyUnknown}
+              title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
+              aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
+              aria-pressed={privacyOn}
+              aria-busy={isPrivacyUnknown}
               className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors",
+                "inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
                 privacyOn
                   ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
+                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
               )}
             >
-              {privacyOn ? <EyeOff size={16} /> : <Eye size={16} />}
-              <span className="hidden sm:inline">{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
+              {isPrivacyUnknown ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+              <span className="hidden sm:inline">{isPrivacyUnknown ? "Laden" : privacyOn ? "Verborgen" : "Zichtbaar"}</span>
             </button>
             <button
               type="button"
               onClick={resetFilters}
               aria-label="Filters resetten"
               title="Filters resetten"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
             >
-              <RotateCcw size={16} />
+              <RotateCcw size={16} aria-hidden="true" />
               <span className="hidden sm:inline">Reset</span>
             </button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="flex flex-col gap-5">
+        <PageToolbar
+          label="Finance selectie"
+          leading={<CalendarDays size={17} className="text-amber-300" aria-hidden="true" />}
+          trailing={
+            <>
+              <button
+                type="button"
+                onClick={() => setControlsOpen(true)}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 lg:hidden"
+              >
+                <CreditCard size={16} aria-hidden="true" />
+                Periode & rekening
+              </button>
+              <button
+                type="button"
+                onClick={scrollToTransactions}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] lg:hidden"
+              >
+                <SlidersHorizontal size={16} aria-hidden="true" />
+                Filters{selectedFilterCount > 0 ? " (" + selectedFilterCount + ")" : ""}
+              </button>
+            </>
+          }
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">
+              {jaarFilter || "Alle jaren"} · {ibanFilter ? ibanLabel(ibanFilter) : "Alle rekeningen"}
+            </p>
+            <p className="truncate text-xs text-slate-400">
+              {filters.maandFilter ? formatMonth(filters.maandFilter) : "Geen maandfilter"}
+            </p>
+          </div>
+        </PageToolbar>
+
+        {hasDesktopControls ? (
           <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
-            <div className="flex flex-col gap-5">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-white">Periode</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {jaarFilter ? `Analyse voor ${jaarFilter}` : "Alle beschikbare jaren"}
-                    </p>
-                  </div>
-                  <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-slate-400">
-                    <ShieldCheck size={14} />
-                    Veilig opgeslagen
-                  </div>
-                </div>
-
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  {yearOptions.map((year) => (
-                    <SegmentedButton
-                      key={year || "all"}
-                      active={jaarFilter === year}
-                      icon={CalendarDays}
-                      onClick={() => handleJaarFilter(year)}
-                    >
-                      {year || "Alles"}
-                    </SegmentedButton>
-                  ))}
-                </div>
-              </div>
-
-              {stats && stats.ibannen.length > 0 && (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-white">Rekeningen</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {ibanFilter ? ibanLabel(ibanFilter) : "Alle rekeningen samengevoegd"}
-                      </p>
-                    </div>
-                    <span className="text-xs font-semibold text-amber-200">{formatPrivateEuro(stats.huidigSaldo)}</span>
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                    <SegmentedButton
-                      active={!ibanFilter}
-                      icon={CreditCard}
-                      onClick={() => handleIbanTab(undefined)}
-                    >
-                      Alle rekeningen
-                    </SegmentedButton>
-                    {stats.ibannen.map((iban: string) => (
-                      <SegmentedButton
-                        key={iban}
-                        active={ibanFilter === iban}
-                        icon={CreditCard}
-                        onClick={() => handleIbanTab(iban)}
-                      >
-                        <span className="flex flex-col items-start leading-tight">
-                          <span>{ibanLabel(iban)}</span>
-                          {stats.huidigSaldoPerIban[iban] !== undefined && (
-                            <span className="text-xs opacity-80">
-                              {formatPrivateEuro(stats.huidigSaldoPerIban[iban])} · {formatShortDate(stats.saldoPeildatumPerIban?.[iban])}
-                            </span>
-                          )}
-                        </span>
-                      </SegmentedButton>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {recentMonths.length > 0 && (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white">Snelle maandselectie</p>
-                      {(stats?.maanden?.length ?? 0) > recentMonths.length && (
-                        <p className="mt-0.5 text-[11px] text-slate-500">
-                          Laatste {recentMonths.length} maanden — oudere maanden via het maandfilter in de lijst.
-                        </p>
-                      )}
-                    </div>
-                    {filters.maandFilter && (
-                      <button
-                        type="button"
-                        onClick={() => updateFilters({ maandFilter: undefined })}
-                        className="text-xs font-semibold text-amber-200 hover:text-amber-100"
-                      >
-                        Maand wissen
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                    {recentMonths.map((month) => (
-                      <button
-                        key={month}
-                        type="button"
-                        onClick={() => updateFilters({ maandFilter: filters.maandFilter === month ? undefined : month })}
-                        className={cn(
-                          "h-9 shrink-0 rounded-lg border px-3 text-sm font-semibold transition-colors",
-                          filters.maandFilter === month
-                            ? "border-sky-500/35 bg-sky-500/15 text-sky-200"
-                            : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200"
-                        )}
-                      >
-                        {formatMonth(month)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            {periodControls}
           </div>
+        ) : (
+          <BottomSheet
+            open={controlsOpen}
+            onClose={() => setControlsOpen(false)}
+            title="Periode en rekening"
+            contentClassName="p-4"
+          >
+            {periodControls}
+          </BottomSheet>
+        )}
 
-          <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
-            <div className="flex h-full flex-col gap-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold text-white">Import</p>
-                  <p className="mt-1 text-xs text-slate-500">Rabobank CSV-export importeren</p>
-                </div>
-                <Upload size={18} className="text-amber-300" />
-              </div>
-              <div className="finance-import min-w-0">
-                <CsvUploader onImported={refresh} />
-              </div>
-            </div>
+        <CollapsibleSection
+          title="Transacties importeren"
+          subtitle="Rabobank CSV-export"
+          icon={<Upload size={18} />}
+          theme="amber"
+          defaultOpen={false}
+        >
+          <div className="finance-import min-w-0">
+            <CsvUploader onImported={refresh} />
           </div>
-        </section>
-
+        </CollapsibleSection>
         {stats && stats.storneringen > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
@@ -503,7 +567,7 @@ export default function FinancePage() {
             subtitle={`${stats.maanden.length} maanden geanalyseerd`}
             icon={<Landmark size={18} />}
             theme="emerald"
-            defaultOpen={true}
+            defaultOpen={false}
           >
             <FinanceCharts
               stats={stats}
@@ -620,7 +684,7 @@ export default function FinancePage() {
             )}
           </div>
         </section>
-      </main>
-    </div>
+      </div>
+    </AppPageShell>
   );
 }

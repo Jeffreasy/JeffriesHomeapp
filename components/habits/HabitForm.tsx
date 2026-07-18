@@ -23,7 +23,7 @@ import {
 import type { HabitCreateData } from "@/hooks/useHabits";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { OverlaySurface } from "@/components/ui/OverlaySurface";
 
 /**
  * HabitForm — Create/edit modal.
@@ -71,7 +71,6 @@ export function HabitForm({
   initial,
 }: HabitFormProps) {
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const sheetRef = useRef<HTMLDivElement>(null);
   const { openConfirm } = useConfirm();
   const [naam, setNaam] = useState(initial?.naam ?? "");
   const [emoji, setEmoji] = useState(initial?.emoji ?? "🎯");
@@ -106,10 +105,6 @@ export function HabitForm({
   const [showEmojis, setShowEmojis] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Focus trap (M22): keep Tab/Shift+Tab inside the sheet and restore focus on
-  // close — the only modal in the app that rolled its own dialog without one.
-  useFocusTrap(open, sheetRef);
 
   // R3: freeze `initial` at open-time. The habits query can return a new object
   // identity while the editor is open (e.g. a Telegram check-off + refocus);
@@ -187,19 +182,6 @@ export function HabitForm({
     onClose();
   }, [isDirty, isSubmitting, onClose, openConfirm]);
 
-  // Escape-to-close (was missing entirely — M22 noted HabitForm as the only
-  // dialog without it).
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      void handleCloseAttempt();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open, handleCloseAttempt]);
-
   // Reset state ONLY when the form opens (R3): keyed on `[open]`, not `initial`,
   // so a concurrent server refresh of the habits list can't wipe typed edits.
   // Reads the frozen snapshot captured at open-time above.
@@ -228,16 +210,6 @@ export function HabitForm({
     }, 0);
 
     return () => window.clearTimeout(timeout);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
   }, [open]);
 
   useEffect(() => {
@@ -301,37 +273,18 @@ export function HabitForm({
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => void handleCloseAttempt()}
-            className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm"
-          />
-
-          {/* Sheet — full-height on mobile, centered modal on desktop */}
-          <motion.div
-            key="sheet"
-            ref={sheetRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-label={initial ? "Habit bewerken" : "Nieuwe habit"}
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-[91] flex max-h-[calc(100dvh-10px)] flex-col rounded-t-3xl shadow-2xl md:inset-auto md:bottom-auto md:left-1/2 md:top-1/2 md:w-full md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:max-h-[min(760px,88vh)]"
-            style={{
-              background: "rgba(15, 15, 20, 0.98)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
+    <OverlaySurface
+      open={open}
+      onClose={() => void handleCloseAttempt()}
+      ariaLabel={initial ? "Habit bewerken" : "Nieuwe habit"}
+      presentation="responsive"
+      maxWidth="lg"
+      closeOnBackdrop={!isSubmitting}
+      closeOnEscape={!isSubmitting}
+      ariaBusy={isSubmitting}
+      dataAppModal="habit-form"
+      className="max-h-[calc(100dvh-10px)] rounded-t-3xl border-[var(--color-border)] bg-[rgba(15,15,20,0.98)] shadow-2xl sm:max-h-[min(760px,88dvh)] sm:rounded-2xl"
+    >
             {/* Drag handle (mobile) */}
             <div className="flex shrink-0 justify-center pb-1 pt-3 md:hidden">
               <div className="w-10 h-1 rounded-full bg-[rgba(255,255,255,0.1)]" />
@@ -825,9 +778,6 @@ export function HabitForm({
                     : "Habit toevoegen"}
               </button>
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+    </OverlaySurface>
   );
 }

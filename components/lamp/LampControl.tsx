@@ -1,16 +1,17 @@
 "use client";
 
 import { HexColorPicker } from "react-colorful";
-import { useState, useEffect, useRef, useId, useCallback } from "react";
+import { useState, useEffect, useRef, useId, useCallback, type CSSProperties } from "react";
 import { Thermometer, Sun, Palette, RefreshCw } from "lucide-react";
 import { devicesApi, type Device, type DeviceCommand } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { useToast } from "@/components/ui/Toast";
-import { cn, hexToRgb, rgbToHex } from "@/lib/utils";
+import { cn, hexToRgb, kelvinToHex, rgbToHex } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import { mergeRefreshedDevice } from "@/lib/lampCommandJournal";
 import { runWithAbortTimeout } from "@/lib/lampCommandTransport";
+import { createLampAmbientStyle } from "@/lib/lampPresentation";
 
 interface LampControlProps {
   device: Device;
@@ -317,12 +318,26 @@ export function LampControl({ device }: LampControlProps) {
   };
 
   const kelvin = localMireds > 0 ? Math.round(1_000_000 / localMireds) : 2700;
+  const controlAccent = mode === "color" ? localHex : kelvinToHex(kelvin);
+  const controlStyle = {
+    ...createLampAmbientStyle(controlAccent, true),
+    "--control-brightness": `${localBrightness}%`,
+  } as CSSProperties;
 
   return (
-    <div className="p-4 space-y-5" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="space-y-5 p-4"
+      style={controlStyle}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {isPending && (
+        <p role="status" aria-live="polite" className="rounded-lg border border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-soft)] px-3 py-2 text-center text-xs text-[var(--lamp-text)]">
+          Wijziging wordt toegepast - de gewenste staat blijft zichtbaar tot bevestiging.
+        </p>
+      )}
       {/* M7: eerlijk zijn over de uit-staat — bediening zet de lamp aan */}
       {!isOn && (
-        <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-center text-xs text-amber-300/90">
+        <p className="rounded-lg border border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-soft)] px-3 py-2 text-center text-xs text-[var(--lamp-text)]">
           Lamp staat uit — bediening zet hem aan
         </p>
       )}
@@ -335,14 +350,14 @@ export function LampControl({ device }: LampControlProps) {
             <span>Helderheid</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-amber-400 font-mono">{localBrightness}%</span>
+            <span className="font-mono text-xs text-[var(--lamp-text)]">{localBrightness}%</span>
             <button
               type="button"
               onClick={refresh}
               disabled={refreshing || isPending}
               aria-label="Serverstatus ophalen"
               title="Haal de laatst bekende serverstatus op"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white/5 hover:text-slate-400"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-subtle)] transition-colors hover:bg-white/5 hover:text-slate-400"
             >
               <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} aria-hidden="true" />
             </button>
@@ -356,9 +371,7 @@ export function LampControl({ device }: LampControlProps) {
           onChange={(e) => handleBrightness(+e.target.value)}
           aria-label="Helderheid"
           {...interactionProps}
-          style={{
-            background: `linear-gradient(to right, #f59e0b ${localBrightness}%, rgba(255,255,255,0.1) ${localBrightness}%)`,
-          }}
+          className="bg-[linear-gradient(to_right,var(--lamp-accent)_var(--control-brightness),rgba(255,255,255,0.1)_var(--control-brightness))]"
         />
       </div>
 
@@ -373,8 +386,8 @@ export function LampControl({ device }: LampControlProps) {
             aria-pressed={mode === m}
             className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg transition-all disabled:cursor-wait disabled:opacity-50 ${
               mode === m
-                ? "bg-[rgba(255,255,255,0.1)] text-white font-medium"
-                : "text-slate-500 hover:text-slate-300"
+                ? "border border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-medium)] font-medium text-[var(--lamp-text)]"
+                : "text-[var(--color-text-muted)] hover:text-slate-300"
             }`}
           >
             {m === "white" ? <Thermometer size={12} /> : <Palette size={12} />}
@@ -408,7 +421,7 @@ export function LampControl({ device }: LampControlProps) {
               background: "linear-gradient(to right, #cce4ff, #fff4e6, #ff9329)",
             }}
           />
-          <div className="flex justify-between mt-1 text-[10px] text-slate-600">
+          <div className="flex justify-between mt-1 text-[10px] text-[var(--color-text-subtle)]">
             <span>Koel 6500K</span>
             <span>Warm 2200K</span>
           </div>

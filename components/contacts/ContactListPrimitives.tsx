@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { Building2, Check, X } from "lucide-react";
+import { Building2, Check } from "lucide-react";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { Modal } from "@/components/ui/Modal";
 import type { Contact, ContactLabel } from "@/lib/api";
 import { labelChipClasses, labelDotClasses } from "@/lib/contacten/labelColors";
 import { relationshipLabel } from "@/lib/contacten/contact-display";
@@ -203,35 +203,19 @@ export function EmptyBox({ title, text, action }: { title: string; text: string;
 // ─── Modal shell ─────────────────────────────────────────────────────────────
 
 export function ModalShell({ title, onClose, children, footer }: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
-  const body = (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
-      <div className="absolute inset-0 cursor-pointer bg-black/65 backdrop-blur-sm" onClick={onClose} />
-      <div
-        role="dialog"
-        aria-modal="true"
-        data-app-modal="contact"
-        onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl sm:max-w-lg sm:rounded-2xl"
-      >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-3 sm:px-5">
-          <h2 className="truncate text-base font-bold text-white">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Sluiten"
-            className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
-          >
-            <X size={18} />
-          </button>
-        </header>
-        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-5">{children}</div>
-        {footer && (
-          <footer className="shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:px-5">
-            {footer}
-          </footer>
-        )}
-      </div>
-    </div>
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={title}
+      maxWidth="lg"
+      theme="surface"
+      dataAppModal="contact"
+      contentClassName="overflow-x-hidden px-4 py-4 sm:px-5"
+      footer={footer}
+      footerClassName="px-4 sm:px-5"
+    >
+      {children}
+    </Modal>
   );
-  return typeof document === "undefined" ? body : createPortal(body, document.body);
 }
