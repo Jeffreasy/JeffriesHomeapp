@@ -102,7 +102,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
             aria-controls={scenePanelId}
             aria-label={`Scènes voor ${room.name}`}
             className={cn(
-              "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
+              "inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
               showScenes
                 ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
                 : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200",
@@ -130,7 +130,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
             }
             aria-pressed={allOn}
             className={cn(
-              "inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
+              "inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
               allOn
                 ? "border-slate-500/30 bg-slate-500/15 text-slate-200 hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300"
                 : "border-amber-500/25 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15",
@@ -164,7 +164,7 @@ export function RoomSection({ room, devices, onSelect }: RoomSectionProps) {
                   onClick={() => void applyScene(scene)}
                   disabled={!hasOnlineDevices || isPending}
                   aria-label={`${scene.label} scène toepassen in ${room.name}`}
-                  className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-[background,border-color] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-[background,border-color] duration-150 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
                   style={{
                     background: `${scene.color}12`,
                     borderColor: `${scene.color}30`,

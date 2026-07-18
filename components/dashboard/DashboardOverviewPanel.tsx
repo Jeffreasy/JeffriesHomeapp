@@ -124,7 +124,7 @@ export function OverviewPanel({
           : "Agenda rustig";
 
   return (
-    <Panel className="overflow-hidden p-0">
+    <Panel padding="none" className="overflow-hidden">
       <div className="border-b border-[var(--color-border)] px-4 py-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
           Vandaag

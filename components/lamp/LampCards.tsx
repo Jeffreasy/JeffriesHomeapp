@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { FilterMode } from "./LampUtils";
+import { Surface } from "@/components/ui/Surface";
+import { SurfaceHeader as CoreSurfaceHeader } from "@/components/ui/SurfaceHeader";
 import { cn } from "@/lib/utils";
 
 export function Panel({
@@ -23,12 +25,16 @@ export function Panel({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        "glass min-w-0 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] sm:p-5",
-        className,
-      )}
+      className="min-w-0"
     >
-      {children}
+      <Surface
+        className={cn(
+          "bg-[rgba(255,255,255,0.04)] shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl",
+          className,
+        )}
+      >
+        {children}
+      </Surface>
     </motion.div>
   );
 }
@@ -45,20 +51,12 @@ export function SectionHeader({
   sub?: string;
 }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-          <Icon size={16} className="text-amber-300" aria-hidden="true" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
-            {label}
-          </p>
-          <h2 className="truncate text-base font-bold text-white">{title}</h2>
-        </div>
-      </div>
-      {sub && <span className="shrink-0 text-xs text-[var(--color-text-muted)]">{sub}</span>}
-    </div>
+    <CoreSurfaceHeader
+      icon={<Icon size={16} className="text-amber-300" />}
+      eyebrow={label}
+      title={title}
+      meta={sub}
+    />
   );
 }
 

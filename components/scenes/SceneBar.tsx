@@ -138,7 +138,7 @@ function ColorPill({
               <button
                 ref={closeBtnRef}
                 onClick={() => setOpen(false)}
-                className="text-slate-500 hover:text-slate-300 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-300"
                 type="button"
                 aria-label="Sluiten"
               >
@@ -159,7 +159,7 @@ function ColorPill({
               type="button"
               onClick={() => void apply()}
               disabled={devices.length === 0 || isPending}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 py-2 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+              className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Send size={12} />
               Toepassen op {devices.length} lampen
@@ -207,7 +207,7 @@ export function SceneBar({ devices, sendBatch, isPending }: SceneBarProps) {
         aria-label={`Scène ${scene.label} toepassen`}
         className={cn(
           "flex flex-shrink-0 items-center gap-1.5 rounded-xl border font-medium transition-[background,border-color,box-shadow] duration-200 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40",
-          small ? "px-2.5 py-1.5 text-[11px] min-h-[36px]" : "px-3 py-2 text-xs min-h-[44px]",
+          small ? "min-h-11 px-2.5 py-1.5 text-[11px]" : "min-h-11 px-3 py-2 text-xs",
           active && "ring-1"
         )}
         style={{

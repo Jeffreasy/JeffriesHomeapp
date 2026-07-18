@@ -113,11 +113,12 @@ Gedeelde primitives staan in `components/ui/`:
 
 - `Button` voor varianten, loading, focus en minimale touchmaat;
 - `Surface` voor panelen en semantische surfaces;
+- `SurfaceHeader` voor de gedeelde kopstructuur, metadata en surface-acties;
 - `FeedbackState` voor loading, empty en error;
 - `OverlaySurface`, `Modal`, `BottomSheet` en `ConfirmDialog` voor overlays;
 - `Toast` uitsluitend voor tijdelijke, niet-kritieke bevestiging.
 
-Reusable components combineren classes met `cn()`. Core tonen staan in `lib/ui/tones.ts`; domeinspecifieke betekenis blijft bij het domein. Willekeurige nieuwe z-indexes, portals, scroll-locks of modals buiten de centrale overlaylaag zijn niet toegestaan.
+Reusable components combineren classes met `cn()`. Core tonen staan in `lib/ui/tones.ts`; domeinspecifieke betekenis blijft bij het domein. Interactieve touchdoelen blijven minimaal 44px hoog. Willekeurige nieuwe z-indexes, portals, scroll-locks of modals buiten de centrale overlaylaag zijn niet toegestaan.
 
 Mobiel is taakgericht: kernacties en individuele lampbediening komen vóór samenvattingen. Desktop toont meer parallelle context. Beide viewports gebruiken dezelfde data- en actiecontracten.
 

@@ -6,6 +6,10 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { type Tone, toneClasses } from "./DashboardUtils";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { buttonVariants } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
+import { SurfaceHeader as CoreSurfaceHeader } from "@/components/ui/SurfaceHeader";
+import { cn } from "@/lib/utils";
 import type { AppIconName } from "@/lib/symbols";
 
 type IconSource = LucideIcon | AppIconName;
@@ -27,14 +31,30 @@ function RenderIcon({
   return <Icon size={size} className={className} />;
 }
 
-export function Panel({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Panel({
+  children,
+  className,
+  padding = "md",
+}: {
+  children: ReactNode;
+  className?: string;
+  padding?: "none" | "md";
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.035)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:rounded-2xl sm:p-5 ${className}`}
+      className="min-w-0"
     >
-      {children}
+      <Surface
+        padding={padding}
+        className={cn(
+          "rounded-xl bg-[rgba(255,255,255,0.035)] shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:rounded-2xl",
+          className,
+        )}
+      >
+        {children}
+      </Surface>
     </motion.div>
   );
 }
@@ -54,27 +74,27 @@ export function SectionHeader({
   actionLabel?: string;
   compact?: boolean;
 }) {
-  return (
-    <div className={`flex items-center justify-between gap-3 ${compact ? "mb-3" : "mb-4"}`}>
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)]">
-          <RenderIcon icon={icon} size={16} className="text-amber-300" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">{label}</p>
-          <h2 className="truncate text-base font-bold text-white">{title}</h2>
-        </div>
-      </div>
-      {href && (
-        <Link
-          href={href}
-          className="inline-flex h-9 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-semibold text-amber-300/80 transition-colors hover:bg-amber-500/10 hover:text-amber-200"
-        >
-          {actionLabel ?? "Open"}
-          <ChevronRight size={14} />
-        </Link>
+  const action = href ? (
+    <Link
+      href={href}
+      className={cn(
+        buttonVariants({ variant: "ghost", size: "sm" }),
+        "shrink-0 gap-1 text-amber-300/80 hover:bg-amber-500/10 hover:text-amber-200",
       )}
-    </div>
+    >
+      {actionLabel ?? "Open"}
+      <ChevronRight size={14} aria-hidden="true" />
+    </Link>
+  ) : undefined;
+
+  return (
+    <CoreSurfaceHeader
+      icon={<RenderIcon icon={icon} size={16} className="text-amber-300" />}
+      eyebrow={label}
+      title={title}
+      action={action}
+      compact={compact}
+    />
   );
 }
 

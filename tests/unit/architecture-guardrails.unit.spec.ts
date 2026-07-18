@@ -168,3 +168,23 @@ test("the single-owner sign-in surface cannot start an enrollment flow", () => {
   expect(providers).toContain('signUpUrl="/sign-in"');
   expect(signUpPage).toContain('redirect("/sign-in")');
 });
+
+test("dashboard and lighting flows compose canonical UI and touch contracts", () => {
+  const dashboardPrimitives = readSource("components/dashboard/DashboardPrimitives.tsx");
+  const lampCards = readSource("components/lamp/LampCards.tsx");
+
+  for (const source of [dashboardPrimitives, lampCards]) {
+    expect(source).toContain('from "@/components/ui/Surface"');
+    expect(source).toContain('from "@/components/ui/SurfaceHeader"');
+  }
+
+  for (const relativePath of [
+    "components/lamp/LampToolbar.tsx",
+    "components/room/RoomSection.tsx",
+    "components/scenes/SceneBar.tsx",
+  ]) {
+    expect(readSource(relativePath), `${relativePath} bypasses the 44px touch contract`).not.toMatch(
+      /\b(?:h-9|h-10|min-h-9)\b|min-h-\[36px\]/,
+    );
+  }
+});
