@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Loader2, Pencil, Router, Trash2, X } from "lucide-react";
+import { Check, Pencil, Trash2, X } from "lucide-react";
 import { useUpdateRoom } from "@/hooks/useRooms";
 import { useToast } from "@/components/ui/Toast";
 import type { Device, Room } from "@/lib/api";
+import { IconButton } from "@/components/ui/IconButton";
+import { Surface } from "@/components/ui/Surface";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { Input } from "@/components/ui/Input";
 
 export function RoomRow({
   room,
@@ -48,32 +52,30 @@ export function RoomRow({
   };
 
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:items-center">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
-        <Router size={16} className="text-amber-300" />
-      </div>
+    <Surface tone="subtle" radius="sm" padding="sm" className="flex items-start gap-3 sm:items-center">
+      <AppIcon name="router" tone="info" size="md" framed />
 
       {editing ? (
         <div className="grid min-w-0 flex-1 gap-2 sm:grid-cols-[minmax(0,1fr)_96px]">
-          <input
+          <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && save()}
-            className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+            className="min-w-0"
             aria-label="Kamernaam"
           />
-          <input
+          <Input
             value={floor}
             onChange={(event) => setFloor(event.target.value)}
             type="number"
-            className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
+            className="min-w-0"
             aria-label="Verdieping"
           />
         </div>
       ) : (
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-200">{room.name}</p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="truncate text-sm font-semibold text-[var(--color-text)]">{room.name}</p>
+          <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
             {devices.length} lamp(en) - verdieping {room.floor_number}
           </p>
         </div>
@@ -82,46 +84,41 @@ export function RoomRow({
       <div className="flex shrink-0 items-center gap-1.5">
         {editing ? (
           <>
-            <button
-              type="button"
+            <IconButton
               onClick={save}
               disabled={isPending}
-              aria-label="Kamer opslaan"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 transition-colors hover:bg-emerald-500/15 disabled:opacity-50"
-            >
-              {isPending ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-            </button>
-            <button
-              type="button"
+              loading={isPending}
+              label="Kamer opslaan"
+              variant="success"
+              icon={<Check size={14} />}
+            />
+            <IconButton
               onClick={reset}
-              aria-label="Kamer bewerken annuleren"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 transition-colors hover:text-slate-300"
-            >
-              <X size={14} />
-            </button>
+              label="Kamer bewerken annuleren"
+              variant="secondary"
+              icon={<X size={14} />}
+            />
           </>
         ) : (
           <>
-            <button
-              type="button"
+            <IconButton
               onClick={() => setEditing(true)}
-              aria-label={`Kamer ${room.name} bewerken`}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 transition-colors hover:border-amber-500/30 hover:text-amber-300"
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              type="button"
+              label={`Kamer ${room.name} bewerken`}
+              variant="secondary"
+              icon={<Pencil size={14} />}
+              className="hover:border-[var(--color-warning-border)] hover:text-[var(--color-warning)]"
+            />
+            <IconButton
               onClick={() => onDelete(room)}
               disabled={deleting}
-              aria-label={`Kamer ${room.name} verwijderen`}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-500 transition-colors hover:border-rose-500/30 hover:text-rose-300 disabled:opacity-50"
-            >
-              {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-            </button>
+              loading={deleting}
+              label={`Kamer ${room.name} verwijderen`}
+              variant="danger"
+              icon={<Trash2 size={14} />}
+            />
           </>
         )}
       </div>
-    </div>
+    </Surface>
   );
 }

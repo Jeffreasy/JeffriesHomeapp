@@ -1,9 +1,9 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentPropsWithRef } from "react";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)] disabled:cursor-not-allowed disabled:opacity-50",
+  "inline-flex min-h-[var(--control-height)] items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-[background-color,border-color,color,box-shadow] duration-[var(--motion-fast)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)] disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -13,14 +13,23 @@ export const buttonVariants = cva(
           "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]",
         ghost:
           "border-transparent bg-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]",
+        info:
+          "border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)] hover:bg-[var(--color-info-border)]",
+        success:
+          "border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)] hover:bg-[var(--color-success-border)]",
+        successSolid:
+          "border-[var(--color-success-border)] bg-[var(--color-success)] text-[var(--color-solid-foreground-dark)] hover:bg-[var(--color-success-solid-hover)]",
+        infoSolid:
+          "border-[var(--color-info-border)] bg-[var(--color-info)] text-[var(--color-solid-foreground-dark)] hover:bg-[var(--color-info-solid-hover)]",
+        warning:
+          "border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)] hover:bg-[var(--color-warning-border)]",
         danger:
-          "border-rose-400/25 bg-rose-500/15 text-rose-100 hover:bg-rose-500/25",
+          "border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] text-[var(--color-danger)] hover:bg-[var(--color-danger-border)]",
       },
       size: {
-        // Compact typography must not reduce the 44px touch target.
         sm: "rounded-lg px-3 text-xs",
         md: "px-4",
-        icon: "h-11 w-11 px-0",
+        icon: "h-[var(--touch-target)] w-[var(--touch-target)] px-0",
       },
       fullWidth: {
         true: "w-full",
@@ -36,9 +45,10 @@ export const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends ButtonHTMLAttributes<HTMLButtonElement>,
+  extends ComponentPropsWithRef<"button">,
     VariantProps<typeof buttonVariants> {
   loading?: boolean;
+  loadingLabel?: string;
 }
 
 export function Button({
@@ -47,9 +57,11 @@ export function Button({
   size,
   fullWidth,
   loading = false,
+  loadingLabel = "Bezig…",
   disabled,
   children,
   type = "button",
+  "aria-busy": ariaBusy,
   ...props
 }: ButtonProps) {
   return (
@@ -57,16 +69,16 @@ export function Button({
       type={type}
       className={cn(buttonVariants({ variant, size, fullWidth }), className)}
       disabled={disabled || loading}
-      aria-busy={loading || undefined}
       {...props}
+      aria-busy={loading || ariaBusy || undefined}
     >
       {loading ? (
         <span
           aria-hidden="true"
-          className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+          className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent motion-reduce:animate-none"
         />
       ) : null}
-      {children}
+      {loading ? loadingLabel : children}
     </button>
   );
 }

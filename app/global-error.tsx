@@ -20,6 +20,8 @@ export default function GlobalError({
 
   const chunkError = isChunkLoadError(error);
 
+  // This boundary replaces the root layout, so recovery cannot depend on its CSS or providers.
+
   return (
     <html lang="nl">
       <body

@@ -1,4 +1,4 @@
-import type { AppIconName } from "@/lib/symbols";
+import type { NavigationIconName } from "@/components/layout/NavigationIcon";
 
 export type NavigationSectionId = "start" | "planning" | "persoonlijk" | "relaties" | "bedrijf" | "systeem";
 export type NavigationPrefetchPolicy = "automatic" | "intent";
@@ -8,7 +8,7 @@ export interface NavigationItem {
   label: string;
   shortLabel: string;
   description: string;
-  icon: AppIconName;
+  icon: NavigationIconName;
   section: NavigationSectionId;
   mobile: "primary" | "more";
   /**

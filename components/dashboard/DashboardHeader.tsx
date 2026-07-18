@@ -1,7 +1,8 @@
 "use client";
 
-import { Eye, EyeOff, Home, Loader2, Power } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Eye, EyeOff, Home, Power } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface DashboardHeaderProps {
   greeting: string;
@@ -29,57 +30,46 @@ export function DashboardHeader({
   const allLightsLabel = allOn ? "Alle online lampen uitzetten" : "Alle online lampen aanzetten";
 
   return (
-    <header className="app-topbar sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-background)]/92 backdrop-blur-xl">
+    <header className="app-topbar sticky top-0 z-[var(--layer-sticky)] border-b border-[var(--color-border)] bg-[var(--color-background)]/92 backdrop-blur-xl">
       <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:px-6 lg:px-8">
         <div className="flex min-w-0 items-center gap-2.5">
           <div
-            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-300 min-[430px]:flex"
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)] min-[430px]:flex"
             aria-hidden="true"
           >
             <Home size={17} />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-bold text-white sm:text-lg">{greeting}</h1>
+            <h1 className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg">{greeting}</h1>
             <p className="truncate text-xs capitalize text-[var(--color-text-muted)]">{today}</p>
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
+          <IconButton
             onClick={togglePrivacy}
+            label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Privacy mode uitzetten" : "Privacy mode aanzetten"}
+            icon={privacyOn ? <EyeOff size={17} /> : <Eye size={17} />}
+            variant="secondary"
+            loading={isPrivacyUnknown}
             disabled={isPrivacyUnknown}
-            aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Privacy mode uitzetten" : "Privacy mode aanzetten"}
-            aria-pressed={privacyOn}
             aria-busy={isPrivacyUnknown}
-            title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Privacy mode uitzetten" : "Privacy mode aanzetten"}
-            className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200 disabled:cursor-wait disabled:opacity-60"
-          >
-            {isPrivacyUnknown ? <Loader2 size={17} className="animate-spin" aria-hidden="true" /> : privacyOn ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
-          </button>
+            aria-pressed={privacyOn}
+          />
 
-          <button
-            type="button"
+          <Button
             onClick={toggleAll}
-            disabled={onlineDevicesCount === 0 || lightingPending}
+            disabled={onlineDevicesCount === 0}
+            loading={lightingPending}
+            loadingLabel="Bezig"
+            variant={allOn ? "warning" : "secondary"}
             aria-label={allLightsLabel}
-            aria-busy={lightingPending}
             title={allLightsLabel}
-            className={cn(
-              "inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
-              allOn
-                ? "border-amber-500/30 bg-amber-500/15 text-amber-200 hover:bg-amber-500/20"
-                : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-300 hover:bg-[var(--color-surface-hover)]",
-              "disabled:cursor-not-allowed disabled:opacity-50",
-            )}
+            size="sm"
           >
-            {lightingPending ? (
-              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <Power size={16} aria-hidden="true" />
-            )}
-            <span>{lightingPending ? "Bezig" : allOn ? "Alles uit" : "Alles aan"}</span>
-          </button>
+            <Power size={16} aria-hidden="true" />
+            <span>{allOn ? "Alles uit" : "Alles aan"}</span>
+          </Button>
         </div>
       </div>
     </header>

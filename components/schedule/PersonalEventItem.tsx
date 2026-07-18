@@ -8,7 +8,11 @@ import { MapPin, Clock, CalendarDays, AlertTriangle, Trash2, Loader2, X, Check, 
 import { useToast } from "@/components/ui/Toast";
 import { type ConflictInfo } from "@/lib/conflictDetection";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { IconButton } from "@/components/ui/IconButton";
+import { Badge } from "@/components/ui/Badge";
 import { resolveAppIconName } from "@/lib/symbols";
+import { cn } from "@/lib/utils";
+import { uiMotion } from "@/lib/ui/motion";
 import {
   applyEventStatusToCache,
   type PersonalEvent,
@@ -16,7 +20,14 @@ import {
   getTimeLabel,
   isMultiDay,
 } from "@/hooks/usePersonalEvents";
-import { shiftTypeColor } from "@/lib/schedule";
+import {
+  conflictPresentation,
+  scheduleToneVars,
+  shiftPresentation,
+  statusPresentation,
+  teamPresentation,
+  tonePresentation,
+} from "./schedulePresentation";
 
 interface PersonalEventItemProps {
   event:        PersonalEvent;
@@ -28,14 +39,19 @@ interface PersonalEventItemProps {
 }
 
 function statusBadge(event: PersonalEvent) {
-  if (event.status === "PendingCreate") return { label: "Nieuw", className: "bg-sky-500/10 text-sky-300 border-sky-500/20" };
-  if (event.status === "PendingUpdate") return { label: "Wijziging", className: "bg-violet-500/10 text-violet-300 border-violet-500/20" };
-  if (event.status === "PendingDelete") return { label: "Verwijderen", className: "bg-red-500/10 text-red-300 border-red-500/20" };
-  // Lopende dienst: zelfde "Bezig"-vocabulaire als rooster/focus (audit DEEL 2 #12).
-  if (event.status === "Bezig") return { label: "Bezig", className: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" };
-  if (event.status === "Voorbij") return { label: "Voorbij", className: "bg-slate-500/10 text-slate-500 border-slate-500/15" };
-  if (event.kalender === "Rooster") return { label: "Dienst", className: "bg-indigo-500/10 text-indigo-300 border-indigo-500/20" };
-  return null;
+  const label =
+    event.status === "PendingCreate" ? "Nieuw"
+    : event.status === "PendingUpdate" ? "Wijziging"
+    : event.status === "PendingDelete" ? "Verwijderen"
+    : event.status === "Bezig" ? "Bezig"
+    : event.status === "Voorbij" ? "Voorbij"
+    : event.kalender === "Rooster" ? "Dienst"
+    : null;
+  if (!label) return null;
+  return {
+    label,
+    presentation: statusPresentation(event.kalender === "Rooster" ? "Rooster" : event.status),
+  };
 }
 
 export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictInfo, compact = false }: PersonalEventItemProps) {
@@ -46,7 +62,14 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
   const canEdit = Boolean(onEdit && !isRooster && !isPendingDelete);
   const keyboardEditable = canEdit && compact;
   const badge = statusBadge(event);
-  const shiftColors = isRooster && event.shiftType ? shiftTypeColor(event.shiftType) : null;
+  const shiftColors = isRooster && event.shiftType ? shiftPresentation(event.shiftType) : null;
+  const team = isRooster && event.team ? teamPresentation(event.team) : null;
+  const conflictTone = conflictInfo ? conflictPresentation(conflictInfo.level) : tonePresentation("neutral");
+  const accent = conflictInfo
+    ? conflictTone
+    : isToday
+      ? tonePresentation("accent")
+      : shiftColors ?? tonePresentation("neutral");
   const symbol = resolveAppIconName(event.symbol, isRooster ? "roster" : "agenda");
 
   const { success, error, toast } = useToast();
@@ -92,26 +115,11 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
     if (canEdit) onEdit?.(event);
   };
 
-  // Conflict border color
-  const borderLeft = hasConflict
-    ? conflictInfo.level === "hard"
-      ? "border-l-red-500/60"
-      : conflictInfo.level === "soft"
-        ? "border-l-amber-500/60"
-        : "border-l-sky-500/40"
-    : isToday
-      ? "border-l-emerald-500/40"
-      : isRooster
-        ? shiftColors
-          ? ""
-          : "border-l-slate-600/40"
-        : "border-l-transparent";
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15 }}
+      transition={{ duration: uiMotion.durationSeconds.fast }}
       onClick={handleEdit}
       onKeyDown={(event) => {
         if (!keyboardEditable || (event.key !== "Enter" && event.key !== " ")) return;
@@ -120,23 +128,17 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
       }}
       role={keyboardEditable ? "button" : undefined}
       tabIndex={keyboardEditable ? 0 : undefined}
-      className={`
-        group relative flex items-start rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)]
-        ${compact ? "gap-2 px-2.5 py-2.5" : "gap-3 px-3 py-3"}
-        border-l-2 ${borderLeft}
-        ${isPendingDelete ? "opacity-70" : ""}
-        ${canEdit ? "hover:bg-white/[0.04] cursor-pointer" : "cursor-default"}
-        transition-colors
-      `}
-      style={
-        !hasConflict && !isToday && shiftColors
-          ? { borderLeftColor: shiftColors.accent }
-          : undefined
-      }
+      className={cn(
+        "group relative flex items-start rounded-xl border border-l-2 border-[var(--color-border)] border-l-[var(--schedule-accent)] bg-[var(--color-surface-muted)] transition-[background-color,border-color,opacity] duration-[var(--motion-fast)] ease-[var(--ease-standard)]",
+        compact ? "gap-2 px-2.5 py-2.5" : "gap-3 px-3 py-3",
+        isPendingDelete && "opacity-70",
+        canEdit ? "cursor-pointer hover:bg-[var(--color-surface-hover)]" : "cursor-default",
+      )}
+      style={scheduleToneVars(accent.tone)}
     >
       <AppIcon
         name={symbol}
-        tone={hasConflict ? "amber" : isRooster ? "indigo" : "cyan"}
+        tone={hasConflict ? conflictTone.tone : isToday ? "accent" : "info"}
         size="sm"
         framed
         active={isToday}
@@ -147,71 +149,60 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
       <div className="min-w-0 flex-1">
         {/* Title + Time row */}
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {isRooster && event.team && (
-            <span className="text-[9px] font-black px-1.5 py-0.5 rounded border bg-indigo-500/10 text-indigo-300 border-indigo-500/20 shrink-0 uppercase tracking-wider">
+          {isRooster && event.team && team && (
+            <Badge tone={team.tone} size="sm" className="shrink-0 uppercase tracking-wider">
               {event.team}
-            </span>
+            </Badge>
           )}
-          <p className={`min-w-0 flex-1 break-words font-semibold text-slate-200 sm:truncate ${compact ? "text-xs leading-4" : "text-[13px] leading-5"}`}>
+          <p className={`min-w-0 flex-1 break-words font-semibold text-[var(--color-text)] sm:truncate ${compact ? "text-xs leading-4" : "text-[13px] leading-5"}`}>
             {event.titel}
           </p>
           {badge && (
-            <span className={`hidden sm:inline-flex shrink-0 rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${badge.className}`}>
+            <Badge tone={badge.presentation.tone} size="sm" className="hidden shrink-0 uppercase tracking-wider sm:inline-flex">
               {badge.label}
-            </span>
+            </Badge>
           )}
-          {isRooster && event.shiftType && (
-            <span
-              className="text-[9px] font-black px-1.5 py-0.5 rounded border shrink-0 uppercase tracking-widest"
-              style={{
-                background: shiftColors ? shiftColors.accent + "15" : "rgba(255,255,255,0.05)",
-                color: shiftColors ? shiftColors.accent : "#94a3b8",
-                borderColor: shiftColors ? shiftColors.accent + "30" : "rgba(255,255,255,0.1)",
-              }}
-            >
+          {isRooster && event.shiftType && shiftColors && (
+            <Badge tone={shiftColors.tone} size="sm" className="shrink-0 uppercase tracking-widest">
               {event.shiftType}
-            </span>
+            </Badge>
           )}
         </div>
 
         {/* Meta row — location, multi-day, conflict */}
         <div className={`mt-1 flex flex-wrap items-center ${compact ? "gap-x-2 gap-y-1" : "gap-2"}`}>
-          <span className="flex items-center gap-1 text-[10px] text-slate-500">
-            <Clock size={9} className="text-slate-600" />
+          <span className="flex items-center gap-1 text-micro text-[var(--color-text-muted)]">
+            <Clock size={9} className="text-[var(--color-text-subtle)]" />
             {getTimeLabel(event)}
           </span>
 
-          <span className="flex items-center gap-1 text-[10px] text-slate-600">
+          <span className="flex items-center gap-1 text-micro text-[var(--color-text-subtle)]">
             <CalendarDays size={9} />
             {formatDateRange(event)}
           </span>
 
           {multiDay && (
-            <span className="flex items-center gap-1 text-[10px] text-slate-600">
+            <span className="flex items-center gap-1 text-micro text-[var(--color-text-subtle)]">
               <CalendarDays size={9} />
               meerdaags
             </span>
           )}
 
           {event.locatie && (
-            <span className="flex min-w-0 max-w-full items-center gap-1 truncate text-[10px] text-slate-500 sm:max-w-[220px]">
+            <span className="flex min-w-0 max-w-full items-center gap-1 truncate text-micro text-[var(--color-text-muted)] sm:max-w-[220px]">
               <MapPin size={9} className="shrink-0" />
               {event.locatie}
             </span>
           )}
 
           {badge && (
-            <span className={`inline-flex sm:hidden rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${badge.className}`}>
+            <Badge tone={badge.presentation.tone} size="sm" className="uppercase tracking-wider sm:hidden">
               {badge.label}
-            </span>
+            </Badge>
           )}
 
           {conflictInfo && (
-            <span className={`flex items-center gap-1 text-[10px] font-medium ${
-              conflictInfo.level === "hard" ? "text-red-400"
-              : conflictInfo.level === "soft" ? "text-amber-400"
-              : "text-sky-400"
-            }`}>
+            <span className={cn("flex items-center gap-1 text-micro font-medium", conflictTone.text)}>
               <AlertTriangle size={9} />
               {conflictInfo.message}
             </span>
@@ -228,7 +219,7 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
           <AnimatePresence mode="wait">
             {isDeleting ? (
               <motion.div key="loader" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <Loader2 size={14} className="animate-spin text-slate-500" />
+                <Loader2 size={14} className="animate-spin text-[var(--color-text-muted)] motion-reduce:animate-none" />
               </motion.div>
             ) : confirmDelete ? (
               <motion.div
@@ -236,36 +227,52 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                className="flex items-center gap-0.5 bg-red-950/50 border border-red-500/20 rounded-md px-1.5 py-0.5"
+                className="flex items-center gap-0.5 bg-[var(--color-danger-subtle)] border border-[var(--color-danger-border)] rounded-md px-1.5 py-0.5"
               >
-                <span className="text-[10px] text-red-400 font-medium mr-0.5">Verwijderen?</span>
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(); }} aria-label="Verwijderen bevestigen" className="flex h-9 w-9 items-center justify-center rounded hover:bg-red-500/20 text-red-500 cursor-pointer">
-                  <Check size={14} />
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }} aria-label="Verwijderen annuleren" className="flex h-9 w-9 items-center justify-center rounded hover:bg-slate-700/50 text-slate-400 cursor-pointer">
-                  <X size={14} />
-                </button>
+                <span className="text-micro text-[var(--color-danger)] font-medium mr-0.5">Verwijderen?</span>
+                <IconButton
+                  label="Verwijderen bevestigen"
+                  variant="danger"
+                  icon={<Check size={14} />}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDelete();
+                  }}
+                />
+                <IconButton
+                  label="Verwijderen annuleren"
+                  variant="secondary"
+                  icon={<X size={14} />}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setConfirmDelete(false);
+                  }}
+                />
               </motion.div>
             ) : (
               <>
                 {onEdit && !isPendingDelete && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onEdit(event); }}
-                    className={`${compact ? "h-8 w-8" : "h-9 w-9"} flex items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-white/[0.06] hover:text-indigo-400`}
-                    aria-label="Afspraak wijzigen"
+                  <IconButton
+                    label="Afspraak wijzigen"
                     title="Wijzigen"
-                  >
-                    <Pencil size={13} />
-                  </button>
+                    icon={<Pencil size={13} />}
+                    onClick={(clickEvent) => {
+                      clickEvent.stopPropagation();
+                      onEdit(event);
+                    }}
+                    className="hover:text-[var(--color-info)]"
+                  />
                 )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-                  className={`${compact ? "h-8 w-8" : "h-9 w-9"} flex items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-red-500/10 hover:text-red-400`}
-                  aria-label="Afspraak verwijderen"
+                <IconButton
+                  label="Afspraak verwijderen"
                   title="Verwijderen"
-                >
-                  <Trash2 size={13} />
-                </button>
+                  variant="danger"
+                  icon={<Trash2 size={13} />}
+                  onClick={(clickEvent) => {
+                    clickEvent.stopPropagation();
+                    handleDelete();
+                  }}
+                />
               </>
             )}
           </AnimatePresence>
@@ -273,7 +280,7 @@ export function PersonalEventItem({ event, isToday, onEdit, onRefetch, conflictI
       )}
 
       {isToday && !hasConflict && !isRooster && (
-        <span className="absolute right-2 bottom-1 hidden text-[8px] font-bold uppercase tracking-wider text-emerald-500/50 sm:inline">
+        <span className="absolute right-2 bottom-1 hidden text-micro font-bold uppercase tracking-wider text-[var(--color-primary-hover)] sm:inline">
           vandaag
         </span>
       )}

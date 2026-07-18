@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { RefreshCw, WifiOff } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { reportClientError } from "@/lib/observability/client-events";
 import { decideControllerChange } from "@/lib/pwa-update";
+import { cn } from "@/lib/utils";
 
 export function PwaRegistry() {
   const [isOffline, setIsOffline] = useState(false);
@@ -84,7 +86,7 @@ export function PwaRegistry() {
   }, []);
 
   return (
-    <div className="pointer-events-none fixed inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top,0px))] z-[100] flex flex-col items-center gap-2">
+    <div className="pointer-events-none fixed inset-x-3 top-[calc(0.75rem+env(safe-area-inset-top,0px))] z-[var(--layer-status)] flex flex-col items-center gap-2">
       <AnimatePresence>
         {isOffline ? (
           <motion.div
@@ -93,7 +95,7 @@ export function PwaRegistry() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             role="status"
-            className="pointer-events-auto flex min-h-11 items-center gap-2 rounded-full border border-rose-500/30 bg-rose-950/95 px-4 text-sm font-semibold text-rose-100 shadow-lg backdrop-blur-md"
+            className={cn(surfaceVariants({ tone: "danger", radius: "lg", padding: "sm" }), "pointer-events-auto flex min-h-11 items-center gap-2 rounded-full text-sm font-semibold backdrop-blur-md")}
           >
             <WifiOff size={16} aria-hidden="true" />
             <span>Offline modus actief</span>
@@ -106,9 +108,9 @@ export function PwaRegistry() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             role="status"
-            className="pointer-events-auto flex min-h-11 max-w-md items-center gap-3 rounded-2xl border border-amber-400/25 bg-amber-950/95 px-3 py-2 text-sm text-amber-50 shadow-lg backdrop-blur-md"
+            className={cn(surfaceVariants({ tone: "accent", radius: "lg", padding: "sm" }), "pointer-events-auto flex min-h-11 max-w-md items-center gap-3 text-sm backdrop-blur-md")}
           >
-            <RefreshCw size={16} className="shrink-0 text-amber-300" aria-hidden="true" />
+            <RefreshCw size={16} className="shrink-0 text-[var(--color-primary-hover)]" aria-hidden="true" />
             <span className="min-w-0 flex-1">Nieuwe versie gereed</span>
             <Button size="sm" variant="primary" onClick={() => window.location.reload()}>
               Nu herladen

@@ -1,12 +1,13 @@
 "use client";
 
-import { useId } from "react";
+import { useId, type RefObject } from "react";
 import { X } from "lucide-react";
 import { useSwipe } from "@/hooks/useSwipe";
+import { IconButton } from "@/components/ui/IconButton";
 import { OverlaySurface } from "@/components/ui/OverlaySurface";
 import { cn } from "@/lib/utils";
 
-interface BottomSheetProps {
+export interface BottomSheetProps {
   open: boolean;
   onClose: () => void;
   title?: string;
@@ -14,6 +15,7 @@ interface BottomSheetProps {
   closeLabel?: string;
   className?: string;
   contentClassName?: string;
+  initialFocusRef?: RefObject<HTMLElement | null>;
   children: React.ReactNode;
 }
 
@@ -25,6 +27,7 @@ export function BottomSheet({
   closeLabel = "Paneel sluiten",
   className,
   contentClassName,
+  initialFocusRef,
   children,
 }: BottomSheetProps) {
   const titleId = useId();
@@ -41,8 +44,9 @@ export function BottomSheet({
       maxWidth="lg"
       ariaLabel={title ? undefined : ariaLabel}
       ariaLabelledBy={title ? titleId : undefined}
+      initialFocusRef={initialFocusRef}
       className={cn(
-        "max-h-[min(88dvh,720px)] border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[0_-24px_70px_rgba(0,0,0,0.45)] sm:rounded-t-2xl",
+        "border-t border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-overlay)] sm:rounded-t-2xl",
         className,
       )}
     >
@@ -53,24 +57,22 @@ export function BottomSheet({
         onTouchCancel={onTouchCancel}
       >
         <div className="flex justify-center pb-2 pt-3" aria-hidden="true">
-          <div className="h-1 w-10 rounded-full bg-white/20" />
+          <div className="h-1 w-10 rounded-full bg-[var(--color-border-strong)]" />
         </div>
         <div className="flex min-h-12 items-center justify-between gap-3 border-b border-[var(--color-border)] px-5 pb-3">
           {title ? (
-            <h2 id={titleId} className="min-w-0 truncate text-base font-semibold text-white">
+            <h2 id={titleId} className="min-w-0 truncate text-base font-semibold text-[var(--color-text)]">
               {title}
             </h2>
           ) : (
             <span className="sr-only">{ariaLabel}</span>
           )}
-          <button
-            type="button"
+          <IconButton
+            icon={<X size={18} />}
+            label={closeLabel}
             onClick={onClose}
-            aria-label={closeLabel}
-            className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--color-surface-hover)] text-slate-400 transition-colors hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
+            className="-mr-1"
+          />
         </div>
       </div>
 

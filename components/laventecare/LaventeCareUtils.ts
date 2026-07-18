@@ -1,4 +1,5 @@
 import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES, type Tone } from "./LaventeCareTypes";
+import { uiToneClasses } from "@/lib/ui/tones";
 import {
   encodeLaventeCarePdfDossierContext,
   getLaventeCarePdfDossierReferenceFromLink,
@@ -6,44 +7,7 @@ import {
   type LaventeCarePdfDossierLink,
 } from "@/lib/laventecare/pdf/context";
 
-export const toneClasses: Record<Tone, { border: string; surface: string; text: string; icon: string }> = {
-  amber: {
-    border: "border-amber-500/25",
-    surface: "bg-amber-500/10",
-    text: "text-amber-200",
-    icon: "text-amber-300",
-  },
-  emerald: {
-    border: "border-emerald-500/25",
-    surface: "bg-emerald-500/10",
-    text: "text-emerald-200",
-    icon: "text-emerald-300",
-  },
-  sky: {
-    border: "border-sky-500/25",
-    surface: "bg-sky-500/10",
-    text: "text-sky-200",
-    icon: "text-sky-300",
-  },
-  rose: {
-    border: "border-rose-500/25",
-    surface: "bg-rose-500/10",
-    text: "text-rose-200",
-    icon: "text-rose-300",
-  },
-  violet: {
-    border: "border-violet-500/25",
-    surface: "bg-violet-500/10",
-    text: "text-violet-200",
-    icon: "text-violet-300",
-  },
-  slate: {
-    border: "border-[var(--color-border)]",
-    surface: "bg-[var(--color-surface)]",
-    text: "text-slate-200",
-    icon: "text-slate-300",
-  },
-};
+export const toneClasses = uiToneClasses;
 
 export const optional = (value: string) => {
   const trimmed = value.trim();
@@ -101,10 +65,10 @@ export function projectStatusLabel(value?: string) {
 }
 
 export function fitTone(score?: number): Tone {
-  if (typeof score !== "number") return "slate";
-  if (score >= 75) return "emerald";
-  if (score >= 55) return "amber";
-  return "rose";
+  if (typeof score !== "number") return "neutral";
+  if (score >= 75) return "success";
+  if (score >= 55) return "warning";
+  return "danger";
 }
 
 // ─── Vervaldatum/overdue-helpers (N9) ────────────────────────────────────────

@@ -235,13 +235,6 @@ export function getThisWeek(diensten: DienstRow[]): DienstRow[] {
   return getUpcoming(diensten, 7);
 }
 
-export function shiftTypeColor(type: string): { bg: string; text: string; accent: string } {
-  switch (type) {
-    case "Vroeg":  return { bg: "bg-orange-900/30", text: "text-orange-300", accent: "#f97316" };
-    case "Laat":   return { bg: "bg-red-900/30",    text: "text-red-300",    accent: "#ef4444" };
-    default:       return { bg: "bg-blue-900/30",   text: "text-blue-300",   accent: "#3b82f6" };
-  }
-}
 
 export function formatDienst(d: DienstRow): string {
   return `${d.dag} ${d.startDatum.slice(8)} ${d.startDatum.slice(5, 7)} · ${d.startTijd}–${d.eindTijd}`;

@@ -82,8 +82,8 @@ export function activeFilterCount(filters: TransactionFilter) {
 }
 
 export function getDeltaTone(value: number | null | undefined) {
-  if (typeof value !== "number") return "slate" as const;
-  return value >= 0 ? "green" as const : "rose" as const;
+  if (typeof value !== "number") return "neutral" as const;
+  return value >= 0 ? "success" as const : "danger" as const;
 }
 
 export const DEFAULT_FILTERS: TransactionFilter = {

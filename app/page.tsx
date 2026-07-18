@@ -21,6 +21,8 @@ import {
 import { BridgeStatusNotice } from "@/components/lamp/BridgeStatusNotice";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { AppPageShell } from "@/components/layout/AppPageShell";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import { getLightingSummary } from "@/lib/lighting";
 import { calculateScheduleSalaryForecast } from "@/lib/salaryForecast";
 
@@ -167,7 +169,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="text-slate-100">
+    <div className="text-[var(--color-text)]">
       <DashboardHeader
         greeting={dateInfo?.greeting ?? "Welkom"}
         today={dateInfo?.todayLabel ?? "vandaag"}
@@ -182,29 +184,33 @@ export default function DashboardPage() {
 
       <AppPageShell width="standard" className="app-page-shell--after-topbar space-y-4">
         {hasLoadingData && (
-          <div className="flex min-h-9 items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-[var(--color-text-muted)]">
-            <AppIcon name="activity" tone="blue" size="xs" />
+          <Surface tone="info" radius="md" padding="xs" className="flex min-h-11 items-center gap-2 text-xs text-[var(--color-text-muted)]">
+            <AppIcon name="activity" tone="info" size="xs" />
             Gegevens worden bijgewerkt
-          </div>
+          </Surface>
         )}
 
         {hasFailedData && !hasLoadingData && (
-          <div
+          <Surface
             role="alert"
-            className="flex min-h-10 items-center justify-between gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200"
+            tone="danger"
+            radius="md"
+            padding="xs"
+            className="flex min-h-11 items-center justify-between gap-2 text-xs text-[var(--color-danger)]"
           >
             <span className="flex min-w-0 items-center gap-2">
-              <AppIcon name="warning" tone="rose" size="xs" />
+              <AppIcon name="warning" tone="danger" size="xs" />
               <span className="truncate">Sommige gegevens konden niet worden bijgewerkt</span>
             </span>
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant="danger"
               onClick={retryFailedSources}
-              className="min-h-9 shrink-0 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 font-semibold text-rose-100 transition-colors hover:bg-rose-500/20"
+              className="shrink-0"
             >
               Opnieuw
-            </button>
-          </div>
+            </Button>
+          </Surface>
         )}
 
         <BridgeStatusNotice

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import Link from "next/link";
 import {
   ArrowRight,
   CalendarClock,
@@ -13,12 +12,10 @@ import {
   Home,
   KeyRound,
   Lightbulb,
-  Loader2,
   Lock,
   Mail,
   RefreshCw,
   Server,
-  Settings,
   ShieldCheck,
   Smartphone,
   StickyNote,
@@ -29,6 +26,12 @@ import { useDevices } from "@/hooks/useDevices";
 import { useRooms, useDeleteRoom } from "@/hooks/useRooms";
 import { usePrivacy, privacyQueryKey, clearPrivacyOverride, notifyPrivacyChange } from "@/hooks/usePrivacy";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { ResponsiveActions } from "@/components/ui/ResponsiveActions";
 import { useToast } from "@/components/ui/Toast";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
@@ -37,7 +40,6 @@ import { AddDeviceForm } from "@/components/settings/AddDeviceForm";
 import { AddRoomForm } from "@/components/settings/AddRoomForm";
 import { RoomRow } from "@/components/settings/RoomRow";
 import { type Room, privacyApi, settingsApi, syncApi } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -50,7 +52,8 @@ import {
   type SyncTarget,
   type TelegramStatusResult,
 } from "@/components/settings/SettingsUtils";
-import { EmptyState, MetricCard, Panel, RouteTile, SectionHeader, StatusRow } from "@/components/settings/SettingsCards";
+import { EmptyState, MetricCard, RouteTile, SectionHeader, StatusRow } from "@/components/settings/SettingsCards";
+import { Surface } from "@/components/ui/Surface";
 import { SettingsRuntime, SettingsPendingActions, SettingsBridge } from "@/components/settings/SettingsRuntime";
 import { SettingsIntegrations } from "@/components/settings/SettingsIntegrations";
 import { SettingsSync } from "@/components/settings/SettingsSync";
@@ -372,67 +375,62 @@ export default function SettingsPage() {
   // (cached) overview at all — stale data beats a hard error screen.
   if (overviewFailed && !overview) {
     return (
-      <AppPageShell width="narrow" className="py-12 text-slate-100">
-        <div className="mx-auto max-w-lg rounded-lg border border-rose-500/20 bg-rose-500/[0.06] p-6 text-center">
-          <TriangleAlert size={34} className="mx-auto text-rose-300" />
-          <h1 className="mt-4 text-xl font-bold text-white">Instellingen laden mislukt</h1>
-          <p className="mt-2 text-sm text-slate-500">
-            De systeemstatus kon niet worden opgehaald. Controleer je verbinding en probeer het opnieuw.
-          </p>
-          <button
-            type="button"
-            onClick={() => refetchOverview()}
-            className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-4 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/[0.06]"
-          >
-            <RefreshCw size={15} />
-            Opnieuw proberen
-          </button>
-        </div>
+      <AppPageShell width="narrow" className="py-12">
+        <FeedbackState
+          tone="error"
+          title="Instellingen laden mislukt"
+          description="De systeemstatus kon niet worden opgehaald. Controleer je verbinding en probeer het opnieuw."
+          icon={TriangleAlert}
+          action={
+            <Button variant="secondary" onClick={() => refetchOverview()} className="mt-5">
+              <RefreshCw size={15} aria-hidden="true" />
+              Opnieuw proberen
+            </Button>
+          }
+        />
       </AppPageShell>
     );
   }
 
   return (
-    <AppPageShell width="standard" className="space-y-5 text-slate-100">
+    <AppPageShell width="standard" className="space-y-5">
       <AppPageHeader
         eyebrow="Systeem"
         title="Instellingen"
         description="Beheer je account, privacy, integraties en gekoppelde apparaten."
-        leading={
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10">
-            <Settings size={19} className="text-amber-300" aria-hidden="true" />
-          </div>
-        }
+        leading={<AppIcon name="settings" tone="accent" size="lg" framed active />}
         actions={
-          <>
-            <button
-              type="button"
-              onClick={togglePrivacy}
-              disabled={isPrivacyUnknown}
-              title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Details tonen" : "Details verbergen"}
-              aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Details tonen" : "Details verbergen"}
-              aria-pressed={privacyOn}
-              aria-busy={isPrivacyUnknown}
-              className={cn(
-                "inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
-                privacyOn
-                  ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
-              )}
-            >
-              {isPrivacyUnknown ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-              <span className="hidden sm:inline">{isPrivacyUnknown ? "Laden" : privacyOn ? "Verborgen" : "Zichtbaar"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleAllSync}
-              disabled={syncing !== null}
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCw size={16} className={syncing === "all" ? "animate-spin" : ""} aria-hidden="true" />
-              <span className="hidden sm:inline">Synchroniseren</span>
-            </button>
-          </>
+          <ResponsiveActions
+            menuLabel="Instellingenacties"
+            primary={
+              <Button
+                variant="primary"
+                onClick={handleAllSync}
+                disabled={syncing !== null && syncing !== "all"}
+                loading={syncing === "all"}
+                loadingLabel="Synchroniseren…"
+              >
+                <RefreshCw size={16} aria-hidden="true" />
+                <span className="hidden sm:inline">Synchroniseren</span>
+              </Button>
+            }
+            secondary={
+              <Button
+                onClick={togglePrivacy}
+                disabled={isPrivacyUnknown}
+                loading={isPrivacyUnknown}
+                loadingLabel="Laden"
+                title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Details tonen" : "Details verbergen"}
+                aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Details tonen" : "Details verbergen"}
+                aria-pressed={privacyOn}
+                variant={privacyOn ? "warning" : "secondary"}
+                className="w-full justify-start sm:w-auto sm:justify-center"
+              >
+                {privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                <span>{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
+              </Button>
+            }
+          />
         }
       />
 
@@ -445,34 +443,31 @@ export default function SettingsPage() {
             localApiHost={localApiHost}
           />
 
-          <Panel>
+          <Surface radius="sm">
             <SectionHeader icon={Lock} label="Toegang" title="Account en privacy" sub={userLoaded ? "actief" : "laden"} />
             <div className="space-y-3">
-              <StatusRow icon={ShieldCheck} label="Gebruiker" value={privacyOn ? "Afgeschermd" : accountName} tone="green" />
-              <StatusRow icon={KeyRound} label="Clerk" value={privacyOn ? mask(accountEmail) : accountEmail} tone="indigo" />
-              <button
-                type="button"
+              <StatusRow icon={ShieldCheck} label="Gebruiker" value={privacyOn ? "Afgeschermd" : accountName} tone="success" />
+              <StatusRow icon={KeyRound} label="Clerk" value={privacyOn ? mask(accountEmail) : accountEmail} tone="info" />
+              <Button
+                variant={privacyOn ? "primary" : "secondary"}
+                fullWidth
                 onClick={togglePrivacy}
                 disabled={isPrivacyUnknown}
+                loading={isPrivacyUnknown}
+                loadingLabel="Privacy laden"
                 aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Accountdetails tonen" : "Accountdetails verbergen"}
                 aria-pressed={privacyOn}
-                aria-busy={isPrivacyUnknown}
                 title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Accountdetails tonen" : "Accountdetails verbergen"}
-                className={cn(
-                  "flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-3 text-left transition-colors disabled:cursor-wait disabled:opacity-60",
-                  privacyOn
-                    ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-100"
-                    : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]"
-                )}
+                className="justify-between py-3"
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  {isPrivacyUnknown ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-                  <span className="text-sm font-semibold">{isPrivacyUnknown ? "Privacy laden" : privacyOn ? "Privacy aan" : "Privacy uit"}</span>
+                  {privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                  <span>{privacyOn ? "Privacy aan" : "Privacy uit"}</span>
                 </span>
-                <ArrowRight size={15} className="shrink-0 text-slate-500" />
-              </button>
+                <ArrowRight size={15} className="shrink-0 text-[var(--color-text-muted)]" />
+              </Button>
             </div>
-          </Panel>
+          </Surface>
         </section>
 
         <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -481,28 +476,28 @@ export default function SettingsPage() {
             label="Rooster"
             value={`${overview?.schedule.upcoming ?? 0}`}
             meta={`${overview?.schedule.total ?? 0} diensten - ${formatDateTime(overview?.schedule.importedAt)}`}
-            tone="sky"
+            tone="info"
           />
           <MetricCard
             icon={Mail}
             label="Gmail"
             value={`${overview?.email.unread ?? 0}`}
             meta={`${overview?.email.total ?? 0} emails - ${formatDateTime(overview?.email.lastFullSync)}`}
-            tone={(overview?.email.unread ?? 0) > 0 ? "amber" : "green"}
+            tone={(overview?.email.unread ?? 0) > 0 ? "accent" : "success"}
           />
           <MetricCard
             icon={StickyNote}
             label="Persoonlijke data"
             value={`${(overview?.data.notes ?? 0) + (overview?.data.activeHabits ?? 0)}`}
             meta={`${overview?.data.notes ?? 0} notities - ${overview?.data.activeHabits ?? 0} actieve habits`}
-            tone="indigo"
+            tone="info"
           />
           <MetricCard
             icon={Home}
             label="Kamers"
             value={`${overviewRooms.total}`}
             meta={`${overviewRooms.unassignedDevices} lampen zonder kamer`}
-            tone={overviewRooms.unassignedDevices > 0 ? "amber" : "slate"}
+            tone={overviewRooms.unassignedDevices > 0 ? "warning" : "neutral"}
           />
         </section>
 
@@ -517,15 +512,15 @@ export default function SettingsPage() {
           />
 
           <div className="space-y-6">
-            <Panel>
+            <Surface radius="sm">
               <SectionHeader icon={Server} label="Endpoints" title="Runtime" sub={localApiHost} />
               <div className="space-y-3">
-                <StatusRow icon={Cloud} label="Render API" value={localApiHost} tone="green" />
+                <StatusRow icon={Cloud} label="Render API" value={localApiHost} tone="success" />
                 <StatusRow
                   icon={Server}
                   label="Legacy secret"
                   value={overview?.integrations.legacyHttpSecret ? "Ingesteld" : "Niet actief"}
-                  tone={overview?.integrations.legacyHttpSecret ? "sky" : "slate"}
+                  tone={overview?.integrations.legacyHttpSecret ? "info" : "neutral"}
                 />
                 <StatusRow
                   icon={Smartphone}
@@ -537,10 +532,10 @@ export default function SettingsPage() {
                         : "Geen recente heartbeat"
                       : "Direct LAN"
                   }
-                  tone={bridgeQueueActive ? (overview?.integrations.localBridge ? "green" : "rose") : "slate"}
+                  tone={bridgeQueueActive ? (overview?.integrations.localBridge ? "success" : "danger") : "neutral"}
                 />
               </div>
-            </Panel>
+            </Surface>
 
             <SettingsBridge overview={overview} />
           </div>
@@ -559,31 +554,28 @@ export default function SettingsPage() {
           title="Apparaat & Kamerbeheer"
           subtitle={`${devices.length} lampen en ${rooms.length} kamers`}
           icon={<Lightbulb size={18} />}
-          theme="sky"
+          tone="info"
           defaultOpen={false}
         >
           <div className="grid gap-6 xl:grid-cols-2">
             <ErrorBoundary>
-              <Panel>
+              <Surface radius="sm">
                 <SectionHeader
                   icon={Lightbulb}
                   label="Smart home"
                   title="Lampen beheren"
                   sub={devicesLoading ? "laden" : plural(devices.length, "lamp", "lampen")}
                   action={
-                    <Link
-                      href="/lampen"
-                      className="inline-flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
-                    >
+                    <ButtonLink href="/lampen" variant="secondary" size="sm">
                       Openen
-                      <ArrowRight size={14} />
-                    </Link>
+                      <ArrowRight size={14} aria-hidden="true" />
+                    </ButtonLink>
                   }
                 />
                 <div className="mt-4 space-y-2">
                   {devicesLoading ? (
                     Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} className="h-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
+                      <Skeleton key={index} className="h-16" />
                     ))
                   ) : devices.length > 0 ? (
                     devices.map((device) => <DeviceRow key={device.id} device={device} rooms={rooms} />)
@@ -596,11 +588,11 @@ export default function SettingsPage() {
                       a structural no-op, since there is no real discovery
                       endpoint. Re-add a panel here once the backend can scan. */}
                 </div>
-              </Panel>
+              </Surface>
             </ErrorBoundary>
 
             <ErrorBoundary>
-              <Panel>
+              <Surface radius="sm">
                 <SectionHeader
                   icon={Home}
                   label="Indeling"
@@ -610,7 +602,7 @@ export default function SettingsPage() {
                 <div className="mt-4 space-y-2">
                   {roomsLoading ? (
                     Array.from({ length: 3 }).map((_, index) => (
-                      <div key={index} className="h-16 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" />
+                      <Skeleton key={index} className="h-16" />
                     ))
                   ) : roomRows.length > 0 ? (
                     roomRows.map(({ room, devices: roomDevices }) => (
@@ -627,7 +619,7 @@ export default function SettingsPage() {
                   )}
                   <AddRoomForm />
                 </div>
-              </Panel>
+              </Surface>
             </ErrorBoundary>
           </div>
         </CollapsibleSection>
@@ -636,7 +628,7 @@ export default function SettingsPage() {
           title="Integraties & Systeem"
           subtitle="Telegram, Sync en Navigatie"
           icon={<Server size={18} />}
-          theme="violet"
+          tone="info"
           defaultOpen={false}
         >
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -651,14 +643,14 @@ export default function SettingsPage() {
               syncMap={syncMap}
             />
 
-            <Panel>
+            <Surface radius="sm">
               <SectionHeader icon={ArrowRight} label="Navigatie" title="Werkgebieden" />
               <div className="mt-4 space-y-2">
                 {routeTiles.map((tile) => (
                   <RouteTile key={tile.href} {...tile} />
                 ))}
               </div>
-            </Panel>
+            </Surface>
           </div>
         </CollapsibleSection>
 
@@ -666,66 +658,62 @@ export default function SettingsPage() {
           title="Privacy & Beveiliging"
           subtitle="Privacy center en Backups"
           icon={<ShieldCheck size={18} />}
-          theme="rose"
+          tone="danger"
           defaultOpen={false}
         >
-          <Panel>
+          <Surface radius="sm">
               <SectionHeader icon={ShieldCheck} label="Privacy" title="Privacy center" sub="centrale voorkeuren" />
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                 {(["finance", "habits", "notes", "email", "account"] as const satisfies readonly PrivacyScope[]).map((scope) => (
-                  <button
+                  <Button
                     key={scope}
-                    type="button"
                     onClick={() => togglePrivacyScope(scope)}
                     disabled={!privacySettings || isPrivacyUnknown}
                     aria-busy={!privacySettings || isPrivacyUnknown}
                     aria-pressed={privacySettings?.[scope] ?? false}
                     aria-label={!privacySettings || isPrivacyUnknown ? `${PRIVACY_SCOPE_LABELS[scope]} privacyvoorkeur wordt geladen` : `${PRIVACY_SCOPE_LABELS[scope]}: ${privacySettings[scope] ? "maskering uitzetten" : "maskering aanzetten"}`}
                     title={!privacySettings || isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : `${PRIVACY_SCOPE_LABELS[scope]}: ${privacySettings[scope] ? "maskering uitzetten" : "maskering aanzetten"}`}
-                    className={cn(
-                      "rounded-lg border px-3 py-3 text-left transition-colors disabled:opacity-50 disabled:cursor-not-allowed",
-                      privacySettings?.[scope] ?? false
-                        ? "border-indigo-500/25 bg-indigo-500/10 text-indigo-100"
-                        : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]",
-                    )}
+                    variant={privacySettings?.[scope] ? "primary" : "secondary"}
+                    fullWidth
+                    className="h-auto flex-col items-start py-3 text-left"
                   >
                     <span className="block text-xs font-bold uppercase">{PRIVACY_SCOPE_LABELS[scope]}</span>
-                    <span className="mt-1 block text-sm font-semibold">
+                    <span className="block text-sm font-semibold">
                       {!privacySettings || isPrivacyUnknown ? "Laden" : privacySettings[scope] ? "Maskeren" : "Zichtbaar"}
                     </span>
-                  </button>
+                  </Button>
 
                 ))}
               </div>
-              <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-sm font-bold text-white">Backup/export</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
+              <Surface tone="subtle" radius="sm" padding="md" className="mt-4">
+                <p className="text-sm font-bold text-[var(--color-text)]">Backup/export</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
                   Exporteert je eigen data als JSON: kamers, lampen, automations, rooster, notities, habits en finance.
                 </p>
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
                   onClick={handleBackupExport}
-                  disabled={backupRequested}
-
-                  className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50"
+                  loading={backupRequested}
+                  loadingLabel="Exporteren…"
+                  className="mt-3"
                 >
-                  {backupRequested ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                  <Download size={15} />
                   JSON export
-                </button>
-              </div>
-          </Panel>
+                </Button>
+              </Surface>
+          </Surface>
         </CollapsibleSection>
 
         {telegramNeedsAttention ? (
-          <div className="flex items-start gap-3 rounded-lg border border-rose-500/20 bg-rose-500/10 p-4">
-            <TriangleAlert size={18} className="mt-0.5 shrink-0 text-rose-300" />
+          <Surface tone="danger" radius="sm" padding="md" className="flex items-start gap-3" role="alert">
+            <TriangleAlert size={18} className="mt-0.5 shrink-0 text-[var(--color-danger)]" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-rose-200">Telegram is niet volledig dichtgezet</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">
+              <p className="text-sm font-semibold text-[var(--color-danger)]">Telegram is niet volledig dichtgezet</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
                 Zet owner chat id en START_BACKGROUND_ENGINE=true in de Go API env voordat Telegram/Grok write-flows actief blijven.
               </p>
             </div>
-          </div>
+          </Surface>
         ) : null}
       </div>
     </AppPageShell>

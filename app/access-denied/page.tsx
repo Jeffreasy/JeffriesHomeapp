@@ -1,8 +1,10 @@
 "use client";
 
 import { SignOutButton, useAuth } from "@clerk/nextjs";
-import { ArrowRight, Loader2, LogOut, ShieldX } from "lucide-react";
-import Link from "next/link";
+import { ArrowRight, LogOut, ShieldX } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { Surface } from "@/components/ui/Surface";
 
 export default function AccessDeniedPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -14,21 +16,29 @@ export default function AccessDeniedPage() {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(244,63,94,0.12),transparent_42%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,var(--color-danger-subtle),transparent_42%)]"
       />
 
-      <section
+      <Surface
         aria-labelledby="access-denied-title"
-        className="relative w-full max-w-md rounded-3xl border border-rose-500/20 bg-[var(--color-surface)] p-6 text-center shadow-2xl sm:p-8"
+        tone="danger"
+        radius="lg"
+        padding="lg"
+        className="relative w-full max-w-md text-center"
       >
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-rose-500/25 bg-rose-500/10 text-rose-300">
+        <Surface
+          tone="danger"
+          radius="lg"
+          padding="none"
+          className="mx-auto flex h-14 w-14 items-center justify-center text-[var(--color-danger)]"
+        >
           <ShieldX size={25} aria-hidden="true" />
-        </div>
+        </Surface>
 
-        <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.18em] text-rose-300/80">
+        <p className="mt-5 text-micro font-bold uppercase tracking-[0.18em] text-[var(--color-danger)]">
           Toegang beveiligd
         </p>
-        <h1 id="access-denied-title" className="mt-2 text-xl font-bold text-white">
+        <h1 id="access-denied-title" className="mt-2 text-xl font-bold text-[var(--color-text)]">
           Dit account heeft geen toegang
         </h1>
         <p className="mt-3 text-sm leading-6 text-[var(--color-text-muted)]">
@@ -38,36 +48,22 @@ export default function AccessDeniedPage() {
 
         <div className="mt-6">
           {!isLoaded ? (
-            <button
-              type="button"
-              disabled
-              aria-busy="true"
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-hover)] px-4 text-sm font-semibold text-[var(--color-text-muted)]"
-            >
-              <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-              Account controleren
-            </button>
+            <Button fullWidth loading loadingLabel="Account controleren" disabled />
           ) : isSignedIn ? (
             <SignOutButton redirectUrl="/sign-in">
-              <button
-                type="button"
-                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-bold text-amber-200 transition-colors hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-              >
+              <Button fullWidth variant="secondary">
                 <LogOut size={16} aria-hidden="true" />
                 Uitloggen en ander account kiezen
-              </button>
+              </Button>
             </SignOutButton>
           ) : (
-            <Link
-              href="/sign-in"
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-bold text-amber-200 transition-colors hover:bg-amber-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-            >
+            <ButtonLink href="/sign-in" fullWidth variant="primary">
               Naar inloggen
               <ArrowRight size={16} aria-hidden="true" />
-            </Link>
+            </ButtonLink>
           )}
         </div>
-      </section>
+      </Surface>
     </main>
   );
 }

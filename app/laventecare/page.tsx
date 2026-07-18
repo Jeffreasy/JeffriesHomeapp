@@ -1,5 +1,8 @@
 "use client";
 
+import { Skeleton } from "@/components/ui/Skeleton";
+import { cn } from "@/lib/utils";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useToast } from "@/components/ui/Toast";
@@ -658,7 +661,7 @@ export default function LaventeCarePage() {
         description: "Klantdossiers, operating model en snelle context.",
         count: `${companies.length + activeLeads.length + totalWorkstreams + activeProjects.length}`,
         icon: portalIcons.overview,
-        tone: "sky",
+        tone: "info",
       },
       {
         id: "pipeline",
@@ -667,7 +670,7 @@ export default function LaventeCarePage() {
         description: "Klantdossiers, leads, projecten en opdrachten in een werkstroom.",
         count: `${companies.length + activeLeads.length + totalWorkstreams + activeProjects.length}`,
         icon: portalIcons.pipeline,
-        tone: "amber",
+        tone: "accent",
       },
       {
         id: "signals",
@@ -676,7 +679,7 @@ export default function LaventeCarePage() {
         description: "Nieuwe matches, open acties en follow-ups.",
         count: `${businessSignals.length + actionItems.length + followUps.length}`,
         icon: portalIcons.signals,
-        tone: "violet",
+        tone: "info",
       },
       {
         id: "commerce",
@@ -685,7 +688,7 @@ export default function LaventeCarePage() {
         description: "Uren, offertes, facturen en Bunq betaalverzoeken.",
         count: `${quotes.length + timeEntries.length + invoices.length}`,
         icon: portalIcons.commerce,
-        tone: "amber",
+        tone: "accent",
       },
       {
         id: "mailbox",
@@ -694,7 +697,7 @@ export default function LaventeCarePage() {
         description: "Zakelijke klantmails renderen, versturen en auditten.",
         count: `${mailTemplates.length + mailOutbox.length}`,
         icon: portalIcons.mailbox,
-        tone: mailbox?.summary.configured ? "emerald" : "amber",
+        tone: mailbox?.summary.configured ? "success" : "warning",
       },
       {
         id: "operations",
@@ -703,7 +706,7 @@ export default function LaventeCarePage() {
         description: "Besluiten, changes, SLA en supportsignalering.",
         count: `${recentDecisions.length + openChanges.length + openIncidents.length}`,
         icon: portalIcons.operations,
-        tone: openIncidents.length > 0 ? "rose" : "slate",
+        tone: openIncidents.length > 0 ? "danger" : "neutral",
       },
       {
         id: "knowledge",
@@ -712,7 +715,7 @@ export default function LaventeCarePage() {
         description: "Documenttemplates, zoeklaag en PDF dossierhistorie.",
         count: `${summary.documents}`,
         icon: portalIcons.knowledge,
-        tone: "sky",
+        tone: "info",
       },
     ],
     [
@@ -1720,10 +1723,11 @@ export default function LaventeCarePage() {
       toastError("Factuurpreview kon niet worden geopend. Sta pop-ups toe voor deze site.");
       return;
     }
+    // This detached preview cannot consume app CSS; mirror the emergency palette until generated HTML replaces it.
     preview.document.open();
     preview.document.write(
       "<!doctype html><html lang=\"nl\"><head><meta charset=\"utf-8\"><title>Factuurdocument</title></head>" +
-        "<body style=\"margin:0;display:grid;place-items:center;min-height:100vh;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif\">" +
+        "<body style=\"margin:0;display:grid;place-items:center;min-height:100vh;background:#0a0a0f;color:#f1f5f9;font-family:Inter,system-ui,sans-serif\">" +
         "<p>Factuurdocument genereren…</p></body></html>",
     );
     preview.document.close();
@@ -1897,7 +1901,7 @@ export default function LaventeCarePage() {
   // volstaat de amber banner hieronder.
   if (cockpitError && !cockpitLoading && !cockpit) {
     return (
-      <AppPageShell width="wide" className="py-10 text-slate-100">
+      <AppPageShell width="wide" className="py-10 text-[var(--color-text)]">
         <div className="mx-auto max-w-xl">
           <ErrorState
             title="LaventeCare kon niet laden"
@@ -1915,18 +1919,18 @@ export default function LaventeCarePage() {
     // Skeleton mirrors the real layout (full-width hero + max-w-[1600px] main +
     // a tall workspace) so the page doesn't jump when cockpit data resolves.
     return (
-      <AppPageShell width="wide" className="space-y-5 text-slate-100" aria-busy="true">
-        <div className="h-44 w-full animate-pulse border-b border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] sm:h-48" />
+      <AppPageShell width="wide" className="space-y-5 text-[var(--color-text)]" aria-busy="true">
+        <Skeleton className="h-44 w-full rounded-none border-b border-[var(--color-border)] sm:h-48" />
         <div className="space-y-5">
-          <div className="h-11 w-full max-w-md animate-pulse rounded-xl glass" />
+          <Skeleton className="h-11 w-full max-w-md" />
           <div className="grid gap-4 md:grid-cols-4">
             {[0, 1, 2, 3].map((item) => (
-              <div key={item} className="h-28 animate-pulse rounded-2xl glass" />
+              <Skeleton key={item} className="h-28 rounded-2xl" />
             ))}
           </div>
           <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <div className="min-h-[50vh] animate-pulse rounded-2xl glass" />
-            <div className="hidden min-h-[50vh] animate-pulse rounded-2xl glass lg:block" />
+            <Skeleton className="min-h-[50vh] rounded-2xl" />
+            <Skeleton className="hidden min-h-[50vh] rounded-2xl lg:block" />
           </div>
         </div>
       </AppPageShell>
@@ -1934,7 +1938,7 @@ export default function LaventeCarePage() {
   }
 
   return (
-    <AppPageShell width="wide" className="space-y-5 text-slate-100">
+    <AppPageShell width="wide" className="space-y-5 text-[var(--color-text)]">
       <LaventeCareHeader
         summary={summary}
         seeding={seeding}
@@ -2125,16 +2129,16 @@ export default function LaventeCarePage() {
                   }}
                 />
                 <details
-                  className="glass min-w-0 overflow-hidden"
+ className={cn(surfaceVariants({ padding: "none" }), "min-w-0 overflow-hidden")}
                   onToggle={(event) => setShowFullCapabilities(event.currentTarget.open)}
                 >
-                  <summary className="cursor-pointer list-none p-4 text-sm font-bold text-white marker:hidden">
+                  <summary className="cursor-pointer list-none p-4 text-sm font-bold text-[var(--color-text)] marker:hidden">
                     Volledige capability matrix
                     {capabilityRows.filter((row) => row.status === "attention" || row.status === "missing").length > 0
                       ? ` (${capabilityRows.filter((row) => row.status === "attention" || row.status === "missing").length} focus)`
                       : ""}
                   </summary>
-                  {showFullCapabilities ? <div className="space-y-5 border-t border-white/10 p-4">
+                  {showFullCapabilities ? <div className="space-y-5 border-t border-[var(--color-border)] p-4">
                     <CapabilityMatrix
                       capabilityRows={capabilityRows}
                       expanded

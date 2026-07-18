@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { type Tone, toneClasses } from "./NotesUtils";
+import { Button } from "@/components/ui/Button";
 
 export function MetricTile({
   icon: Icon,
   label,
   value,
   meta,
-  tone = "slate",
+  tone = "neutral",
   onClick,
   active = false,
   className,
@@ -30,9 +32,9 @@ export function MetricTile({
         <Icon size={16} className={toneClass.icon} />
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
+        <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">{label}</p>
         <p className={cn("mt-1 truncate text-xl font-bold leading-tight sm:mt-2 sm:text-2xl", toneClass.text)}>{value}</p>
-        <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-slate-500 sm:line-clamp-none">{meta}</p>
+        <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-[var(--color-text-muted)] sm:line-clamp-none">{meta}</p>
       </div>
     </div>
   );
@@ -42,23 +44,25 @@ export function MetricTile({
     // affordance (hover + focus ring + pressed state) instead of looking
     // clickable while being inert.
     return (
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        fullWidth
         onClick={onClick}
         aria-pressed={active}
         className={cn(
-          "glass min-w-0 cursor-pointer p-3 text-left outline-none transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:ring-2 focus-visible:ring-amber-400/60 sm:p-4",
+          surfaceVariants({ padding: "none" }),
+          "justify-start p-3 text-left sm:p-4",
           toneClass.border,
-          active && "ring-1 ring-amber-400/50",
+          active && "ring-1 ring-[var(--color-primary)]",
           className,
         )}
       >
         {inner}
-      </button>
+      </Button>
     );
   }
 
-  return <div className={cn("glass min-w-0 p-3 sm:p-4", toneClass.border, className)}>{inner}</div>;
+  return <div className={cn(surfaceVariants({ padding: "none" }), "p-3 sm:p-4", toneClass.border, className)}>{inner}</div>;
 }
 
 export function SectionTitle({
@@ -75,12 +79,12 @@ export function SectionTitle({
   return (
     <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 sm:h-9 sm:w-9">
-          <Icon size={16} className="text-amber-300" />
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] sm:h-9 sm:w-9">
+          <Icon size={16} className="text-[var(--color-primary-hover)]" />
         </div>
         <div className="min-w-0">
-          <h2 className="text-base font-bold text-white">{title}</h2>
-          {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+          <h2 className="text-base font-bold text-[var(--color-text)]">{title}</h2>
+          {subtitle && <p className="mt-1 text-sm text-[var(--color-text-muted)]">{subtitle}</p>}
         </div>
       </div>
       {action}
@@ -102,20 +106,18 @@ export function SegmentedButton({
   className?: string;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant={active ? "primary" : "secondary"}
+      size="sm"
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-amber-400/60",
-        active
-          ? "border-amber-500/35 bg-amber-500/15 text-amber-200"
-          : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200",
+        "min-w-0 gap-2 rounded-lg px-3",
         className,
       )}
     >
       <Icon size={15} className="shrink-0" />
       {children}
-    </button>
+    </Button>
   );
 }

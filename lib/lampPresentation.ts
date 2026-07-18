@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Device } from "@/lib/api";
 import { hexToRgb, kelvinToHex, rgbToHex } from "@/lib/utils";
+import { contrastRatio } from "@/lib/ui/colorContrast";
 
 export type LampVisualMode = "offline" | "off" | "white" | "color";
 export type LampDeliveryPhase = "reported" | "pending";
@@ -36,30 +37,6 @@ const OFFLINE_ACCENT = "#64748b";
 function alphaColor(hex: string, alpha: number): string {
   const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
-}
-
-function linearChannel(channel: number): number {
-  const value = channel / 255;
-  return value <= 0.04045
-    ? value / 12.92
-    : ((value + 0.055) / 1.055) ** 2.4;
-}
-
-function luminance({ r, g, b }: { r: number; g: number; b: number }): number {
-  return (
-    0.2126 * linearChannel(r) +
-    0.7152 * linearChannel(g) +
-    0.0722 * linearChannel(b)
-  );
-}
-
-function contrastRatio(
-  first: { r: number; g: number; b: number },
-  second: { r: number; g: number; b: number },
-): number {
-  const lighter = Math.max(luminance(first), luminance(second));
-  const darker = Math.min(luminance(first), luminance(second));
-  return (lighter + 0.05) / (darker + 0.05);
 }
 
 /**

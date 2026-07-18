@@ -4,7 +4,7 @@ import { ArrowRight, Calendar, Clock3, Wallet, type LucideIcon } from "lucide-re
 import Link from "next/link";
 import type { PersonalEvent } from "@/hooks/usePersonalEvents";
 import type { useSchedule } from "@/hooks/useSchedule";
-import { Panel } from "./DashboardPrimitives";
+import { Surface } from "@/components/ui/Surface";
 import {
   formatEventMeta,
   formatRelativeDateLabel,
@@ -34,13 +34,13 @@ function OverviewCell({
   return (
     <Link
       href={href}
-      className="group flex min-h-[76px] min-w-0 items-center gap-3 bg-[var(--color-surface)] p-3 transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-400/70 sm:min-h-[124px] sm:block sm:p-4"
+      className="group flex min-h-[76px] min-w-0 items-center gap-3 bg-[var(--color-surface)] p-3 transition-colors hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)] sm:min-h-[124px] sm:block sm:p-4"
     >
       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${classes.border} ${classes.surface}`}>
         <Icon size={16} className={classes.icon} aria-hidden="true" />
       </div>
       <div className="min-w-0 flex-1 sm:mt-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
+        <p className="text-micro font-semibold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
           {label}
         </p>
         <p className={`mt-0.5 truncate text-sm font-bold ${classes.text}`}>{value}</p>
@@ -49,7 +49,7 @@ function OverviewCell({
       <ArrowRight
         size={14}
         aria-hidden="true"
-        className="shrink-0 text-slate-700 transition-colors group-hover:text-slate-300 sm:float-right sm:-mt-16"
+        className="shrink-0 text-[var(--color-text-subtle)] transition-colors group-hover:text-[var(--color-text)] sm:float-right sm:-mt-16"
       />
     </Link>
   );
@@ -124,18 +124,18 @@ export function OverviewPanel({
           : "Agenda rustig";
 
   return (
-    <Panel padding="none" className="overflow-hidden">
+    <Surface padding="none" className="overflow-hidden">
       <div className="border-b border-[var(--color-border)] px-4 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
+        <p className="text-micro font-semibold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
           Vandaag
         </p>
-        <h2 className="mt-0.5 text-base font-bold text-white">Werk, agenda en finance</h2>
+        <h2 className="mt-0.5 text-base font-bold text-[var(--color-text)]">Werk, agenda en finance</h2>
       </div>
 
       <div className="grid gap-px bg-[var(--color-border)] sm:grid-cols-3">
         <OverviewCell
           icon={Clock3}
-          tone={scheduleFailed ? "rose" : "indigo"}
+          tone={scheduleFailed ? "danger" : "info"}
           label="Volgende dienst"
           value={dienstValue}
           sub={dienstSub}
@@ -143,7 +143,7 @@ export function OverviewPanel({
         />
         <OverviewCell
           icon={Calendar}
-          tone={appointmentsFailed ? "rose" : hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "blue"}
+          tone={appointmentsFailed ? "danger" : hardConflicts > 0 ? "danger" : conflicts > 0 ? "warning" : "info"}
           label="Volgende afspraak"
           value={eventValue}
           sub={eventSub}
@@ -151,13 +151,13 @@ export function OverviewPanel({
         />
         <OverviewCell
           icon={Wallet}
-          tone={financeFailed ? "rose" : financeLoading ? "slate" : "green"}
+          tone={financeFailed ? "danger" : financeLoading ? "neutral" : "success"}
           label={nettoLabel}
           value={nettoValue}
           sub={nettoSub}
           href="/finance"
         />
       </div>
-    </Panel>
+    </Surface>
   );
 }

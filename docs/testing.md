@@ -41,6 +41,13 @@ Gebruik Node.js 22 om lokaal dezelfde majorversie als CI te testen. De productie
 - coalescing, commandbarrières en totale abort-deadlines vanaf de gebruikersinteractie;
 - behoud van optimistic state én versere metadata bij een late refresh;
 - kamerfallbacks, filters en consistente online/on-tellingen.
+- het centrale design-systemcontract, inclusief verbannen legacyaliases en feature-CSS;
+- expliciete button-types, touch-safe raw controls en semantische teksttokens;
+- één Surface- en Tabs-contract zonder domein-`Panel` of tweede TabBar;
+- reduced-motion-safe programmatic scrolling en app-brede `MotionConfig`;
+- echte WCAG-AA-contrastberekening van teksttokens;
+- geen lege/NUL-bronbestanden, `transition-all`, vaste duration- of 8–11px-klassen;
+- geen fysieke featurekleuren buiten gevalideerde dataprojecties.
 
 Browserquerydata wordt niet persistent opgeslagen. Iedere Clerk-identiteit krijgt een eigen in-memory `QueryClient`; bij een identiteitswissel ontstaat een nieuwe cache. Dit voorkomt dat private data van een eerdere sessie terugkomt uit IndexedDB of localStorage.
 
@@ -93,9 +100,10 @@ De geauthenticeerde suite:
 
 - bezoekt alle elf routes uit de centrale hoofdnavigatie op desktop, tablet en mobiel;
 - bewaakt één `main#main`, het gedeelde page-contract en horizontale overflow;
-- controleert mobiele touchdoelen en het focusherstel van de Meer-sheet;
+- controleert op alle routes alle gerenderde mobiele buttons en form controls,
+  ook onder de fold, op de minimale 44px touchmaat en bewaakt het focusherstel van de Meer-sheet;
 - opent de automatiseringsmodal en het responsive lampdetail zonder op te slaan of lampcommando's te sturen;
-- voert Axe WCAG A/AA-scans uit op Dashboard, Lampen, Automations en LaventeCare;
+- voert Axe WCAG A/AA-scans uit op alle elf hoofdroutes;
 - onderschept alle `/api/backend/**`-requests met deterministische, synthetische GET-data;
 - blokkeert en faalt op iedere backendmutatie;
 - meldt een echte, geldige non-owner aan en controleert de redirect naar `/access-denied`;

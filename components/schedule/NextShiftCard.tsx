@@ -1,13 +1,17 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { type DienstRow, getEndKey, getStartKey, shiftTypeColor } from "@/lib/schedule";
+import { type DienstRow, getEndKey, getStartKey } from "@/lib/schedule";
 import { getDisplayEndDate, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { type ConflictInfo } from "@/lib/conflictDetection";
 import { cn } from "@/lib/utils";
-import { AppIcon, type SymbolTone } from "@/components/ui/AppIcon";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { Button } from "@/components/ui/Button";
+import { Skeleton } from "@/components/ui/Skeleton";
 import type { AppIconName } from "@/lib/symbols";
 import { hoursValue, formatShortDate } from "./RoosterUtils";
+import { conflictPresentation, shiftPresentation } from "./schedulePresentation";
 
 /** Datumnotatie in nl-NL ("12 mrt") — gelijk aan de rest van de app i.p.v. de
  *  eigen numerieke DD-MM(-YYYY)-variant die hier afweek (audit L datumdrift). */
@@ -47,10 +51,9 @@ interface NextShiftCardProps {
 export function NextShiftCard({ dienst, compact, loading = false, onImport, afspraken = [], conflictMap, todayIso }: NextShiftCardProps) {
   if (!dienst && loading) {
     return (
-      <div
-        aria-hidden="true"
+      <Skeleton
         className={cn(
-          "glass min-w-0 animate-pulse rounded-xl border border-[var(--color-border)]",
+          surfaceVariants({ padding: "none", radius: "md" }),
           compact ? "h-[76px]" : "h-[120px]",
         )}
       />
@@ -60,27 +63,24 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
   if (!dienst) {
     return (
       <div className={cn(
-        "glass rounded-xl border border-[var(--color-border)] flex items-center justify-center min-w-0",
+        surfaceVariants({ padding: "none", radius: "md" }),
+        "flex items-center justify-center",
         compact ? "px-4 py-3" : "px-6 py-8"
       )}>
         <div className="text-center">
-          <p className="text-sm text-slate-500">Geen aankomende diensten</p>
+          <p className="text-sm text-[var(--color-text-muted)]">Geen aankomende diensten</p>
           {onImport && (
-            <button
-              onClick={onImport}
-              className="mt-2 text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 mx-auto"
-            >
-              {/* onImport draait de Google-kalendersync, niet de CSV-import —
-                  daarom "synchroniseren" i.p.v. "importeren" (audit L). */}
-              <AppIcon name="refresh" tone="amber" size="xs" /> Rooster synchroniseren
-            </button>
+            <Button size="sm" variant="primary" onClick={onImport} className="mt-2">
+              <AppIcon name="calendar" tone="accent" size="xs" />
+              Agenda synchroniseren
+            </Button>
           )}
         </div>
       </div>
     );
   }
 
-  const colors      = shiftTypeColor(dienst.shiftType);
+  const colors      = shiftPresentation(dienst.shiftType);
   const isBezig      = dienst.status === "Bezig";
   const relativeDay  = getRelativeDay(dienst.startDatum, todayIso);
   const relativeDate = relativeDay
@@ -108,12 +108,11 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
       ?? (isHeledag ? "soft"
         : overlapsShift() ? "hard"
         : "info");
+    const presentation = conflictPresentation(level);
     return {
-      textClass: level === "hard" ? "text-red-400" : level === "soft" ? "text-amber-400" : "text-blue-400",
-      iconTone: (level === "hard" ? "red" : level === "soft" ? "amber" : "blue") as SymbolTone,
-      textColor: level === "hard" ? "#ef4444" : level === "soft" ? "#f59e0b" : "#60a5fa",
-      bg:     level === "hard" ? "rgba(239,68,68,0.10)" : level === "soft" ? "rgba(245,158,11,0.10)" : "rgba(96,165,250,0.08)",
-      border: level === "hard" ? "rgba(239,68,68,0.25)" : level === "soft" ? "rgba(245,158,11,0.25)" : "rgba(96,165,250,0.20)",
+      presentation,
+      textClass: presentation.text,
+      iconTone: presentation.tone,
       icon:      (level === "hard" ? "warning" : isHeledag ? "calendar" : "info") as AppIconName,
       timeLabel: isHeledag ? "hele dag" : `${evt.startTijd}–${evt.eindTijd}`,
       suffix:    level === "hard" ? " — overlapt!" : "",
@@ -126,14 +125,14 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
       <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        className={cn("rounded-xl px-4 py-3 border border-[var(--color-border)]", colors.bg)}
+        className={cn("rounded-xl border px-4 py-3", colors.surface, colors.border)}
       >
         <div className="flex items-center justify-between">
           <div>
-            <p className="mb-0.5 inline-flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">
+            <p className="mb-0.5 inline-flex items-center gap-1.5 text-micro font-medium uppercase tracking-wider text-[var(--color-text-muted)]">
               <AppIcon
                 name={isBezig ? "statusActive" : "time"}
-                tone={isBezig ? "green" : "amber"}
+                tone={isBezig ? "success" : "accent"}
                 size="xs"
                 iconClassName={isBezig ? "fill-current" : undefined}
               />
@@ -142,17 +141,17 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
             <p className={cn("text-sm font-bold", colors.text)}>
               {dienst.dag} · {formatDate(dienst.startDatum)}
             </p>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-[var(--color-text-muted)]">
               {dienst.startTijd}–{dienst.eindTijd} · {dienst.shiftType} · {hoursValue(dienst.duur)}u
             </p>
             {!isBezig && (
               <p className={cn(
-                "mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold",
-                isToday ? "text-green-400" : isTomorrow ? "text-amber-400" : "text-slate-500"
+                "mt-0.5 inline-flex items-center gap-1 text-micro font-semibold",
+                isToday || isTomorrow ? "text-[var(--color-primary-hover)]" : "text-[var(--color-text-muted)]"
               )}>
                 <AppIcon
                   name={isToday ? "statusActive" : "calendar"}
-                  tone={isToday ? "green" : isTomorrow ? "amber" : "slate"}
+                  tone={isToday || isTomorrow ? "accent" : "neutral"}
                   size="xs"
                   iconClassName={isToday ? "fill-current" : undefined}
                 />
@@ -160,13 +159,13 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
               </p>
             )}
             {isZondag && (
-              <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-bold text-yellow-400">
-                <AppIcon name="money" tone="yellow" size="xs" /> +ORT toeslag
+              <p className="mt-0.5 inline-flex items-center gap-1 text-micro font-bold text-[var(--color-primary-hover)]">
+                <AppIcon name="money" tone="accent" size="xs" /> +ORT toeslag
               </p>
             )}
             {isZaterdag && (
-              <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-yellow-600">
-                <AppIcon name="calendar" tone="yellow" size="xs" /> Weekend
+              <p className="mt-0.5 inline-flex items-center gap-1 text-micro font-medium text-[var(--color-primary-hover)]">
+                <AppIcon name="calendar" tone="accent" size="xs" /> Weekend
               </p>
             )}
             {afspraken.length > 0 && (
@@ -174,7 +173,7 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
                 {afspraken.map(evt => {
                   const c = resolveConflict(evt);
                   return (
-                    <p key={evt.eventId} className={`inline-flex items-center gap-1 text-[10px] font-medium ${c.textClass}`}>
+                    <p key={evt.eventId} className={`inline-flex items-center gap-1 text-micro font-medium ${c.textClass}`}>
                       <AppIcon name={c.icon} tone={c.iconTone} size="xs" />
                       {evt.titel} · {c.timeLabel}{c.suffix}
                     </p>
@@ -183,10 +182,7 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
               </div>
             )}
           </div>
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: colors.accent + "22", border: `1px solid ${colors.accent}44` }}
-          >
+          <div className={cn("flex h-10 w-10 items-center justify-center rounded-xl border", colors.surface, colors.border, colors.text)}>
             <AppIcon name="time" size="md" iconClassName="text-current" />
           </div>
         </div>
@@ -199,32 +195,25 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-2xl overflow-hidden"
-      style={{
-        background: `linear-gradient(135deg, ${colors.accent}18 0%, ${colors.accent}08 100%)`,
-        border: `1px solid ${colors.accent}30`,
-      }}
+      className={cn("overflow-hidden rounded-2xl border", colors.surface, colors.border)}
     >
       {/* Status banner */}
-      <div
-        className="px-4 py-1.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2"
-        style={{ background: colors.accent + "20", color: colors.accent }}
-      >
+      <div className={cn("flex items-center gap-2 border-b px-4 py-1.5 text-xs font-bold uppercase tracking-widest", colors.surface, colors.border, colors.text)}>
         <span className="inline-flex items-center gap-1.5">
           <AppIcon
             name={isBezig ? "statusActive" : "time"}
-            tone={isBezig ? "green" : "amber"}
+            tone={isBezig ? "success" : "accent"}
             size="xs"
             iconClassName={isBezig ? "fill-current" : "text-current"}
           />
           {isBezig ? "Bezig" : "Volgende dienst"}
         </span>
         {isZondag && (
-          <span className="ml-2 inline-flex items-center gap-1 text-yellow-400">
-            <AppIcon name="money" tone="yellow" size="xs" /> +ORT
+          <span className="ml-2 inline-flex items-center gap-1 text-[var(--color-primary-hover)]">
+            <AppIcon name="money" tone="accent" size="xs" /> +ORT
           </span>
         )}
-        {isZaterdag && <span className="ml-2 text-yellow-600">weekend</span>}
+        {isZaterdag && <span className="ml-2 text-[var(--color-primary-hover)]">weekend</span>}
         <span className="ml-auto font-normal normal-case tracking-normal opacity-70">
           {dienst.shiftType}
           {!isBezig && relativeDay && (
@@ -239,27 +228,27 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
         {/* Date + time */}
         <div className="mb-3 flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-xl font-bold text-white sm:text-2xl">{dienst.dag}</p>
-            <p className="text-sm text-slate-400">{relativeDate}</p>
+            <p className="truncate text-xl font-bold text-[var(--color-text)] sm:text-2xl">{dienst.dag}</p>
+            <p className="text-sm text-[var(--color-text-muted)]">{relativeDate}</p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-xl font-bold sm:text-2xl" style={{ color: colors.accent }}>
+            <p className={cn("text-xl font-bold sm:text-2xl", colors.text)}>
               {dienst.startTijd}
             </p>
-            <p className="text-sm text-slate-400">tot {dienst.eindTijd}</p>
+            <p className="text-sm text-[var(--color-text-muted)]">tot {dienst.eindTijd}</p>
           </div>
         </div>
 
         {/* Details */}
         <div className="space-y-1.5 text-sm">
           {dienst.locatie && (
-            <div className="flex items-center gap-2 text-slate-300">
-              <AppIcon name="location" tone="slate" size="xs" />
+            <div className="flex items-center gap-2 text-[var(--color-text)]">
+              <AppIcon name="location" tone="neutral" size="xs" />
               <span className="truncate">{dienst.locatie}</span>
             </div>
           )}
-          <div className="flex items-center gap-2 text-slate-300">
-            <AppIcon name="timer" tone="slate" size="xs" />
+          <div className="flex items-center gap-2 text-[var(--color-text)]">
+            <AppIcon name="timer" tone="neutral" size="xs" />
             <span>{hoursValue(dienst.duur)} uur · Team {dienst.team || "?"}</span>
           </div>
         </div>
@@ -270,9 +259,14 @@ export function NextShiftCard({ dienst, compact, loading = false, onImport, afsp
             {afspraken.map(evt => {
               const c = resolveConflict(evt);
               return (
-                <div key={evt.eventId}
-                  className="flex items-center gap-2 text-xs px-3 py-2 rounded-xl"
-                  style={{ background: c.bg, border: `1px solid ${c.border}`, color: c.textColor }}
+                <div
+                  key={evt.eventId}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border px-3 py-2 text-xs",
+                    c.presentation.surface,
+                    c.presentation.border,
+                    c.presentation.text,
+                  )}
                 >
                   <AppIcon name={c.icon} tone={c.iconTone} size="xs" iconClassName="text-current" />
                   <span className="min-w-0 truncate">{evt.titel} · {c.timeLabel}{c.suffix}</span>

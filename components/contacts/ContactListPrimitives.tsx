@@ -2,25 +2,26 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Building2, Check } from "lucide-react";
-import { AppIcon } from "@/components/ui/AppIcon";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { MobileActionDock } from "@/components/ui/MobileActionDock";
 import { Modal } from "@/components/ui/Modal";
+import { Select } from "@/components/ui/Select";
 import type { Contact, ContactLabel } from "@/lib/api";
-import { labelChipClasses, labelDotClasses } from "@/lib/contacten/labelColors";
+import { labelChipClasses, labelColorStyle, labelDotClasses } from "@/lib/contacten/labelColors";
 import { relationshipLabel } from "@/lib/contacten/contact-display";
 export function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      variant={active ? "primary" : "secondary"}
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
-        active
-          ? "border-amber-500/30 bg-amber-500/15 text-amber-200"
-          : "border-[var(--color-border)] text-slate-400 hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
-      }`}
+      className="rounded-full"
     >
       {label}
-    </button>
+    </Button>
   );
 }
 
@@ -56,14 +57,18 @@ export function BulkBar({
 }) {
   const [labelId, setLabelId] = useState("");
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[90] border-t border-[var(--color-border)] bg-[#0a0a0f]/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] pt-3 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-white">{count} geselecteerd</span>
-        <select
+    <MobileActionDock
+      label="Bulkacties voor geselecteerde contacten"
+      className="flex-wrap px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:fixed md:inset-x-6 md:bottom-6 md:right-auto md:top-auto md:mt-0"
+    >
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-2">
+        <span className="whitespace-nowrap text-sm font-semibold text-[var(--color-text)]">{count} geselecteerd</span>
+        <Select
+          density="compact"
           value={labelId}
           onChange={(e) => setLabelId(e.target.value)}
           aria-label="Label kiezen"
-          className="min-h-[38px] min-w-0 flex-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-slate-200 outline-none [color-scheme:dark] sm:max-w-xs"
+          className="min-w-40 flex-1 sm:max-w-xs"
         >
           <option value="">Kies label…</option>
           {labels.map((l) => (
@@ -71,32 +76,18 @@ export function BulkBar({
               {l.name}
             </option>
           ))}
-        </select>
-        <button
-          type="button"
-          disabled={!labelId}
-          onClick={() => labelId && onApply(labelId, false)}
-          className="min-h-[38px] rounded-lg border border-amber-500/25 bg-amber-500/12 px-3 text-xs font-semibold text-amber-300 hover:bg-amber-500/18 disabled:opacity-40"
-        >
+        </Select>
+        <Button size="sm" variant="primary" disabled={!labelId} onClick={() => labelId && onApply(labelId, false)}>
           Toevoegen
-        </button>
-        <button
-          type="button"
-          disabled={!labelId}
-          onClick={() => labelId && onApply(labelId, true)}
-          className="min-h-[38px] rounded-lg border border-[var(--color-border)] px-3 text-xs font-semibold text-slate-300 hover:bg-[var(--color-surface-hover)] disabled:opacity-40"
-        >
+        </Button>
+        <Button size="sm" disabled={!labelId} onClick={() => labelId && onApply(labelId, true)}>
           Verwijderen
-        </button>
-        <button
-          type="button"
-          onClick={onClear}
-          className="min-h-[38px] rounded-lg px-3 text-xs font-semibold text-slate-500 hover:text-slate-300"
-        >
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onClear}>
           Wis
-        </button>
+        </Button>
       </div>
-    </div>
+    </MobileActionDock>
   );
 }
 
@@ -120,22 +111,21 @@ export function ContactCard({
       ? orgNames.slice(0, 2).join(", ") + (orgNames.length > 2 ? ` +${orgNames.length - 2}` : "")
       : "";
   return (
-    <button
-      type="button"
+    <Button
       onClick={onClick}
       aria-pressed={selectMode ? selected : undefined}
-      className={`flex min-h-[64px] items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${
-        selected
-          ? "border-amber-500/50 bg-amber-500/[0.07]"
-          : "border-[var(--color-border)] bg-white/[0.02] hover:bg-white/[0.04]"
-      }`}
+      variant={selected ? "primary" : "secondary"}
+      fullWidth
+      className="h-auto min-h-16 justify-start gap-3 px-3 py-2.5 text-left"
     >
-      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-sm font-bold uppercase text-amber-200">
+      <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-sm font-bold uppercase text-[var(--color-primary-hover)]">
         {contact.display_name.trim().charAt(0) || "?"}
         {selectMode && (
           <span
             className={`absolute -left-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border ${
-              selected ? "border-amber-400 bg-amber-500 text-black" : "border-slate-500 bg-[#0a0a0f] text-transparent"
+              selected
+                ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
+                : "border-[var(--color-border-strong)] bg-[var(--color-background)] text-transparent"
             }`}
           >
             <Check size={10} strokeWidth={3} />
@@ -144,17 +134,17 @@ export function ContactCard({
         {contact.source === "laventecare" && (
           <span
             title="Beheerd in LaventeCare"
-            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-[#0a0a0f] bg-sky-500/90 text-white"
+            className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border border-[var(--color-background)] bg-[var(--color-info-subtle)] text-[var(--color-text)]"
           >
             <Building2 size={9} />
           </span>
         )}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-white">{contact.display_name}</span>
-        {sub && <span className="mt-0.5 block truncate text-xs text-slate-500">{sub}</span>}
+        <span className="block truncate text-sm font-semibold text-[var(--color-text)]">{contact.display_name}</span>
+        {sub && <span className="mt-0.5 block truncate text-xs text-[var(--color-text-subtle)]">{sub}</span>}
         {orgLine && (
-          <span className="mt-0.5 flex items-center gap-1 text-[11px] text-sky-300/70">
+          <span className="mt-0.5 flex items-center gap-1 text-micro text-[var(--color-info)]">
             <Building2 size={10} className="shrink-0" />
             <span className="truncate">{orgLine}</span>
           </span>
@@ -164,40 +154,32 @@ export function ContactCard({
             {contact.labels!.slice(0, 3).map((l) => (
               <span
                 key={l.id}
-                className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${labelChipClasses(l.color)}`}
+                style={labelColorStyle(l.color)}
+                className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-micro font-semibold ${labelChipClasses()}`}
               >
-                <span className={`h-1 w-1 rounded-full ${labelDotClasses(l.color)}`} />
+                <span className={`h-1 w-1 rounded-full ${labelDotClasses()}`} />
                 {l.name}
               </span>
             ))}
             {contact.labels!.length > 3 && (
-              <span className="text-[10px] font-semibold text-slate-500">+{contact.labels!.length - 3}</span>
+              <span className="text-micro font-semibold text-[var(--color-text-subtle)]">+{contact.labels!.length - 3}</span>
             )}
           </span>
         )}
       </span>
       <span className="flex shrink-0 flex-wrap justify-end gap-1">
         {(contact.relationship_types ?? []).slice(0, 2).map((t) => (
-          <span key={t} className="rounded-md border border-[var(--color-border)] px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">
+          <Badge key={t} size="sm" className="min-h-0 px-1.5 py-1 text-micro">
             {relationshipLabel(t)}
-          </span>
+          </Badge>
         ))}
       </span>
-    </button>
+    </Button>
   );
 }
 
 export function EmptyBox({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[var(--color-border)] px-4 py-12 text-center">
-      <AppIcon name="relations" tone="slate" size="lg" />
-      <div>
-        <p className="text-sm font-semibold text-slate-300">{title}</p>
-        <p className="mt-1 text-xs text-slate-500">{text}</p>
-      </div>
-      {action}
-    </div>
-  );
+  return <FeedbackState title={title} description={text} action={action} />;
 }
 
 // ─── Modal shell ─────────────────────────────────────────────────────────────
@@ -209,7 +191,7 @@ export function ModalShell({ title, onClose, children, footer }: { title: string
       onClose={onClose}
       title={title}
       maxWidth="lg"
-      theme="surface"
+      tone="surface"
       dataAppModal="contact"
       contentClassName="overflow-x-hidden px-4 py-4 sm:px-5"
       footer={footer}

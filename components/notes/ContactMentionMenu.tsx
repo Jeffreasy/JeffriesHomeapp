@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent, type RefObject } from "react";
 import { UserRound } from "lucide-react";
 import type { Contact } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
+import { InputAnchoredListbox } from "@/components/ui/InputAnchoredListbox";
 
 type UseContactMentionOptions = {
   value: string;
@@ -97,6 +99,7 @@ export function useContactMention({
 
 export function ContactMentionMenu({
   id,
+  anchorRef,
   isOpen,
   query,
   suggestions,
@@ -106,6 +109,7 @@ export function ContactMentionMenu({
   onSelect,
 }: {
   id: string;
+  anchorRef: RefObject<HTMLElement | null>;
   isOpen: boolean;
   query: string;
   suggestions: Contact[];
@@ -117,43 +121,47 @@ export function ContactMentionMenu({
   if (!isOpen) return null;
 
   return (
-    <div
+    <InputAnchoredListbox
       id={id}
-      role="listbox"
-      aria-label="Contact kiezen"
-      className="absolute left-2 right-2 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[#11111a] p-1.5 shadow-2xl sm:left-10 sm:right-auto sm:min-w-80"
+      anchorRef={anchorRef}
+      label="Contact kiezen"
     >
       {isLoading ? (
-        <p role="status" className="px-3 py-2 text-xs text-slate-500">Contacten laden…</p>
+        <p role="status" className="px-3 py-2 text-xs text-[var(--color-text-muted)]">Contacten laden…</p>
       ) : isError ? (
-        <p role="alert" className="px-3 py-2 text-xs text-amber-300">Contacten konden niet geladen worden.</p>
+        <p role="alert" className="px-3 py-2 text-xs text-[var(--color-danger)]">Contacten konden niet geladen worden.</p>
       ) : suggestions.length === 0 ? (
-        <p className="px-3 py-2 text-xs text-slate-500">
+        <p className="px-3 py-2 text-xs text-[var(--color-text-muted)]">
           Geen contact gevonden{query ? ` voor “${query}”` : ""}.
         </p>
       ) : (
         suggestions.map((contact, index) => (
-          <button
+          <Button
             key={contact.id}
+            variant="ghost"
+            fullWidth
             id={`${id}-${contact.id}`}
             type="button"
             role="option"
+            tabIndex={-1}
             aria-selected={index === activeIndex}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => onSelect(contact)}
-            className={`flex min-h-10 w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
-              index === activeIndex ? "bg-violet-500/15 text-violet-100" : "text-slate-300 hover:bg-white/[0.05]"
+            className={`justify-start gap-2 rounded-lg px-2.5 py-2 text-left ${
+              index === activeIndex
+                ? "bg-[var(--color-primary-subtle)] text-[var(--color-text)]"
+                : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
             }`}
           >
-            <UserRound size={14} className="shrink-0 text-violet-300/80" aria-hidden="true" />
+            <UserRound size={14} className="shrink-0 text-[var(--color-primary-hover)]" aria-hidden="true" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold">{contact.display_name}</span>
-              <span className="block truncate text-[10px] text-slate-500">{contactMeta(contact)}</span>
+              <span className="block truncate text-micro text-[var(--color-text-muted)]">{contactMeta(contact)}</span>
             </span>
-          </button>
+          </Button>
         ))
       )}
-    </div>
+    </InputAnchoredListbox>
   );
 }
 

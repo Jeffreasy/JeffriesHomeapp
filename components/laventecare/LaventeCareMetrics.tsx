@@ -19,35 +19,35 @@ export function LaventeCareMetrics({
         label="Open leads"
         value={summary.activeLeads}
         detail={`${summary.leads} totaal in de funnel`}
-        tone="sky"
+        tone="info"
       />
       <MetricCard
         icon={FolderKanban}
         label="Actieve projecten"
         value={summary.activeProjects}
         detail={`${summary.projects} projecten geregistreerd`}
-        tone="emerald"
+        tone="success"
       />
       <MetricCard
         icon={Sparkles}
         label="Signalen"
         value={businessSignalsCount}
         detail={`${summary.actionItems ?? 0} acties open`}
-        tone="violet"
+        tone="info"
       />
       <MetricCard
         icon={FileText}
         label="Documentbasis"
         value={`${summary.documents}/${LAVENTECARE_DOCUMENT_TOTAL}`}
         detail={summary.documentsSeeded ? "Geindexeerd in PostgreSQL" : "Catalogus klaar om te initialiseren"}
-        tone="amber"
+        tone="accent"
       />
       <MetricCard
         icon={LifeBuoy}
         label="SLA signalen"
         value={summary.openIncidents}
         detail={`${summary.openChanges} open change requests`}
-        tone={summary.openIncidents > 0 ? "rose" : "violet"}
+        tone={summary.openIncidents > 0 ? "danger" : "info"}
       />
     </section>
   );

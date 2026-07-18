@@ -124,19 +124,19 @@ export function HabitsOverzichtTab({
                 label="Actief"
                 value={groupedHabits.actief.length}
                 total={Math.max(1, habits.length)}
-                tone="amber"
+                tone="accent"
               />
               <DistributionRow
                 label="Gepauzeerd"
                 value={groupedHabits.gepauzeerd.length}
                 total={Math.max(1, habits.length)}
-                tone="sky"
+                tone="info"
               />
               <DistributionRow
                 label="Incidenten vandaag"
                 value={dayHealth.incidents}
                 total={Math.max(1, todayHabits.length)}
-                tone="rose"
+                tone="danger"
               />
             </div>
           </SidePanel>

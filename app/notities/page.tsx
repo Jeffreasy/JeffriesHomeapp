@@ -32,6 +32,11 @@ import { NotesMetricsRow } from "@/components/notes/NotesMetrics";
 import { WeekJournal, getMonday, amsterdamToday } from "@/components/notes/WeekJournal";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { Badge } from "@/components/ui/Badge";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { TabPanel } from "@/components/ui/Tabs";
 import { resolveLaventeCareBusinessContextFromText } from "@/lib/laventecare/business-context";
 import { enrichNoteDraft, getPrimaryWorkspaceContext, parseHashTags, type BusinessContextValue } from "@/lib/workspace-context";
 import { ApiError } from "@/lib/api";
@@ -589,7 +594,7 @@ export default function NotitiesPage() {
   };
 
   return (
-    <AppPageShell width="wide" className="text-slate-100">
+    <AppPageShell width="wide" className="text-[var(--color-text)]">
       <NotesHeader
         count={count}
         archivedCount={archived.length}
@@ -607,13 +612,7 @@ export default function NotitiesPage() {
       <div className="mt-4 flex flex-col gap-4 sm:gap-6">
         {/* ── Week Journal Tab ── */}
         {activeTab === "journal" && (
-          <section
-            id="notes-tabpanel-journal"
-            role="tabpanel"
-            aria-labelledby="notes-tab-journal"
-            tabIndex={0}
-            className="focus:outline-none"
-          >
+          <TabPanel idPrefix="notes" value="journal">
             <WeekJournal
               notes={[...active, ...completed]}
               diensten={diensten}
@@ -627,18 +626,12 @@ export default function NotitiesPage() {
               isError={isError}
               masked={privacyOn}
             />
-          </section>
+          </TabPanel>
         )}
 
         {/* ── Collection Tab ── */}
         {activeTab === "collection" && (
-          <section
-            id="notes-tabpanel-collection"
-            role="tabpanel"
-            aria-labelledby="notes-tab-collection"
-            tabIndex={0}
-            className="flex flex-col gap-4 focus:outline-none sm:gap-6"
-          >
+          <TabPanel idPrefix="notes" value="collection" className="flex flex-col gap-4 sm:gap-6">
             <NotesCaptureCard
               value={quickText}
               saving={quickSaving}
@@ -721,7 +714,7 @@ export default function NotitiesPage() {
               eventLabelById={eventLabelById}
               backlinksById={backlinksById}
             />
-          </section>
+          </TabPanel>
         )}
       </div>
 
@@ -869,6 +862,7 @@ function NotesCaptureCard({
   const quickContext = getPrimaryWorkspaceContext(value, parsed.extractedTags);
   const canSave = Boolean(parsed.cleanText);
   const mentionListId = "notes-capture-contact-list";
+  const mentionAnchorRef = useRef<HTMLInputElement>(null);
   const mention = useContactMention({
     value,
     contacts,
@@ -878,10 +872,11 @@ function NotesCaptureCard({
   });
 
   return (
-    <section className="glass relative border-amber-500/20 bg-amber-500/[0.045] p-2">
-      <div className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 focus-within:border-amber-500/45">
-        <StickyNote size={16} className="shrink-0 text-amber-300/80" />
-        <input
+    <section className={`${surfaceVariants({ tone: "accent", padding: "xs" })} relative`}>
+      <div className="flex min-h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 focus-within:border-[var(--color-primary-border)]">
+        <StickyNote size={16} className="shrink-0 text-[var(--color-primary)]" />
+        <Input
+          ref={mentionAnchorRef}
           type="text"
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -900,30 +895,27 @@ function NotesCaptureCard({
           aria-expanded={mention.isOpen}
           aria-controls={mentionListId}
           aria-activedescendant={mention.isOpen && mention.suggestions[mention.activeIndex] ? `${mentionListId}-${mention.suggestions[mention.activeIndex].id}` : undefined}
-          className="min-w-0 flex-1 bg-transparent text-base text-slate-100 outline-none placeholder:text-slate-600 disabled:opacity-50 sm:text-sm"
+          className="min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 text-base shadow-none hover:border-transparent focus:border-transparent focus:ring-0 sm:text-sm"
         />
-        <button
-          type="button"
+        <IconButton
+          label="Open in editor"
+          icon={<ArrowUpRight size={16} />}
+          variant="secondary"
           onClick={onOpenEditor}
-          title="Open in editor"
-          aria-label="Open in editor"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200"
-        >
-          <ArrowUpRight size={16} />
-        </button>
-        <button
-          type="button"
+        />
+        <IconButton
+          label="Snelle notitie opslaan"
+          icon={<Plus size={16} />}
+          variant="primary"
           onClick={() => void onSave()}
-          disabled={!canSave || saving}
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-[var(--color-primary-foreground)] transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-35"
-          aria-label="Snelle notitie opslaan"
-        >
-          <Plus size={16} />
-        </button>
+          disabled={!canSave}
+          loading={saving}
+        />
       </div>
 
       <ContactMentionMenu
         id={mentionListId}
+        anchorRef={mentionAnchorRef}
         isOpen={mention.isOpen}
         query={mention.query}
         suggestions={mention.suggestions}
@@ -936,29 +928,27 @@ function NotesCaptureCard({
       {(parsed.extractedTags.length > 0 || quickContext || selectedContact) && (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {parsed.extractedTags.map((tag) => (
-            <span key={tag} className="rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-200">
+            <Badge key={tag} tone="accent" size="sm">
               #{tag}
-            </span>
+            </Badge>
           ))}
           {quickContext && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-200">
+            <Badge tone="info" size="sm">
               {quickContext.label}
-              <span className="text-cyan-300/70">#{quickContext.tag}</span>
-            </span>
+              <span className="text-[var(--color-info)]">#{quickContext.tag}</span>
+            </Badge>
           )}
           {selectedContact && (
-            <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border border-violet-500/20 bg-violet-500/10 px-2 py-1 text-xs font-semibold text-violet-200">
+            <Badge tone="info" size="sm" className="min-w-0 max-w-full">
               <UserRound size={11} className="shrink-0" aria-hidden="true" />
               <span className="truncate">{selectedContact.display_name}</span>
-              <button
-                type="button"
+              <IconButton
+                label={`Koppeling met ${selectedContact.display_name} verwijderen`}
+                icon={<X size={11} />}
                 onClick={onClearContact}
-                aria-label={`Koppeling met ${selectedContact.display_name} verwijderen`}
-                className="-mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded text-violet-300/70 hover:bg-violet-500/20 hover:text-violet-100"
-              >
-                <X size={11} aria-hidden="true" />
-              </button>
-            </span>
+                className="-mr-2 border-transparent bg-transparent"
+              />
+            </Badge>
           )}
         </div>
       )}

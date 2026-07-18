@@ -19,7 +19,7 @@ import { getAmsterdamTodayIso, formatHours, formatMetaDate, pluralize, type Tab,
 import { shortSyncError, getShiftAppointments } from "@/components/schedule/scheduleUtils";
 import { EmptyRoster } from "@/components/schedule/RoosterCards";
 import { OverviewPanel, OverviewTab } from "@/components/schedule/RoosterOverview";
-import { TabBar, tabBarPanelId, tabBarTabId } from "@/components/schedule/TabBar";
+import { TabPanel, Tabs } from "@/components/ui/Tabs";
 import {
   AppPageHeader,
   AppPageShell,
@@ -28,14 +28,18 @@ import {
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { StatChip } from "@/components/ui/StatChip";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 function DeferredRosterPanel({ label }: { label: string }) {
   return (
     <div
       role="status"
-      className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-white/8 bg-white/[0.025] text-sm text-slate-400"
+      className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-active)] text-sm text-[var(--color-text-muted)]"
     >
-      <RefreshCw aria-hidden className="h-4 w-4 animate-spin" />
+      <RefreshCw aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
       {label}
     </div>
   );
@@ -63,9 +67,6 @@ const LazyCreateEventModal = dynamic(
 );
 
 
-const tabId = (id: Tab) => tabBarTabId("rooster", id);
-const tabPanelId = (id: Tab) => tabBarPanelId("rooster", id);
-
 function MobileRosterSnapshot({
   upcomingHours,
   upcomingCount,
@@ -91,7 +92,7 @@ function MobileRosterSnapshot({
         value={formatHours(upcomingHours)}
         meta={`${pluralize(upcomingCount, "dienst", "diensten")} · komende 30 dagen`}
         inlineMeta="30 dgn"
-        tone="amber"
+        tone="accent"
       />
       <StatChip
         icon={Briefcase}
@@ -99,7 +100,7 @@ function MobileRosterSnapshot({
         value={String(upcomingCount)}
         meta="komende 30 dagen"
         inlineMeta="30 dgn"
-        tone="sky"
+        tone="info"
       />
       {/* Stable metric — the value no longer silently switches meaning between
           "vandaag" and "aankomend" depending on the day (audit N6). */}
@@ -109,7 +110,7 @@ function MobileRosterSnapshot({
         value={String(eventCount)}
         meta={`${todayEventCount} vandaag · ${eventCount} komend`}
         inlineMeta={`${todayEventCount} vandaag`}
-        tone="indigo"
+        tone="info"
       />
       <StatChip
         icon={AlertTriangle}
@@ -117,7 +118,7 @@ function MobileRosterSnapshot({
         value={hardConflicts > 0 ? String(hardConflicts) : String(conflicts)}
         meta={hardConflicts > 0 ? "direct nalopen" : conflicts > 0 ? "aandacht" : "rustig"}
         inlineMeta={hardConflicts > 0 ? "direct nalopen" : conflicts > 0 ? "aandacht" : "rustig"}
-        tone={hardConflicts > 0 ? "rose" : conflicts > 0 ? "amber" : "green"}
+        tone={hardConflicts > 0 ? "danger" : conflicts > 0 ? "warning" : "success"}
       />
     </section>
   );
@@ -316,8 +317,8 @@ export default function RoosterPage() {
   };
 
   return (
-    <AppPageShell width="standard" className="space-y-6 text-slate-100">
-      <div className="sticky top-0 z-30 space-y-2 bg-[var(--color-background)]/95 pb-3 backdrop-blur-xl">
+    <AppPageShell width="standard" className="space-y-6 text-[var(--color-text)]">
+      <div className="sticky top-0 z-[var(--layer-sticky)] space-y-2 bg-[var(--color-background)]/95 pb-3 backdrop-blur-xl">
         <div className="flex items-center justify-between gap-2">
           <AppPageHeader
             eyebrow="Planning"
@@ -328,51 +329,43 @@ export default function RoosterPage() {
                 : "Nog niet gesynchroniseerd"
             }
             leading={
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-300">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]">
                 <Calendar size={19} aria-hidden="true" />
               </div>
             }
             className="min-w-0 flex-1"
           />
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
+            <Button
               onClick={handleCalendarSync}
-              disabled={calSyncing}
-              aria-busy={calSyncing}
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:cursor-wait disabled:opacity-50"
+              loading={calSyncing}
+              loadingLabel="Synchroniseren…"
+              variant="primary"
+              size="sm"
+              className="shrink-0"
             >
-              <RefreshCw
-                size={16}
-                className={calSyncing ? "animate-spin" : ""}
-                aria-hidden="true"
-              />
-              <span className="hidden sm:inline">
-                {calSyncing ? "Synchroniseren…" : "Synchroniseren"}
-              </span>
+              <RefreshCw size={16} aria-hidden="true" />
+              <span className="hidden sm:inline">Synchroniseren</span>
               <span className="sm:hidden">Sync</span>
-            </button>
-            <button
-              type="button"
+            </Button>
+            <IconButton
               onClick={() => setActionsOpen(true)}
-              aria-label="Meer roosteracties"
+              label="Meer roosteracties"
               aria-haspopup="dialog"
               aria-expanded={actionsOpen}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-white"
-            >
-              <MoreHorizontal size={18} aria-hidden="true" />
-            </button>
+              icon={<MoreHorizontal size={18} />}
+            />
           </div>
         </div>
 
         <PageToolbar label="Roosteronderdelen">
-          <TabBar
-            tabs={TABS}
-            active={tab}
-            onChange={setTab}
+          <Tabs
+            items={TABS}
+            value={tab}
+            onValueChange={setTab}
             idPrefix="rooster"
             ariaLabel="Rooster onderdelen"
-            tone="amber"
+            tone="accent"
             className="w-full"
           />
         </PageToolbar>
@@ -389,27 +382,23 @@ export default function RoosterPage() {
 
       <div className="space-y-6">
         {isLoading && hasScheduleData && (
-          <div className="flex items-center gap-2 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-slate-500">
-            <Clock3 size={13} className="text-sky-300" />
+          <div className="flex items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-text-muted)]">
+            <Clock3 size={13} className="text-[var(--color-info)]" />
             Roostergegevens worden bijgewerkt
           </div>
         )}
 
         {/* Failed ≠ empty (audit DEEL 2 #2): een mislukte refresh mét gecachte
-            data toont een persistente amber banner i.p.v. stil verouderde data. */}
+            data toont een persistente semantische waarschuwing i.p.v. stil verouderde data. */}
         {scheduleIsError && hasScheduleData && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
-            <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2 text-xs text-[var(--color-warning)]">
+            <AlertTriangle size={13} className="shrink-0 text-[var(--color-warning)]" />
             <span className="min-w-0 flex-1">
               Rooster verversen mislukt — je ziet mogelijk verouderde gegevens.
             </span>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
-            >
+            <Button size="sm" variant="secondary" onClick={() => void refetch()}>
               Opnieuw proberen
-            </button>
+            </Button>
           </div>
         )}
 
@@ -417,46 +406,33 @@ export default function RoosterPage() {
             een 500 volledig — een vrolijk-groene "rustig"-conflictchip naast een
             lege tijdlijn. Nu een expliciete banner met retry. */}
         {eventsError && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
-            <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2 text-xs text-[var(--color-warning)]">
+            <AlertTriangle size={13} className="shrink-0 text-[var(--color-warning)]" />
             <span className="min-w-0 flex-1">
               Afspraken en conflicten konden niet worden geladen — de tijdlijn en tellingen kunnen onvolledig zijn.
             </span>
-            <button
-              type="button"
-              onClick={() => void refetchEvents()}
-              className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
-            >
+            <Button size="sm" variant="secondary" onClick={() => void refetchEvents()}>
               Opnieuw proberen
-            </button>
+            </Button>
           </div>
         )}
 
         {/* Persistente wachtrij-fout van de laatste sync — pariteit met het
             sidebar-paneel op /agenda (audit F10). */}
         {pendingSyncError && (
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.05] px-3 py-2">
+          <div className="rounded-xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-3 py-2">
             <div className="flex items-center gap-2">
-              <AlertTriangle size={13} className="shrink-0 text-amber-400" />
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">Wachtrij-fout</p>
+              <AlertTriangle size={13} className="shrink-0 text-[var(--color-danger)]" />
+              <p className="text-micro font-semibold uppercase tracking-wider text-[var(--color-danger)]">Wachtrij-fout</p>
             </div>
-            <p className="mt-1 text-[11px] leading-relaxed text-amber-400/80">{shortSyncError(pendingSyncError)}</p>
+            <p className="mt-1 text-micro leading-relaxed text-[var(--color-danger)]">{shortSyncError(pendingSyncError)}</p>
             <div className="mt-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleCalendarSync}
-                disabled={calSyncing}
-                className="rounded-md border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 disabled:opacity-50 cursor-pointer"
-              >
+              <Button size="sm" variant="primary" onClick={handleCalendarSync} loading={calSyncing} loadingLabel="Syncen…">
                 Opnieuw syncen
-              </button>
-              <button
-                type="button"
-                onClick={() => setPendingSyncError(null)}
-                className="rounded-md px-2 py-1 text-[10px] font-semibold text-slate-500 transition-colors hover:text-slate-300 cursor-pointer"
-              >
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setPendingSyncError(null)}>
                 Verbergen
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -472,9 +448,9 @@ export default function RoosterPage() {
           <div className="space-y-4" aria-hidden="true">
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="space-y-2">
-                <div className="h-4 w-40 animate-pulse rounded bg-white/5" />
-                <div className="h-12 animate-pulse rounded-lg bg-white/[0.03]" />
-                <div className="h-12 animate-pulse rounded-lg bg-white/[0.03]" />
+                <Skeleton className="h-4 w-40 rounded" />
+                <Skeleton className="h-12 rounded-lg" />
+                <Skeleton className="h-12 rounded-lg" />
               </div>
             ))}
           </div>
@@ -483,20 +459,16 @@ export default function RoosterPage() {
         {/* Failed ≠ empty (audit DEEL 2 #2): een 500 zonder data toont een
             foutpaneel met retry, niet de uitnodigende "Rooster ophalen"-CTA. */}
         {tab === "overzicht" && !hasScheduleData && !isLoading && scheduleIsError && (
-          <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] px-6 py-12 text-center">
-            <AlertTriangle size={28} className="text-amber-400" />
-            <h3 className="mt-4 text-lg font-semibold text-amber-100">Rooster kon niet worden geladen</h3>
-            <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
+          <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-6 py-12 text-center">
+            <AlertTriangle size={28} className="text-[var(--color-danger)]" />
+            <h3 className="mt-4 text-lg font-semibold text-[var(--color-danger)]">Rooster kon niet worden geladen</h3>
+            <p className="mt-2 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
               {scheduleErrorMessage(scheduleError)}
             </p>
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 cursor-pointer"
-            >
+            <Button variant="primary" onClick={() => void refetch()} className="mt-5">
               <RefreshCw size={15} />
               Opnieuw proberen
-            </button>
+            </Button>
           </div>
         )}
 
@@ -567,7 +539,7 @@ export default function RoosterPage() {
             )}
 
             {tab === "overzicht" && hasScheduleData && (
-              <div role="tabpanel" id={tabPanelId("overzicht")} aria-labelledby={tabId("overzicht")} tabIndex={0}>
+              <TabPanel idPrefix="rooster" value="overzicht">
                 <OverviewTab
                   unifiedWeeks={unifiedWeeks}
                   isWeekOpen={isWeekOpen}
@@ -587,44 +559,38 @@ export default function RoosterPage() {
                   metaSyncedAt={meta?.importedAt}
                   thisMonthEvents={thisMonthEvents.length}
                 />
-              </div>
+              </TabPanel>
             )}
 
             {tab === "statistieken" && (
-              <div
-                role="tabpanel"
-                id={tabPanelId("statistieken")}
-                aria-labelledby={tabId("statistieken")}
-                tabIndex={0}
-                className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
+              <TabPanel
+                idPrefix="rooster"
+                value="statistieken"
+                className={surfaceVariants({ tone: "subtle" })}
               >
                 <ErrorBoundary>
                   <LazyStatsView diensten={diensten} />
                 </ErrorBoundary>
-              </div>
+              </TabPanel>
             )}
 
             {tab === "salaris" && (
-              <div
-                role="tabpanel"
-                id={tabPanelId("salaris")}
-                aria-labelledby={tabId("salaris")}
-                tabIndex={0}
-                className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
+              <TabPanel
+                idPrefix="rooster"
+                value="salaris"
+                className={surfaceVariants({ tone: "subtle" })}
               >
                 <ErrorBoundary>
                   <LazySalarisView diensten={diensten} />
                 </ErrorBoundary>
-              </div>
+              </TabPanel>
             )}
 
             {tab === "afspraken_beheer" && (
-              <div
-                role="tabpanel"
-                id={tabPanelId("afspraken_beheer")}
-                aria-labelledby={tabId("afspraken_beheer")}
-                tabIndex={0}
-                className="rounded-2xl border border-white/8 bg-white/[0.035] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:p-5"
+              <TabPanel
+                idPrefix="rooster"
+                value="afspraken_beheer"
+                className={surfaceVariants({ tone: "subtle" })}
               >
                 <ErrorBoundary>
                   {/* Volledige dienstenlijst — zelfde invoer als de pagina zelf
@@ -641,7 +607,7 @@ export default function RoosterPage() {
                     onPendingSyncError={setPendingSyncError}
                   />
                 </ErrorBoundary>
-              </div>
+              </TabPanel>
             )}
           </>
         )}
@@ -654,64 +620,68 @@ export default function RoosterPage() {
         closeLabel="Roosteracties sluiten"
       >
         <div className="space-y-2 p-4 sm:p-5">
-          <button
-            type="button"
+          <Button
+            fullWidth
+            variant="secondary"
             onClick={() => {
               fileRef.current?.click();
               setActionsOpen(false);
             }}
             disabled={isLoading || importing}
-            className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-left text-sm font-semibold text-slate-200 transition-colors hover:bg-[var(--color-surface-hover)] disabled:cursor-wait disabled:opacity-50"
+            className="min-h-14 justify-start px-4 text-left"
           >
             <Upload
               size={18}
-              className={importing ? "animate-pulse text-amber-300" : "text-slate-400"}
+              className={importing ? "animate-pulse text-[var(--color-primary-hover)] motion-reduce:animate-none" : "text-[var(--color-text-muted)]"}
               aria-hidden="true"
             />
             <span className="min-w-0 flex-1">
               <span className="block">{importing ? "Importeren…" : "CSV importeren"}</span>
-              <span className="mt-0.5 block text-xs font-normal text-slate-500">
+              <span className="mt-0.5 block text-xs font-normal text-[var(--color-text-muted)]">
                 Voeg diensten toe vanuit een roosterbestand
               </span>
             </span>
-          </button>
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            fullWidth
+            variant="secondary"
             onClick={() => {
               setActionsOpen(false);
               openNewEvent();
             }}
-            className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.06] px-4 text-left text-sm font-semibold text-indigo-200 transition-colors hover:bg-indigo-500/10"
+            className="min-h-14 justify-start border-[var(--color-info-border)] bg-[var(--color-info-subtle)] px-4 text-left text-[var(--color-info)] hover:bg-[var(--color-info-border)]"
           >
             <Plus size={18} aria-hidden="true" />
             <span className="min-w-0 flex-1">
               <span className="block">Nieuwe afspraak</span>
-              <span className="mt-0.5 block text-xs font-normal text-indigo-300/70">
+              <span className="mt-0.5 block text-xs font-normal text-[var(--color-info)]">
                 Plan een persoonlijk agenda-item
               </span>
             </span>
-          </button>
+          </Button>
 
           {meta && (
-            <button
-              type="button"
+            <Button
+              fullWidth
+              variant="danger"
               onClick={() => void handleClearSchedule()}
-              disabled={clearing}
-              className="flex min-h-12 w-full items-center gap-3 rounded-xl border border-rose-500/20 bg-rose-500/[0.06] px-4 text-left text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/10 disabled:cursor-wait disabled:opacity-50"
+              loading={clearing}
+              loadingLabel="Rooster wissen…"
+              className="min-h-14 justify-start px-4 text-left"
             >
               {clearing ? (
-                <RefreshCw size={18} className="animate-spin" aria-hidden="true" />
+                <RefreshCw size={18} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
               ) : (
                 <Trash2 size={18} aria-hidden="true" />
               )}
               <span className="min-w-0 flex-1">
                 <span className="block">{clearing ? "Wissen…" : "Rooster wissen"}</span>
-                <span className="mt-0.5 block text-xs font-normal text-rose-300/70">
+                <span className="mt-0.5 block text-xs font-normal text-[var(--color-danger)]">
                   Verwijder alle geïmporteerde diensten
                 </span>
               </span>
-            </button>
+            </Button>
           )}
         </div>
       </BottomSheet>

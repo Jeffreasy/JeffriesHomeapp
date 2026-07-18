@@ -1,4 +1,5 @@
 import { eur } from "@/lib/finance-constants";
+import { Surface } from "@/components/ui/Surface";
 import { formatMonth } from "./FinanceUtils";
 
 // ─── Recharts custom tooltips ─────────────────────────────────────────────────
@@ -17,14 +18,23 @@ interface TooltipProps {
 export function ChartTooltip({ active, payload, label, valueFormatter = eur, labelFormatter = formatMonth }: TooltipProps) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="chart-tooltip">
-      <p className="chart-tooltip__label">{label ? labelFormatter(label) : label}</p>
-      {payload.map((p) => (
-        <p key={p.name} className="chart-tooltip__value" style={{ color: p.color }}>
-          {p.name}: {valueFormatter(p.value)}
-        </p>
-      ))}
-    </div>
+    <Surface tone="elevated" radius="sm" padding="xs" className="min-w-36 text-xs">
+      <p className="mb-1.5 font-semibold text-[var(--color-text)]">
+        {label ? labelFormatter(label) : label}
+      </p>
+      <div className="space-y-1">
+        {payload.map((p) => (
+          <p key={p.name} className="flex items-center gap-2 font-medium tabular-nums text-[var(--color-text)]">
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: p.color }}
+            />
+            <span>{p.name}: {valueFormatter(p.value)}</span>
+          </p>
+        ))}
+      </div>
+    </Surface>
   );
 }
 
@@ -44,12 +54,19 @@ export function PieTooltip({ active, payload, valueFormatter }: PieTooltipProps)
     ? (item.percent * 100).toFixed(1)
     : null;
   return (
-    <div className="chart-tooltip">
-      <p className="chart-tooltip__label">{item.name}</p>
-      <p className="chart-tooltip__value" style={{ color: item.color }}>
-        {formatValue(item.value)}
-        {pct && <span className="chart-tooltip__pct"> ({pct}%)</span>}
+    <Surface tone="elevated" radius="sm" padding="xs" className="min-w-36 text-xs">
+      <p className="mb-1.5 font-semibold text-[var(--color-text)]">{item.name}</p>
+      <p className="flex items-center gap-2 font-medium tabular-nums text-[var(--color-text)]">
+        <span
+          aria-hidden="true"
+          className="h-2 w-2 shrink-0 rounded-full"
+          style={{ backgroundColor: item.color }}
+        />
+        <span>
+          {formatValue(item.value)}
+          {pct && <span className="text-[var(--color-text-subtle)]"> ({pct}%)</span>}
+        </span>
       </p>
-    </div>
+    </Surface>
   );
 }

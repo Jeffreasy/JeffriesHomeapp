@@ -112,14 +112,28 @@ De door de lamp gekozen kleur is functionele UI-context. `lib/lampPresentation.t
 Gedeelde primitives staan in `components/ui/`:
 
 - `Button` voor varianten, loading, focus en minimale touchmaat;
+- `ButtonLink` en `IconButton` voor link- en icoonacties zonder stijlduplicatie;
 - `Surface` voor panelen en semantische surfaces;
 - `SurfaceHeader` voor de gedeelde kopstructuur, metadata en surface-acties;
+- `FormField`, `Input`, `Select`, `Textarea`, `Checkbox`, `Switch` en `Range` voor velden en validatie;
+- `Tabs` voor het volledige keyboard- en tabpanelcontract;
+- `Badge`, `Progress` en `Skeleton` voor compacte status en voortgang;
 - `FeedbackState` voor loading, empty en error;
-- `OverlaySurface`, `Modal`, `BottomSheet` en `ConfirmDialog` voor overlays;
-- `Toast` uitsluitend voor tijdelijke, niet-kritieke bevestiging.
+- `OverlaySurface`, `Modal`, `BottomSheet` en `ConfirmDialog` voor modale overlays;
+- `Popover` voor verankerde desktopmenu's en pickers met dezelfde inhoud als mobiele sheet;
+- `InputAnchoredListbox` voor portalled comboboxsuggesties met centrale viewport-collision;
+- `ResponsiveActions` en `MobileActionDock` voor taakgerichte mobiele acties;
+- `Toast` uitsluitend voor tijdelijke, niet-kritieke bevestiging of herstelactie.
 
-Reusable components combineren classes met `cn()`. Core tonen staan in `lib/ui/tones.ts`; domeinspecifieke betekenis blijft bij het domein. Interactieve touchdoelen blijven minimaal 44px hoog. Willekeurige nieuwe z-indexes, portals, scroll-locks of modals buiten de centrale overlaylaag zijn niet toegestaan.
-
+Reusable components combineren classes met `cn()`. Semantische tonen staan in
+`lib/ui/tones.ts`; domeinspecifieke betekenis blijft bij het domein. Legacy
+`.glass`-, `.btn`-, finance-BEM-, domein-`Panel`- en losse TabBar-contracten
+zijn verwijderd en worden door een architecture test geblokkeerd. Interactieve
+touchdoelen blijven minimaal 44px hoog. Willekeurige nieuwe z-indexes, portals,
+scroll-locks of modals buiten de centrale overlaylaag zijn niet toegestaan.
+`text-micro`, `lib/ui/motion.ts` en de globale `MotionConfig` begrenzen
+respectievelijk compacte typografie en animatie; losse 8–11px-klassen,
+`transition-all` en fysieke featurekleuren worden door guardrails geweigerd.
 Mobiel is taakgericht: kernacties en individuele lampbediening komen vóór samenvattingen. Desktop toont meer parallelle context. Beide viewports gebruiken dezelfde data- en actiecontracten.
 
 ## 9. Performancecontract
@@ -129,6 +143,8 @@ Zware code blijft buiten het initiële pad:
 - roosterstatistieken, salaris en maandgrafieken zijn dynamische workspaces;
 - loonstrook- en mailbijlage-PDF-parsers laden pas na een bestandsactie;
 - routeprefetch gebeurt alleen waar navigatie-intentie dit rechtvaardigt.
+- de persistente shell gebruikt een compacte `NavigationIcon`-registry; de volledige
+  symboolpicker-registry is uitsluitend route- en editorcode.
 
 `performance-budget.json` definieert een fail-closed gzipbudget voor gedeelde JS, CSS, iedere geproduceerde route en individuele chunks. `scripts/check-performance-budget.mjs` leest de echte Next.js buildmanifesten, weigert ontbrekende of ontsnappende assets en faalt CI bij overschrijding.
 
@@ -143,7 +159,10 @@ Verboden in telemetry:
 - namen, e-mailadressen, user-id's of CRM-context;
 - raw `error.message`, stacktraces of browserconsole-inhoud.
 
-Gebruikers krijgen veilige Nederlandse feedback en een herstelactie. Technische details blijven in gecontroleerde, allowlisted diagnostiek.
+Gebruikers krijgen veilige Nederlandse feedback en een herstelactie. Technische
+details blijven in gecontroleerde, allowlisted diagnostiek. `app/global-error.tsx`
+is bewust self-contained omdat deze noodgrens de rootlayout vervangt en dus niet
+op diens CSS, providers of design-systemcomponenten mag vertrouwen.
 
 ## 11. LaventeCare PDF-privacy
 

@@ -1,10 +1,18 @@
 "use client";
 
+import { Button } from "@/components/ui/Button";
+import { FormField } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
-import { FolderKanban, Loader2, Plus } from "lucide-react";
-import { Modal, ModalCancelButton } from "@/components/ui/Modal";
+import { FolderKanban, Plus } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
+import { ModalCancelButton } from "@/components/ui/ModalCancelButton";
 import type { CompanyItem, ProjectForm } from "./LaventeCareTypes";
 import { LAVENTECARE_PROJECT_PHASES, LAVENTECARE_PROJECT_STATUSES } from "./LaventeCareTypes";
+
+const PROJECT_FORM_ID = "laventecare-project-form";
 
 export function LaventeCareProjectModal({
   isOpen,
@@ -33,7 +41,7 @@ export function LaventeCareProjectModal({
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     if (!projectForm.naam.trim()) {
       setNaamError("Naam is verplicht");
-      window.setTimeout(() => document.getElementById("project-form-naam")?.focus(), 0);
+      window.setTimeout(() => document.getElementById("project-form-name")?.focus(), 0);
     } else {
       setNaamError("");
     }
@@ -46,156 +54,184 @@ export function LaventeCareProjectModal({
       onClose={onClose}
       dirty={dirty}
       title="Nieuw project toevoegen"
-      icon={<FolderKanban size={18} className="text-emerald-300" />}
-      theme="emerald"
+      icon={<FolderKanban size={18} className="text-[var(--color-success)]" />}
+      tone="success"
       maxWidth="2xl"
-    >
-      <form onSubmit={handleSubmit} noValidate className="grid gap-4 sm:grid-cols-2">
-        <label className="block sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Bestaande klant</span>
-          <select
-            value={projectForm.companyId}
-            onChange={(event) => {
-              const selected = companies.find((company) => company.id === event.target.value);
-              setProjectForm((form) => ({
-                ...form,
-                companyId: event.target.value,
-                companyName: selected ? selected.naam : form.companyName,
-                website: selected?.website ?? form.website,
-              }));
-            }}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <ModalCancelButton onFallback={onClose} className="w-full sm:w-auto" />
+          <Button
+            type="submit"
+            form={PROJECT_FORM_ID}
+            variant="successSolid"
+            loading={savingProject}
+            loadingLabel="Project toevoegen…"
+            className="w-full px-6 sm:w-auto"
           >
-            <option value="">Nieuwe/geen klant</option>
-            {companies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.naam}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">
-            Naam <span className="text-rose-300">*</span>
-          </span>
-          <input
-            id="project-form-naam"
-            required
-            aria-invalid={Boolean(naamError)}
-            value={projectForm.naam}
-            onChange={(event) => setProjectForm((form) => ({ ...form, naam: event.target.value }))}
-            placeholder="Naam van het project"
-            className={`mt-1 w-full rounded-lg border bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 ${
-              naamError
-                ? "border-rose-400/60 focus:border-rose-400/60"
-                : "border-[var(--color-border)] focus:border-emerald-500"
-            }`}
-          />
-          {naamError ? (
-            <p className="mt-1 text-xs font-semibold text-rose-300" role="alert">
-              {naamError}
-            </p>
-          ) : null}
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Nieuwe klantnaam</span>
-          <input
-            value={projectForm.companyName}
-            disabled={dossierSelected}
-            onChange={(event) => setProjectForm((form) => ({ ...form, companyName: event.target.value }))}
-            placeholder="Alleen invullen bij nieuwe klant"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          {dossierSelected ? (
-            <span className="mt-1 block text-[11px] text-slate-500">wordt overgenomen uit klantdossier</span>
-          ) : null}
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Website</span>
-          <input
-            value={projectForm.website}
-            disabled={dossierSelected}
-            onChange={(event) => setProjectForm((form) => ({ ...form, website: event.target.value }))}
-            placeholder="https://..."
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
-          />
-          {dossierSelected ? (
-            <span className="mt-1 block text-[11px] text-slate-500">wordt overgenomen uit klantdossier</span>
-          ) : null}
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Fase</span>
-          <select
-            value={projectForm.fase}
-            onChange={(event) => setProjectForm((form) => ({ ...form, fase: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
-          >
-            {LAVENTECARE_PROJECT_PHASES.map((phase) => (
-              <option key={phase.value} value={phase.value}>
-                {phase.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Status</span>
-          <select
-            value={projectForm.status}
-            onChange={(event) => setProjectForm((form) => ({ ...form, status: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
-          >
-            {LAVENTECARE_PROJECT_STATUSES.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Waarde indicatie</span>
-          <input
-            type="number"
-            value={projectForm.waardeIndicatie}
-            onChange={(event) =>
-              setProjectForm((form) => ({
-                ...form,
-                waardeIndicatie: event.target.value ? Number(event.target.value) : "",
-              }))
-            }
-            placeholder="Bijv. 1500"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Deadline</span>
-          <input
-            type="date"
-            value={projectForm.deadline}
-            onChange={(event) => setProjectForm((form) => ({ ...form, deadline: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors focus:border-emerald-500"
-          />
-        </label>
-        <label className="block sm:col-span-2">
-          <span className="text-xs font-semibold text-slate-400">Samenvatting</span>
-          <textarea
-            value={projectForm.samenvatting}
-            onChange={(event) => setProjectForm((form) => ({ ...form, samenvatting: event.target.value }))}
-            placeholder="Waar gaat het project over?"
-            rows={3}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none transition-colors placeholder:text-slate-600 focus:border-emerald-500"
-          />
-        </label>
-        <div className="mt-4 flex justify-end border-t border-white/5 pt-4 sm:col-span-2">
-          {/* R11: via de guarded close, zodat de dirty-guard ook hier geldt. */}
-          <ModalCancelButton
-            onFallback={onClose}
-            className="mr-3 px-4 py-2 text-sm text-slate-300 transition-colors hover:text-white"
-          />
-          <button type="submit" disabled={savingProject} className="btn border-transparent bg-emerald-500 px-6 text-white hover:bg-emerald-600">
-            {savingProject ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Plus size={16} className="mr-2" />}
+            <Plus size={16} aria-hidden="true" />
             Project toevoegen
-          </button>
+          </Button>
         </div>
+      }
+    >
+      <form id={PROJECT_FORM_ID} onSubmit={handleSubmit} noValidate className="grid gap-4 sm:grid-cols-2">
+        <FormField
+          id="project-form-company"
+          label="Bestaande klant"
+          className="sm:col-span-2"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
+              value={projectForm.companyId}
+              onChange={(event) => {
+                const selected = companies.find((company) => company.id === event.target.value);
+                setProjectForm((form) => ({
+                  ...form,
+                  companyId: event.target.value,
+                  companyName: selected ? selected.naam : form.companyName,
+                  website: selected?.website ?? form.website,
+                }));
+              }}
+            >
+              <option value="">Nieuwe/geen klant</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.naam}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        <FormField
+          id="project-form-name"
+          label={<>Naam <span aria-hidden="true" className="text-[var(--color-danger)]">*</span></>}
+          error={naamError || undefined}
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              required
+              invalid={Boolean(naamError)}
+              value={projectForm.naam}
+              onChange={(event) => setProjectForm((form) => ({ ...form, naam: event.target.value }))}
+              placeholder="Naam van het project"
+            />
+          )}
+        </FormField>
+        <FormField
+          id="project-form-company-name"
+          label="Nieuwe klantnaam"
+          description={dossierSelected ? "Wordt overgenomen uit klantdossier" : undefined}
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              value={projectForm.companyName}
+              disabled={dossierSelected}
+              onChange={(event) => setProjectForm((form) => ({ ...form, companyName: event.target.value }))}
+              placeholder="Alleen invullen bij nieuwe klant"
+            />
+          )}
+        </FormField>
+        <FormField
+          id="project-form-website"
+          label="Website"
+          description={dossierSelected ? "Wordt overgenomen uit klantdossier" : undefined}
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              value={projectForm.website}
+              disabled={dossierSelected}
+              onChange={(event) => setProjectForm((form) => ({ ...form, website: event.target.value }))}
+              placeholder="https://..."
+            />
+          )}
+        </FormField>
+        <FormField
+          id="project-form-phase"
+          label="Fase"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
+              value={projectForm.fase}
+              onChange={(event) => setProjectForm((form) => ({ ...form, fase: event.target.value }))}
+            >
+              {LAVENTECARE_PROJECT_PHASES.map((phase) => (
+                <option key={phase.value} value={phase.value}>
+                  {phase.label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        <FormField
+          id="project-form-status"
+          label="Status"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
+              value={projectForm.status}
+              onChange={(event) => setProjectForm((form) => ({ ...form, status: event.target.value }))}
+            >
+              {LAVENTECARE_PROJECT_STATUSES.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
+        <FormField
+          id="project-form-estimated-value"
+          label="Waarde indicatie"
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              type="number"
+              value={projectForm.waardeIndicatie}
+              onChange={(event) =>
+                setProjectForm((form) => ({
+                  ...form,
+                  waardeIndicatie: event.target.value ? Number(event.target.value) : "",
+                }))
+              }
+              placeholder="Bijv. 1500"
+            />
+          )}
+        </FormField>
+        <FormField
+          id="project-form-deadline"
+          label="Deadline"
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              type="date"
+              value={projectForm.deadline}
+              onChange={(event) => setProjectForm((form) => ({ ...form, deadline: event.target.value }))}
+            />
+          )}
+        </FormField>
+        <FormField
+          id="project-form-summary"
+          label="Samenvatting"
+          className="sm:col-span-2"
+        >
+          {(controlProps) => (
+            <Textarea
+              {...controlProps}
+              value={projectForm.samenvatting}
+              onChange={(event) => setProjectForm((form) => ({ ...form, samenvatting: event.target.value }))}
+              placeholder="Waar gaat het project over?"
+              rows={3}
+            />
+          )}
+        </FormField>
       </form>
     </Modal>
   );

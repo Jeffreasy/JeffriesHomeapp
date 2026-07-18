@@ -1,3 +1,9 @@
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { IconButton } from "@/components/ui/IconButton";
+import { MetricCard as UiMetricCard } from "@/components/ui/MetricCard";
+import { Surface } from "@/components/ui/Surface";
 import type { ReactNode } from "react";
 import {
   CalendarClock,
@@ -31,36 +37,26 @@ export function MetricCard({
   detail: string;
   tone: Tone;
 }) {
-  const toneClass = toneClasses[tone];
   return (
-    <div className="glass min-w-0 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{metricLabel}</p>
-          <p className="mt-2 text-2xl font-bold text-white">{value}</p>
-        </div>
-        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border", toneClass.border, toneClass.surface)}>
-          <Icon size={18} className={toneClass.icon} />
-        </div>
-      </div>
-      <p className="mt-3 text-sm text-slate-400">{detail}</p>
-    </div>
+    <UiMetricCard
+      icon={Icon}
+      label={metricLabel}
+      value={value}
+      description={detail}
+      tone={tone}
+      appearance="neutral"
+    />
   );
 }
 
 export function EmptyState({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="glass min-w-0 border-dashed p-5 text-sm text-slate-400">
-      <p className="font-semibold text-slate-200">{title}</p>
-      <p className="mt-1">{body}</p>
-    </div>
-  );
+  return <FeedbackState compact title={title} description={body} className="border-dashed" />;
 }
 
 function signalMeta(source: BusinessSignal["source"]): { icon: LucideIcon; label: string; tone: Tone } {
-  if (source === "email") return { icon: Mail, label: "Email", tone: "sky" };
-  if (source === "agenda") return { icon: CalendarClock, label: "Agenda", tone: "emerald" };
-  return { icon: StickyNote, label: "Notitie", tone: "amber" };
+  if (source === "email") return { icon: Mail, label: "Email", tone: "info" };
+  if (source === "agenda") return { icon: CalendarClock, label: "Agenda", tone: "success" };
+  return { icon: StickyNote, label: "Notitie", tone: "accent" };
 }
 
 export function SignalCard({
@@ -81,52 +77,49 @@ export function SignalCard({
   const tone = toneClasses[meta.tone];
   const disabled = busyAction || busyLead;
   return (
-    <div className="glass min-w-0 p-4">
+    <Surface padding="none" className="p-4">
       <div className="flex items-start gap-3">
         <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", tone.border, tone.surface)}>
           <Icon size={16} className={tone.icon} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={cn("rounded-full border px-2 py-0.5 text-xs font-bold", tone.border, tone.surface, tone.text)}>
+            <Badge tone={meta.tone} size="sm">
               {meta.label}
-            </span>
-            <span className={cn(
-              "rounded-full border px-2 py-0.5 text-xs font-bold",
-              signal.urgency === "hoog" ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400",
-            )}>
+            </Badge>
+            <Badge tone={signal.urgency === "hoog" ? "danger" : "neutral"} size="sm">
               {signal.urgency}
-            </span>
+            </Badge>
           </div>
-          <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-white">{signal.title}</h3>
-          <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{signal.subtitle}</p>
-          <p className="mt-3 text-xs font-semibold text-slate-400">
+          <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-[var(--color-text)]">{signal.title}</h3>
+          <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--color-text-muted)]">{signal.subtitle}</p>
+          <p className="mt-3 text-xs font-semibold text-[var(--color-text-muted)]">
             {formatDate(signal.date)} - match: {signal.matchedTerm}
           </p>
-          <p className="mt-2 text-sm leading-5 text-slate-400">{signal.actionHint}</p>
+          <p className="mt-2 text-sm leading-5 text-[var(--color-text-muted)]">{signal.actionHint}</p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-            <button
+            <Button
               type="button"
               onClick={() => onCreateAction(signal)}
               disabled={disabled}
-              className="btn btn--ghost btn--sm flex-1 justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+              variant="ghost" size="sm" className="flex-1"
             >
-              {busyAction ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              {busyAction ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <Plus size={14} />}
               Actie
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => onConvertToLead(signal)}
               disabled={disabled}
-              className="btn btn--primary btn--sm flex-1 justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+              variant="primary" size="sm" className="flex-1"
             >
-              {busyLead ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+              {busyLead ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none" /> : <ArrowRight size={14} />}
               Lead
-            </button>
+            </Button>
           </div>
         </div>
       </div>
-    </div>
+    </Surface>
   );
 }
 
@@ -141,24 +134,21 @@ const followUpSourceLabels: Record<FollowUpSignal["source"], string> = {
 
 export function FollowUpCard({ followUp }: { followUp: FollowUpSignal }) {
   return (
-    <div className="glass min-w-0 p-4">
+    <Surface padding="none" className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">
             {followUpSourceLabels[followUp.source] ?? label(followUp.source)}
           </p>
-          <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-white">{followUp.title}</h3>
+          <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-[var(--color-text)]">{followUp.title}</h3>
         </div>
-        <span className={cn(
-          "shrink-0 rounded-full border px-2.5 py-1 text-xs font-bold",
-          followUp.priority === "hoog" ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
-        )}>
+        <Badge tone={followUp.priority === "hoog" ? "danger" : "success"} className="shrink-0">
           {formatDate(followUp.date)}
-        </span>
+        </Badge>
       </div>
-      <p className="mt-3 text-xs font-semibold text-slate-500">{label(followUp.status)}</p>
-      <p className="mt-2 text-sm leading-5 text-slate-400">{followUp.actionHint}</p>
-    </div>
+      <p className="mt-3 text-xs font-semibold text-[var(--color-text-muted)]">{label(followUp.status)}</p>
+      <p className="mt-2 text-sm leading-5 text-[var(--color-text-muted)]">{followUp.actionHint}</p>
+    </Surface>
   );
 }
 
@@ -173,46 +163,42 @@ export function ActionItemCard({
 }) {
   const highPriority = action.priority === "hoog";
   return (
-    <div className="glass min-w-0 p-4">
+    <Surface padding="none" className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-bold text-slate-300">
+            <Badge tone="neutral" size="sm">
               {label(action.actionType)}
-            </span>
-            <span className={cn(
-              "rounded-full border px-2 py-0.5 text-xs font-bold",
-              highPriority ? "border-rose-500/25 bg-rose-500/10 text-rose-200" : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
-            )}>
+            </Badge>
+            <Badge tone={highPriority ? "danger" : "success"} size="sm">
               {label(action.priority)}
-            </span>
+            </Badge>
           </div>
-          <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-white">{action.title}</h3>
+          <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-[var(--color-text)]">{action.title}</h3>
           {(action.company_name || action.project_name || action.workstream_title || action.lead_title) && (
-            <p className="mt-1 truncate text-xs font-semibold text-amber-300/80">
+            <p className="mt-1 truncate text-xs font-semibold text-[var(--color-primary-hover)]">
               {[action.company_name, action.project_name ?? action.workstream_title ?? action.lead_title].filter(Boolean).join(" · ")}
             </p>
           )}
-          {action.summary && <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{action.summary}</p>}
-          <p className="mt-3 text-xs font-semibold text-slate-500">
+          {action.summary && <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--color-text-muted)]">{action.summary}</p>}
+          <p className="mt-3 text-xs font-semibold text-[var(--color-text-muted)]">
             {label(action.source)}
             {action.dueDate ? ` - ${formatDate(action.dueDate)}${action.due_time ? ` ${action.due_time}` : ""}` : ""}
           </p>
           {action.source_activity_title && (
-            <p className="mt-1 truncate text-xs text-slate-500">← vanuit moment: {action.source_activity_title}</p>
+            <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">← vanuit moment: {action.source_activity_title}</p>
           )}
         </div>
-        <button
-          type="button"
+        <IconButton
           onClick={() => onComplete(action)}
           disabled={busy}
-          aria-label={`Rond actie af: ${action.title}`}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-online)]/25 bg-[var(--color-online)]/10 text-[var(--color-online)] transition-colors hover:bg-[var(--color-online)]/20 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {busy ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={16} />}
-        </button>
+          label={`Rond actie af: ${action.title}`}
+          variant="success"
+          loading={busy}
+          icon={<CheckCircle2 size={16} />}
+        />
       </div>
-    </div>
+    </Surface>
   );
 }
 
@@ -233,18 +219,18 @@ export function OperationCard({
 }) {
   const toneClass = toneClasses[tone];
   return (
-    <div className="glass min-w-0 p-4">
+    <Surface padding="none" className="p-4">
       <div className="flex items-start gap-3">
         <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", toneClass.border, toneClass.surface)}>
           <Icon size={16} className={toneClass.icon} />
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{meta}</p>
-          <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-white">{title}</h3>
-          <p className="mt-2 line-clamp-3 text-sm leading-5 text-slate-400">{body}</p>
+          <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">{meta}</p>
+          <h3 className="mt-1 line-clamp-2 text-sm font-semibold text-[var(--color-text)]">{title}</h3>
+          <p className="mt-2 line-clamp-3 text-sm leading-5 text-[var(--color-text-muted)]">{body}</p>
           {actions ? <div className="mt-3 flex flex-wrap gap-2">{actions}</div> : null}
         </div>
       </div>
-    </div>
+    </Surface>
   );
 }

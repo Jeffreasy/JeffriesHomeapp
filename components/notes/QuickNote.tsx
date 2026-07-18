@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useRef, useState } from "react";
 import { StickyNote, Plus, ChevronRight, Pin, ListChecks, UserRound, X } from "lucide-react";
-import Link from "next/link";
 import { useNotes, type NoteRecord } from "@/hooks/useNotes";
 import { usePrivacy } from "@/hooks/usePrivacy";
 import { AppIcon } from "@/components/ui/AppIcon";
@@ -15,6 +13,11 @@ import { useContacten } from "@/hooks/useContacten";
 import type { Contact } from "@/lib/api";
 import { ContactMentionMenu, useContactMention } from "./ContactMentionMenu";
 import { NoteContextBadge } from "./NoteContextBadge";
+import { Badge } from "@/components/ui/Badge";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Surface } from "@/components/ui/Surface";
 
 export function QuickNote() {
   const { notes, active, create, isLoading } = useNotes();
@@ -26,6 +29,7 @@ export function QuickNote() {
   const [saving, setSaving] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const mentionListId = "dashboard-quick-note-contact-list";
+  const mentionAnchorRef = useRef<HTMLInputElement>(null);
   const mention = useContactMention({
     value: text,
     contacts,
@@ -82,31 +86,34 @@ export function QuickNote() {
     <section>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <p className="text-xs text-slate-500 uppercase tracking-wider">Notities</p>
+          <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Notities</p>
           {notes.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-[10px] text-slate-600 bg-[var(--color-surface)] px-1.5 py-0.5 rounded-md tabular-nums">
+            <Badge tone="neutral" size="sm" className="tabular-nums">
               {notes.length}
               {totalPinned > 0 && (
                 <span className="inline-flex items-center gap-0.5">
-                  · {totalPinned} <Pin size={9} className="text-amber-400 fill-amber-400" />
+                  · {totalPinned} <Pin size={9} className="fill-current text-[var(--color-primary)]" />
                 </span>
               )}
-            </span>
+            </Badge>
           )}
         </div>
-        <Link
+        <ButtonLink
           href="/notities"
-          className="text-xs text-amber-400/70 hover:text-amber-400 transition-colors flex items-center gap-1"
+          variant="ghost"
+          size="sm"
+          className="gap-1 px-2"
         >
           Alle notities <ChevronRight size={12} />
-        </Link>
+        </ButtonLink>
       </div>
 
       {/* Quick capture */}
-      <div className="glass relative mb-3 rounded-xl border border-[var(--color-border)]">
+      <Surface padding="none" radius="md" className="relative mb-3">
         <div className="flex items-center gap-2 px-3 py-2">
-          <StickyNote size={14} className="text-amber-400/50 shrink-0" />
-          <input
+          <StickyNote size={14} className="shrink-0 text-[var(--color-primary)]" />
+          <Input
+            ref={mentionAnchorRef}
             type="text"
             placeholder="Snel noteren... (#tag of @contact)"
             aria-label="Snel noteren"
@@ -124,24 +131,21 @@ export function QuickNote() {
                 handleQuickSave();
               }
             }}
-            className="flex-1 bg-transparent text-base sm:text-sm text-slate-200 placeholder:text-slate-600 outline-none"
+            className="min-w-0 flex-1 rounded-none border-0 bg-transparent px-0 text-base shadow-none hover:border-transparent focus:border-transparent focus:ring-0 sm:text-sm"
           />
           {text.trim() && (
-            <motion.button
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              whileTap={{ scale: 0.9 }}
+            <IconButton
+              label="Snelle notitie opslaan"
+              icon={<Plus size={14} />}
+              variant="primary"
               onClick={() => void handleQuickSave()}
-              disabled={saving}
-              aria-label="Snelle notitie opslaan"
-              className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors cursor-pointer"
-            >
-              <Plus size={14} aria-hidden="true" />
-            </motion.button>
+              loading={saving}
+            />
           )}
         </div>
         <ContactMentionMenu
           id={mentionListId}
+          anchorRef={mentionAnchorRef}
           isOpen={mention.isOpen}
           query={mention.query}
           suggestions={mention.suggestions}
@@ -154,40 +158,38 @@ export function QuickNote() {
         {text.includes("#") && (
           <div className="px-3 pb-2 flex items-center gap-1">
             {quickParsed.extractedTags.map((t) => (
-              <span key={t} className="text-[10px] text-amber-400/60 bg-amber-500/10 px-1.5 py-0.5 rounded">
+              <Badge key={t} tone="accent" size="sm">
                 #{t}
-              </span>
+              </Badge>
             ))}
           </div>
         )}
         {quickContext && (
           <div className="px-3 pb-2">
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold text-cyan-200">
-              <AppIcon name={quickContext.noteSymbol} tone="cyan" size="xs" />
+            <Badge tone="info" size="sm">
+              <AppIcon name={quickContext.noteSymbol} tone="info" size="xs" />
               {quickContext.label}
-              <span className="text-cyan-300/70">#{quickContext.tag}</span>
-            </span>
+              <span className="text-[var(--color-info)]">#{quickContext.tag}</span>
+            </Badge>
           </div>
         )}
         {quickBusinessContext && (
           <div className="px-3 pb-2">
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-semibold text-emerald-200">
-              {quickBusinessContext.type === "contact" ? <UserRound size={11} aria-hidden="true" /> : <AppIcon name="business" tone="emerald" size="xs" />}
+            <Badge tone={quickBusinessContext.type === "contact" ? "info" : "accent"} size="sm">
+              {quickBusinessContext.type === "contact" ? <UserRound size={11} aria-hidden="true" /> : <AppIcon name="business" tone="accent" size="xs" />}
               {businessContextLabel(quickBusinessContext)}
               {selectedContact ? (
-                <button
-                  type="button"
+                <IconButton
+                  label={`Koppeling met ${selectedContact.display_name} verwijderen`}
+                  icon={<X size={10} />}
                   onClick={() => setSelectedContact(null)}
-                  aria-label={`Koppeling met ${selectedContact.display_name} verwijderen`}
-                  className="-mr-1 flex h-5 w-5 items-center justify-center rounded hover:bg-emerald-500/20"
-                >
-                  <X size={10} aria-hidden="true" />
-                </button>
+                  className="-mr-2 border-transparent bg-transparent"
+                />
               ) : null}
-            </span>
+            </Badge>
           </div>
         )}
-      </div>
+      </Surface>
 
       {/* Recent notes */}
       {!isLoading && recent.length > 0 && (
@@ -206,38 +208,39 @@ function RecentNoteRow({ note, masked = false }: { note: NoteRecord; masked?: bo
   const checklistInfo = masked ? null : getQuickChecklistInfo(note.inhoud);
 
   return (
-    <motion.div
-      whileHover={{ x: 2 }}
+    <div
       className="group flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
     >
-      <Link
+      <ButtonLink
         href={`/notities?note=${encodeURIComponent(note.id)}`}
         aria-label={masked ? "Notitie openen" : `Notitie openen: ${displayTitle}`}
-        className="flex min-w-0 flex-1 items-center gap-2.5 rounded outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+        variant="ghost"
+        fullWidth
+        className="min-w-0 flex-1 justify-start gap-2.5 rounded-lg px-2"
       >
-        {note.isPinned && <Pin size={10} className="text-amber-400 fill-amber-400 shrink-0" />}
+        {note.isPinned && <Pin size={10} className="shrink-0 fill-current text-[var(--color-primary)]" />}
         <AppIcon
           name={resolveAppIconName(note.symbol, "note")}
-          tone="amber"
+          tone="accent"
           size="xs"
           framed
           className="h-6 w-6 rounded-md"
         />
-        <span className="text-xs text-slate-400 group-hover:text-slate-200 transition-colors truncate flex-1 min-w-0">
+        <span className="min-w-0 flex-1 truncate text-xs text-[var(--color-text-muted)]">
           {displayTitle}
         </span>
-      </Link>
+      </ButtonLink>
       <NoteContextBadge note={note} masked={masked} compact className="max-w-28" />
         {checklistInfo && (
-          <span className="text-[10px] text-slate-600 shrink-0 tabular-nums">
+          <span className="text-micro text-[var(--color-text-subtle)] shrink-0 tabular-nums">
             <ListChecks size={9} className="inline mr-0.5" />
             {checklistInfo}
           </span>
         )}
-        <span className="text-[10px] text-slate-600 shrink-0">
+        <span className="text-micro text-[var(--color-text-subtle)] shrink-0">
           {formatCompact(note.gewijzigd)}
         </span>
-    </motion.div>
+    </div>
   );
 }
 

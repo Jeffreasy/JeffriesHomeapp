@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Router, Plus, Loader2 } from "lucide-react";
+import { Router, Plus } from "lucide-react";
 import { useCreateRoom } from "@/hooks/useRooms";
 import { useToast } from "@/components/ui/Toast";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { FormField } from "@/components/ui/FormField";
+import { SurfaceHeader } from "@/components/ui/SurfaceHeader";
 
 export function AddRoomForm() {
   const [open, setOpen] = useState(false);
@@ -30,67 +35,68 @@ export function AddRoomForm() {
 
   if (!open) {
     return (
-      <button
+      <Button
+        variant="secondary"
+        fullWidth
         onClick={() => setOpen(true)}
-        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--color-border)] px-3 py-3 text-sm text-slate-500 transition-all hover:border-amber-500/30 hover:text-amber-400"
+        className="border-dashed py-3 text-[var(--color-text-muted)] hover:border-[var(--color-warning-border)] hover:text-[var(--color-warning)]"
       >
         <Plus size={15} />
         Kamer toevoegen
-      </button>
+      </Button>
     );
   }
 
   return (
-    <form onSubmit={submit} className="glass rounded-lg p-4 space-y-3">
-      <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-        <Router size={14} className="text-amber-400" />
-        Nieuwe kamer
-      </p>
+    <form onSubmit={submit} className={`${surfaceVariants({ padding: "sm", radius: "sm" })} space-y-3`}>
+      <SurfaceHeader
+        icon={<Router size={14} className="text-[var(--color-warning)]" />}
+        title="Nieuwe kamer"
+        headingLevel={3}
+        compact
+      />
       <div className="grid gap-2 sm:grid-cols-2">
-        <div>
-          <label htmlFor="room-name" className="text-xs text-slate-500 mb-1 block">
-            Naam *
-          </label>
-          <input
-            id="room-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Woonkamer"
-            required
-            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
-          />
-        </div>
-        <div>
-          <label htmlFor="room-floor" className="text-xs text-slate-500 mb-1 block">
-            Verdieping
-          </label>
-          <input
-            id="room-floor"
-            type="number"
-            value={floor}
-            onChange={(e) => setFloor(e.target.value)}
-            min={0}
-            max={10}
-            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
-          />
-        </div>
+        <FormField id="room-name" label="Naam">
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Woonkamer"
+              required
+            />
+          )}
+        </FormField>
+        <FormField id="room-floor" label="Verdieping">
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              type="number"
+              value={floor}
+              onChange={(event) => setFloor(event.target.value)}
+              min={0}
+              max={10}
+            />
+          )}
+        </FormField>
       </div>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <button
+        <Button
           type="submit"
-          disabled={isPending}
-          className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-400 transition-colors hover:bg-amber-500/25"
+          variant="primary"
+          loading={isPending}
+          loadingLabel="Aanmaken…"
+          className="flex-1"
         >
-          {isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          <Plus size={14} />
           Aanmaken
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
           onClick={() => setOpen(false)}
-          className="min-h-10 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)]"
         >
           Annuleren
-        </button>
+        </Button>
       </div>
     </form>
   );

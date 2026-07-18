@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Loader2 } from "lucide-react";
 import type { BridgeStatus } from "@/hooks/useDevices";
+import { Surface } from "@/components/ui/Surface";
 import { cn } from "@/lib/utils";
 
 interface BridgeStatusNoticeProps {
@@ -34,36 +35,31 @@ export function BridgeStatusNotice({
       : "Bridge offline — lampcommando's worden uitgesteld";
 
   return (
-    <div
+    <Surface
       role="status"
       aria-live="polite"
       aria-busy={checking}
-      className={cn(
-        "flex items-start gap-3 rounded-2xl border p-4",
-        checking
-          ? "border-blue-500/25 bg-blue-500/10"
-          : "border-amber-500/30 bg-amber-500/10",
-        className,
-      )}
+      tone={checking ? "info" : "warning"}
+      className={cn("flex items-start gap-3", className)}
     >
       {checking ? (
         <Loader2
           size={18}
-          className="mt-0.5 shrink-0 animate-spin text-blue-300"
+          className="mt-0.5 shrink-0 animate-spin text-[var(--color-info)] motion-reduce:animate-none"
           aria-hidden="true"
         />
       ) : (
         <AlertTriangle
           size={18}
-          className="mt-0.5 shrink-0 text-amber-300"
+          className="mt-0.5 shrink-0 text-[var(--color-warning)]"
           aria-hidden="true"
         />
       )}
       <div className="min-w-0">
-        <p className={cn("text-sm font-semibold", checking ? "text-blue-200" : "text-amber-200")}>
+        <p className={cn("text-sm font-semibold", checking ? "text-[var(--color-info)]" : "text-[var(--color-warning)]")}>
           {title}
         </p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">
+        <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">
           {checking
             ? "De lampen blijven bedienbaar terwijl de afleverroute wordt gecontroleerd."
             : unavailable
@@ -80,6 +76,6 @@ export function BridgeStatusNotice({
             ` ${bridge?.commandsPending} commando('s) in de wachtrij.`}
         </p>
       </div>
-    </div>
+    </Surface>
   );
 }

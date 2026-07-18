@@ -1,14 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ElementType, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Filter, X, ChevronDown, ChevronUp,
   ArrowUpRight, ArrowDownRight, ArrowLeftRight,
   Tag, Calendar, Euro, FileText, RotateCcw,
 } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { FormField } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Surface, surfaceVariants } from "@/components/ui/Surface";
 import { CATEGORIE_OPTIES, CODE_LABELS, eurExact } from "@/lib/finance-constants";
 import type { TransactionFilter } from "@/hooks/useTransactions";
+import { uiMotion } from "@/lib/ui/motion";
+import { cn } from "@/lib/utils";
 
 // Accepteert Nederlandse invoer: "1.234,56" → 1234.56, "12,50" → 12.5. Zonder
 // komma wordt een punt als decimaalteken gelezen ("12.50" → 12.5), behalve bij
@@ -38,35 +47,41 @@ function amountToInput(value: number | undefined): string {
 
 function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="filter-chip">
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      onClick={onRemove}
+      aria-label={"Verwijder filter " + label}
+      className="h-auto min-h-11 shrink-0 rounded-full px-3 text-left"
+    >
       {label}
-      <button type="button" className="filter-chip__remove" onClick={onRemove} aria-label={`Verwijder filter ${label}`}>
-        <X size={12} />
-      </button>
-    </span>
+      <X size={14} aria-hidden="true" />
+    </Button>
   );
 }
 
 // ─── Filter Group ────────────────────────────────────────────────────────────
 
 function FilterGroup({ icon: Icon, title, children, defaultOpen = false }: {
-  icon: React.ElementType; title: string; children: React.ReactNode; defaultOpen?: boolean;
+  icon: ElementType; title: string; children: ReactNode; defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className={`filter-group ${open ? "filter-group--open" : ""}`}>
-      <button
-        type="button"
-        className="filter-group__header"
+    <Surface tone="subtle" radius="md" padding="none" className="overflow-hidden">
+      <Button
+        variant="ghost"
+        fullWidth
+        className="justify-start rounded-none border-0 px-3"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        <Icon size={14} className="filter-group__icon" aria-hidden="true" />
-        <span className="filter-group__title">{title}</span>
-        {open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
-      </button>
-      {open && <div className="filter-group__body">{children}</div>}
-    </div>
+        <Icon size={15} className="text-[var(--color-primary)]" aria-hidden="true" />
+        <span className="flex-1 text-left">{title}</span>
+        {open ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+      </Button>
+      {open && <div className="space-y-3 border-t border-[var(--color-border)] p-3">{children}</div>}
+    </Surface>
   );
 }
 
@@ -95,6 +110,9 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
     minDraft && minDraft.parsed === filters.minBedrag ? minDraft.text : amountToInput(filters.minBedrag);
   const maxText =
     maxDraft && maxDraft.parsed === filters.maxBedrag ? maxDraft.text : amountToInput(filters.maxBedrag);
+  const amountRangeInvalid =
+    filters.minBedrag != null && filters.maxBedrag != null && filters.minBedrag > filters.maxBedrag;
+  const amountRangeErrorId = "filter-amount-range-error";
   const activeCount = [
     filters.categorieFilter,
     filters.richting,
@@ -123,31 +141,30 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
   if (filters.excludeIntern === false) chips.push({ label: "Interne overboekingen zichtbaar", onRemove: () => onChange({ excludeIntern: true }) });
 
   return (
-    <div className="filter-panel">
+    <div className="space-y-3">
       {/* Toggle bar */}
-      <div className="filter-panel__bar">
-        <button
-          type="button"
-          className="filter-panel__toggle"
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button
+          variant="secondary"
           onClick={() => setExpanded(!expanded)}
           aria-expanded={expanded}
         >
-          <Filter size={15} aria-hidden="true" />
+          <Filter size={16} aria-hidden="true" />
           <span>Filters</span>
-          {activeCount > 0 && <span className="filter-panel__badge">{activeCount}</span>}
-          {expanded ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
-        </button>
+          {activeCount > 0 && <Badge tone="accent">{activeCount}</Badge>}
+          {expanded ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+        </Button>
 
         {activeCount > 0 && (
-          <button type="button" className="filter-panel__reset" onClick={onReset}>
-            <RotateCcw size={13} aria-hidden="true" /> Reset
-          </button>
+          <Button type="button" variant="ghost" size="sm" onClick={onReset}>
+            <RotateCcw size={15} aria-hidden="true" /> Reset
+          </Button>
         )}
       </div>
 
       {/* Active filter chips */}
       {chips.length > 0 && (
-        <div className="filter-chips">
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
           {chips.map((chip) => (
             <FilterChip key={chip.label} label={chip.label} onRemove={chip.onRemove} />
           ))}
@@ -158,36 +175,37 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
       <AnimatePresence>
         {expanded && (
           <motion.div
-            className="filter-panel__body"
+            className="overflow-hidden"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            style={{ overflow: "hidden" }}
+            transition={{ duration: uiMotion.durationSeconds.standard, ease: "easeInOut" }}
           >
+          <div className={cn(surfaceVariants({ tone: "subtle", radius: "md", padding: "sm" }), "space-y-3")}>
           {/* Richting */}
           <FilterGroup icon={ArrowLeftRight} title="Richting" defaultOpen>
-            <div className="filter-radio-group">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {([undefined, "in", "uit"] as const).map((val) => (
-                <button
+                <Button
                   key={val ?? "all"}
                   type="button"
                   aria-pressed={filters.richting === val}
-                  className={`filter-radio ${filters.richting === val ? "filter-radio--active" : ""}`}
+                  variant={filters.richting === val ? "primary" : "secondary"}
+                  size="sm"
+                  fullWidth
                   onClick={() => onChange({ richting: val ?? undefined })}
                 >
-                  {val === "in" && <ArrowUpRight size={13} />}
-                  {val === "uit" && <ArrowDownRight size={13} />}
+                  {val === "in" && <ArrowUpRight size={15} aria-hidden="true" />}
+                  {val === "uit" && <ArrowDownRight size={15} aria-hidden="true" />}
                   {val === undefined ? "Alle" : val === "in" ? "Inkomsten" : "Uitgaven"}
-                </button>
+                </Button>
               ))}
             </div>
           </FilterGroup>
 
           {/* Categorie */}
           <FilterGroup icon={Tag} title="Categorie" defaultOpen>
-            <select
-              className="filter-select"
+            <Select
               aria-label="Filter op categorie"
               value={filters.categorieFilter ?? ""}
               onChange={(e) => onChange({ categorieFilter: e.target.value || undefined })}
@@ -196,93 +214,99 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
               {CATEGORIE_OPTIES.map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
-            </select>
+            </Select>
           </FilterGroup>
 
           {/* Bedragbereik */}
           <FilterGroup icon={Euro} title="Bedragbereik">
-            <div className="filter-range">
-              <div className="filter-range__field">
-                <label className="filter-range__label" htmlFor="filter-min-bedrag">Min (€)</label>
-                <input
-                  id="filter-min-bedrag"
-                  type="text"
-                  inputMode="decimal"
-                  className="filter-range__input"
-                  placeholder="0,00"
-                  value={minText}
-                  onChange={(e) => {
-                    setMinDraft({ text: e.target.value, parsed: parseAmountInput(e.target.value) });
-                    onChange({ minBedrag: parseAmountInput(e.target.value) });
-                  }}
-                />
+            <fieldset className="space-y-3">
+              <legend className="sr-only">Bedragbereik in euro</legend>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
+                <FormField id="finance-filter-min-amount" label="Min (€)" className="min-w-0">
+                  {(controlProps) => (
+                    <Input
+                      {...controlProps}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      value={minText}
+                      aria-invalid={amountRangeInvalid || undefined}
+                      aria-describedby={amountRangeInvalid ? amountRangeErrorId : controlProps["aria-describedby"]}
+                      onChange={(e) => {
+                        setMinDraft({ text: e.target.value, parsed: parseAmountInput(e.target.value) });
+                        onChange({ minBedrag: parseAmountInput(e.target.value) });
+                      }}
+                    />
+                  )}
+                </FormField>
+                <span className="flex min-h-11 items-center text-[var(--color-text-subtle)]" aria-hidden="true">–</span>
+                <FormField id="finance-filter-max-amount" label="Max (€)" className="min-w-0">
+                  {(controlProps) => (
+                    <Input
+                      {...controlProps}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="∞"
+                      value={maxText}
+                      aria-invalid={amountRangeInvalid || undefined}
+                      aria-describedby={amountRangeInvalid ? amountRangeErrorId : controlProps["aria-describedby"]}
+                      onChange={(e) => {
+                        setMaxDraft({ text: e.target.value, parsed: parseAmountInput(e.target.value) });
+                        onChange({ maxBedrag: parseAmountInput(e.target.value) });
+                      }}
+                    />
+                  )}
+                </FormField>
               </div>
-              <span className="filter-range__sep" aria-hidden="true">–</span>
-              <div className="filter-range__field">
-                <label className="filter-range__label" htmlFor="filter-max-bedrag">Max (€)</label>
-                <input
-                  id="filter-max-bedrag"
-                  type="text"
-                  inputMode="decimal"
-                  className="filter-range__input"
-                  placeholder="∞"
-                  value={maxText}
-                  onChange={(e) => {
-                    setMaxDraft({ text: e.target.value, parsed: parseAmountInput(e.target.value) });
-                    onChange({ maxBedrag: parseAmountInput(e.target.value) });
-                  }}
-                  aria-invalid={filters.minBedrag != null && filters.maxBedrag != null && filters.minBedrag > filters.maxBedrag}
-                />
-              </div>
-            </div>
-            {filters.minBedrag != null && filters.maxBedrag != null && filters.minBedrag > filters.maxBedrag && (
-              <p className="mt-1.5 text-[11px] text-amber-300">Min is groter dan max — geen resultaten.</p>
-            )}
+              {amountRangeInvalid ? (
+                <p id={amountRangeErrorId} role="alert" className="text-xs text-[var(--color-danger)]">
+                  Minimum is groter dan maximum — er zijn geen resultaten.
+                </p>
+              ) : null}
+            </fieldset>
           </FilterGroup>
 
           {/* Datumbereik */}
           <FilterGroup icon={Calendar} title="Datumbereik">
-            <div className="filter-range">
-              <div className="filter-range__field">
-                <label className="filter-range__label" htmlFor="filter-datum-van">Van</label>
-                <input
-                  id="filter-datum-van"
-                  type="date"
-                  className="filter-range__input"
-                  value={filters.datumVan ?? ""}
-                  onChange={(e) => onChange({ datumVan: e.target.value || undefined, maandFilter: undefined })}
-                />
-              </div>
-              <span className="filter-range__sep" aria-hidden="true">–</span>
-              <div className="filter-range__field">
-                <label className="filter-range__label" htmlFor="filter-datum-tot">Tot</label>
-                <input
-                  id="filter-datum-tot"
-                  type="date"
-                  className="filter-range__input"
-                  value={filters.datumTot ?? ""}
-                  onChange={(e) => onChange({ datumTot: e.target.value || undefined, maandFilter: undefined })}
-                />
-              </div>
+            <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
+              <FormField id="finance-filter-date-from" label="Van" className="min-w-0">
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    type="date"
+                    value={filters.datumVan ?? ""}
+                    onChange={(e) => onChange({ datumVan: e.target.value || undefined, maandFilter: undefined })}
+                  />
+                )}
+              </FormField>
+              <span className="flex min-h-11 items-center text-[var(--color-text-subtle)]" aria-hidden="true">–</span>
+              <FormField id="finance-filter-date-to" label="Tot" className="min-w-0">
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    type="date"
+                    value={filters.datumTot ?? ""}
+                    onChange={(e) => onChange({ datumTot: e.target.value || undefined, maandFilter: undefined })}
+                  />
+                )}
+              </FormField>
             </div>
             {/* Quick month selector */}
             {availableMaanden.length > 0 && (
-              <select
-                className="filter-select filter-select--sm"
+              <Select
                 aria-label="Snelkeuze maand"
                 value={filters.maandFilter ?? ""}
                 onChange={(e) => onChange({ maandFilter: e.target.value || undefined, datumVan: undefined, datumTot: undefined })}
               >
                 <option value="">Snelkeuze maand…</option>
                 {availableMaanden.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
+              </Select>
             )}
           </FilterGroup>
 
           {/* Transactie type */}
           <FilterGroup icon={FileText} title="Transactie type">
-            <select
-              className="filter-select"
+            <Select
               aria-label="Filter op transactietype"
               value={filters.codeFilter ?? ""}
               onChange={(e) => onChange({ codeFilter: e.target.value || undefined })}
@@ -291,21 +315,22 @@ export function FilterPanel({ filters, onChange, onReset, availableMaanden = [] 
               {Object.entries(CODE_LABELS).map(([code, label]) => (
                 <option key={code} value={code}>{label}</option>
               ))}
-            </select>
+            </Select>
           </FilterGroup>
 
           {/* Toggles */}
-          <div className="filter-toggles">
-            <label className="filter-toggle-item">
-              <input type="checkbox" checked={filters.excludeIntern ?? true}
-                onChange={(e) => onChange({ excludeIntern: e.target.checked })} />
-              Verberg interne overboekingen
-            </label>
-            <label className="filter-toggle-item">
-              <input type="checkbox" checked={filters.onlyStorneringen ?? false}
-                onChange={(e) => onChange({ onlyStorneringen: e.target.checked })} />
-              Alleen storneringen
-            </label>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Checkbox
+              label="Verberg interne overboekingen"
+              checked={filters.excludeIntern ?? true}
+              onChange={(e) => onChange({ excludeIntern: e.target.checked })}
+            />
+            <Checkbox
+              label="Alleen storneringen"
+              checked={filters.onlyStorneringen ?? false}
+              onChange={(e) => onChange({ onlyStorneringen: e.target.checked })}
+            />
+          </div>
           </div>
           </motion.div>
         )}

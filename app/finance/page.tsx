@@ -40,9 +40,15 @@ import {
 import { SegmentedButton, SectionTitle } from "@/components/finance/FinanceCards";
 import { FinanceMetricsGrid } from "@/components/finance/FinanceMetricsGrid";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
-import { ErrorState } from "@/components/dashboard/DashboardPrimitives";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { AppIcon } from "@/components/ui/AppIcon";
+import { ResponsiveActions } from "@/components/ui/ResponsiveActions";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Surface, surfaceVariants } from "@/components/ui/Surface";
 import { AppPageHeader, AppPageShell, PageToolbar } from "@/components/layout/AppPageShell";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { scrollElementIntoView } from "@/lib/ui/scroll";
 
 type ChartView = "saldo" | "inuit";
 
@@ -169,17 +175,18 @@ export default function FinancePage() {
 
   const scrollToTransactions = useCallback(() => {
     if (typeof document === "undefined") return;
-    document
-      .getElementById("finance-transactions")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollElementIntoView(
+      document.getElementById("finance-transactions"),
+      { block: "start" },
+    );
   }, []);
 
-  const toggleCategoryFilter = (cat: string) => {
+  const toggleCategoryFilter = useCallback((cat: string) => {
     setFilters((current) => ({
       ...current,
       categorieFilter: current.categorieFilter === cat ? undefined : cat,
     }));
-  };
+  }, []);
 
   // Used by the insights merchant/category controls, which live far above the
   // transaction list they filter. Without bringing the list (and search box)
@@ -197,7 +204,7 @@ export default function FinancePage() {
       toggleCategoryFilter(cat);
       scrollToTransactions();
     },
-    [scrollToTransactions]
+    [scrollToTransactions, toggleCategoryFilter]
   );
 
   const formatPrivateEuro = useCallback((value: number) => mask(eur(value)), [mask]);
@@ -294,19 +301,19 @@ export default function FinancePage() {
   const hasData = Boolean(stats && totalCount > 0);
 
   const periodControls = (
-    <div className="flex flex-col gap-5 [&_button]:min-h-11">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-white">Periode</p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="text-sm font-semibold text-[var(--color-text)]">Periode</p>
+            <p className="mt-1 text-xs text-[var(--color-text-subtle)]">
               {jaarFilter ? "Analyse voor " + jaarFilter : "Alle beschikbare jaren"}
             </p>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-slate-400">
+          <Badge tone="info" size="md">
             <ShieldCheck size={14} aria-hidden="true" />
             Veilig opgeslagen
-          </div>
+          </Badge>
         </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -327,12 +334,12 @@ export default function FinancePage() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-white">Rekeningen</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="text-sm font-semibold text-[var(--color-text)]">Rekeningen</p>
+              <p className="mt-1 text-xs text-[var(--color-text-subtle)]">
                 {ibanFilter ? ibanLabel(ibanFilter) : "Alle rekeningen samengevoegd"}
               </p>
             </div>
-            <span className="text-xs font-semibold text-amber-200">
+            <span className="text-xs font-semibold tabular-nums text-[var(--color-primary)]">
               {formatPrivateEuro(stats.huidigSaldo)}
             </span>
           </div>
@@ -370,42 +377,42 @@ export default function FinancePage() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white">Snelle maandselectie</p>
+              <p className="text-sm font-semibold text-[var(--color-text)]">Snelle maandselectie</p>
               {(stats?.maanden?.length ?? 0) > recentMonths.length && (
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-[var(--color-text-subtle)]">
                   Laatste {recentMonths.length} maanden; oudere maanden staan in de lijstfilters.
                 </p>
               )}
             </div>
             {filters.maandFilter && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => updateFilters({ maandFilter: undefined })}
-                className="min-h-11 shrink-0 rounded-lg px-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/10 hover:text-amber-100"
+                className="shrink-0"
               >
                 Wissen
-              </button>
+              </Button>
             )}
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {recentMonths.map((month) => (
-              <button
+              <Button
                 key={month}
                 type="button"
+                variant={filters.maandFilter === month ? "primary" : "secondary"}
+                size="sm"
                 onClick={() =>
                   updateFilters({
                     maandFilter: filters.maandFilter === month ? undefined : month,
                   })
                 }
-                className={cn(
-                  "min-h-11 shrink-0 rounded-lg border px-3 text-sm font-semibold transition-colors",
-                  filters.maandFilter === month
-                    ? "border-sky-500/35 bg-sky-500/15 text-sky-200"
-                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-slate-200",
-                )}
+                aria-pressed={filters.maandFilter === month}
+                className="shrink-0"
               >
                 {formatMonth(month)}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -414,7 +421,7 @@ export default function FinancePage() {
   );
 
   return (
-    <AppPageShell width="wide" className="finance-dashboard-shell space-y-5 text-slate-100">
+    <AppPageShell width="wide" className="space-y-5 text-[var(--color-text)]">
       <AppPageHeader
         eyebrow="Finance cockpit"
         title="Finance"
@@ -423,84 +430,85 @@ export default function FinancePage() {
             ? totalCount.toLocaleString("nl-NL") + " transacties · " + stats.maanden.length + " maanden"
             : "Transacties en cashflow laden"
         }
-        leading={
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-amber-500/20 bg-amber-500/10">
-            <Landmark size={20} className="text-amber-300" aria-hidden="true" />
-          </div>
-        }
+        leading={<AppIcon name="finance" tone="accent" size="lg" framed active />}
         actions={
-          <>
-            <button
-              type="button"
-              onClick={togglePrivacy}
-              disabled={isPrivacyUnknown}
-              title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
-              aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
-              aria-pressed={privacyOn}
-              aria-busy={isPrivacyUnknown}
-              className={cn(
-                "inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:cursor-wait disabled:opacity-60",
-                privacyOn
-                  ? "border-indigo-500/30 bg-indigo-500/15 text-indigo-200"
-                  : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.06]",
-              )}
-            >
-              {isPrivacyUnknown ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-              <span className="hidden sm:inline">{isPrivacyUnknown ? "Laden" : privacyOn ? "Verborgen" : "Zichtbaar"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={resetFilters}
-              aria-label="Filters resetten"
-              title="Filters resetten"
-              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
-            >
-              <RotateCcw size={16} aria-hidden="true" />
-              <span className="hidden sm:inline">Reset</span>
-            </button>
-          </>
+          <ResponsiveActions
+            menuLabel="Financeacties"
+            primary={
+              <Button
+                type="button"
+                variant={privacyOn ? "warning" : "secondary"}
+                onClick={togglePrivacy}
+                loading={isPrivacyUnknown}
+                disabled={isPrivacyUnknown}
+                aria-busy={isPrivacyUnknown || undefined}
+                loadingLabel="Laden"
+                title={isPrivacyUnknown ? "Privacyvoorkeur wordt veilig geladen" : privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
+                aria-label={isPrivacyUnknown ? "Privacyvoorkeur wordt geladen" : privacyOn ? "Bedragen tonen" : "Bedragen verbergen"}
+                aria-pressed={privacyOn}
+              >
+                {privacyOn ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                <span className="hidden sm:inline">{privacyOn ? "Verborgen" : "Zichtbaar"}</span>
+              </Button>
+            }
+            secondary={
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={resetFilters}
+                aria-label="Filters resetten"
+                title="Filters resetten"
+                className="w-full justify-start sm:w-auto sm:justify-center"
+              >
+                <RotateCcw size={16} aria-hidden="true" />
+                <span>Reset</span>
+              </Button>
+            }
+          />
         }
       />
 
       <div className="flex flex-col gap-5">
         <PageToolbar
           label="Finance selectie"
-          leading={<CalendarDays size={17} className="text-amber-300" aria-hidden="true" />}
+          leading={<CalendarDays size={17} className="text-[var(--color-primary)]" aria-hidden="true" />}
           trailing={
             <>
-              <button
+              <Button
                 type="button"
+                variant="primary"
                 onClick={() => setControlsOpen(true)}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15 lg:hidden"
+                className="lg:hidden"
               >
                 <CreditCard size={16} aria-hidden="true" />
                 Periode & rekening
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={scrollToTransactions}
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06] lg:hidden"
+                className="lg:hidden"
               >
                 <SlidersHorizontal size={16} aria-hidden="true" />
                 Filters{selectedFilterCount > 0 ? " (" + selectedFilterCount + ")" : ""}
-              </button>
+              </Button>
             </>
           }
         >
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-white">
+            <p className="truncate text-sm font-semibold text-[var(--color-text)]">
               {jaarFilter || "Alle jaren"} · {ibanFilter ? ibanLabel(ibanFilter) : "Alle rekeningen"}
             </p>
-            <p className="truncate text-xs text-slate-400">
+            <p className="truncate text-xs text-[var(--color-text-muted)]">
               {filters.maandFilter ? formatMonth(filters.maandFilter) : "Geen maandfilter"}
             </p>
           </div>
         </PageToolbar>
 
         {hasDesktopControls ? (
-          <div className="rounded-lg border border-white/10 bg-white/[0.035] p-4">
+          <Surface tone="subtle" radius="md" padding="md">
             {periodControls}
-          </div>
+          </Surface>
         ) : (
           <BottomSheet
             open={controlsOpen}
@@ -516,10 +524,10 @@ export default function FinancePage() {
           title="Transacties importeren"
           subtitle="Rabobank CSV-export"
           icon={<Upload size={18} />}
-          theme="amber"
+          tone="accent"
           defaultOpen={false}
         >
-          <div className="finance-import min-w-0">
+          <div className="min-w-0">
             <CsvUploader onImported={refresh} />
           </div>
         </CollapsibleSection>
@@ -527,21 +535,26 @@ export default function FinancePage() {
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col gap-3 rounded-lg border border-rose-500/25 bg-rose-500/10 p-4 text-rose-100 sm:flex-row sm:items-center sm:justify-between"
+            className={cn(
+              surfaceVariants({ tone: "danger", radius: "md", padding: "sm" }),
+              "flex flex-col gap-3 text-[var(--color-danger)] sm:flex-row sm:items-center sm:justify-between",
+            )}
           >
             <div className="flex items-center gap-3">
-               <AlertTriangle size={18} className="shrink-0 text-rose-300" />
+               <AlertTriangle size={18} className="shrink-0" aria-hidden="true" />
                <span className="text-sm">
                  <strong>{stats.storneringen} stornering(en)</strong> gevonden in de geselecteerde periode
                </span>
             </div>
-            <button
+            <Button
                type="button"
-               className="inline-flex h-9 items-center justify-center rounded-lg border border-rose-400/25 bg-rose-500/10 px-3 text-sm font-semibold text-rose-100 transition-colors hover:bg-rose-500/15"
+               variant="danger"
+               size="sm"
                onClick={() => updateFilters({ onlyStorneringen: !filters.onlyStorneringen })}
+               aria-pressed={Boolean(filters.onlyStorneringen)}
             >
                {filters.onlyStorneringen ? "Toon alles" : "Alleen storneringen"}
-            </button>
+            </Button>
           </motion.div>
         )}
 
@@ -566,7 +579,7 @@ export default function FinancePage() {
             title="Maandelijks Verloop & Cashflow"
             subtitle={`${stats.maanden.length} maanden geanalyseerd`}
             icon={<Landmark size={18} />}
-            theme="emerald"
+            tone="success"
             defaultOpen={false}
           >
             <FinanceCharts
@@ -590,7 +603,7 @@ export default function FinancePage() {
             title="Inzichten"
             subtitle="Grootste uitgavenposten en terugkerende betalingen"
             icon={<Eye size={18} />}
-            theme="amber"
+            tone="accent"
             defaultOpen={false}
           >
             <FinanceInsights
@@ -613,7 +626,7 @@ export default function FinancePage() {
           </CollapsibleSection>
         )}
 
-        <section id="finance-transactions" className="scroll-mt-24 rounded-lg border border-white/10 bg-white/[0.035] p-4">
+        <section id="finance-transactions" className={cn(surfaceVariants({ tone: "default", radius: "lg", padding: "md" }), "scroll-mt-24")}>
           <SectionTitle
             icon={Search}
             title="Transacties"
@@ -624,9 +637,10 @@ export default function FinancePage() {
             }
             action={
               transactions.length > 0 ? (
-                <button
+                <Button
                   type="button"
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/[0.06]"
+                  variant="secondary"
+                  size="sm"
                   onClick={isExporting ? cancelExport : handleExport}
                   title={isExporting
                     ? "Lopende export annuleren"
@@ -634,7 +648,7 @@ export default function FinancePage() {
                 >
                   {isExporting && exportProgress ? (
                     <>
-                      <Loader2 size={16} className="animate-spin" />
+                      <Loader2 size={16} className="animate-spin motion-reduce:animate-none" />
                       Annuleren ({exportProgress.loaded.toLocaleString("nl-NL")}/{exportProgress.total.toLocaleString("nl-NL")})
                     </>
                   ) : (
@@ -643,16 +657,16 @@ export default function FinancePage() {
                       Export CSV
                     </>
                   )}
-                </button>
+                </Button>
               ) : null
             }
           />
 
           <div className="mt-5 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 flex-1 [&_.search-bar]:max-w-none">
-              <SearchBar value={zoekterm} onChange={setZoekterm} />
+            <div className="min-w-0 flex-1">
+              <SearchBar value={zoekterm} onChange={setZoekterm} className="w-full max-w-none" />
             </div>
-            <div className="min-w-0 xl:w-[520px]">
+            <div className="min-w-0 xl:w-1/2">
               <FilterPanel
                 filters={filters}
                 onChange={updateFilters}
@@ -664,9 +678,12 @@ export default function FinancePage() {
 
           <div className="mt-5">
             {isError ? (
-              <ErrorState
-                onRetry={refresh}
-                text="De transacties konden niet worden geladen. Je bestaande gegevens zijn niet kwijt."
+              <FeedbackState
+                tone="error"
+                title="Transacties laden mislukt"
+                description="De transacties konden niet worden geladen. Je bestaande gegevens zijn niet kwijt."
+                actionLabel="Opnieuw proberen"
+                onAction={refresh}
               />
             ) : (
               <TransactionList

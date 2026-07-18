@@ -11,18 +11,17 @@ import {
   useState,
 } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
 import { OverlaySurface } from "@/components/ui/OverlaySurface";
-import { cn } from "@/lib/utils";
 
-interface ConfirmOptions {
+export interface ConfirmOptions {
   title?: string;
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "default";
 }
-
-type ConfirmState = ConfirmOptions;
 
 interface ConfirmContextValue {
   openConfirm: (options: ConfirmOptions) => Promise<boolean>;
@@ -37,7 +36,7 @@ export function useConfirm() {
 }
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<ConfirmState | null>(null);
+  const [state, setState] = useState<ConfirmOptions | null>(null);
   const resolveRef = useRef<((value: boolean) => void) | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
@@ -81,63 +80,55 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         ariaDescribedBy={messageId}
         initialFocusRef={isDanger ? cancelRef : confirmRef}
         priority="critical"
-        className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-2xl sm:p-6"
+        className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-[var(--shadow-overlay)] sm:p-6"
       >
-        {state && (
+        {state ? (
           <>
-            <button
-              type="button"
+            <IconButton
+              icon={<X size={17} />}
+              label="Bevestigingsvenster sluiten"
               onClick={() => handleClose(false)}
-              className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-xl text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70"
-              aria-label="Bevestigingsvenster sluiten"
-            >
-              <X size={17} aria-hidden="true" />
-            </button>
+              className="absolute right-2 top-2"
+            />
 
-            <div className="mb-5 flex items-start gap-3 pr-8">
+            <div className="mb-5 flex items-start gap-3 pr-10">
               <div
-                className={cn(
-                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-                  isDanger ? "bg-rose-500/15 text-rose-400" : "bg-amber-500/15 text-amber-400",
-                )}
+                className={
+                  isDanger
+                    ? "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-danger-subtle)] text-[var(--color-danger)]"
+                    : "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-warning-subtle)] text-[var(--color-warning)]"
+                }
               >
                 <AlertTriangle size={18} aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <h2 id={titleId} className="mb-1 text-sm font-semibold text-white">
+                <h2 id={titleId} className="mb-1 text-sm font-semibold text-[var(--color-text)]">
                   {state.title ?? "Bevestigen"}
                 </h2>
-                <p id={messageId} className="text-sm leading-5 text-slate-400">
+                <p id={messageId} className="text-sm leading-5 text-[var(--color-text-muted)]">
                   {state.message}
                 </p>
               </div>
             </div>
 
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button
+              <Button
                 ref={cancelRef}
-                type="button"
+                variant="secondary"
                 onClick={() => handleClose(false)}
-                className="min-h-11 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
               >
                 {state.cancelLabel ?? "Annuleren"}
-              </button>
-              <button
+              </Button>
+              <Button
                 ref={confirmRef}
-                type="button"
+                variant={isDanger ? "danger" : "primary"}
                 onClick={() => handleClose(true)}
-                className={cn(
-                  "min-h-11 rounded-xl border px-4 text-sm font-semibold transition-colors",
-                  isDanger
-                    ? "border-rose-500/30 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25"
-                    : "border-amber-500/30 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25",
-                )}
               >
                 {state.confirmLabel ?? "Bevestigen"}
-              </button>
+              </Button>
             </div>
           </>
-        )}
+        ) : null}
       </OverlaySurface>
     </ConfirmContext.Provider>
   );

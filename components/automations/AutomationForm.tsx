@@ -1,7 +1,6 @@
 "use client";
 
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Check, Plus, Loader2 } from "lucide-react";
 import {
   type Automation,
   type AutomationAction,
@@ -15,7 +14,13 @@ import {
 } from "@/lib/automations";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
-import { cn } from "@/lib/utils";
+import { ModalCancelButton } from "@/components/ui/ModalCancelButton";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Range } from "@/components/ui/Range";
+import { FormField } from "@/components/ui/FormField";
+import { Surface } from "@/components/ui/Surface";
+import { AppIcon } from "@/components/ui/AppIcon";
 
 interface AutomationFormProps {
   initialData?: Automation;
@@ -184,130 +189,151 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
       isOpen
       onClose={() => void requestClose()}
       title={modalTitle}
-      icon={initialData ? undefined : <Plus size={17} className="text-amber-400" />}
+      icon={initialData ? undefined : <AppIcon name="add" tone="accent" size="sm" />}
       maxWidth="md"
-      theme="amber"
+      tone="accent"
       presentation="dialog"
       closeDisabled={saving}
       ariaBusy={saving}
       dataAppModal="automation-form"
-      contentClassName="space-y-5"
-    >
-      <div>
-        <label htmlFor="auto-name" className="mb-1 block text-xs font-semibold text-slate-300">
-          Naam <span className="text-amber-400" aria-hidden="true">*</span>
-        </label>
-        <input
-          id="auto-name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Bijv. Ochtendlicht woonkamer"
-          className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
-        />
-      </div>
+      footer={
+        <div className="grid gap-2 sm:flex sm:items-center sm:justify-end">
+          <ModalCancelButton
+            onFallback={() => void requestClose()}
+            disabled={saving}
+            className="w-full sm:w-auto"
+          />
+          <Button
+            type="submit"
+            form="automation-editor-form"
+            disabled={Boolean(validationHint)}
+            loading={saving}
+            loadingLabel="Bezig met opslaan…"
+            variant="primary"
+            className="w-full sm:w-auto"
+          >
+            Opslaan
+          </Button>
+          {validationHint ? (
+            <p className="text-center text-micro text-[var(--color-text-muted)] sm:order-first sm:mr-auto sm:text-left">
+              {validationHint}
+            </p>
+          ) : null}
+        </div>
+      }
 
-      <div>
-        <label htmlFor="auto-time" className="mb-1 block text-xs font-semibold text-slate-300">Tijdstip</label>
-        <input
-          id="auto-time"
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50 [color-scheme:dark]"
-        />
-        <p className="mt-1 text-[10px] text-slate-500">Tijden in Nederlandse tijd (Europe/Amsterdam)</p>
-      </div>
+    >
+      <form
+        id="automation-editor-form"
+        className="space-y-5"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleSave();
+        }}
+      >
+        <FormField id="auto-name" label="Naam">
+        {(controlProps) => (
+          <Input
+            {...controlProps}
+            aria-required="true"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Bijv. Ochtendlicht woonkamer"
+          />
+        )}
+      </FormField>
+
+      <FormField
+        id="auto-time"
+        label="Tijdstip"
+        description="Tijden in Nederlandse tijd (Europe/Amsterdam)"
+      >
+        {(controlProps) => (
+          <Input
+            {...controlProps}
+            type="time"
+            value={time}
+            onChange={(event) => setTime(event.target.value)}
+            className="[color-scheme:dark]"
+          />
+        )}
+      </FormField>
 
       <fieldset>
         <legend className="sr-only">Type Trigger</legend>
-        <div className="flex bg-[var(--color-surface)] border border-[var(--color-border)] p-1 rounded-xl mb-4">
-          <button
-            type="button"
+        <Surface tone="subtle" padding="none" radius="md" className="mb-4 flex gap-1 p-1">
+          <Button
             onClick={() => setTriggerType("time")}
             aria-pressed={triggerType === "time"}
-            className={cn(
-              "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
-              triggerType === "time"
-                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-sm"
-                : "text-slate-500 hover:text-slate-300 border border-transparent"
-            )}
+            variant={triggerType === "time" ? "primary" : "ghost"}
+            size="sm"
+            fullWidth
           >
-            Vaste Dagen
-          </button>
-          <button
-            type="button"
+            Vaste dagen
+          </Button>
+          <Button
             onClick={() => setTriggerType("schedule")}
             aria-pressed={triggerType === "schedule"}
-            className={cn(
-              "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
-              triggerType === "schedule"
-                ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-sm"
-                : "text-slate-500 hover:text-slate-300 border border-transparent"
-            )}
+            variant={triggerType === "schedule" ? "primary" : "ghost"}
+            size="sm"
+            fullWidth
           >
-            Rooster (Smart)
-          </button>
-        </div>
+            Rooster (smart)
+          </Button>
+        </Surface>
       </fieldset>
 
       {triggerType === "time" ? (
         <fieldset>
           <legend className="sr-only">Dagen</legend>
-          <div className="flex gap-2 mb-2 text-[10px]">
+          <div className="mb-2 flex flex-wrap gap-1">
             {[["Alle", ALL_DAYS], ["Doordeweeks", WEEKDAYS], ["Weekend", WEEKEND]].map(
-              ([label, d]) => (
-                <button
+              ([label, presetDays]) => (
+                <Button
                   key={label as string}
-                  type="button"
-                  onClick={() => setDays(d as number[])}
-                  className="text-slate-500 hover:text-amber-400"
+                  onClick={() => setDays(presetDays as number[])}
+                  variant="ghost"
+                  size="sm"
                 >
                   {label as string}
-                </button>
+                </Button>
               )
             )}
           </div>
-          <div className="flex gap-1">
-            {DAY_LABELS.map((label, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-pressed={days.includes(i)}
-                onClick={() => toggleDay(i)}
-                className={cn(
-                  "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all",
-                  days.includes(i)
-                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                    : "bg-[var(--color-surface)] text-slate-500 border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
-                )}
+          <div className="grid grid-cols-7 gap-1">
+            {DAY_LABELS.map((label, dayIndex) => (
+              <Button
+                key={label}
+                aria-pressed={days.includes(dayIndex)}
+                onClick={() => toggleDay(dayIndex)}
+                variant={days.includes(dayIndex) ? "primary" : "secondary"}
+                size="sm"
+                fullWidth
+                className="px-0"
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         </fieldset>
       ) : (
         <fieldset>
-          <legend className="text-xs font-semibold text-slate-300 mb-2">Kies de Dienst</legend>
-          <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
+          <legend className="mb-2 text-sm font-medium text-[var(--color-text)]">Kies de dienst</legend>
+          <p className="text-micro text-[var(--color-text-muted)] mb-3 leading-relaxed">
             De automatisering gaat alléén af als je op deze dag de geselecteerde dienst hebt.
           </p>
           <div className="grid grid-cols-3 gap-2">
             {(["Vroeg", "Laat", "Dienst"] as ShiftType[]).map((shift) => (
-              <button
+              <Button
                 key={shift}
-                type="button"
                 aria-pressed={shiftType === shift}
                 onClick={() => setShiftType(shift)}
-                className={cn(
-                  "py-2 rounded-lg text-xs font-medium border transition-all",
-                  shiftType === shift
-                    ? "bg-amber-500/15 text-amber-400 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.1)]"
-                    : "bg-[var(--color-surface)] text-slate-400 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
-                )}
+                variant={shiftType === shift ? "primary" : "secondary"}
+                size="sm"
+                fullWidth
               >
                 {shift}
-              </button>
+              </Button>
             ))}
           </div>
         </fieldset>
@@ -315,155 +341,132 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
 
       {/* M3: niet-blokkerende waarschuwing bij overlappende automations */}
       {overlapping.length > 0 && (
-        <p
-          role="status"
-          className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-300"
-        >
+        <Surface tone="warning" radius="sm" padding="sm" role="status" className="text-xs text-[var(--color-warning)]">
           Let op: &lsquo;{overlapping[0].name}&rsquo;
           {overlapping.length > 1
             ? ` en ${overlapping.length - 1} andere draaien`
             : " draait"}{" "}
           ook om {time} op deze dagen.
-        </p>
+        </Surface>
       )}
 
       <fieldset>
         <legend className="sr-only">Actie type</legend>
-        <div className="grid grid-cols-3 gap-1 rounded-xl bg-[var(--color-surface)] p-1 border border-[var(--color-border)]">
-          {(Object.keys(actionLabels) as ActionType[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              aria-pressed={actionType === t}
-              onClick={() => setActionType(t)}
-              className={cn(
-                "py-1 rounded-lg text-xs transition-all",
-                actionType === t ? "bg-[var(--color-surface-hover)] text-white font-medium" : "text-slate-500 hover:bg-[var(--color-surface-hover)]"
-              )}
+        <Surface tone="subtle" padding="none" radius="md" className="grid grid-cols-3 gap-1 p-1">
+          {(Object.keys(actionLabels) as ActionType[]).map((type) => (
+            <Button
+              key={type}
+              aria-pressed={actionType === type}
+              onClick={() => setActionType(type)}
+              variant={actionType === type ? "primary" : "ghost"}
+              size="sm"
+              fullWidth
+              className="px-2"
             >
-              {actionLabels[t]}
-            </button>
+              {actionLabels[type]}
+            </Button>
           ))}
-        </div>
+        </Surface>
       </fieldset>
 
       <div>
         {actionType === "scene" && (
           <div className="grid grid-cols-3 gap-1">
             {Object.entries(SCENE_DEFINITIONS).map(([id, { label }]) => (
-              <button
+              <Button
                 key={id}
-                type="button"
                 aria-pressed={sceneId === id}
                 onClick={() => setSceneId(id)}
-                className={cn(
-                  "py-1.5 rounded-lg text-xs border transition-all",
-                  sceneId === id
-                    ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-                    : "bg-[var(--color-surface)] text-slate-400 border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
-                )}
+                variant={sceneId === id ? "primary" : "secondary"}
+                size="sm"
+                fullWidth
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
         )}
         {actionType === "brightness" && (
-          <>
-            <label htmlFor="auto-brightness" className="sr-only">Helderheid</label>
-            <input
-              id="auto-brightness"
-              type="range"
-              min={5}
-              max={100}
-              value={brightness}
-              onChange={(e) => setBrightness(+e.target.value)}
-              style={{
-                background: `linear-gradient(to right, #f59e0b ${brightness}%, rgba(255,255,255,0.1) ${brightness}%)`,
-              }}
-            />
-          </>
+          <FormField id="automation-action-brightness" label="Helderheid" visuallyHiddenLabel>
+            {(controlProps) => (
+              <Range
+                {...controlProps}
+                min={5}
+                max={100}
+                value={brightness}
+                fillValue={brightness}
+                track="accent"
+                onChange={(e) => setBrightness(+e.target.value)}
+              />
+            )}
+          </FormField>
         )}
         {actionType === "color_temp" && (
-          <>
-            <label htmlFor="auto-colortemp" className="sr-only">Kleurtemperatuur</label>
-            <input
-              id="auto-colortemp"
-              type="range"
-              min={154}
-              max={455}
-              value={colorTempMireds}
-              onChange={(e) => setColorTempMireds(+e.target.value)}
-              // Mireds: laag = koel (6500K), hoog = warm (2200K) → links koel/blauw, rechts warm/oranje
-              style={{ background: "linear-gradient(to right, #cce4ff, #fff4e6, #ff9329)" }}
-            />
-          </>
+          <FormField id="automation-action-color-temperature" label="Kleurtemperatuur" visuallyHiddenLabel>
+            {(controlProps) => (
+              <Range
+                {...controlProps}
+                min={154}
+                max={455}
+                value={colorTempMireds}
+                track="temperature"
+                onChange={(e) => setColorTempMireds(+e.target.value)}
+                // Mireds: laag = koel (6500K), hoog = warm (2200K) → links koel/blauw, rechts warm/oranje
+              />
+            )}
+          </FormField>
         )}
         {actionType === "color" && (
-          <div className="flex items-center gap-3">
-            <label htmlFor="auto-color" className="sr-only">Kleur kiezen</label>
-            <input
-              id="auto-color"
-              type="color"
-              value={colorHex}
-              onChange={(e) => setColorHex(e.target.value)}
-              className="w-12 h-10 rounded-lg border border-[var(--color-border)] bg-transparent cursor-pointer"
-            />
-            <span className="text-xs font-mono text-slate-400">{colorHex.toUpperCase()}</span>
-          </div>
+          <FormField id="automation-action-color" label="Kleur kiezen" visuallyHiddenLabel>
+            {(controlProps) => (
+              <div className="flex items-center gap-3">
+                <input
+                  {...controlProps}
+                  type="color"
+                  value={colorHex}
+                  onChange={(e) => setColorHex(e.target.value)}
+                  className="h-11 w-12 cursor-pointer rounded-lg border border-[var(--color-border)] bg-transparent"
+                />
+                <span className="font-mono text-xs text-[var(--color-text-muted)]">{colorHex.toUpperCase()}</span>
+              </div>
+            )}
+          </FormField>
         )}
       </div>
 
       <fieldset>
-        <legend className="text-xs font-semibold text-slate-300 mb-2">Slimme Uitsluitingen</legend>
-        <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
+        <legend className="mb-2 text-sm font-medium text-[var(--color-text)]">Slimme uitsluitingen</legend>
+        <p className="text-micro text-[var(--color-text-muted)] mb-3 leading-relaxed">
           Sla deze automatisering automatisch over als je één van deze diensten hebt op die dag.
         </p>
         <div className="grid grid-cols-3 gap-2">
           {(["Vroeg", "Laat", "Dienst"] as ShiftType[]).map((shift) => {
             const isTrigger = shift === shiftType;
             return (
-              <button
+              <Button
                 key={shift}
-                type="button"
                 aria-pressed={excludedShifts.includes(shift)}
                 disabled={isTrigger}
                 title={isTrigger ? "Dit is je triggershift — uitsluiten zou de automatisering nooit laten vuren" : undefined}
                 onClick={() => toggleExcludedShift(shift)}
-                className={cn(
-                  "py-1.5 rounded-lg text-xs font-medium border transition-all disabled:cursor-not-allowed disabled:opacity-40",
-                  excludedShifts.includes(shift)
-                    ? "bg-purple-500/15 text-purple-400 border-purple-500/30 shadow-[0_0_8px_rgba(168,85,247,0.1)]"
-                    : "bg-[var(--color-surface)] text-slate-400 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
-                )}
+                variant={excludedShifts.includes(shift) ? "primary" : "secondary"}
+                size="sm"
+                fullWidth
               >
                 {shift}
-              </button>
+              </Button>
             );
           })}
         </div>
       </fieldset>
 
       {saveError && (
-        <p role="alert" className="rounded-lg border border-rose-500/25 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+        <Surface tone="danger" radius="sm" padding="sm" role="alert" className="text-xs text-[var(--color-danger)]">
           {saveError}
-        </p>
+        </Surface>
       )}
 
-      <div>
-        <button
-          type="button"
-          onClick={() => void handleSave()}
-          disabled={!!validationHint || saving}
-          className="w-full py-2 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 text-sm font-medium hover:bg-amber-500/25 disabled:opacity-40 flex items-center justify-center gap-2"
-        >
-          {saving ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Check size={13} aria-hidden="true" />}
-          {saving ? "Bezig met opslaan…" : "Opslaan"}
-        </button>
-        {validationHint && (
-          <p className="mt-1.5 text-center text-[11px] text-slate-500">{validationHint}</p>
-        )}
-      </div>
+      </form>
     </Modal>
   );
 });

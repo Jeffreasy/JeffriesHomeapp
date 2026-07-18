@@ -1,5 +1,12 @@
 "use client";
 
+import { scrollElementIntoView } from "@/lib/ui/scroll";
+import { Button } from "@/components/ui/Button";
+import { Checkbox } from "@/components/ui/Checkbox";
+import { FormField } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { laventecareApi } from "@/lib/api";
@@ -24,6 +31,9 @@ import {
   Workflow,
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
+import { ModalCancelButton } from "@/components/ui/ModalCancelButton";
+import { TabPanel, Tabs } from "@/components/ui/Tabs";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 import { cn } from "@/lib/utils";
 import { laventeCareQueryKeys } from "@/lib/laventecare/query-keys";
 import type { LCActivityEventCreate } from "@/lib/api";
@@ -56,6 +66,13 @@ import {
 } from "./LaventeCareUtils";
 
 type DossierTab = "overview" | "timeline" | "work" | "documents" | "access";
+const DOSSIER_TABS = [
+  { id: "overview", label: "Overzicht", icon: Activity },
+  { id: "timeline", label: "Timeline", icon: History },
+  { id: "work", label: "Werk", icon: FolderKanban },
+  { id: "documents", label: "Documenten", icon: FileCheck2 },
+  { id: "access", label: "Toegang", icon: KeyRound },
+] satisfies ReadonlyArray<{ id: DossierTab; label: string; icon: typeof Activity }>;
 
 // M-J: groepen voor de timeline-filterchips.
 type TimelineGroup =
@@ -77,7 +94,7 @@ type TimelineItem = {
   meta?: string;
   /** M-L: klikbare verwijzing naar een ander timeline-item (moment↔actie). */
   link?: { label: string; targetId: string };
-  tone: "amber" | "emerald" | "sky" | "violet" | "slate" | "rose";
+  tone: UiTone;
 };
 
 const TIMELINE_GROUPS: Array<{ key: TimelineGroup; label: string }> = [
@@ -105,6 +122,9 @@ type ActivityFormState = {
   followUpDueTime: string;
   followUpPriority: string;
 };
+
+const DOSSIER_ACTIVITY_FORM_ID = "laventecare-dossier-activity-form";
+const DOSSIER_ACCESS_FORM_ID = "laventecare-dossier-access-form";
 
 const emptyActivityForm: ActivityFormState = {
   eventType: "contact",
@@ -209,6 +229,7 @@ export function LaventeCareCustomerDossier({
   // M-B: dirty-status van het toegang-formulier (leeft in AccessCredentialPanel),
   // gelift zodat de modal-dirty-guard hem meeneemt.
   const [accessFormDirty, setAccessFormDirty] = useState(false);
+  const [accessFormCanSubmit, setAccessFormCanSubmit] = useState(false);
   const companyId = company?._id ?? company?.id ?? "";
 
   // R3-9: per-klant activiteit + toegang direct uit de list-endpoints, i.p.v.
@@ -331,7 +352,7 @@ export function LaventeCareCustomerDossier({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!form.title.trim()) return;
+    if (savingActivity || !form.title.trim()) return;
     if (form.createFollowUp && !form.followUpTitle.trim()) return;
 
     // M-C: alleen resetten na een geslaagde save — bij een fout (de pagina
@@ -371,32 +392,67 @@ export function LaventeCareCustomerDossier({
       dirty={JSON.stringify(form) !== JSON.stringify(emptyActivityForm) || accessFormDirty}
       dirtyMessage="Het dossier bevat niet-opgeslagen formulierinvoer."
       title={`Klantdossier: ${company.naam}`}
-      icon={<Building2 size={18} className="text-amber-300" />}
-      theme="amber"
+      icon={<Building2 size={18} className="text-[var(--color-primary-hover)]" />}
+      tone="accent"
       maxWidth="4xl"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <ModalCancelButton onFallback={onClose} className="w-full sm:w-auto">
+            {activeTab === "timeline" || activeTab === "access" ? "Annuleren" : "Sluiten"}
+          </ModalCancelButton>
+          {activeTab === "timeline" ? (
+            <Button
+              type="submit"
+              form={DOSSIER_ACTIVITY_FORM_ID}
+              variant="primary"
+              loading={savingActivity}
+              loadingLabel="Vastleggen..."
+              disabled={!form.title.trim() || (form.createFollowUp && !form.followUpTitle.trim())}
+              className="w-full sm:w-auto"
+            >
+              <Plus size={15} aria-hidden="true" />
+              Vastleggen
+            </Button>
+          ) : null}
+          {activeTab === "access" ? (
+            <Button
+              type="submit"
+              form={DOSSIER_ACCESS_FORM_ID}
+              variant="primary"
+              loading={savingAccessCredential}
+              loadingLabel="Toegang vastleggen..."
+              disabled={!accessFormCanSubmit}
+              className="w-full sm:w-auto"
+            >
+              <Plus size={15} aria-hidden="true" />
+              Toegang vastleggen
+            </Button>
+          ) : null}
+        </div>
+      }
     >
       <div className="space-y-5">
-        <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3 sm:p-4">
+        <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3 sm:p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-200">
+                <span className="rounded-full border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] px-2.5 py-1 text-xs font-bold text-[var(--color-primary-hover)]">
                   {label(company.relatie_type)}
                 </span>
-                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-200">
+                <span className="rounded-full border border-[var(--color-success-border)] bg-[var(--color-success-subtle)] px-2.5 py-1 text-xs font-bold text-[var(--color-success)]">
                   {label(company.status)}
                 </span>
                 {company.sector ? (
-                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-bold text-slate-300">
+                  <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2.5 py-1 text-xs font-bold text-[var(--color-text-muted)]">
                     {company.sector}
                   </span>
                 ) : null}
               </div>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-400">
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--color-text-muted)]">
                 {company.notities || "Nog geen klantcontext vastgelegd. Log een moment of voeg notities toe zodat Brain dit dossier beter begrijpt."}
               </p>
               {primaryContact ? (
-                <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-2">
+                <div className="mt-3 grid gap-2 text-xs text-[var(--color-text-muted)] sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-2">
                   <span className="inline-flex min-w-0 items-center gap-1.5">
                     <UserRound size={13} />
                     <span className="truncate">{primaryContact.naam}</span>
@@ -418,47 +474,47 @@ export function LaventeCareCustomerDossier({
             </div>
 
             <div className="grid shrink-0 grid-cols-3 gap-2 lg:flex">
-              <button
+              <Button
                 type="button"
                 onClick={() => onEditCompany(company)}
-                className="btn btn--ghost btn--sm justify-center"
+                variant="ghost" size="sm"
                 aria-label={`${company.naam} bewerken`}
                 title="Klant bewerken"
               >
                 <Save size={14} />
                 <span className="hidden sm:inline">Bewerken</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => onAddContact(company)}
-                className="btn btn--ghost btn--sm justify-center"
+                variant="ghost" size="sm"
                 aria-label={`Contact toevoegen aan ${company.naam}`}
                 title="Contact toevoegen"
               >
                 <Plus size={14} />
                 <span className="hidden sm:inline">Contact</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => onStartWorkstream(company)}
-                className="btn btn--primary btn--sm justify-center"
+                variant="primary" size="sm"
                 aria-label={`Nieuwe opdracht voor ${company.naam}`}
                 title="Nieuwe opdracht"
               >
                 <Workflow size={14} />
                 <span className="hidden sm:inline">Opdracht</span>
-              </button>
+              </Button>
               {onOpenCommerce ? (
-                <button
+                <Button
                   type="button"
                   onClick={() => onOpenCommerce(company)}
-                  className="btn btn--ghost btn--sm justify-center"
+                  variant="ghost" size="sm"
                   aria-label={`Open Commercie voor ${company.naam}`}
                   title="Open in Commercie (klant voorgeselecteerd)"
                 >
                   <ReceiptText size={14} />
                   <span className="hidden sm:inline">Commercie</span>
-                </button>
+                </Button>
               ) : null}
             </div>
           </div>
@@ -471,16 +527,17 @@ export function LaventeCareCustomerDossier({
           </div>
         </section>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:overflow-x-auto sm:pb-1" role="tablist" aria-label="Klantdossier onderdelen">
-          <TabButton active={activeTab === "overview"} icon={Activity} label="Overzicht" onClick={() => setActiveTab("overview")} />
-          <TabButton active={activeTab === "timeline"} icon={History} label="Timeline" onClick={() => setActiveTab("timeline")} />
-          <TabButton active={activeTab === "work"} icon={FolderKanban} label="Werk" onClick={() => setActiveTab("work")} />
-          <TabButton active={activeTab === "documents"} icon={FileCheck2} label="Documenten" onClick={() => setActiveTab("documents")} />
-          <TabButton active={activeTab === "access"} icon={KeyRound} label="Toegang" onClick={() => setActiveTab("access")} />
-        </div>
+        <Tabs
+          items={DOSSIER_TABS}
+          value={activeTab}
+          onValueChange={setActiveTab}
+          idPrefix="laventecare-dossier"
+          ariaLabel="Klantdossier onderdelen"
+          appearance="contained"
+        />
 
         {activeTab === "timeline" ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <TabPanel idPrefix="laventecare-dossier" value="timeline" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             <TimelineList timeline={timeline} />
             <ActivityForm
               form={form}
@@ -491,11 +548,11 @@ export function LaventeCareCustomerDossier({
               saving={savingActivity}
               onSubmit={handleSubmit}
             />
-          </div>
+          </TabPanel>
         ) : null}
 
         {activeTab === "overview" ? (
-          <div className="grid gap-3 md:grid-cols-2">
+          <TabPanel idPrefix="laventecare-dossier" value="overview" className="grid gap-3 md:grid-cols-2">
             <InfoPanel title="Relatie" rows={[
               ["Relatietype", label(company.relatie_type)],
               ["Status", label(company.status)],
@@ -521,11 +578,11 @@ export function LaventeCareCustomerDossier({
               ["Email", primaryContact?.email ?? "Niet gevuld"],
               ["Telefoon", primaryContact?.telefoon ?? "Niet gevuld"],
             ]} />
-          </div>
+          </TabPanel>
         ) : null}
 
         {activeTab === "work" ? (
-          <div className="grid gap-3 lg:grid-cols-3">
+          <TabPanel idPrefix="laventecare-dossier" value="work" className="grid gap-3 lg:grid-cols-3">
             <WorkColumn title="Leads" empty="Geen open leads" items={companyLeads.map((lead) => ({
               id: lead._id ?? lead.id,
               title: lead.titel,
@@ -544,11 +601,11 @@ export function LaventeCareCustomerDossier({
               meta: `${projectFaseLabel(project.fase)} - ${formatMoney(project.waarde_indicatie ?? undefined)}`,
               body: project.samenvatting,
             }))} />
-          </div>
+          </TabPanel>
         ) : null}
 
         {activeTab === "documents" ? (
-          <div className="space-y-3">
+          <TabPanel idPrefix="laventecare-dossier" value="documents" className="space-y-3">
             {companyDocuments.length > 0 ? (
               companyDocuments.map((doc) => (
                 <DocumentCard
@@ -560,17 +617,21 @@ export function LaventeCareCustomerDossier({
                 />
               ))
             ) : (
-              <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-500">
+              <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-5 text-sm text-[var(--color-text-muted)]">
                 Nog geen PDF of dossierdocument vastgelegd voor deze klant.
               </div>
             )}
-          </div>
+          </TabPanel>
         ) : null}
 
         {/* Blijft gemount (alleen visueel verborgen) zodat een half ingevuld
             toegang-formulier een tabwissel binnen het dossier overleeft en de
             dirty-guard (M-B) waarheidsgetrouw is. */}
-        <div className={activeTab === "access" ? undefined : "hidden"}>
+        <TabPanel
+          idPrefix="laventecare-dossier"
+          value="access"
+          className={activeTab === "access" ? undefined : "hidden"}
+        >
           <AccessCredentialPanel
             companyId={companyId}
             contacts={companyContacts}
@@ -583,8 +644,9 @@ export function LaventeCareCustomerDossier({
             onCreate={onCreateAccessCredential}
             onUpdate={onUpdateAccessCredential}
             onDirtyChange={setAccessFormDirty}
+            onCanSubmitChange={setAccessFormCanSubmit}
           />
-        </div>
+        </TabPanel>
       </div>
     </Modal>
   );
@@ -592,41 +654,11 @@ export function LaventeCareCustomerDossier({
 
 function DossierMetric({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 p-3">
-      <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-bold text-white">{value}</p>
-      <p className="mt-0.5 truncate text-[11px] text-slate-500">{detail}</p>
+    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3">
+      <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">{label}</p>
+      <p className="mt-1 text-xl font-bold text-[var(--color-text)]">{value}</p>
+      <p className="mt-0.5 truncate text-micro text-[var(--color-text-muted)]">{detail}</p>
     </div>
-  );
-}
-
-function TabButton({
-  active,
-  icon: Icon,
-  label: tabLabel,
-  onClick,
-}: {
-  active: boolean;
-  icon: typeof History;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      role="tab"
-      aria-selected={active}
-      className={cn(
-        "inline-flex h-10 min-w-0 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition sm:min-w-[132px]",
-        active
-          ? "border-amber-400/40 bg-amber-500/10 text-amber-100"
-          : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06] hover:text-white"
-      )}
-    >
-      <Icon size={15} />
-      {tabLabel}
-    </button>
   );
 }
 
@@ -649,7 +681,7 @@ function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
 
   if (timeline.length === 0) {
     return (
-      <div className="order-2 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm text-slate-500 lg:order-1">
+      <div className="order-2 rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-5 text-sm text-[var(--color-text-muted)] lg:order-1">
         Nog geen dossiermomenten. Log het eerste contactmoment om de klantgeschiedenis te starten.
       </div>
     );
@@ -671,7 +703,7 @@ function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
     window.setTimeout(() => {
       const element = document.getElementById(`dossier-timeline-${targetId}`);
       if (!element) return;
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrollElementIntoView(element, { block: "center" });
       setHighlightId(targetId);
       if (highlightTimer.current !== null) window.clearTimeout(highlightTimer.current);
       highlightTimer.current = window.setTimeout(() => setHighlightId(null), 2200);
@@ -682,38 +714,32 @@ function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
     <div className="order-2 space-y-3 lg:order-1">
       {presentGroups.length > 1 ? (
         <div className="flex flex-wrap gap-1.5">
-          <button
+          <Button
             type="button"
+            size="sm"
+            variant={groupFilter === null ? "primary" : "secondary"}
             onClick={() => setGroupFilter(null)}
             aria-pressed={groupFilter === null}
-            className={cn(
-              "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-              groupFilter === null
-                ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
-                : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
-            )}
+            className="rounded-full"
           >
             Alles ({timeline.length})
-          </button>
+          </Button>
           {presentGroups.map((group) => {
             const count = timeline.filter((item) => item.group === group.key).length;
             return (
-              <button
+              <Button
                 key={group.key}
                 type="button"
+                size="sm"
+                variant={groupFilter === group.key ? "primary" : "secondary"}
                 onClick={() =>
                   setGroupFilter((current) => (current === group.key ? null : group.key))
                 }
                 aria-pressed={groupFilter === group.key}
-                className={cn(
-                  "rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
-                  groupFilter === group.key
-                    ? "border-amber-400/40 bg-amber-500/15 text-amber-100"
-                    : "border-white/10 bg-white/[0.03] text-slate-400 hover:bg-white/[0.06]"
-                )}
+                className="rounded-full"
               >
                 {group.label} ({count})
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -723,8 +749,8 @@ function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
           key={item.id}
           id={`dossier-timeline-${item.id}`}
           className={cn(
-            "rounded-xl border border-white/10 bg-white/[0.03] p-4 transition-colors duration-500",
-            highlightId === item.id && "border-amber-400/50 bg-amber-500/[0.08]"
+            "rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 transition-colors duration-[var(--motion-slow)]",
+            highlightId === item.id && "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]"
           )}
         >
           <div className="flex gap-3">
@@ -733,32 +759,34 @@ function TimelineList({ timeline }: { timeline: TimelineItem[] }) {
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-bold uppercase tracking-normal text-slate-400">
+                <span className="rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-0.5 text-micro font-bold uppercase tracking-normal text-[var(--color-text-muted)]">
                   {label(item.kind)}
                 </span>
-                <span className="text-xs font-semibold text-slate-500">{formatDate(item.date)}</span>
+                <span className="text-xs font-semibold text-[var(--color-text-muted)]">{formatDate(item.date)}</span>
               </div>
-              <h3 className="mt-2 line-clamp-2 text-sm font-bold text-white">{item.title}</h3>
-              {item.meta ? <p className="mt-1 text-xs font-semibold text-slate-500">{item.meta}</p> : null}
+              <h3 className="mt-2 line-clamp-2 text-sm font-bold text-[var(--color-text)]">{item.title}</h3>
+              {item.meta ? <p className="mt-1 text-xs font-semibold text-[var(--color-text-muted)]">{item.meta}</p> : null}
               {item.link ? (
                 <TimelineLinkButton link={item.link} onJump={jumpTo} />
               ) : null}
-              {item.body ? <p className="mt-2 line-clamp-3 text-sm leading-5 text-slate-400">{item.body}</p> : null}
+              {item.body ? <p className="mt-2 line-clamp-3 text-sm leading-5 text-[var(--color-text-muted)]">{item.body}</p> : null}
             </div>
           </div>
         </div>
       ))}
       {filtered.length > TIMELINE_INITIAL_COUNT ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
+          fullWidth
           onClick={() => setShowAll((value) => !value)}
           aria-expanded={showAll}
-          className="w-full rounded-lg border border-white/10 bg-white/[0.02] py-2 text-xs font-semibold text-slate-400 transition hover:bg-white/[0.05]"
         >
           {showAll
             ? "Toon minder"
             : `Toon alle ${filtered.length} momenten`}
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -773,13 +801,15 @@ function TimelineLinkButton({
   onJump: (targetId: string) => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       onClick={() => onJump(link.targetId)}
-      className="mt-1 inline-flex max-w-full items-center text-left text-xs font-semibold text-sky-300 underline decoration-sky-300/40 underline-offset-2 transition hover:text-sky-200"
+      className="mt-1 max-w-full justify-start px-0 text-left text-[var(--color-info)] underline decoration-[var(--color-info)] underline-offset-2"
     >
       <span className="truncate">{link.label}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -801,175 +831,211 @@ function ActivityForm({
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
   return (
-    <form onSubmit={onSubmit} className="order-1 rounded-xl border border-amber-500/15 bg-amber-500/[0.05] p-4 lg:order-2 lg:sticky lg:top-4">
+    <form
+      id={DOSSIER_ACTIVITY_FORM_ID}
+      onSubmit={onSubmit}
+      aria-busy={saving || undefined}
+      className="order-1 rounded-xl border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] p-4 lg:order-2 lg:sticky lg:top-4"
+    >
       <div className="flex items-center gap-2">
-        <NotebookPen size={16} className="text-amber-300" />
-        <h3 className="text-sm font-bold text-white">Moment loggen</h3>
+        <NotebookPen size={16} className="text-[var(--color-primary-hover)]" />
+        <h3 className="text-sm font-bold text-[var(--color-text)]">Moment loggen</h3>
       </div>
 
       <div className="mt-4 space-y-3">
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Type</span>
-          <select
-            value={form.eventType}
-            onChange={(event) => setForm((current) => ({ ...current, eventType: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-          >
-            {LAVENTECARE_ACTIVITY_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormField
+          id="dossier-activity-type"
+          label="Type"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
+              value={form.eventType}
+              onChange={(event) => setForm((current) => ({ ...current, eventType: event.target.value }))}
+            >
+              {LAVENTECARE_ACTIVITY_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
 
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Titel</span>
-          <input
-            value={form.title}
-            onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-            placeholder="Bijv. Scope afgestemd"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-          />
-        </label>
+        <FormField
+          id="dossier-activity-title"
+          label="Titel"
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              value={form.title}
+              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              placeholder="Bijv. Scope afgestemd"
+            />
+          )}
+        </FormField>
 
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Notitie</span>
-          <textarea
-            value={form.body}
-            onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))}
-            rows={4}
-            placeholder="Wat is er besproken, besloten of afgesproken?"
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-          />
-        </label>
+        <FormField
+          id="dossier-activity-notes"
+          label="Notitie"
+        >
+          {(controlProps) => (
+            <Textarea
+              {...controlProps}
+              value={form.body}
+              onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))}
+              rows={4}
+              placeholder="Wat is er besproken, besloten of afgesproken?"
+            />
+          )}
+        </FormField>
 
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Datum/tijd</span>
-          <input
-            type="datetime-local"
-            value={form.occurredAt}
-            onChange={(event) => setForm((current) => ({ ...current, occurredAt: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-          />
-        </label>
+        <FormField
+          id="dossier-activity-occurred-at"
+          label="Datum/tijd"
+        >
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              type="datetime-local"
+              value={form.occurredAt}
+              onChange={(event) => setForm((current) => ({ ...current, occurredAt: event.target.value }))}
+            />
+          )}
+        </FormField>
 
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Contactpersoon</span>
-          <select
-            value={form.contactId}
-            onChange={(event) => setForm((current) => ({ ...current, contactId: event.target.value }))}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-          >
-            <option value="">Geen specifieke contactpersoon</option>
-            {contacts.map((contact) => (
-              <option key={contact._id ?? contact.id} value={contact._id ?? contact.id}>
-                {contact.naam}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormField
+          id="dossier-activity-contact"
+          label="Contactpersoon"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
+              value={form.contactId}
+              onChange={(event) => setForm((current) => ({ ...current, contactId: event.target.value }))}
+            >
+              <option value="">Geen specifieke contactpersoon</option>
+              {contacts.map((contact) => (
+                <option key={contact._id ?? contact.id} value={contact._id ?? contact.id}>
+                  {contact.naam}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
 
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-400">Project/opdracht</span>
-          <select
-            value={form.projectId || `workstream:${form.workstreamId}`}
-            onChange={(event) => {
-              const value = event.target.value;
-              if (value.startsWith("workstream:")) {
-                setForm((current) => ({ ...current, projectId: "", workstreamId: value.replace("workstream:", "") }));
-              } else {
-                setForm((current) => ({ ...current, projectId: value, workstreamId: "" }));
-              }
-            }}
-            className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-          >
-            <option value="">Geen koppeling</option>
-            {projects.map((project) => (
-              <option key={project._id ?? project.id} value={project._id ?? project.id}>
-                Project: {project.naam}
-              </option>
-            ))}
-            {workstreams.map((workstream) => (
-              <option key={workstream._id ?? workstream.id} value={`workstream:${workstream._id ?? workstream.id}`}>
-                Opdracht: {workstream.titel}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormField
+          id="dossier-activity-context"
+          label="Project/opdracht"
+        >
+          {(controlProps) => (
+            <Select
+              {...controlProps}
+              value={form.projectId || `workstream:${form.workstreamId}`}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value.startsWith("workstream:")) {
+                  setForm((current) => ({ ...current, projectId: "", workstreamId: value.replace("workstream:", "") }));
+                } else {
+                  setForm((current) => ({ ...current, projectId: value, workstreamId: "" }));
+                }
+              }}
+            >
+              <option value="">Geen koppeling</option>
+              {projects.map((project) => (
+                <option key={project._id ?? project.id} value={project._id ?? project.id}>
+                  Project: {project.naam}
+                </option>
+              ))}
+              {workstreams.map((workstream) => (
+                <option key={workstream._id ?? workstream.id} value={`workstream:${workstream._id ?? workstream.id}`}>
+                  Opdracht: {workstream.titel}
+                </option>
+              ))}
+            </Select>
+          )}
+        </FormField>
 
-        <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-          <input
-            type="checkbox"
-            checked={form.createFollowUp}
-            onChange={(event) => {
-              const checked = event.target.checked;
-              setForm((current) => ({
-                ...current,
-                createFollowUp: checked,
-                followUpTitle: checked && !current.followUpTitle && current.title ? `Opvolgen: ${current.title}` : current.followUpTitle,
-              }));
-            }}
-            className="h-4 w-4 rounded border-white/20 bg-transparent accent-amber-500"
-          />
-          <span className="text-xs font-semibold text-slate-300">Vervolgactie aanmaken vanuit dit moment</span>
-        </label>
+        <Checkbox
+          label="Vervolgactie aanmaken vanuit dit moment"
+          checked={form.createFollowUp}
+          onChange={(event) => {
+            const checked = event.target.checked;
+            setForm((current) => ({
+              ...current,
+              createFollowUp: checked,
+              followUpTitle:
+                checked && !current.followUpTitle && current.title
+                  ? `Opvolgen: ${current.title}`
+                  : current.followUpTitle,
+            }));
+          }}
+          className="border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
+        />
 
         {form.createFollowUp ? (
-          <div className="space-y-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.03] p-3">
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-400">Actie-titel</span>
-              <input
-                value={form.followUpTitle}
-                onChange={(event) => setForm((current) => ({ ...current, followUpTitle: event.target.value }))}
-                placeholder="Bijv. Prijsindicatie terugkoppelen"
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-              />
-            </label>
+          <div className="space-y-3 rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] p-3">
+            <FormField
+              id="dossier-activity-follow-up-title"
+              label="Actie-titel"
+            >
+              {(controlProps) => (
+                <Input
+                  {...controlProps}
+                  value={form.followUpTitle}
+                  onChange={(event) => setForm((current) => ({ ...current, followUpTitle: event.target.value }))}
+                  placeholder="Bijv. Prijsindicatie terugkoppelen"
+                />
+              )}
+            </FormField>
             <div className="grid grid-cols-2 gap-2">
-              <label className="block">
-                <span className="text-xs font-semibold text-slate-400">Vervaldatum</span>
-                <input
-                  type="date"
-                  value={form.followUpDueDate}
-                  onChange={(event) => setForm((current) => ({ ...current, followUpDueDate: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-semibold text-slate-400">Tijdstip</span>
-                <input
-                  type="time"
-                  value={form.followUpDueTime}
-                  onChange={(event) => setForm((current) => ({ ...current, followUpDueTime: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-                />
-              </label>
-            </div>
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-400">Prioriteit</span>
-              <select
-                value={form.followUpPriority}
-                onChange={(event) => setForm((current) => ({ ...current, followUpPriority: event.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
+              <FormField
+                id="dossier-activity-follow-up-due-date"
+                label="Vervaldatum"
               >
-                <option value="laag">Laag</option>
-                <option value="normaal">Normaal</option>
-                <option value="hoog">Hoog</option>
-              </select>
-            </label>
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    type="date"
+                    value={form.followUpDueDate}
+                    onChange={(event) => setForm((current) => ({ ...current, followUpDueDate: event.target.value }))}
+                  />
+                )}
+              </FormField>
+              <FormField
+                id="dossier-activity-follow-up-due-time"
+                label="Tijdstip"
+              >
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    type="time"
+                    value={form.followUpDueTime}
+                    onChange={(event) => setForm((current) => ({ ...current, followUpDueTime: event.target.value }))}
+                  />
+                )}
+              </FormField>
+            </div>
+            <FormField
+              id="dossier-activity-follow-up-priority"
+              label="Prioriteit"
+            >
+              {(controlProps) => (
+                <Select
+                  {...controlProps}
+                  value={form.followUpPriority}
+                  onChange={(event) => setForm((current) => ({ ...current, followUpPriority: event.target.value }))}
+                >
+                  <option value="laag">Laag</option>
+                  <option value="normaal">Normaal</option>
+                  <option value="hoog">Hoog</option>
+                </Select>
+              )}
+            </FormField>
           </div>
         ) : null}
       </div>
-
-      <button
-        type="submit"
-        disabled={saving || !form.title.trim() || (form.createFollowUp && !form.followUpTitle.trim())}
-        className="btn mt-4 w-full border-transparent bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-        Vastleggen
-      </button>
     </form>
   );
 }
@@ -986,6 +1052,7 @@ function AccessCredentialPanel({
   onCreate,
   onUpdate,
   onDirtyChange,
+  onCanSubmitChange,
 }: {
   companyId: string;
   contacts: ContactItem[];
@@ -1021,6 +1088,7 @@ function AccessCredentialPanel({
   ) => Promise<void>;
   /** M-B: lift de dirty-status naar de dossier-modal-guard. */
   onDirtyChange?: (dirty: boolean) => void;
+  onCanSubmitChange?: (canSubmit: boolean) => void;
 }) {
   const [form, setForm] = useState<AccessCredentialForm>({
     ...emptyAccessCredentialForm,
@@ -1038,10 +1106,13 @@ function AccessCredentialPanel({
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
+  useEffect(() => {
+    onCanSubmitChange?.(Boolean(form.title.trim()));
+  }, [form.title, onCanSubmitChange]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!form.title.trim()) return;
+    if (saving || !form.title.trim()) return;
     // M-C: alleen resetten na een geslaagde save — bij een fout (de pagina
     // toont al een toast en rethrowt) blijft de invoer staan.
     try {
@@ -1084,172 +1155,216 @@ function AccessCredentialPanel({
             />
           ))
         ) : (
-          <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5 text-sm leading-6 text-slate-500">
+          <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-5 text-sm leading-6 text-[var(--color-text-muted)]">
             Nog geen toegang vastgelegd. Leg pilotaccounts, portalen en tijdelijke rollen hier vast zodat mails, dossiers en AI-context niet afhankelijk zijn van losse notities.
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-xl border border-amber-500/15 bg-amber-500/[0.05] p-4 lg:sticky lg:top-4">
+      <form
+        id={DOSSIER_ACCESS_FORM_ID}
+        onSubmit={handleSubmit}
+        aria-busy={saving || undefined}
+        className="rounded-xl border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] p-4 lg:sticky lg:top-4"
+      >
         <div className="flex items-center gap-2">
-          <KeyRound size={16} className="text-amber-300" />
-          <h3 className="text-sm font-bold text-white">Toegang toevoegen</h3>
+          <KeyRound size={16} className="text-[var(--color-primary-hover)]" />
+          <h3 className="text-sm font-bold text-[var(--color-text)]">Toegang toevoegen</h3>
         </div>
 
         <div className="mt-4 space-y-3">
-          <label className="block">
-            <span className="text-xs font-semibold text-slate-400">Titel</span>
-            <input
-              value={form.title}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Pilot admin, WordPress beheer, klantportaal..."
-              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold text-slate-400">Login URL</span>
-            <input
-              value={form.loginUrl}
-              onChange={(event) => setForm((current) => ({ ...current, loginUrl: event.target.value }))}
-              placeholder="https://.../login"
-              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-            />
-          </label>
+          <FormField
+            id="dossier-credential-title"
+            label="Titel"
+          >
+            {(controlProps) => (
+              <Input
+                {...controlProps}
+                value={form.title}
+                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Pilot admin, WordPress beheer, klantportaal..."
+              />
+            )}
+          </FormField>
+          <FormField
+            id="dossier-credential-login-url"
+            label="Login URL"
+          >
+            {(controlProps) => (
+              <Input
+                {...controlProps}
+                value={form.loginUrl}
+                onChange={(event) => setForm((current) => ({ ...current, loginUrl: event.target.value }))}
+                placeholder="https://.../login"
+              />
+            )}
+          </FormField>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-400">Gebruiker</span>
-              <input
-                value={form.username}
-                onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-                placeholder="email of gebruikersnaam"
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-400">Rol</span>
-              <input
-                value={form.role}
-                onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}
-                placeholder="Admin, editor, klant..."
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-              />
-            </label>
+            <FormField
+              id="dossier-credential-username"
+              label="Gebruiker"
+            >
+              {(controlProps) => (
+                <Input
+                  {...controlProps}
+                  value={form.username}
+                  onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+                  placeholder="email of gebruikersnaam"
+                />
+              )}
+            </FormField>
+            <FormField
+              id="dossier-credential-role"
+              label="Rol"
+            >
+              {(controlProps) => (
+                <Input
+                  {...controlProps}
+                  value={form.role}
+                  onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}
+                  placeholder="Admin, editor, klant..."
+                />
+              )}
+            </FormField>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-400">Omgeving</span>
-              <select
-                value={form.environment}
-                onChange={(event) => setForm((current) => ({ ...current, environment: event.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-              >
-                <option value="test">Test</option>
-                <option value="pilot">Pilot</option>
-                <option value="productie">Productie</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-400">Status</span>
-              <select
-                value={form.status}
-                onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-              >
-                <option value="actief">Actief</option>
-                <option value="tijdelijk">Tijdelijk</option>
-                <option value="te_controleren">Te controleren</option>
-                <option value="verlopen">Verlopen</option>
-                <option value="ingetrokken">Ingetrokken</option>
-              </select>
-            </label>
+            <FormField
+              id="dossier-credential-environment"
+              label="Omgeving"
+            >
+              {(controlProps) => (
+                <Select
+                  {...controlProps}
+                  value={form.environment}
+                  onChange={(event) => setForm((current) => ({ ...current, environment: event.target.value }))}
+                >
+                  <option value="test">Test</option>
+                  <option value="pilot">Pilot</option>
+                  <option value="productie">Productie</option>
+                </Select>
+              )}
+            </FormField>
+            <FormField
+              id="dossier-credential-status"
+              label="Status"
+            >
+              {(controlProps) => (
+                <Select
+                  {...controlProps}
+                  value={form.status}
+                  onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}
+                >
+                  <option value="actief">Actief</option>
+                  <option value="tijdelijk">Tijdelijk</option>
+                  <option value="te_controleren">Te controleren</option>
+                  <option value="verlopen">Verlopen</option>
+                  <option value="ingetrokken">Ingetrokken</option>
+                </Select>
+              )}
+            </FormField>
           </div>
-          <label className="block">
-            <span className="text-xs font-semibold text-slate-400">Secret</span>
-            <input
-              type="password"
-              value={form.secretValue}
-              onChange={(event) => setForm((current) => ({ ...current, secretValue: event.target.value }))}
-              placeholder="Alleen invullen als backend secret key staat"
-              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold text-slate-400">Secret hint</span>
-            <input
-              value={form.secretHint}
-              onChange={(event) => setForm((current) => ({ ...current, secretHint: event.target.value }))}
-              placeholder="Bijv. gedeeld via veilige mail"
-              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold text-slate-400">Contactpersoon</span>
-            <select
-              value={form.contactId}
-              onChange={(event) => setForm((current) => ({ ...current, contactId: event.target.value }))}
-              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-            >
-              <option value="">Niet gekoppeld</option>
-              {contacts.map((contact) => (
-                <option key={contact._id ?? contact.id} value={contact._id ?? contact.id}>{contact.naam}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            <span className="text-xs font-semibold text-slate-400">Project/opdracht</span>
-            <select
-              value={form.projectId || `workstream:${form.workstreamId}`}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value.startsWith("workstream:")) {
-                  setForm((current) => ({ ...current, projectId: "", workstreamId: value.replace("workstream:", "") }));
-                } else {
-                  setForm((current) => ({ ...current, projectId: value, workstreamId: "" }));
-                }
-              }}
-              className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-            >
-              <option value="">Niet gekoppeld</option>
-              {projects.map((project) => (
-                <option key={project._id ?? project.id} value={project._id ?? project.id}>Project: {project.naam}</option>
-              ))}
-              {workstreams.map((workstream) => (
-                <option key={workstream._id ?? workstream.id} value={`workstream:${workstream._id ?? workstream.id}`}>
-                  Opdracht: {workstream.titel}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FormField
+            id="dossier-credential-secret"
+            label="Secret"
+          >
+            {(controlProps) => (
+              <Input
+                {...controlProps}
+                type="password"
+                value={form.secretValue}
+                onChange={(event) => setForm((current) => ({ ...current, secretValue: event.target.value }))}
+                placeholder="Alleen invullen als backend secret key staat"
+              />
+            )}
+          </FormField>
+          <FormField
+            id="dossier-credential-secret-hint"
+            label="Secret hint"
+          >
+            {(controlProps) => (
+              <Input
+                {...controlProps}
+                value={form.secretHint}
+                onChange={(event) => setForm((current) => ({ ...current, secretHint: event.target.value }))}
+                placeholder="Bijv. gedeeld via veilige mail"
+              />
+            )}
+          </FormField>
+          <FormField
+            id="dossier-credential-contact"
+            label="Contactpersoon"
+          >
+            {(controlProps) => (
+              <Select
+                {...controlProps}
+                value={form.contactId}
+                onChange={(event) => setForm((current) => ({ ...current, contactId: event.target.value }))}
+              >
+                <option value="">Niet gekoppeld</option>
+                {contacts.map((contact) => (
+                  <option key={contact._id ?? contact.id} value={contact._id ?? contact.id}>{contact.naam}</option>
+                ))}
+              </Select>
+            )}
+          </FormField>
+          <FormField
+            id="dossier-credential-context"
+            label="Project/opdracht"
+          >
+            {(controlProps) => (
+              <Select
+                {...controlProps}
+                value={form.projectId || `workstream:${form.workstreamId}`}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value.startsWith("workstream:")) {
+                    setForm((current) => ({ ...current, projectId: "", workstreamId: value.replace("workstream:", "") }));
+                  } else {
+                    setForm((current) => ({ ...current, projectId: value, workstreamId: "" }));
+                  }
+                }}
+              >
+                <option value="">Niet gekoppeld</option>
+                {projects.map((project) => (
+                  <option key={project._id ?? project.id} value={project._id ?? project.id}>Project: {project.naam}</option>
+                ))}
+                {workstreams.map((workstream) => (
+                  <option key={workstream._id ?? workstream.id} value={`workstream:${workstream._id ?? workstream.id}`}>
+                    Opdracht: {workstream.titel}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </FormField>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-400">Gecontroleerd</span>
-              <input
-                type="date"
-                value={form.lastCheckedAt}
-                onChange={(event) => setForm((current) => ({ ...current, lastCheckedAt: event.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-400">Vervalt</span>
-              <input
-                type="date"
-                value={form.expiresAt}
-                onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-white outline-none focus:border-amber-500"
-              />
-            </label>
+            <FormField
+              id="dossier-credential-last-checked-at"
+              label="Gecontroleerd"
+            >
+              {(controlProps) => (
+                <Input
+                  {...controlProps}
+                  type="date"
+                  value={form.lastCheckedAt}
+                  onChange={(event) => setForm((current) => ({ ...current, lastCheckedAt: event.target.value }))}
+                />
+              )}
+            </FormField>
+            <FormField
+              id="dossier-credential-expires-at"
+              label="Vervalt"
+            >
+              {(controlProps) => (
+                <Input
+                  {...controlProps}
+                  type="date"
+                  value={form.expiresAt}
+                  onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))}
+                />
+              )}
+            </FormField>
           </div>
         </div>
-
-        <button
-          type="submit"
-          disabled={saving || !form.title.trim()}
-          className="btn mt-4 w-full border-transparent bg-amber-500 text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-          Toegang vastleggen
-        </button>
       </form>
     </div>
   );
@@ -1298,23 +1413,23 @@ function AccessCredentialCard({
   };
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <KeyRound size={16} className="text-amber-300" />
-            <h3 className="truncate text-sm font-bold text-white">{item.title}</h3>
+            <KeyRound size={16} className="text-[var(--color-primary-hover)]" />
+            <h3 className="truncate text-sm font-bold text-[var(--color-text)]">{item.title}</h3>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
             {label(item.environment)} - {label(item.status)}
             {item.role ? ` - ${item.role}` : ""}
           </p>
         </div>
         <span className={cn(
-          "inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-[11px] font-bold",
+          "inline-flex w-fit items-center rounded-full border px-2.5 py-1 text-micro font-bold",
           item.secret_configured
-            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-            : "border-amber-500/25 bg-amber-500/10 text-amber-200"
+            ? "border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)]"
+            : "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]"
         )}>
           {item.secret_configured ? "Secret aanwezig" : "Via veilig kanaal"}
         </span>
@@ -1332,75 +1447,87 @@ function AccessCredentialCard({
           href={toExternalHref(item.login_url)}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 block truncate rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-bold text-sky-200 transition hover:bg-sky-500/20"
+          className="mt-3 block truncate rounded-lg border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] px-3 py-2 text-xs font-bold text-[var(--color-info)] transition-colors hover:bg-[var(--color-info-border)]"
         >
           {item.login_url}
         </a>
       ) : null}
-      {item.notes ? <p className="mt-3 text-xs leading-5 text-slate-500">{item.notes}</p> : null}
+      {item.notes ? <p className="mt-3 text-xs leading-5 text-[var(--color-text-muted)]">{item.notes}</p> : null}
 
       {onUpdate && id ? (
-        <div className="mt-3 border-t border-white/5 pt-3">
+        <div className="mt-3 border-t border-[var(--color-border)] pt-3">
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex min-w-0 items-center gap-2 text-[11px] font-semibold text-slate-500">
-              Status
-              <select
-                value={item.status}
-                disabled={busy}
-                onChange={(event) => {
-                  void onUpdate(id, { status: event.target.value });
-                }}
-                className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-1.5 text-xs font-semibold text-white outline-none focus:border-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {ACCESS_CREDENTIAL_STATUSES.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-                {ACCESS_CREDENTIAL_STATUSES.every((status) => status.value !== item.status) ? (
-                  <option value={item.status}>{label(item.status)}</option>
-                ) : null}
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => (editing ? setEditing(false) : startEdit())}
-              disabled={busy}
-              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 text-[11px] font-semibold text-slate-300 transition hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+            <FormField
+              id={`access-credential-${id}-status`}
+              label="Status"
+              className="min-w-0 flex-1 sm:max-w-48"
             >
+              {(controlProps) => (
+                <Select
+                  {...controlProps}
+                  value={item.status}
+                  disabled={busy}
+                  onChange={(event) => {
+                    void onUpdate(id, { status: event.target.value });
+                  }}
+                  density="compact"
+                >
+                  {ACCESS_CREDENTIAL_STATUSES.map((status) => (
+                    <option key={status.value} value={status.value}>
+                      {status.label}
+                    </option>
+                  ))}
+                  {ACCESS_CREDENTIAL_STATUSES.every((status) => status.value !== item.status) ? (
+                    <option value={item.status}>{label(item.status)}</option>
+                  ) : null}
+                </Select>
+              )}
+            </FormField>
+            <Button type="button" variant="secondary" size="sm" onClick={() => (editing ? setEditing(false) : startEdit())} disabled={busy}>
               {editing ? "Annuleren" : "Label/hint bewerken"}
-            </button>
-            {busy ? <Loader2 size={13} className="animate-spin text-slate-400" /> : null}
+            </Button>
+            {busy ? <Loader2 size={13} className="animate-spin motion-reduce:animate-none text-[var(--color-text-muted)]" /> : null}
           </div>
           {editing ? (
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-[11px] font-semibold text-slate-500">Secret label</span>
-                <input
-                  value={secretLabel}
-                  onChange={(event) => setSecretLabel(event.target.value)}
-                  placeholder="wachtwoord, API key..."
-                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-                />
-              </label>
-              <label className="block">
-                <span className="text-[11px] font-semibold text-slate-500">Secret hint</span>
-                <input
-                  value={secretHint}
-                  onChange={(event) => setSecretHint(event.target.value)}
-                  placeholder="Bijv. gedeeld via veilige mail"
-                  className="mt-1 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-xs text-white outline-none placeholder:text-slate-600 focus:border-amber-500"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => void saveEdit()}
-                disabled={busy}
-                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 text-xs font-bold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2"
+              <FormField
+                id={`access-credential-${id}-secret-label`}
+                label="Secret label"
               >
-                {busy ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    value={secretLabel}
+                    onChange={(event) => setSecretLabel(event.target.value)}
+                    placeholder="wachtwoord, API key..."
+                  />
+                )}
+              </FormField>
+              <FormField
+                id={`access-credential-${id}-secret-hint`}
+                label="Secret hint"
+              >
+                {(controlProps) => (
+                  <Input
+                    {...controlProps}
+                    value={secretHint}
+                    onChange={(event) => setSecretHint(event.target.value)}
+                    placeholder="Bijv. gedeeld via veilige mail"
+                  />
+                )}
+              </FormField>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => void saveEdit()}
+                loading={busy}
+                loadingLabel="Wijzigingen opslaan"
+                className="sm:col-span-2"
+              >
+                <Save size={13} aria-hidden="true" />
                 Wijzigingen opslaan
-              </button>
+              </Button>
             </div>
           ) : null}
         </div>
@@ -1411,22 +1538,22 @@ function AccessCredentialCard({
 
 function AccessRow({ label: rowLabel, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-white/10 bg-black/10 px-3 py-2">
-      <p className="text-[11px] font-semibold uppercase tracking-normal text-slate-500">{rowLabel}</p>
-      <p className="mt-1 truncate text-xs font-semibold text-slate-200">{value}</p>
+    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] px-3 py-2">
+      <p className="text-micro font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">{rowLabel}</p>
+      <p className="mt-1 truncate text-xs font-semibold text-[var(--color-text)]">{value}</p>
     </div>
   );
 }
 
 function InfoPanel({ title, rows }: { title: string; rows: [string, string][] }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-      <h3 className="text-sm font-bold text-white">{title}</h3>
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
+      <h3 className="text-sm font-bold text-[var(--color-text)]">{title}</h3>
       <div className="mt-3 space-y-2">
         {rows.map(([rowLabel, value]) => (
           <div key={rowLabel} className="grid gap-1 text-sm sm:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] sm:gap-3">
-            <span className="text-slate-500">{rowLabel}</span>
-            <span className="min-w-0 break-words font-semibold text-slate-200 sm:text-right">{value}</span>
+            <span className="text-[var(--color-text-muted)]">{rowLabel}</span>
+            <span className="min-w-0 break-words font-semibold text-[var(--color-text)] sm:text-right">{value}</span>
           </div>
         ))}
       </div>
@@ -1445,19 +1572,19 @@ function toExternalHref(url: string) {
 
 function WorkColumn({ title, empty, items }: { title: string; empty: string; items: { id: string; title: string; meta: string; body?: string | null }[] }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-      <h3 className="text-sm font-bold text-white">{title}</h3>
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
+      <h3 className="text-sm font-bold text-[var(--color-text)]">{title}</h3>
       <div className="mt-3 space-y-2">
         {items.length > 0 ? (
           items.map((item) => (
-            <div key={item.id} className="rounded-lg border border-white/10 bg-black/10 p-3">
-              <p className="line-clamp-2 text-sm font-semibold text-white">{item.title}</p>
-              <p className="mt-1 text-xs text-slate-500">{item.meta}</p>
-              {item.body ? <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-400">{item.body}</p> : null}
+            <div key={item.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3">
+              <p className="line-clamp-2 text-sm font-semibold text-[var(--color-text)]">{item.title}</p>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">{item.meta}</p>
+              {item.body ? <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--color-text-muted)]">{item.body}</p> : null}
             </div>
           ))
         ) : (
-          <p className="text-sm text-slate-500">{empty}</p>
+          <p className="text-sm text-[var(--color-text-muted)]">{empty}</p>
         )}
       </div>
     </div>
@@ -1490,36 +1617,36 @@ function DocumentCard({
       href={doc.pdf_url}
       target="_blank"
       rel="noreferrer"
-      className="group block rounded-xl border border-white/10 bg-white/[0.03] p-4 transition hover:border-amber-500/25 hover:bg-white/[0.06]"
+      className="group block rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 transition-colors hover:border-[var(--color-primary-border)] hover:bg-[var(--color-surface-hover)]"
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]">
           <FileCheck2 size={17} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-            <span className="truncate text-sm font-bold text-white">{doc.titel}</span>
+            <span className="truncate text-sm font-bold text-[var(--color-text)]">{doc.titel}</span>
             {versionBadge ? (
               <span
                 className={cn(
-                  "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold",
+                  "shrink-0 rounded-full border px-2 py-0.5 text-micro font-bold",
                   versionBadge === "nieuwste"
-                    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
-                    : "border-white/10 bg-white/[0.04] text-slate-400"
+                    ? "border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)]"
+                    : "border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)]"
                 )}
               >
                 {versionBadge === "nieuwste" ? "Nieuwste versie" : "Oudere versie"}
               </span>
             ) : null}
           </span>
-          <span className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-slate-500">
+          <span className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-[var(--color-text-muted)]">
             <span>{doc.template_label ?? label(doc.context_type)}</span>
             <span aria-hidden="true">-</span>
             <span>{formatDate(doc.created_at)}</span>
           </span>
-          {doc.notes ? <span className="mt-2 line-clamp-2 block text-sm leading-5 text-slate-400">{doc.notes}</span> : null}
+          {doc.notes ? <span className="mt-2 line-clamp-2 block text-sm leading-5 text-[var(--color-text-muted)]">{doc.notes}</span> : null}
         </span>
-        <span className="hidden shrink-0 rounded-lg border border-white/10 bg-black/10 px-2.5 py-1 text-xs font-bold text-slate-300 transition group-hover:border-amber-500/25 group-hover:text-amber-200 sm:inline-flex">
+        <span className="hidden shrink-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] px-2.5 py-1 text-xs font-bold text-[var(--color-text-muted)] transition-colors group-hover:border-[var(--color-primary-border)] group-hover:text-[var(--color-primary-hover)] sm:inline-flex">
           Open PDF
         </span>
       </div>
@@ -1579,7 +1706,7 @@ function buildTimeline(input: {
       body: doc.notes,
       date: doc.created_at,
       meta: doc.template_label ?? label(doc.context_type),
-      tone: "amber",
+      tone: "accent",
     });
   }
 
@@ -1592,7 +1719,7 @@ function buildTimeline(input: {
       body: access.login_url,
       date: access.updated_at ?? access.created_at,
       meta: `${label(access.environment)} - ${label(access.status)}`,
-      tone: access.status === "actief" ? "emerald" : "amber",
+      tone: access.status === "actief" ? "success" : "warning",
     });
   }
 
@@ -1618,7 +1745,7 @@ function buildTimeline(input: {
               targetId: `activity:${action.source_activity_id}`,
             }
           : undefined,
-      tone: action.status === "done" || action.status === "afgerond" ? "emerald" : "sky",
+      tone: action.status === "done" || action.status === "afgerond" ? "success" : "info",
     });
   }
 
@@ -1631,7 +1758,7 @@ function buildTimeline(input: {
       body: project.samenvatting,
       date: project.updated_at ?? project.created_at,
       meta: `${projectFaseLabel(project.fase)} - ${projectStatusLabel(project.status)}`,
-      tone: "violet",
+      tone: "info",
     });
   }
 
@@ -1644,7 +1771,7 @@ function buildTimeline(input: {
       body: workstream.volgende_stap ?? workstream.doel,
       date: workstream.updated_at ?? workstream.created_at,
       meta: `${label(workstream.type)} - ${label(workstream.status)}`,
-      tone: "sky",
+      tone: "info",
     });
   }
 
@@ -1657,7 +1784,7 @@ function buildTimeline(input: {
       body: lead.pijnpunt,
       date: lead.updated_at ?? lead.created_at,
       meta: `${label(lead.status)}${lead.prioriteit ? ` - ${label(lead.prioriteit)}` : ""}`,
-      tone: "emerald",
+      tone: "success",
     });
   }
 
@@ -1678,7 +1805,7 @@ function buildTimeline(input: {
       ]
         .filter(Boolean)
         .join(" - "),
-      tone: entry.invoice_id ? "emerald" : "slate",
+      tone: entry.invoice_id ? "success" : "neutral",
     });
   }
 
@@ -1698,13 +1825,13 @@ function buildTimeline(input: {
         .filter(Boolean)
         .join(" - "),
       // L12: rood alleen voor écht te-late facturen; betaald = groen, een verse
-      // concept/verstuurd-factuur is neutraal (amber), niet alarmerend rood.
+      // concept/verstuurd-factuur is neutraal, niet alarmerend rood.
       tone:
         invoice.status === "betaald"
-          ? "emerald"
+          ? "success"
           : invoice.status !== "geannuleerd" && isPastDate(invoice.due_date)
-            ? "rose"
-            : "amber",
+            ? "danger"
+            : "neutral",
     });
   }
 
@@ -1717,7 +1844,7 @@ function buildTimeline(input: {
       body: contact.notities,
       date: contact.updated_at ?? contact.created_at,
       meta: contact.rol ?? "Contactpersoon",
-      tone: "slate",
+      tone: "neutral",
     });
   }
 
@@ -1729,7 +1856,7 @@ function buildTimeline(input: {
     body: input.company.notities,
     date: input.company.created_at,
     meta: label(input.company.relatie_type),
-    tone: "amber",
+    tone: "accent",
   });
 
   // Geen harde cap meer: TimelineList toont de eerste 40 met een
@@ -1740,20 +1867,15 @@ function buildTimeline(input: {
 }
 
 function activityTone(eventType: string): TimelineItem["tone"] {
-  if (eventType === "meeting" || eventType === "contact" || eventType === "call") return "emerald";
-  if (eventType === "email") return "sky";
-  if (eventType === "besluit") return "violet";
-  if (eventType === "project_update") return "amber";
-  return "slate";
+  if (eventType === "meeting" || eventType === "contact" || eventType === "call") return "success";
+  if (eventType === "email" || eventType === "besluit") return "info";
+  if (eventType === "project_update") return "accent";
+  return "neutral";
 }
 
 function toneClass(tone: TimelineItem["tone"]) {
-  if (tone === "emerald") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-300";
-  if (tone === "sky") return "border-sky-500/25 bg-sky-500/10 text-sky-300";
-  if (tone === "violet") return "border-violet-500/25 bg-violet-500/10 text-violet-300";
-  if (tone === "rose") return "border-rose-500/25 bg-rose-500/10 text-rose-300";
-  if (tone === "amber") return "border-amber-500/25 bg-amber-500/10 text-amber-300";
-  return "border-white/10 bg-white/[0.04] text-slate-300";
+  const classes = uiToneClasses[tone];
+  return cn(classes.border, classes.surface, classes.icon);
 }
 
 function timelineIcon(kind: string) {

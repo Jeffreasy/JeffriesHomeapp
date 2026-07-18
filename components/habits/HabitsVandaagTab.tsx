@@ -128,17 +128,17 @@ export function HabitsVandaagTab({
             <MiniStat
               label="Open"
               value={dayHealth.openPositive.toString()}
-              tone="amber"
+              tone="accent"
             />
             <MiniStat
               label="Schoon"
               value={dayHealth.negativeClear.toString()}
-              tone="green"
+              tone="success"
             />
             <MiniStat
               label="XP"
               value={formatXP(stats?.totaalXP ?? 0)}
-              tone="sky"
+              tone="info"
             />
           </div>
         </SidePanel>

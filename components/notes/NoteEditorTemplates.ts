@@ -11,9 +11,9 @@ export const KLEUREN = [
 ];
 
 export const PRIORITEITEN = [
-  { value: "hoog", label: "Hoog", dot: "bg-red-500" },
-  { value: "normaal", label: "Normaal", dot: "bg-slate-500" },
-  { value: "laag", label: "Laag", dot: "bg-blue-400" },
+  { value: "hoog", label: "Hoog", dot: "bg-[var(--color-danger)]" },
+  { value: "normaal", label: "Normaal", dot: "bg-[var(--color-text-muted)]" },
+  { value: "laag", label: "Laag", dot: "bg-[var(--color-info)]" },
 ] as const;
 
 export const NOTE_TEMPLATE_CATEGORIES = ["Algemeen", "Werk", "LaventeCare", "Veiligheid"] as const;

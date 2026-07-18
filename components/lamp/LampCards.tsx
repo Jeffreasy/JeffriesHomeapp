@@ -1,6 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowRight,
@@ -8,36 +5,13 @@ import {
   Search,
   type LucideIcon,
 } from "lucide-react";
-import Link from "next/link";
 import type { FilterMode } from "./LampUtils";
+import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Surface } from "@/components/ui/Surface";
 import { SurfaceHeader as CoreSurfaceHeader } from "@/components/ui/SurfaceHeader";
-import { cn } from "@/lib/utils";
-
-export function Panel({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="min-w-0"
-    >
-      <Surface
-        className={cn(
-          "bg-[rgba(255,255,255,0.04)] shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl",
-          className,
-        )}
-      >
-        {children}
-      </Surface>
-    </motion.div>
-  );
-}
 
 export function SectionHeader({
   icon: Icon,
@@ -52,7 +26,7 @@ export function SectionHeader({
 }) {
   return (
     <CoreSurfaceHeader
-      icon={<Icon size={16} className="text-amber-300" />}
+      icon={<Icon size={16} className="text-[var(--color-primary-hover)]" />}
       eyebrow={label}
       title={title}
       meta={sub}
@@ -62,13 +36,17 @@ export function SectionHeader({
 
 export function WarningPanel({ title, text }: { title: string; text: string }) {
   return (
-    <div className="flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
-      <AlertTriangle size={18} className="mt-0.5 shrink-0 text-rose-300" aria-hidden="true" />
+    <Surface tone="danger" className="flex items-start gap-3">
+      <AlertTriangle
+        size={18}
+        className="mt-0.5 shrink-0 text-[var(--color-danger)]"
+        aria-hidden="true"
+      />
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-rose-200">{title}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">{text}</p>
+        <p className="text-sm font-semibold text-[var(--color-danger)]">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--color-text-muted)]">{text}</p>
       </div>
-    </div>
+    </Surface>
   );
 }
 
@@ -76,14 +54,7 @@ export function LoadingGrid() {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {Array.from({ length: 6 }).map((_, index) => (
-        <motion.div
-          key={index}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: index * 0.05 }}
-          className="h-28 animate-pulse rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]"
-          aria-hidden="true"
-        />
+        <Skeleton key={index} className="h-28 rounded-2xl" />
       ))}
     </div>
   );
@@ -91,22 +62,18 @@ export function LoadingGrid() {
 
 export function EmptyDevices() {
   return (
-    <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-10 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-hover)]">
-        <Lightbulb size={28} className="text-[var(--color-text-subtle)]" aria-hidden="true" />
-      </div>
-      <h2 className="mt-4 text-lg font-semibold text-slate-300">Geen lampen gevonden</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
-        Registreer je eerste WiZ-lamp via instellingen om de bedienpagina te vullen.
-      </p>
-      <Link
-        href="/settings"
-        className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
-      >
-        Instellingen openen
-        <ArrowRight size={15} aria-hidden="true" />
-      </Link>
-    </div>
+    <FeedbackState
+      icon={Lightbulb}
+      title="Geen lampen gevonden"
+      description="Registreer je eerste WiZ-lamp via instellingen om de bedienpagina te vullen."
+      action={
+        <ButtonLink href="/settings" variant="primary" className="mt-5">
+          Instellingen openen
+          <ArrowRight size={15} aria-hidden="true" />
+        </ButtonLink>
+      }
+      className="min-h-[320px]"
+    />
   );
 }
 
@@ -122,23 +89,20 @@ export function NoResults({
   const hasFilter = search.trim().length > 0 || filter !== "all";
 
   return (
-    <div className="flex min-h-[280px] flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-10 text-center">
-      <Search size={28} className="text-[var(--color-text-subtle)]" aria-hidden="true" />
-      <h2 className="mt-4 text-base font-semibold text-slate-300">
-        Geen lampen in deze selectie
-      </h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
-        {hasFilter
+    <FeedbackState
+      icon={Search}
+      title="Geen lampen in deze selectie"
+      description={
+        hasFilter
           ? "Pas je zoekterm of statusfilter aan om meer lampen te zien."
-          : "Er zijn geen lampen die voldoen aan deze weergave."}
-      </p>
-      <button
-        type="button"
-        onClick={onReset}
-        className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
-      >
-        Filters resetten
-      </button>
-    </div>
+          : "Er zijn geen lampen die voldoen aan deze weergave."
+      }
+      action={
+        <Button className="mt-5" onClick={onReset}>
+          Filters resetten
+        </Button>
+      }
+      className="min-h-[280px]"
+    />
   );
 }

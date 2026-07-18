@@ -1,9 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { BriefcaseBusiness, UserRound } from "lucide-react";
 import type { NoteRecord } from "@/hooks/useNotes";
 import { getNoteBusinessContext } from "./NotesUtils";
+import { Badge } from "@/components/ui/Badge";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { cn } from "@/lib/utils";
 
 type NoteContextBadgeProps = {
   note: NoteRecord;
@@ -29,13 +31,11 @@ export function NoteContextBadge({
 
   const isContact = context.type === "contact";
   const label = context.title || (isContact ? "Contact" : "Zakelijke context");
-  const classes = `inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 font-semibold ${
-    compact ? "text-[10px]" : "text-[11px]"
-  } ${
-    isContact
-      ? "border-violet-500/20 bg-violet-500/10 text-violet-200 hover:bg-violet-500/15"
-      : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
-  } ${className}`;
+  const classes = cn(
+    "min-w-0 max-w-full gap-1 rounded-md px-2 font-semibold",
+    "text-micro",
+    className,
+  );
 
   const content = (
     <>
@@ -46,21 +46,25 @@ export function NoteContextBadge({
 
   if (isContact && context.id) {
     return (
-      <Link
+      <ButtonLink
+        variant="secondary"
         href={`/contacten?contact=${encodeURIComponent(context.id)}`}
         onClick={(event) => event.stopPropagation()}
         aria-label={`Open contact: ${label}`}
         title={`Open contact ${label}`}
-        className={classes}
+        className={cn(
+          classes,
+          "border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)] hover:bg-[var(--color-info-border)]",
+        )}
       >
         {content}
-      </Link>
+      </ButtonLink>
     );
   }
 
   return (
-    <span className={classes} title={label}>
+    <Badge tone="accent" size="sm" className={classes} title={label}>
       {content}
-    </span>
+    </Badge>
   );
 }

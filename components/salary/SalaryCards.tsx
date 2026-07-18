@@ -10,6 +10,10 @@ import { FORECAST_ASSUMPTIONS } from "@/lib/salaryForecast";
 import { type SalarisDisplayRecord } from "./SalaryTypes";
 import { fmt, MAANDEN } from "./SalaryUtils";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { Surface } from "@/components/ui/Surface";
+import { SurfaceHeader } from "@/components/ui/SurfaceHeader";
+import { Badge } from "@/components/ui/Badge";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 
 /** S1: privacy-mask voor geldbedragen — identiek patroon als finance. */
 export type MaskFn = (value: string) => string;
@@ -35,37 +39,37 @@ export function PrognoseCard({ record, mask = noMask }: { record: SalarisDisplay
   const hasHourMetrics = typeof record.totaalUren === "number";
 
   return (
-    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-5 space-y-4 min-w-0">
+    <Surface tone="warning" padding="md" className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <p className="text-[10px] text-amber-400/70 uppercase tracking-wider">
+          <p className="text-micro uppercase tracking-wider text-[var(--color-warning)]">
             {isWerkelijk ? "Werkelijke loonstrook" : isRoosterForecast ? "Roosterprognose" : "Lopende maand prognose"}
           </p>
-          <p className="text-lg font-bold text-amber-300">
+          <p className="text-lg font-bold text-[var(--color-warning)]">
             {MAANDEN[record.maand - 1]} {record.jaar}
           </p>
         </div>
         <div className="flex flex-col items-start gap-1 sm:items-end">
-          <span className="text-[10px] text-slate-500 bg-[var(--color-surface)] px-2 py-1 rounded-lg">
+          <Badge tone="neutral" size="sm">
             uurloon ORT {mask(fmt(record.uurloonORT))}
-          </span>
+          </Badge>
           {record.salarisCalibratie && (
-            <span className="text-[10px] text-slate-400">
+            <Badge tone="info" size="sm">
               {record.salarisCalibratie}
-            </span>
+            </Badge>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-[var(--color-surface)] rounded-xl p-3 border border-[var(--color-border)]">
-          <p className="text-[10px] text-slate-500 mb-1">▶ Bruto</p>
-          <p className="text-xl font-bold text-white">{mask(fmt(record.brutoBetaling))}</p>
-        </div>
-        <div className="bg-emerald-500/8 rounded-xl p-3 border border-emerald-500/20">
-          <p className="text-[10px] text-emerald-400/70 mb-1">{isWerkelijk ? "Netto werkelijk" : "≈ Netto prognose"}</p>
-          <p className="text-xl font-bold text-emerald-300">{mask(fmt(record.nettoPrognose))}</p>
-        </div>
+        <Surface tone="subtle" radius="md" padding="sm">
+          <p className="mb-1 text-micro text-[var(--color-text-muted)]">Bruto</p>
+          <p className="text-xl font-bold text-[var(--color-text)]">{mask(fmt(record.brutoBetaling))}</p>
+        </Surface>
+        <Surface tone="success" radius="md" padding="sm">
+          <p className="mb-1 text-micro text-[var(--color-success)]">{isWerkelijk ? "Netto werkelijk" : "≈ Netto prognose"}</p>
+          <p className="text-xl font-bold text-[var(--color-success)]">{mask(fmt(record.nettoPrognose))}</p>
+        </Surface>
       </div>
 
       {hasHourMetrics && (
@@ -73,7 +77,7 @@ export function PrognoseCard({ record, mask = noMask }: { record: SalarisDisplay
           {/* S4: bedragen uit de loonstrook, uren uit het rooster — dat
               onderscheid expliciet labelen. */}
           {isWerkelijk && (
-            <p className="mb-1.5 text-[10px] uppercase tracking-wider text-slate-500">
+            <p className="mb-1.5 text-micro uppercase tracking-wider text-[var(--color-text-muted)]">
               uren volgens rooster
             </p>
           )}
@@ -89,7 +93,7 @@ export function PrognoseCard({ record, mask = noMask }: { record: SalarisDisplay
       {/* Full breakdown is collapsed by default — the card opens on netto/bruto
           + the metric pills, content-first. */}
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg py-1.5 text-xs font-semibold text-slate-400 transition-colors hover:text-slate-200">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg py-1.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]">
           <span>Opbouw{Object.keys(ort).length > 0 ? " & ORT-detail" : ""}</span>
           <ChevronDown size={14} className="shrink-0 transition-transform group-open:rotate-180" />
         </summary>
@@ -111,24 +115,24 @@ export function PrognoseCard({ record, mask = noMask }: { record: SalarisDisplay
         </div>
 
         {Object.keys(ort).length > 0 && (
-          <div className="mt-2 bg-[var(--color-surface)] rounded-lg p-3 border border-[var(--color-border)] space-y-1">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">ORT detail</p>
+          <Surface tone="subtle" radius="sm" padding="sm" className="mt-2 space-y-1">
+            <p className="text-micro text-[var(--color-text-muted)] uppercase tracking-wider mb-2">ORT detail</p>
             {Object.entries(ort).map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-4 text-[11px]">
-                <span className="text-slate-400">{k}</span>
-                <span className="text-right text-slate-300">
+              <div key={k} className="flex justify-between gap-4 text-micro">
+                <span className="text-[var(--color-text-muted)]">{k}</span>
+                <span className="text-right text-[var(--color-text)]">
                   {ortHours[k] ? `${formatHours(ortHours[k])}u · ` : ""}{mask(fmt(v))}
                 </span>
               </div>
             ))}
-          </div>
+          </Surface>
         )}
 
         {/* S2: forecast-aannames — alleen relevant voor prognoses; een
             werkelijke loonstrook rekent nergens mee. */}
         {!isWerkelijk && (
-          <div className="mt-2 bg-[var(--color-surface)] rounded-lg p-3 border border-[var(--color-border)] space-y-1">
-            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Aannames prognose</p>
+          <Surface tone="subtle" radius="sm" padding="sm" className="mt-2 space-y-1">
+            <p className="text-micro text-[var(--color-text-muted)] uppercase tracking-wider mb-2">Aannames prognose</p>
             <AssumptionRow
               label="Contracturen"
               value={`${record.contractUrenPerWeek ?? FORECAST_ASSUMPTIONS.contractUrenPerWeek}u per week`}
@@ -151,10 +155,10 @@ export function PrognoseCard({ record, mask = noMask }: { record: SalarisDisplay
             {record.salarisCalibratie && (
               <AssumptionRow label="Kalibratie" value={record.salarisCalibratie} />
             )}
-          </div>
+          </Surface>
         )}
       </details>
-    </div>
+    </Surface>
   );
 }
 
@@ -164,24 +168,19 @@ function formatHours(value: number) {
 
 function AssumptionRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-4 text-[11px]">
-      <span className="text-slate-400">{label}</span>
-      <span className="text-right text-slate-300">{value}</span>
+    <div className="flex justify-between gap-4 text-micro">
+      <span className="text-[var(--color-text-muted)]">{label}</span>
+      <span className="text-right text-[var(--color-text)]">{value}</span>
     </div>
   );
 }
 
 function MetricPill({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className={cn(
-      "rounded-xl border px-3 py-2",
-      accent
-        ? "border-amber-400/20 bg-amber-400/10"
-        : "border-[var(--color-border)] bg-[var(--color-surface)]"
-    )}>
-      <p className="text-[10px] uppercase tracking-wider text-slate-400">{label}</p>
-      <p className={cn("mt-0.5 text-sm font-bold tabular-nums", accent ? "text-amber-200" : "text-slate-200")}>{value}</p>
-    </div>
+    <Surface tone={accent ? "accent" : "subtle"} radius="md" padding="sm">
+      <p className="text-micro uppercase tracking-wider text-[var(--color-text-muted)]">{label}</p>
+      <p className={cn("mt-0.5 text-sm font-bold tabular-nums", accent ? "text-[var(--color-primary-hover)]" : "text-[var(--color-text)]")}>{value}</p>
+    </Surface>
   );
 }
 
@@ -190,10 +189,10 @@ export function BreakdownRow({ label, bedrag, negatief, accent, mask = noMask }:
 }) {
   return (
     <div className="flex justify-between items-center">
-      <span className={cn("text-slate-500", accent && "text-amber-400/80")}>{label}</span>
+      <span className={cn("text-[var(--color-text-muted)]", accent && "text-[var(--color-warning)]")}>{label}</span>
       <span className={cn(
         "font-medium tabular-nums",
-        negatief ? "text-red-400" : accent ? "text-amber-300" : "text-slate-300"
+        negatief ? "text-[var(--color-danger)]" : accent ? "text-[var(--color-primary-hover)]" : "text-[var(--color-text)]"
       )}>
         {mask(bedrag < 0 ? `-${fmt(-bedrag)}` : fmt(bedrag))}
       </span>
@@ -213,7 +212,7 @@ export function MaandBalk({ record, maxNetto, mask = noMask, selected, onSelect 
   // Privacy: mask() maskeert alleen de tekst, maar de bar-hoogte lekt de
   // relatieve netto-verhoudingen nog. Detecteer de mask-staat en vlak de
   // balken af tot een uniforme hoogte zodra privacy aanstaat.
-  const isMasked = mask(" ") === "••••";
+  const isMasked = mask("") === "••••";
   const pct = isMasked
     ? 100
     : maxNetto > 0 ? (record.nettoPrognose / maxNetto) * 100 : 0;
@@ -228,27 +227,32 @@ export function MaandBalk({ record, maxNetto, mask = noMask, selected, onSelect 
       aria-pressed={selected}
       aria-label={detail}
       className={cn(
-        "flex w-full items-end gap-1.5 group appearance-none border-0 bg-transparent p-0 rounded",
-        selected && "bg-white/[0.05]"
+        "group flex h-full min-h-11 w-full appearance-none items-end gap-1.5 rounded border-0 bg-transparent p-0",
+        selected && "bg-[var(--color-surface-hover)]"
       )}
     >
       <div className="flex flex-col items-center gap-0.5 w-full">
         {isEenm && (
           <span className={cn(
-            "text-[10px] text-amber-400 transition-opacity",
+            "text-micro text-[var(--color-warning)] transition-opacity",
             selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           )}>★</span>
         )}
+        {/* Semantic chart colors encode source and one-off pay; height encodes the salary value. */}
         <div
           className={cn(
-            "w-full rounded-t transition-all duration-300",
-            isWerkelijk ? "bg-emerald-400/60" : isEenm ? "bg-amber-400/60" : "bg-blue-500/40 group-hover:bg-blue-500/60"
+            "min-h-1 w-full rounded-t transition-[height,background-color] duration-[var(--motion-slow)]",
+            isWerkelijk
+              ? "bg-[color-mix(in_srgb,var(--color-success)_60%,transparent)]"
+              : isEenm
+                ? "bg-[color-mix(in_srgb,var(--color-warning)_60%,transparent)]"
+                : "bg-[color-mix(in_srgb,var(--color-info)_40%,transparent)] group-hover:bg-[color-mix(in_srgb,var(--color-info)_60%,transparent)]"
           )}
-          style={{ height: `${Math.max(pct, 4)}%`, minHeight: "4px" }}
+          style={{ height: `${Math.max(pct, 4)}%` }}
         />
         <span className={cn(
-          "text-[10px] transition-colors",
-          selected ? "text-slate-200" : "text-slate-400 group-hover:text-slate-300"
+          "text-micro transition-colors",
+          selected ? "text-[var(--color-text)]" : "text-[var(--color-text-muted)] group-hover:text-[var(--color-text)]"
         )}>
           {MAANDEN[record.maand - 1].slice(0, 3)}
         </span>
@@ -268,30 +272,27 @@ export function JaarSectie({ jaar, records, mask = noMask }: { jaar: number; rec
   const selectedRecord = sorted.find((r) => r.periode === selectedPeriode) ?? null;
 
   return (
-    <div className="glass rounded-2xl border border-[var(--color-border)] overflow-hidden min-w-0">
+    <Surface padding="none" className="overflow-hidden">
       <div className="flex flex-col gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-200">
-          <AppIcon name="calendar" tone="slate" size="sm" />
+        <span className="inline-flex items-center gap-2 text-sm font-bold text-[var(--color-text)]">
+          <AppIcon name="calendar" tone="neutral" size="sm" />
           {jaar}
         </span>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           {/* Scope: jaartotalen mengen werkelijke loonstrookmaanden met
               prognosemaanden — label dat zodra beide soorten meetellen. */}
           {werkelijkAantal > 0 && werkelijkAantal < sorted.length && (
-            <span className="text-slate-500">{werkelijkAantal} werkelijk · {sorted.length - werkelijkAantal} prognose</span>
+            <span className="text-[var(--color-text-muted)]">{werkelijkAantal} werkelijk · {sorted.length - werkelijkAantal} prognose</span>
           )}
           {werkelijkAantal > 0 && werkelijkAantal === sorted.length && (
-            <span className="text-emerald-400">{werkelijkAantal} werkelijk</span>
+            <Badge tone="success" size="sm">{werkelijkAantal} werkelijk</Badge>
           )}
-          <span className="text-slate-500">Bruto <span className="text-slate-300 font-medium">{mask(fmt(totBruto))}</span></span>
-          <span className="text-slate-500">Netto <span className="text-emerald-400 font-bold">{mask(fmt(totNetto))}</span></span>
+          <span className="text-[var(--color-text-muted)]">Bruto <span className="font-medium text-[var(--color-text)]">{mask(fmt(totBruto))}</span></span>
+          <span className="text-[var(--color-text-muted)]">Netto <span className="font-bold text-[var(--color-success)]">{mask(fmt(totNetto))}</span></span>
         </div>
       </div>
 
-      <div
-        className="flex items-end gap-0.5 px-3 pt-3 pb-2"
-        style={{ height: "88px" }}
-      >
+      <div className="flex h-[88px] items-end gap-0.5 px-3 pb-2 pt-3">
         {sorted.map((r) => (
           <MaandBalk
             key={r.periode}
@@ -305,9 +306,9 @@ export function JaarSectie({ jaar, records, mask = noMask }: { jaar: number; rec
       </div>
 
       {selectedRecord && (
-        <p className="px-4 pb-2 text-[11px] text-slate-400" aria-live="polite">
+        <p className="px-4 pb-2 text-micro text-[var(--color-text-muted)]" aria-live="polite">
           {MAANDEN[selectedRecord.maand - 1]} {selectedRecord.jaar}:{" "}
-          <span className="font-semibold text-slate-200">{mask(fmt(selectedRecord.nettoPrognose))}</span>{" "}
+          <span className="font-semibold text-[var(--color-text)]">{mask(fmt(selectedRecord.nettoPrognose))}</span>{" "}
           ({selectedRecord.bron === "werkelijk" ? "werkelijk" : "prognose"}
           {selectedRecord.eenmaligTotaal > 0 ? " · incl. eenmalig" : ""})
         </p>
@@ -318,7 +319,7 @@ export function JaarSectie({ jaar, records, mask = noMask }: { jaar: number; rec
           <MaandRij key={r.periode} record={r} mask={mask} />
         ))}
       </div>
-    </div>
+    </Surface>
   );
 }
 
@@ -332,47 +333,52 @@ export function MaandRij({ record: r, mask = noMask }: { record: SalarisDisplayR
   return (
     <div className="flex flex-col gap-2 px-4 py-3 hover:bg-[var(--color-surface-hover)] transition-colors sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-2 min-w-0">
-        <span className="text-xs font-medium text-slate-400 w-8">{MAANDEN[r.maand - 1]}</span>
-        <span className="text-[10px] text-slate-500">{r.aantalDiensten} diensten</span>
+        <span className="w-8 text-xs font-medium text-[var(--color-text-muted)]">{MAANDEN[r.maand - 1]}</span>
+        <span className="text-micro text-[var(--color-text-muted)]">{r.aantalDiensten} diensten</span>
         {typeof r.totaalUren === "number" && (
-          <span className="text-[10px] text-slate-500">{formatHours(r.totaalUren)}u{isWerkelijk ? " (rooster)" : ""}</span>
+          <span className="text-micro text-[var(--color-text-muted)]">{formatHours(r.totaalUren)}u{isWerkelijk ? " (rooster)" : ""}</span>
         )}
         {isRoosterForecast && (
-          <span className="text-[10px] bg-sky-500/15 text-sky-300 px-1.5 py-0.5 rounded-full">
-            rooster
-          </span>
+          <Badge tone="info" size="sm">rooster</Badge>
         )}
         {isWerkelijk && (
-          <span className="text-[10px] bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded-full">
-            werkelijk
-          </span>
+          <Badge tone="success" size="sm">werkelijk</Badge>
         )}
         {eenmalig.map((e) => (
-          <span key={e.label} className="text-[10px] bg-amber-500/15 text-amber-400 px-1.5 py-0.5 rounded-full">
+          <Badge key={e.label} tone="warning" size="sm">
             {e.label.replace(/^[^\s]+ /, "")}
-          </span>
+          </Badge>
         ))}
       </div>
       <div className="flex items-center justify-between gap-4 text-xs tabular-nums shrink-0 sm:justify-end">
-        <span className="text-slate-500 hidden sm:block">{mask(fmt(r.brutoBetaling))}</span>
-        <span className="text-red-500/80 text-[11px] hidden sm:block">{mask(`-${fmt(r.pensioenpremie)}`)}</span>
-        <span className="text-emerald-400 font-semibold">{mask(fmt(r.nettoPrognose))}</span>
+        <span className="text-[var(--color-text-muted)] hidden sm:block">{mask(fmt(r.brutoBetaling))}</span>
+        <span className="hidden text-micro text-[var(--color-danger)] sm:block">{mask(`-${fmt(r.pensioenpremie)}`)}</span>
+        <span className="font-semibold text-[var(--color-success)]">{mask(fmt(r.nettoPrognose))}</span>
       </div>
     </div>
   );
 }
 
-export function TotaalCard({ icon: Icon, label, value, accent }: {
-  icon: LucideIcon; label: string; value: string; accent: string;
+type TotaalCardTone = Extract<UiTone, "accent" | "info" | "success" | "warning">;
+
+export function TotaalCard({ icon: Icon, label, value, tone }: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  tone: TotaalCardTone;
 }) {
+  const toneClasses = uiToneClasses[tone];
+
   return (
-    <div className="glass rounded-xl p-3 border border-[var(--color-border)] min-w-0" style={{ borderColor: accent + "20" }}>
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Icon size={11} style={{ color: accent }} />
-        <p className="text-[10px] text-slate-400 uppercase tracking-wider">{label}</p>
+    <Surface tone={tone} radius="md" padding="sm">
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <Icon size={14} className={cn("shrink-0", toneClasses.icon)} aria-hidden="true" />
+        <p className="text-micro uppercase tracking-wider text-[var(--color-text-muted)]">
+          {label}
+        </p>
       </div>
-      <p className="text-sm font-bold" style={{ color: accent }}>{value}</p>
-    </div>
+      <p className={cn("text-sm font-bold", toneClasses.text)}>{value}</p>
+    </Surface>
   );
 }
 
@@ -400,40 +406,40 @@ export function VergelijkingSectie({
   const DeltaBadge = ({ delta }: { delta: number }) => {
     const pos = delta >= 0;
     return (
-      <span className={cn(
-        "text-[10px] font-semibold tabular-nums px-1.5 py-0.5 rounded",
-        pos ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-      )}>
+      <Badge tone={pos ? "success" : "danger"} size="sm" className="tabular-nums">
         {mask(`${pos ? "+" : ""}${fmt(delta)}`)}
-      </span>
+      </Badge>
     );
   };
 
   return (
-    <div className="glass rounded-2xl p-5 border border-[var(--color-border)] min-w-0">
-      <p className="text-[10px] text-teal-400/70 uppercase tracking-wider font-bold mb-3">
-        Berekend vs Werkelijk
-      </p>
+    <Surface padding="md">
+      <SurfaceHeader
+        eyebrow="Validatie"
+        title="Berekend vs werkelijk"
+        headingLevel={3}
+        compact
+      />
       {/* Desktop: dense table */}
       <div className="hidden overflow-x-auto sm:block">
-        <table style={{ width: "100%", fontSize: "0.75rem", borderCollapse: "collapse" }}>
+        <table className="w-full border-collapse text-xs">
           <thead>
-            <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-              <th style={{ textAlign: "left", padding: "6px 8px", color: "var(--color-text-muted)" }}>Periode</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", color: "#f59e0b" }}>Berekend</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", color: "#34d399" }}>Werkelijk</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--color-text-muted)" }}>Δ Netto</th>
-              <th style={{ textAlign: "right", padding: "6px 8px", color: "var(--color-text-muted)" }}>Δ ORT</th>
+            <tr className="border-b border-[var(--color-border)]">
+              <th scope="col" className="px-2 py-1.5 text-left text-[var(--color-text-muted)]">Periode</th>
+              <th scope="col" className="px-2 py-1.5 text-right text-[var(--color-warning)]">Berekend</th>
+              <th scope="col" className="px-2 py-1.5 text-right text-[var(--color-success)]">Werkelijk</th>
+              <th scope="col" className="px-2 py-1.5 text-right text-[var(--color-text-muted)]">Δ Netto</th>
+              <th scope="col" className="px-2 py-1.5 text-right text-[var(--color-text-muted)]">Δ ORT</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.periode} style={{ borderBottom: "1px solid var(--color-border)" }}>
-                <td style={{ padding: "6px 8px", fontWeight: 600 }}>{MAANDEN[r.maand - 1]} {r.jaar}</td>
-                <td style={{ padding: "6px 8px", textAlign: "right", color: "#f59e0b" }}>{mask(fmt(r.berekend.nettoPrognose))}</td>
-                <td style={{ padding: "6px 8px", textAlign: "right", color: "#34d399" }}>{mask(fmt(r.werkelijk.netto))}</td>
-                <td style={{ padding: "6px 8px", textAlign: "right" }}><DeltaBadge delta={r.deltaNetto} /></td>
-                <td style={{ padding: "6px 8px", textAlign: "right" }}><DeltaBadge delta={r.deltaOrt} /></td>
+              <tr key={r.periode} className="border-b border-[var(--color-border)]">
+                <td className="px-2 py-1.5 font-semibold">{MAANDEN[r.maand - 1]} {r.jaar}</td>
+                <td className="px-2 py-1.5 text-right text-[var(--color-warning)]">{mask(fmt(r.berekend.nettoPrognose))}</td>
+                <td className="px-2 py-1.5 text-right text-[var(--color-success)]">{mask(fmt(r.werkelijk.netto))}</td>
+                <td className="px-2 py-1.5 text-right"><DeltaBadge delta={r.deltaNetto} /></td>
+                <td className="px-2 py-1.5 text-right"><DeltaBadge delta={r.deltaOrt} /></td>
               </tr>
             ))}
           </tbody>
@@ -443,22 +449,22 @@ export function VergelijkingSectie({
       {/* Phone: stacked card rows — no horizontal scroll */}
       <div className="space-y-2 sm:hidden">
         {rows.map((r) => (
-          <div key={r.periode} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2">
+          <Surface key={r.periode} tone="subtle" radius="sm" padding="sm">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-300">{MAANDEN[r.maand - 1]} {r.jaar}</span>
+              <span className="text-xs font-semibold text-[var(--color-text)]">{MAANDEN[r.maand - 1]} {r.jaar}</span>
               <DeltaBadge delta={r.deltaNetto} />
             </div>
-            <div className="mt-1.5 flex items-center gap-4 text-[11px] tabular-nums">
-              <span className="text-slate-500">Berekend <span className="font-medium text-amber-300">{mask(fmt(r.berekend.nettoPrognose))}</span></span>
-              <span className="text-slate-500">Werkelijk <span className="font-medium text-emerald-300">{mask(fmt(r.werkelijk.netto))}</span></span>
+            <div className="mt-1.5 flex items-center gap-4 text-micro tabular-nums">
+              <span className="text-[var(--color-text-muted)]">Berekend <span className="font-medium text-[var(--color-warning)]">{mask(fmt(r.berekend.nettoPrognose))}</span></span>
+              <span className="text-[var(--color-text-muted)]">Werkelijk <span className="font-medium text-[var(--color-success)]">{mask(fmt(r.werkelijk.netto))}</span></span>
             </div>
-            <div className="mt-1 flex items-center gap-2 text-[11px] tabular-nums">
-              <span className="text-slate-500">Δ ORT</span>
+            <div className="mt-1 flex items-center gap-2 text-micro tabular-nums">
+              <span className="text-[var(--color-text-muted)]">Δ ORT</span>
               <DeltaBadge delta={r.deltaOrt} />
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
-    </div>
+    </Surface>
   );
 }

@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { coreToneClasses, type CoreTone } from "@/lib/ui/tones";
+import { uiToneClasses, type UiTone } from "@/lib/ui/tones";
 
 /** Compact summary control shared by notes, roster and agenda. */
 export function StatChip({
@@ -9,7 +9,7 @@ export function StatChip({
   value,
   meta,
   inlineMeta,
-  tone = "slate",
+  tone = "neutral",
   onClick,
   active = false,
 }: {
@@ -18,11 +18,11 @@ export function StatChip({
   value: string;
   meta?: string;
   inlineMeta?: string;
-  tone?: CoreTone;
+  tone?: UiTone;
   onClick?: () => void;
   active?: boolean;
 }) {
-  const toneClass = coreToneClasses[tone];
+  const toneClass = uiToneClasses[tone];
   const content = (
     <>
       <Icon size={14} className={cn("shrink-0", toneClass.icon)} aria-hidden="true" />
@@ -39,10 +39,10 @@ export function StatChip({
     "inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs outline-none transition-colors sm:text-sm",
     onClick ? "min-h-11" : "h-8",
     active
-      ? "border-amber-500/40 bg-amber-500/15"
+      ? cn(toneClass.border, toneClass.surface)
       : "border-[var(--color-border)] bg-[var(--color-surface)]",
     onClick &&
-      "cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:ring-2 focus-visible:ring-amber-400/60",
+      "cursor-pointer hover:bg-[var(--color-surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]",
   );
 
   if (onClick) {

@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -28,13 +27,16 @@ import {
   EmptyDevices,
   LoadingGrid,
   NoResults,
-  Panel,
   SectionHeader,
   WarningPanel,
 } from "@/components/lamp/LampCards";
 import { LampOverviewSidebar } from "@/components/lamp/LampOverviewSidebar";
 import { LampToolbar } from "@/components/lamp/LampToolbar";
 import { AppPageShell } from "@/components/layout/AppPageShell";
+import { Surface } from "@/components/ui/Surface";
+import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { IconButton } from "@/components/ui/IconButton";
 import type { Device } from "@/lib/api";
 import {
   createLampAmbientStyle,
@@ -171,16 +173,16 @@ export default function LampenPage() {
 
   return (
     <div
-      className="relative min-h-full overflow-hidden text-slate-100"
+      className="relative min-h-full overflow-hidden text-[var(--color-text)]"
       style={pageAmbientStyle}
     >
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_50%_0,var(--lamp-ambient-medium),transparent_68%)] transition-colors duration-500"
+        className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_50%_0,var(--lamp-ambient-medium),transparent_68%)] transition-colors duration-[var(--motion-slow)]"
         aria-hidden="true"
       />
 
       <div className="relative flex min-w-0 flex-1 flex-col">
-        <header className="app-topbar sticky top-0 z-30 border-b border-[var(--lamp-ambient-border)] bg-[var(--color-background)]/92 backdrop-blur-xl">
+        <header className="app-topbar sticky top-0 z-[var(--layer-sticky)] border-b border-[var(--lamp-ambient-border)] bg-[var(--color-background)]/92 backdrop-blur-xl">
           <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-2.5">
               <div
@@ -190,7 +192,7 @@ export default function LampenPage() {
                 <Lightbulb size={17} />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-base font-bold text-white sm:text-lg">Verlichting</h1>
+                <h1 className="truncate text-base font-bold text-[var(--color-text)] sm:text-lg">Verlichting</h1>
                 <p className="truncate text-xs text-[var(--color-text-muted)]" aria-live="polite">
                   {isInitialDeviceLoading
                     ? "Lampen laden..."
@@ -200,27 +202,24 @@ export default function LampenPage() {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
+              <IconButton
                 onClick={refreshDevices}
                 disabled={fetchingDevices}
-                aria-label="Laatst gemelde lampstatus verversen"
-                title="Laatst gemelde lampstatus verversen"
-                className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200 disabled:cursor-wait disabled:opacity-60"
-              >
-                <RefreshCw
-                  size={16}
-                  className={fetchingDevices ? "animate-spin" : ""}
-                  aria-hidden="true"
-                />
-              </button>
-              <Link
+                loading={fetchingDevices}
+                label="Laatst gemelde lampstatus verversen"
+                icon={<RefreshCw size={16} />}
+                variant="secondary"
+              />
+              <ButtonLink
                 href="/settings"
                 aria-label="Lampinstellingen openen"
-                className="hidden h-11 w-11 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)] hover:text-slate-200 sm:flex"
+                title="Lampinstellingen openen"
+                size="icon"
+                variant="secondary"
+                className="hidden sm:inline-flex"
               >
                 <Settings size={16} aria-hidden="true" />
-              </Link>
+              </ButtonLink>
               <button
                 type="button"
                 onClick={toggleAll}
@@ -231,12 +230,12 @@ export default function LampenPage() {
                   "inline-flex h-11 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
                   allOnlineOn
                     ? "border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-medium)] text-[var(--lamp-text)]"
-                    : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-300",
+                    : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)]",
                   "disabled:cursor-not-allowed disabled:opacity-50",
                 )}
               >
                 {lightingPending ? (
-                  <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+                  <Loader2 size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
                 ) : (
                   <Power size={16} aria-hidden="true" />
                 )}
@@ -294,27 +293,24 @@ export default function LampenPage() {
               {isInitialDeviceLoading ? (
                 <LoadingGrid />
               ) : devicesError && devices.length === 0 ? (
-                <div className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/5 px-6 py-10 text-center">
-                  <AlertTriangle size={28} className="text-rose-300" aria-hidden="true" />
-                  <h2 className="mt-4 text-base font-semibold text-rose-200">
+                <div className="flex min-h-[260px] flex-col items-center justify-center rounded-2xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-6 py-10 text-center">
+                  <AlertTriangle size={28} className="text-[var(--color-danger)]" aria-hidden="true" />
+                  <h2 className="mt-4 text-base font-semibold text-[var(--color-danger)]">
                     Lampen konden niet worden geladen
                   </h2>
                   <p className="mt-2 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
                     De statusbron reageert niet. De lampen zelf kunnen nog actief zijn.
                   </p>
-                  <button
-                    type="button"
+                  <Button
                     onClick={refreshDevices}
-                    disabled={fetchingDevices}
-                    className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition-colors hover:bg-rose-500/15 disabled:cursor-wait disabled:opacity-60"
+                    variant="danger"
+                    loading={fetchingDevices}
+                    loadingLabel="Verversen…"
+                    className="mt-5"
                   >
-                    <RefreshCw
-                      size={15}
-                      className={fetchingDevices ? "animate-spin" : ""}
-                      aria-hidden="true"
-                    />
+                    <RefreshCw size={15} aria-hidden="true" />
                     Opnieuw proberen
-                  </button>
+                  </Button>
                 </div>
               ) : hasNoDevices ? (
                 <EmptyDevices />
@@ -356,7 +352,7 @@ export default function LampenPage() {
             </div>
 
             <aside className="space-y-4 xl:sticky xl:top-20">
-              <Panel className="border-[var(--lamp-ambient-border)]">
+              <Surface className="border-[var(--lamp-ambient-border)]">
                 <SectionHeader
                   icon={Sparkles}
                   label="Sfeer"
@@ -372,7 +368,7 @@ export default function LampenPage() {
                   sendBatch={sendBatch}
                   isPending={lightingPending}
                 />
-              </Panel>
+              </Surface>
               <LampOverviewSidebar
                 groups={allRoomGroups}
                 unassignedCount={unassignedCount}

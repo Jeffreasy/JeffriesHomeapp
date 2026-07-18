@@ -75,6 +75,76 @@ test("overlays share one portal root and one accessible surface primitive", () =
   expect(overlaySurface).toMatch(/aria-modal=["']true["']/);
 });
 
+test("anchored interactions share one responsive popover boundary", () => {
+  const popover = readSource("components/ui/Popover.tsx");
+
+  expect(popover).toContain("createPortal(");
+  expect(popover).toContain("getOverlayPortalRoot()");
+  expect(popover).toContain("<BottomSheet");
+  expect(popover).toContain('document.addEventListener("pointerdown"');
+  expect(popover).toContain('event.key !== "Escape"');
+
+  for (const consumer of [
+    "components/scenes/SceneBar.tsx",
+    "components/finance/TransactionList.tsx",
+  ]) {
+    const source = readSource(consumer);
+    expect(source, consumer + " must compose Popover").toContain("<Popover");
+    expect(source, consumer + " must not own outside-click listeners").not.toContain(
+      'document.addEventListener("pointerdown"',
+    );
+  }
+});
+
+test("searchable pickers share one keyboard and ARIA combobox contract", () => {
+  const picker = readSource("components/ui/SearchablePicker.tsx");
+  const popover = readSource("components/ui/Popover.tsx");
+  const bottomSheet = readSource("components/ui/BottomSheet.tsx");
+
+  expect(picker).toContain("<Popover");
+  expect(picker).toContain('role="combobox"');
+  expect(picker).toContain('aria-autocomplete="list"');
+  expect(picker).toContain("aria-activedescendant=");
+  expect(picker).toContain('role="listbox"');
+  expect(picker).toContain('role: "option"');
+  expect(picker).toContain('"aria-selected"');
+  for (const key of ["ArrowDown", "ArrowUp", "Home", "End", "Enter", "Escape"]) {
+    expect(picker, `SearchablePicker must handle ${key}`).toContain(`event.key === "${key}"`);
+  }
+  expect(popover).toContain("initialFocusRef={initialFocusRef}");
+  expect(bottomSheet).toContain("initialFocusRef={initialFocusRef}");
+
+  for (const consumer of [
+    "components/laventecare/BusinessContextPicker.tsx",
+    "components/notes/NoteEditor.tsx",
+  ]) {
+    const source = readSource(consumer);
+    expect(source, consumer + " must compose SearchablePicker").toContain("<SearchablePicker");
+    expect(source, consumer + " must not own document interaction listeners").not.toContain(
+      "document.addEventListener",
+    );
+    expect(source, consumer + " must leave combobox ARIA to the primitive").not.toContain(
+      'role="combobox"',
+    );
+  }
+});
+
+test("combobox suggestions use the collision-safe input listbox boundary", () => {
+  const anchoredListbox = readSource("components/ui/InputAnchoredListbox.tsx");
+  const mentionMenu = readSource("components/notes/ContactMentionMenu.tsx");
+  const quickNote = readSource("components/notes/QuickNote.tsx");
+  const notesPage = readSource("app/notities/page.tsx");
+
+  expect(anchoredListbox).toContain("createPortal(");
+  expect(anchoredListbox).toContain("getOverlayPortalRoot()");
+  expect(anchoredListbox).toContain("ResizeObserver");
+  expect(anchoredListbox).toContain("z-[var(--layer-popover)]");
+  expect(mentionMenu).toContain("<InputAnchoredListbox");
+  expect(mentionMenu).toContain("tabIndex={-1}");
+  expect(mentionMenu).not.toContain("z-40");
+  expect(quickNote).toContain("anchorRef={mentionAnchorRef}");
+  expect(notesPage).toContain("anchorRef={mentionAnchorRef}");
+});
 test("privacy toggles stay disabled while the persisted preference is unknown", () => {
   const privacyRoutes = [
     "app/page.tsx",
@@ -103,13 +173,27 @@ test("privacy toggles stay disabled while the persisted preference is unknown", 
   }
 });
 
+test("the reduced-motion policy wraps PWA feedback and identity-scoped content", () => {
+  const source = readSource("app/providers.tsx");
+  const motionStart = source.indexOf('<MotionConfig reducedMotion="user">');
+  const motionEnd = source.indexOf("</MotionConfig>", motionStart);
+
+  expect(motionStart).toBeGreaterThanOrEqual(0);
+  expect(motionEnd).toBeGreaterThan(motionStart);
+  expect(source.indexOf("<PwaRegistry />")).toBeGreaterThan(motionStart);
+  expect(source.indexOf("<PwaRegistry />")).toBeLessThan(motionEnd);
+  expect(source.indexOf("<IdentityScopedProviders>")).toBeGreaterThan(motionStart);
+  expect(source.indexOf("<IdentityScopedProviders>")).toBeLessThan(motionEnd);
+});
+
 test("NoteEditor joins the central overlay stack without duplicating lifecycle mechanics", () => {
   const source = readSource("components/notes/NoteEditor.tsx");
 
-  expect(source).toContain("useOverlayLifecycle(");
-  expect(source).toContain("getOverlayPortalRoot()");
+  expect(source).toContain("<OverlaySurface");
+  expect(source).not.toContain("useOverlayLifecycle(");
+  expect(source).not.toContain("getOverlayPortalRoot()");
+  expect(source).not.toContain("createPortal(");
   expect(source).toContain("window.visualViewport");
-  expect(source).not.toContain('createPortal(editorModal, document.body)');
   expect(source).not.toContain('document.body.style.overflow');
   expect(source).not.toContain('event.key === "Tab"');
 });
@@ -134,4 +218,31 @@ test("dirty modals delegate discard confirmation to the critical overlay stack",
   expect(modal).not.toContain("useFocusTrap(");
   expect(modal).not.toContain('role="alertdialog"');
   expect(confirmDialog).toContain('priority="critical"');
+});
+
+test("action modals keep persistent controls in the canonical footer", () => {
+  const notes = readSource("components/notes/NotesFilters.tsx");
+  const dossier = readSource("components/laventecare/LaventeCareCustomerDossier.tsx");
+  const mailbox = readSource("components/laventecare/LaventeCareMailboxView.tsx");
+  const documentation = readSource("docs/interface-system.md");
+
+  expect(notes).toContain('const TAG_MANAGER_FORM_ID = "notes-tag-manager-rename-form"');
+  expect(notes).toContain("id={TAG_MANAGER_FORM_ID}");
+  expect(notes).toContain("form={TAG_MANAGER_FORM_ID}");
+  expect(notes).toContain("<ModalCancelButton");
+
+  for (const formId of ["DOSSIER_ACTIVITY_FORM_ID", "DOSSIER_ACCESS_FORM_ID"]) {
+    expect(dossier).toContain(`id={${formId}}`);
+    expect(dossier).toContain(`form={${formId}}`);
+  }
+  expect(dossier).toContain("footer={");
+  expect(dossier).toContain("<ModalCancelButton");
+
+  expect(mailbox.match(/footer=\{/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+  expect(mailbox).toContain("state.primaryAction || state.externalLink");
+  expect(mailbox).toContain("<ModalCancelButton");
+  expect(mailbox).not.toContain(
+    'className="flex items-center justify-end gap-2 border-t border-[var(--color-border)] px-4 py-3 sm:px-5"',
+  );
+  expect(documentation).toContain("Puur informatieve previews krijgen bewust geen lege footer");
 });

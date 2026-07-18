@@ -2,11 +2,13 @@
 
 import { ChevronDown } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { uiMotion } from "@/lib/ui/motion";
 import { DienstItem } from "./DienstItem";
 import { PersonalEventItem } from "./PersonalEventItem";
 import type { PersonalEvent } from "@/hooks/usePersonalEvents";
 import type { UnifiedWeek } from "@/lib/unified";
 import { cn } from "@/lib/utils";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { formatHours, pluralize } from "./RoosterUtils";
 // Gedeelde week-formatter (audit L8) — één bron voor "W27"/"Week 27".
 import { formatWeekNumber } from "./scheduleUtils";
@@ -52,8 +54,9 @@ export function WeekBlock({
   return (
     <div
       className={cn(
-        "glass min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] sm:rounded-2xl",
-        hasToday && "border-amber-500/30 bg-amber-500/[0.025]"
+        surfaceVariants({ padding: "none", radius: "md" }),
+        "overflow-hidden sm:rounded-2xl",
+        hasToday && "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]"
       )}
     >
       <button
@@ -61,43 +64,43 @@ export function WeekBlock({
         onClick={onToggle}
         aria-expanded={open}
         aria-label={`Week ${weekNumber} ${open ? "inklappen" : "uitklappen"}`}
-        className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus:outline-none focus:ring-2 focus:ring-amber-400/35 sm:px-4 sm:py-4"
+        className="grid min-h-[var(--touch-target)] w-full grid-cols-[minmax(0,1fr)_auto] items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] sm:px-4 sm:py-4"
       >
         <div className="flex min-w-0 items-start gap-3">
           <div
             className={cn(
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]",
-              hasToday && "border-amber-500/30 bg-amber-500/10"
+              hasToday && "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]"
             )}
           >
-            <span className={cn("text-xs font-bold text-slate-300", hasToday && "text-amber-200")}>
+            <span className={cn("text-xs font-bold text-[var(--color-text)]", hasToday && "text-[var(--color-primary-hover)]")}>
               W{weekNumber}
             </span>
           </div>
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <p className="text-sm font-bold text-white">Week {weekNumber}</p>
-              {weekRange && <span className="text-xs font-medium text-slate-500">{weekRange}</span>}
+              <p className="text-sm font-bold text-[var(--color-text)]">Week {weekNumber}</p>
+              {weekRange && <span className="text-xs font-medium text-[var(--color-text-muted)]">{weekRange}</span>}
               {hasToday && (
-                <span className="rounded-md border border-amber-500/25 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-200">
+                <span className="rounded-md border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] px-1.5 py-0.5 text-micro font-bold uppercase tracking-wider text-[var(--color-primary-hover)]">
                   Vandaag
                 </span>
               )}
             </div>
-            <div className="mt-2 flex flex-wrap gap-1.5 text-[10px] font-semibold text-slate-400 sm:text-xs">
-              <span className="rounded-md border border-white/8 bg-white/[0.03] px-2 py-1">{pluralize(week.dienstenAantal, "dienst", "diensten")}</span>
-              <span className="rounded-md border border-white/8 bg-white/[0.03] px-2 py-1">{formatHours(week.werkUren)}</span>
-              <span className="rounded-md border border-white/8 bg-white/[0.03] px-2 py-1">{pluralize(appointmentCount, "afspraak", "afspraken")}</span>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-micro font-semibold text-[var(--color-text-muted)] sm:text-xs">
+              <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-1">{pluralize(week.dienstenAantal, "dienst", "diensten")}</span>
+              <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-1">{formatHours(week.werkUren)}</span>
+              <span className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-1">{pluralize(appointmentCount, "afspraak", "afspraken")}</span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2 pt-0.5">
-          <span className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[10px] font-semibold text-amber-200 sm:text-xs">
+          <span className="rounded-lg border border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] px-2 py-1 text-micro font-semibold text-[var(--color-primary-hover)] sm:text-xs">
             {pluralize(week.items.length, "item")}
           </span>
           <ChevronDown
             size={16}
-            className={cn("text-slate-500 transition-transform", open && "rotate-180")}
+            className={cn("text-[var(--color-text-muted)] transition-transform", open && "rotate-180")}
           />
         </div>
       </button>
@@ -108,7 +111,7 @@ export function WeekBlock({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: uiMotion.durationSeconds.standard }}
             className="overflow-hidden"
           >
             <div className="border-t border-[var(--color-border)] p-2 sm:p-3">

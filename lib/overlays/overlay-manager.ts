@@ -160,23 +160,9 @@ export function getOverlayStackServerSnapshot() {
 }
 
 export function getToastPortalRoot() {
-  let root = document.getElementById("app-toast-root");
-  if (root) return root;
-
-  root = document.createElement("div");
-  root.id = "app-toast-root";
-  root.setAttribute("data-app-toast-root", "true");
-  document.body.appendChild(root);
-  return root;
+  return document.getElementById("app-toast-root") ?? document.body;
 }
 
 export function getOverlayPortalRoot() {
-  let root = document.getElementById("app-overlay-root");
-  if (root) return root;
-
-  root = document.createElement("div");
-  root.id = "app-overlay-root";
-  root.setAttribute("data-overlay-root", "true");
-  document.body.appendChild(root);
-  return root;
+  return document.getElementById("app-overlay-root") ?? document.body;
 }

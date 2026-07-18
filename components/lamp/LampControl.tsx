@@ -6,6 +6,10 @@ import { Thermometer, Sun, Palette, RefreshCw } from "lucide-react";
 import { devicesApi, type Device, type DeviceCommand } from "@/lib/api";
 import { useLampCommand } from "@/hooks/useHomeapp";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
+import { FormField } from "@/components/ui/FormField";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Range } from "@/components/ui/Range";
 import { useToast } from "@/components/ui/Toast";
 import { cn, hexToRgb, kelvinToHex, rgbToHex } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -302,7 +306,8 @@ export function LampControl({ device }: LampControlProps) {
   };
 
   // L5: los hex-invoerveld naast de picker (valideert #rrggbb).
-  const hexInputId = useId();
+  const generatedControlId = useId();
+  const hexInputId = `lamp-color-hex-${generatedControlId.replaceAll(":", "")}`;
   const hexInputRef = useRef<HTMLInputElement>(null);
   const [hexDraft, setHexDraft] = useState(localHex);
   useEffect(() => {
@@ -345,38 +350,36 @@ export function LampControl({ device }: LampControlProps) {
       {/* Helderheid + Refresh */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
             <Sun size={13} />
             <span>Helderheid</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-[var(--lamp-text)]">{localBrightness}%</span>
-            <button
-              type="button"
+            <IconButton
               onClick={refresh}
-              disabled={refreshing || isPending}
-              aria-label="Serverstatus ophalen"
+              disabled={isPending}
+              loading={refreshing}
+              label="Serverstatus ophalen"
               title="Haal de laatst bekende serverstatus op"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-subtle)] transition-colors hover:bg-white/5 hover:text-slate-400"
-            >
-              <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} aria-hidden="true" />
-            </button>
+              icon={<RefreshCw size={13} />}
+            />
           </div>
         </div>
-        <input
-          type="range"
+        <Range
           min={10}
           max={100}
           value={localBrightness}
+          fillValue={localBrightness}
+          track="lamp"
           onChange={(e) => handleBrightness(+e.target.value)}
           aria-label="Helderheid"
           {...interactionProps}
-          className="bg-[linear-gradient(to_right,var(--lamp-accent)_var(--control-brightness),rgba(255,255,255,0.1)_var(--control-brightness))]"
         />
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-2 rounded-xl p-1 bg-[rgba(255,255,255,0.05)]">
+      <div className="flex gap-2 rounded-xl bg-[var(--color-surface-hover)] p-1">
         {(["white", "color"] as Mode[]).map((m) => (
           <button
             key={m}
@@ -384,10 +387,10 @@ export function LampControl({ device }: LampControlProps) {
             onClick={() => handleModeSwitch(m)}
             disabled={isPending}
             aria-pressed={mode === m}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded-lg transition-all disabled:cursor-wait disabled:opacity-50 ${
+            className={`flex min-h-[var(--touch-target)] flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs transition-[background-color,border-color,color,opacity] duration-[var(--motion-standard)] disabled:cursor-wait disabled:opacity-50 ${
               mode === m
                 ? "border border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-medium)] font-medium text-[var(--lamp-text)]"
-                : "text-[var(--color-text-muted)] hover:text-slate-300"
+                : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
             }`}
           >
             {m === "white" ? <Thermometer size={12} /> : <Palette size={12} />}
@@ -400,28 +403,23 @@ export function LampControl({ device }: LampControlProps) {
       {mode === "white" && (
         <div>
           <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+            <div className="flex items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
               <Thermometer size={13} />
               <span>Kleurtemperatuur</span>
             </div>
-            <span className="text-xs text-slate-400 font-mono">{kelvin}K</span>
+            <span className="text-xs text-[var(--color-text-muted)] font-mono">{kelvin}K</span>
           </div>
-          <input
-            type="range"
+          <Range
             min={154}
             max={455}
             value={localMireds}
+            track="temperature"
             onChange={(e) => handleColorTemp(+e.target.value)}
             aria-label="Kleurtemperatuur"
             aria-valuetext={`${kelvin} Kelvin`}
             {...interactionProps}
-            style={{
-              // Mireds schaal: laag = koel (6500K), hoog = warm (2200K)
-              // Slider gaat links (koel/blauw) → rechts (warm/oranje)
-              background: "linear-gradient(to right, #cce4ff, #fff4e6, #ff9329)",
-            }}
           />
-          <div className="flex justify-between mt-1 text-[10px] text-[var(--color-text-subtle)]">
+          <div className="flex justify-between mt-1 text-micro text-[var(--color-text-subtle)]">
             <span>Koel 6500K</span>
             <span>Warm 2200K</span>
           </div>
@@ -440,11 +438,13 @@ export function LampControl({ device }: LampControlProps) {
                 onClick={() => handleColor(hex)}
                 aria-label={label}
                 title={label}
-                className="w-full aspect-square rounded-lg border-2 transition-all hover:scale-110 active:scale-95"
-                style={{
-                  background: hex,
-                  borderColor: localHex.toLowerCase() === hex ? "white" : "transparent",
-                }}
+                className={cn(
+                  "aspect-square min-h-[var(--touch-target)] w-full rounded-lg border-2 bg-[var(--lamp-accent)] transition-[background-color,border-color,transform] duration-[var(--motion-standard)] hover:scale-105 active:scale-95 motion-reduce:transform-none",
+                  localHex.toLowerCase() === hex
+                    ? "border-[var(--color-text)]"
+                    : "border-transparent",
+                )}
+                style={createLampAmbientStyle(hex, true)}
               />
             ))}
           </div>
@@ -454,44 +454,38 @@ export function LampControl({ device }: LampControlProps) {
             <HexColorPicker
               color={localHex}
               onChange={handleColor}
-              style={{ width: "100%", height: 130 }}
+              className="!h-32 !w-full"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="h-7 min-w-0 flex-1 rounded-xl border border-[var(--color-border)]"
-              style={{ background: localHex, transition: "background 0.1s" }}
-            />
-            <label htmlFor={hexInputId} className="sr-only">
-              Hexkleur (#rrggbb)
-            </label>
-            <input
-              id={hexInputId}
-              ref={hexInputRef}
-              type="text"
-              autoComplete="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              maxLength={7}
-              placeholder="#ff8800"
-              value={hexDraft}
-              onChange={(e) => handleHexInput(e.target.value)}
-              onBlur={() => setHexDraft(localHex)}
-              aria-invalid={!hexDraftValid}
-              aria-describedby={!hexDraftValid ? `${hexInputId}-error` : undefined}
-              className={cn(
-                "w-24 shrink-0 rounded-lg border bg-[var(--color-surface)] px-2 py-1.5 text-center font-mono text-xs text-slate-300 outline-none transition-colors",
-                hexDraftValid
-                  ? "border-[var(--color-border)] focus:border-amber-500/50"
-                  : "border-rose-500/50 text-rose-300"
-              )}
-            />
-          </div>
-          {!hexDraftValid && (
-            <p id={`${hexInputId}-error`} role="alert" className="text-right text-[10px] text-rose-300">
-              Voer een geldige hexkleur in (#rrggbb).
-            </p>
-          )}
+          <FormField
+            id={hexInputId}
+            label="Hexkleur (#rrggbb)"
+            error={!hexDraftValid ? "Voer een geldige hexkleur in (#rrggbb)." : undefined}
+            visuallyHiddenLabel
+          >
+            {(controlProps) => (
+              <div className="flex items-center gap-2">
+                <div
+                  className="h-7 min-w-0 flex-1 rounded-xl border border-[var(--color-border)] bg-[var(--lamp-accent)] transition-colors duration-[var(--motion-fast)]"
+                />
+                <Input
+                  {...controlProps}
+                  ref={hexInputRef}
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  maxLength={7}
+                  placeholder="#ff8800"
+                  value={hexDraft}
+                  onChange={(e) => handleHexInput(e.target.value)}
+                  onBlur={() => setHexDraft(localHex)}
+                  invalid={!hexDraftValid}
+                  className="w-24 shrink-0 text-center font-mono text-xs"
+                />
+              </div>
+            )}
+          </FormField>
         </div>
       )}
       </div>

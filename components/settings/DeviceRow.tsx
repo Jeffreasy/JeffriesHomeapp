@@ -1,12 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2, Check, X, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Check, X } from "lucide-react";
 import { useUpdateDevice, useDeleteDevice } from "@/hooks/useDevices";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/Toast";
 import { type Device, type Room } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { Surface } from "@/components/ui/Surface";
+import { Badge } from "@/components/ui/Badge";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 
 interface DeviceRowProps {
   device: Device;
@@ -55,51 +59,47 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
   };
 
   return (
-    <div className="glass flex min-w-0 items-start gap-3 rounded-lg p-4 sm:items-center">
-      <div
-        className={cn(
-          "w-2 h-2 rounded-full flex-shrink-0",
-          device.status === "online" ? "bg-green-400" : "bg-red-400"
-        )}
-        aria-label={device.status === "online" ? "Online" : "Offline"}
-      />
+    <Surface tone="subtle" radius="sm" padding="sm" className="flex items-start gap-3 sm:items-center">
+      <Badge tone={device.status === "online" ? "success" : "danger"} size="sm" className="shrink-0">
+        {device.status === "online" ? "Online" : "Offline"}
+      </Badge>
 
       {editing ? (
         <div className="flex-1 flex flex-col gap-2">
-          <input
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && save()}
             placeholder="Naam"
             aria-label="Lamp naam"
-            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-amber-500/50"
+            density="compact"
             autoFocus
           />
           <div className="flex flex-col gap-2 sm:flex-row">
-            <input
+            <Input
               value={ip}
               onChange={(e) => setIp(e.target.value)}
               placeholder="IP-adres"
               aria-label="IP-adres"
-              className="flex-1 min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-amber-500/50 font-mono"
+              density="compact" className="min-w-0 flex-1 font-mono"
             />
-            <select
+            <Select
               value={roomId}
               onChange={(e) => setRoomId(e.target.value)}
               aria-label="Kamer toewijzen"
-              className="flex-1 min-w-0 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-1.5 text-sm text-slate-300 outline-none"
+              density="compact" className="min-w-0 flex-1"
             >
               <option value="">Geen kamer</option>
               {rooms.map((r) => (
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
       ) : (
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-slate-200 truncate">{device.name}</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm font-medium text-[var(--color-text)] truncate">{device.name}</p>
+          <p className="text-xs text-[var(--color-text-muted)]">
             {device.ip_address} · {rooms.find((r) => r.id === device.room_id)?.name ?? "Geen kamer"}
           </p>
         </div>
@@ -108,47 +108,43 @@ export function DeviceRow({ device, rooms }: DeviceRowProps) {
       <div className="flex flex-shrink-0 items-center gap-1.5">
         {editing ? (
           <>
-            <button
+            <IconButton
               onClick={save}
-              disabled={updating}
-              aria-label="Opslaan"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-green-500/30 bg-green-500/15 text-green-400 transition-colors hover:bg-green-500/25"
-            >
-              {updating ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
-            </button>
-            <button
+              label="Opslaan"
+              variant="success"
+              loading={updating}
+              icon={<Check size={14} />}
+            />
+            <IconButton
               onClick={() => {
                 setEditing(false);
                 setName(device.name);
                 setRoomId(device.room_id ?? "");
                 setIp(device.ip_address ?? "");
               }}
-              aria-label="Annuleren"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)]"
-            >
-              <X size={13} />
-            </button>
+              label="Annuleren"
+              variant="secondary"
+              icon={<X size={14} />}
+            />
           </>
         ) : (
           <>
-            <button
+            <IconButton
               onClick={() => setEditing(true)}
-              aria-label={`${device.name} bewerken`}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:border-amber-500/30 hover:text-amber-400"
-            >
-              <Pencil size={13} />
-            </button>
-            <button
+              label={`${device.name} bewerken`}
+              variant="secondary"
+              icon={<Pencil size={14} />}
+            />
+            <IconButton
               onClick={remove}
-              disabled={deleting}
-              aria-label={`${device.name} verwijderen`}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-slate-400 transition-colors hover:border-red-500/30 hover:text-red-400"
-            >
-              {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-            </button>
+              label={`${device.name} verwijderen`}
+              variant="danger"
+              loading={deleting}
+              icon={<Trash2 size={14} />}
+            />
           </>
         )}
       </div>
-    </div>
+    </Surface>
   );
 }

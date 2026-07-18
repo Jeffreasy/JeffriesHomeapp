@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Wifi, Plus, Loader2 } from "lucide-react";
+import { Wifi, Plus } from "lucide-react";
 import { type Room } from "@/lib/api";
 import { useCreateDevice } from "@/hooks/useDevices";
 import { useToast } from "@/components/ui/Toast";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { FormField } from "@/components/ui/FormField";
+import { SurfaceHeader } from "@/components/ui/SurfaceHeader";
 
 interface AddDeviceFormProps {
   rooms: Room[];
@@ -39,82 +45,81 @@ export function AddDeviceForm({ rooms }: AddDeviceFormProps) {
 
   if (!open) {
     return (
-      <button
+      <Button
+        variant="secondary"
+        fullWidth
         onClick={() => setOpen(true)}
-        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--color-border)] px-3 py-3 text-sm text-slate-500 transition-all hover:border-amber-500/30 hover:text-amber-400"
+        className="border-dashed py-3 text-[var(--color-text-muted)] hover:border-[var(--color-warning-border)] hover:text-[var(--color-warning)]"
       >
         <Plus size={15} />
         Lamp registreren (IP-adres)
-      </button>
+      </Button>
     );
   }
 
   return (
-    <form onSubmit={submit} className="glass rounded-lg p-4 space-y-3">
-      <p className="text-sm font-semibold text-slate-200 flex items-center gap-2">
-        <Wifi size={14} className="text-amber-400" />
-        Nieuwe WiZ lamp registreren
-      </p>
+    <form onSubmit={submit} className={`${surfaceVariants({ padding: "sm", radius: "sm" })} space-y-3`}>
+      <SurfaceHeader
+        icon={<Wifi size={14} className="text-[var(--color-warning)]" />}
+        title="Nieuwe WiZ lamp registreren"
+        headingLevel={3}
+        compact
+      />
       <div className="grid gap-2 sm:grid-cols-2">
-        <div>
-          <label htmlFor="device-ip" className="text-xs text-slate-500 mb-1 block">
-            IP-adres *
-          </label>
-          <input
-            id="device-ip"
-            value={ip}
-            onChange={(e) => setIp(e.target.value)}
-            placeholder="192.168.1.xxx"
-            required
-            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
-          />
-        </div>
-        <div>
-          <label htmlFor="device-name" className="text-xs text-slate-500 mb-1 block">
-            Naam *
-          </label>
-          <input
-            id="device-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Woonkamer lamp 1"
-            required
-            className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-amber-500/50"
-          />
-        </div>
+        <FormField id="device-ip" label="IP-adres">
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              value={ip}
+              onChange={(event) => setIp(event.target.value)}
+              placeholder="192.168.1.xxx"
+              required
+            />
+          )}
+        </FormField>
+        <FormField id="device-name" label="Naam">
+          {(controlProps) => (
+            <Input
+              {...controlProps}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Woonkamer lamp 1"
+              required
+            />
+          )}
+        </FormField>
       </div>
-      <div>
-        <label htmlFor="device-room" className="text-xs text-slate-500 mb-1 block">
-          Kamer (optioneel)
-        </label>
-        <select
-          id="device-room"
-          value={roomId}
-          onChange={(e) => setRoomId(e.target.value)}
-          className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-slate-300 outline-none"
-        >
-          <option value="">Geen kamer</option>
-          {rooms.map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
-          ))}
-        </select>
-      </div>
+      <FormField id="device-room" label="Kamer" optional>
+        {(controlProps) => (
+          <Select
+            {...controlProps}
+            value={roomId}
+            onChange={(event) => setRoomId(event.target.value)}
+          >
+            <option value="">Geen kamer</option>
+            {rooms.map((room) => (
+              <option key={room.id} value={room.id}>{room.name}</option>
+            ))}
+          </Select>
+        )}
+      </FormField>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <button
+        <Button
           type="submit"
-          disabled={isPending}
-          className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/15 px-4 py-2 text-sm font-medium text-amber-400 transition-colors hover:bg-amber-500/25"
+          variant="primary"
+          loading={isPending}
+          loadingLabel="Registreren…"
+          className="flex-1"
         >
-          {isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          <Plus size={14} />
           Registreren
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="secondary"
           onClick={() => setOpen(false)}
-          className="min-h-10 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm text-slate-400 transition-colors hover:bg-[var(--color-surface-hover)]"
         >
           Annuleren
-        </button>
+        </Button>
       </div>
     </form>
   );

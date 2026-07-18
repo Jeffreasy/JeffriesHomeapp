@@ -38,6 +38,15 @@ import { DEFAULT_STAP, INCIDENT_TRIGGERS } from "@/lib/habit-constants";
 import { isPeriodHabit, isPeriodSatisfied, type HabitWithLog } from "@/hooks/useHabits";
 import { useDebouncedCallback } from "@/hooks/useDebounce";
 import { AppIcon } from "@/components/ui/AppIcon";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import { Popover } from "@/components/ui/Popover";
+import { Badge } from "@/components/ui/Badge";
+import { Surface } from "@/components/ui/Surface";
+import { habitColorStyle } from "./HabitsUtils";
+import { cn } from "@/lib/utils";
+import { uiMotion } from "@/lib/ui/motion";
 
 /**
  * HabitCard — Habit kaart met checkbox/stepper, streak, XP, incident triggers.
@@ -98,54 +107,13 @@ export function HabitCard({
   const [showTriggerModal, setShowTriggerModal] = useState(false);
   const [selectedTrigger, setSelectedTrigger] = useState<string | undefined>();
   const [triggerNotitie, setTriggerNotitie] = useState("");
-  const menuRef = useRef<HTMLDivElement>(null);
-  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const menuListRef = useRef<HTMLDivElement>(null);
-
-  // A11y (R3): move focus into the action menu when it opens so keyboard users
-  // land on the first menuitem (roving tabindex handles the rest via arrows).
-  useEffect(() => {
-    if (!showMenu) return;
-    const first = menuListRef.current?.querySelector<HTMLButtonElement>(
-      '[role="menuitem"]',
-    );
-    first?.focus();
-  }, [showMenu]);
-
-  useEffect(() => {
-    if (!showMenu) return;
-    const closeOnOutside = (e: Event) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    const closeOnKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setShowMenu(false);
-        menuTriggerRef.current?.focus();
-      }
-    };
-    const closeOnScroll = () => setShowMenu(false);
-    // pointerdown covers mouse + touch + pen; touchstart as fallback for older
-    // iOS Safari where synthetic mouse events are unreliable on non-interactive
-    // tap targets.
-    document.addEventListener("pointerdown", closeOnOutside);
-    document.addEventListener("touchstart", closeOnOutside);
-    document.addEventListener("keydown", closeOnKey);
-    window.addEventListener("scroll", closeOnScroll, { passive: true });
-    return () => {
-      document.removeEventListener("pointerdown", closeOnOutside);
-      document.removeEventListener("touchstart", closeOnOutside);
-      document.removeEventListener("keydown", closeOnKey);
-      window.removeEventListener("scroll", closeOnScroll);
-    };
-  }, [showMenu]);
 
   const isCompleted = habit.log?.voltooid === true;
   const isNegative = habit.type === "negatief";
   const hasIncident = habit.log?.isIncident === true;
   const isQuantitative = habit.isKwantitatief && habit.doelWaarde;
-  const color = habit.kleur ?? "#f97316";
+  const habitStyle = habitColorStyle(habit.kleur);
   // N5: weekly/monthly habits count per periode — target gehaald = voldaan,
   // ook als er vandaag geen vinkje staat.
   const periodHabit = isPeriodHabit(habit);
@@ -268,589 +236,280 @@ export function HabitCard({
 
   return (
     <motion.div
-      ref={menuRef}
       layout
       aria-busy={pending}
-      className="relative rounded-2xl overflow-hidden transition-all"
-      style={{
-        opacity: pending ? 0.6 : 1,
-        background: isSuccess
-          ? `linear-gradient(135deg, ${color}08, ${color}04)`
-          : hasIncident
-            ? "rgba(239,68,68,0.04)"
-            : "rgba(255,255,255,0.02)",
-        border: isSuccess
-          ? `1px solid ${color}20`
-          : hasIncident
-            ? "1px solid rgba(239,68,68,0.12)"
-            : "1px solid rgba(255,255,255,0.05)",
-      }}
+      style={habitStyle}
+      className={cn("relative transition-opacity", pending && "opacity-60")}
     >
-      <div className="flex items-center gap-3 p-3 sm:p-3.5">
-        {/* Check button (positief, niet-kwantitatief) / Status indicator (negatief) */}
-        {isNegative ? (
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-            style={{
-              background: hasIncident
-                ? "rgba(239,68,68,0.12)"
-                : "rgba(34,197,94,0.10)",
-              border: hasIncident
-                ? "1px solid rgba(239,68,68,0.20)"
-                : `1px solid rgba(34,197,94,0.20)`,
-            }}
-          >
-            {hasIncident ? (
-              <AlertTriangle size={18} className="text-red-400" />
-            ) : (
-              <Check size={18} className="text-green-400" />
-            )}
-          </div>
-        ) : isQuantitative ? (
-          /* Kwantitatief: emoji indicator (stepper komt eronder) */
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-            style={{
-              background: isCompleted ? color : `${color}10`,
-              border: isCompleted ? "none" : `2px solid ${color}30`,
-            }}
-          >
-            {isCompleted ? (
-              <Check size={20} className="text-white" />
-            ) : (
-              <span className="text-xl">{displayEmoji}</span>
-            )}
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={onToggle}
-            disabled={pending || paused || toggleBlocked}
-            aria-busy={pending}
-            aria-label={
-              toggleBlocked
-                ? `${displayName}: vandaag niet gepland`
-                : isCompleted
-                  ? `${displayName} heropenen`
-                  : `${displayName} voltooien`
-            }
-            title={
-              toggleBlocked
-                ? "Vandaag niet gepland"
-                : isCompleted
-                  ? "Heropenen"
-                  : "Voltooien"
-            }
-            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 cursor-pointer disabled:cursor-default"
-            style={{
-              background: isCompleted ? color : "rgba(255,255,255,0.03)",
-              border: isCompleted ? "none" : `2px solid ${color}30`,
-            }}
-          >
-            {isCompleted ? (
-              <Check size={20} className="text-white" />
-            ) : (
-              <span className="text-xl">{displayEmoji}</span>
-            )}
-          </button>
+      <Surface
+        tone={hasIncident ? "danger" : isSuccess ? "subtle" : "default"}
+        padding="none"
+        className={cn(
+          "relative overflow-hidden",
+          isSuccess && !hasIncident && "border-[var(--habit-color-border)] bg-[var(--habit-color-soft)]",
         )}
-
-        {/* Content — tap to expand details */}
-        <button
-          type="button"
-          className="min-w-0 flex-1 cursor-pointer text-left"
-          onClick={() => setShowDetail(!showDetail)}
-          aria-expanded={showDetail}
-          aria-label={`${displayName} details ${showDetail ? "sluiten" : "openen"}`}
-        >
-          <div className="flex items-center gap-2">
+      >
+        <div className="flex items-center gap-3 p-3 sm:p-3.5">
+          {isNegative ? (
+            <AppIcon
+              name={hasIncident ? "warning" : "check"}
+              tone={hasIncident ? "danger" : "success"}
+              size="lg"
+              framed
+            />
+          ) : isQuantitative ? (
             <span
-              className="text-sm font-semibold truncate"
-              style={{
-                color: isSuccess
-                  ? "rgba(255,255,255,0.55)"
-                  : hasIncident
-                    ? "#f87171"
-                    : "rgba(255,255,255,0.9)",
-                textDecoration:
-                  isSuccess && !isNegative ? "line-through" : "none",
-              }}
+              aria-hidden="true"
+              className={cn(
+                "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border text-xl",
+                isCompleted
+                  ? "border-[var(--habit-color)] bg-[var(--habit-color)] text-[var(--habit-color-foreground)]"
+                  : "border-[var(--habit-color-border)] bg-[var(--habit-color-soft)]",
+              )}
             >
-              {displayName}
+              {isCompleted ? <Check size={20} /> : displayEmoji}
             </span>
-            {isNegative && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-400 border border-red-500/15">
-                {typeLabel}
-              </span>
-            )}
-            <ChevronDown
-              size={14}
-              className="text-slate-600 shrink-0 transition-transform duration-200"
-              style={{
-                transform: showDetail ? "rotate(180deg)" : "rotate(0deg)",
-              }}
+          ) : (
+            <IconButton
+              onClick={onToggle}
+              disabled={pending || paused || toggleBlocked}
+              aria-busy={pending}
+              label={toggleBlocked ? `${displayName}: vandaag niet gepland` : isCompleted ? `${displayName} heropenen` : `${displayName} voltooien`}
+              title={toggleBlocked ? "Vandaag niet gepland" : isCompleted ? "Heropenen" : "Voltooien"}
+              variant="secondary"
+              className={cn(
+                "h-12 w-12 rounded-xl",
+                isCompleted
+                  ? "border-[var(--habit-color)] bg-[var(--habit-color)] text-[var(--habit-color-foreground)]"
+                  : "border-[var(--habit-color-border)] bg-[var(--habit-color-soft)]",
+              )}
+              icon={isCompleted ? <Check size={20} /> : <span className="text-xl">{displayEmoji}</span>}
             />
-          </div>
+          )}
 
-          <div className="flex items-center gap-2 mt-1">
-            {/* N5: week/maand-voortgang voor x_per_week / x_per_maand habits */}
-            {periodHabit && periodTarget > 0 && !masked && (
-              <span
-                className={`text-[10px] font-semibold ${
-                  periodSatisfied ? "text-green-400/90" : "text-sky-400/80"
-                }`}
-              >
-                {periodCount}/{periodTarget}{" "}
-                {habit.frequentie === "x_per_week" ? "deze week" : "deze maand"}
-                {periodSatisfied ? " ✓" : ""}
-              </span>
-            )}
-            {habit.huidigeStreak > 0 && (
-              <span className="text-[10px] text-orange-400/80 font-medium">
-                {formatStreak(habit.huidigeStreak, habit.frequentie)}
-              </span>
-            )}
-            {habit.log?.xpVerdiend ? (
-              <span className="text-[10px] text-green-400/60">
-                +{habit.log.xpVerdiend} XP
-              </span>
-            ) : null}
-            {!masked && (
-              <span className="text-[10px] text-[var(--color-text-muted)]">
-                {MOEILIJKHEID_LABELS[habit.moeilijkheid as string]}
-              </span>
-            )}
-            {habit.doelTijd && !masked && (
-              <span className="inline-flex items-center gap-1 text-[10px] text-sky-400/60">
-                <AppIcon name="time" tone="blue" size="xs" />
-                {habit.doelTijd}
-              </span>
-            )}
-          </div>
-        </button>
-
-        {/* Incident button (negatieve habits) — apart van stepper */}
-        {isNegative && !hasIncident && (
-          <button
-            type="button"
-            onClick={() => setShowTriggerModal(true)}
-            disabled={pending || paused || incidentDisabled}
-            aria-busy={pending}
-            aria-label={
-              incidentDisabled
-                ? `Incident loggen kan alleen tot 30 dagen terug`
-                : `Incident loggen voor ${displayName}`
-            }
-            className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-red-500/12 bg-red-500/8 transition-transform active:scale-90 disabled:cursor-default disabled:opacity-40"
-            title={
-              incidentDisabled
-                ? "Incident loggen kan alleen tot 30 dagen terug"
-                : "Incident loggen"
-            }
+          <Button
+            variant="ghost"
+            onClick={() => setShowDetail(!showDetail)}
+            aria-expanded={showDetail}
+            aria-label={`${displayName} details ${showDetail ? "sluiten" : "openen"}`}
+            className="h-auto min-w-0 flex-1 justify-start px-1 py-1 text-left"
           >
-            <AlertTriangle size={16} className="text-red-400/70" />
-          </button>
-        )}
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2">
+                <span className={cn(
+                  "truncate text-sm font-semibold",
+                  isSuccess ? "text-[var(--color-text-muted)]" : hasIncident ? "text-[var(--color-danger)]" : "text-[var(--color-text)]",
+                  isSuccess && !isNegative && "line-through",
+                )}>
+                  {displayName}
+                </span>
+                {isNegative && <Badge tone="danger" size="sm">{typeLabel}</Badge>}
+                <ChevronDown
+                  size={14}
+                  className={cn("shrink-0 text-[var(--color-text-subtle)] transition-transform duration-[var(--motion-fast)]", showDetail && "rotate-180")}
+                  aria-hidden="true"
+                />
+              </span>
+              <span className="mt-1 flex flex-wrap items-center gap-2">
+                {periodHabit && periodTarget > 0 && !masked && (
+                  <Badge tone={periodSatisfied ? "success" : "info"} size="sm">
+                    {periodCount}/{periodTarget} {habit.frequentie === "x_per_week" ? "deze week" : "deze maand"}{periodSatisfied ? " ✓" : ""}
+                  </Badge>
+                )}
+                {habit.huidigeStreak > 0 && <span className="text-micro font-medium text-[var(--color-warning)]">{formatStreak(habit.huidigeStreak, habit.frequentie)}</span>}
+                {habit.log?.xpVerdiend ? <span className="text-micro text-[var(--color-success)]">+{habit.log.xpVerdiend} XP</span> : null}
+                {!masked && <span className="text-micro text-[var(--color-text-muted)]">{MOEILIJKHEID_LABELS[habit.moeilijkheid as string]}</span>}
+                {habit.doelTijd && !masked && <span className="inline-flex items-center gap-1 text-micro text-[var(--color-info)]"><AppIcon name="time" tone="info" size="xs" />{habit.doelTijd}</span>}
+              </span>
+            </span>
+          </Button>
 
-        {/* Incident verwijderen (H5) — geen doodlopende indicator meer: een
-            misklik kan de registratie voor deze dag weer weghalen. */}
-        {isNegative && hasIncident && onRemoveIncident && (
-          <button
-            type="button"
-            onClick={onRemoveIncident}
-            disabled={pending || paused}
-            aria-busy={pending}
-            aria-label={`Incident verwijderen voor ${displayName}`}
-            className="flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-red-500/15 bg-red-500/8 px-2.5 text-[10px] font-semibold text-red-300/90 transition-transform active:scale-90 disabled:cursor-default disabled:opacity-40"
-            title="Incident verwijderen"
-          >
-            <RotateCcw size={14} className="text-red-400/80" />
-            <span className="hidden sm:inline">Incident verwijderen</span>
-          </button>
-        )}
-
-        {/* More menu */}
-        <button
-          ref={menuTriggerRef}
-          type="button"
-          onClick={() => setShowMenu(!showMenu)}
-          aria-haspopup="menu"
-          aria-expanded={showMenu}
-          aria-label={`Acties voor ${displayName}`}
-          title="Acties"
-          className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl transition-colors hover:bg-[var(--color-surface-hover)]"
-        >
-          <MoreVertical size={16} className="text-slate-500" />
-        </button>
-      </div>
-
-      {/* ─── Kwantitatief Stepper (eigen rij onder de habit info) ──────────── */}
-      {/* M-C (R3): op de Overzicht-tab mag een niet-geplande, niet-periodieke
-          habit géén stepper tonen — anders schrijft +stap stilletjes een log
-          naar een dag waarop de habit niet gepland staat. */}
-      {isQuantitative && toggleBlocked && (
-        <div className="px-3.5 pb-3">
-          <p className="text-[10px] text-[var(--color-text-muted)]">
-            Vandaag niet gepland
-          </p>
-        </div>
-      )}
-      {isQuantitative && !toggleBlocked && (
-        <div className="px-3.5 pb-3">
-          {/* Progress bar */}
-          <div className="h-1.5 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden mb-2">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ background: color }}
-              animate={{ width: `${progress * 100}%` }}
-              transition={{ type: "spring", damping: 20, stiffness: 200 }}
+          {isNegative && !hasIncident && (
+            <IconButton
+              onClick={() => setShowTriggerModal(true)}
+              disabled={pending || paused || incidentDisabled}
+              loading={pending}
+              label={incidentDisabled ? "Incident loggen kan alleen tot 30 dagen terug" : `Incident loggen voor ${displayName}`}
+              title={incidentDisabled ? "Incident loggen kan alleen tot 30 dagen terug" : "Incident loggen"}
+              icon={<AlertTriangle size={16} />}
+              variant="danger"
             />
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Minus button — niet uitgeschakeld tijdens debounce/verzenden
-                (M-F): taps accumuleren lokaal en gaan in één request. */}
-            <button
-              type="button"
-              onClick={() => stepBy(-stap)}
-              disabled={displayedWaarde <= 0 || paused}
-              aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verminderen`}
-              className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-20"
-              style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
-              }}
-            >
-              <Minus size={16} className="text-slate-400" />
-            </button>
-
-            {/* Huidige waarde — direct bewerkbaar; Enter of blur commit (M-F). */}
-            <div className="flex flex-1 items-center justify-center gap-1">
-              {masked ? (
-                <span className="text-sm font-bold text-[rgba(255,255,255,0.8)]">
-                  •• <span className="text-[10px] text-[var(--color-text-muted)]">/ ••</span>
-                </span>
-              ) : (
-                <>
-                  <input
-                    type="number"
-                    min={0}
-                    inputMode="decimal"
-                    value={waardeInput ?? String(displayedWaarde)}
-                    onChange={(e) => setWaardeInput(e.target.value)}
-                    onBlur={commitWaardeInput}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        e.currentTarget.blur();
-                      }
-                    }}
-                    disabled={paused}
-                    aria-label={`${displayName} waarde (${habit.eenheid ?? "aantal"})`}
-                    className="w-16 rounded-lg border border-[var(--color-border)] bg-[rgba(255,255,255,0.04)] px-2 py-1.5 text-center text-sm font-bold outline-none [appearance:textfield] focus:border-sky-500/40 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                    style={{ color: displayedCompleted ? color : "rgba(255,255,255,0.8)" }}
-                  />
-                  <span className="text-[10px] text-[var(--color-text-muted)]">
-                    / {habit.doelWaarde} {habit.eenheid ?? ""}
-                  </span>
-                </>
-              )}
-            </div>
-
-            {/* Plus button */}
-            <button
-              type="button"
-              onClick={() => stepBy(stap)}
-              disabled={displayedCompleted || paused}
-              aria-label={`${displayName} ${stap} ${habit.eenheid ?? ""} verhogen`}
-              className="w-11 h-11 rounded-xl flex items-center justify-center active:scale-90 transition-all cursor-pointer disabled:opacity-30"
-              style={{
-                background: `${color}15`,
-                border: `1px solid ${color}30`,
-              }}
-            >
-              <Plus size={16} style={{ color }} />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Expandable Detail Panel ──────────────────────────────────────── */}
-      <AnimatePresence>
-        {showDetail && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            className="overflow-hidden"
-          >
-            <div className="px-3.5 pb-3 border-t border-[var(--color-border)] pt-3">
-              {/* Beschrijving */}
-              {habit.beschrijving && !masked && (
-                <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
-                  {habit.beschrijving}
-                </p>
-              )}
-
-              {/* Incident→streak uitleg voor negatieve habits (R3): maak het
-                  gamification-effect expliciet — een schone dag bouwt de streak,
-                  een gelogd incident zet hem terug op nul. */}
-              {isNegative && !masked && (
-                <p className="mb-3 rounded-lg border border-red-500/10 bg-red-500/[0.05] px-2.5 py-2 text-[11px] leading-relaxed text-slate-400">
-                  Elke dag zonder incident bouwt je streak op; een gelogd
-                  incident zet de streak terug op nul.
-                </p>
-              )}
-
-              {/* Stats grid */}
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                <DetailStat
-                  icon={<Calendar size={12} />}
-                  label="Frequentie"
-                  value={frequencyLabel}
-                  color="#3b82f6"
-                />
-                <DetailStat
-                  icon={<Trophy size={12} />}
-                  label="Langste streak"
-                  value={formatStreakShort(habit.langsteStreak, habit.frequentie)}
-                  color="#f59e0b"
-                />
-                <DetailStat
-                  icon={<Target size={12} />}
-                  label="Totaal voltooid"
-                  value={`${habit.totaalVoltooid}x`}
-                  color="#22c55e"
-                />
-              </div>
-
-              {/* XP + Level progress */}
-              {(() => {
-                const levelInfo = getLevel(habit.totaalXP);
-                return (
-                  <div
-                    className="rounded-xl p-2.5"
-                    style={{
-                      background: `${color}06`,
-                      border: `1px solid ${color}10`,
-                    }}
-                  >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <Zap size={12} style={{ color }} />
-                        <span
-                          className="text-[11px] font-bold"
-                          style={{ color }}
-                        >
-                          Lv.{levelInfo.level} {levelInfo.titel}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[var(--color-text-muted)]">
-                        {formatXP(habit.totaalXP)}
-                        {levelInfo.nextXP > 0 && (
-                          <span className="text-[var(--color-text-subtle)]">
-                            {" "}
-                            · nog {levelInfo.nextXP}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="h-1 bg-[rgba(255,255,255,0.05)] rounded-full overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ background: color }}
-                        animate={{ width: `${levelInfo.progress * 100}%` }}
-                        transition={{
-                          type: "spring",
-                          damping: 20,
-                          stiffness: 200,
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Rooster koppeling badge */}
-              {habit.roosterFilter && habit.roosterFilter !== "alle" && (
-                <div className="flex items-center gap-1.5 mt-2.5">
-                  <TrendingUp size={11} className="text-cyan-400/60" />
-                  <span className="text-[10px] text-cyan-400/70">
-                    Rooster:{" "}
-                    {ROOSTER_LABELS[habit.roosterFilter] ?? habit.roosterFilter}
-                  </span>
-                </div>
-              )}
-
-              {/* Aangemaakt datum */}
-              <div className="flex items-center gap-1.5 mt-2">
-                <span className="text-[10px] text-[var(--color-text-muted)]">
-                  Aangemaakt{" "}
-                  {new Date(habit.aangemaakt).toLocaleDateString("nl-NL", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ─── Incident Trigger Modal ───────────────────────────────────────── */}
-      <AnimatePresence>
-        {showTriggerModal && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="border-t border-red-500/10 overflow-hidden"
-          >
-            <div className="p-3.5">
-              <p className="text-[11px] text-slate-400 font-medium mb-2.5">
-                Wat was de trigger?
-              </p>
-
-              <div className="grid grid-cols-2 gap-1.5 mb-3">
-                {INCIDENT_TRIGGERS.map((t, index) => (
-                  <button
-                    type="button"
-                    key={t.value}
-                    onClick={() =>
-                      setSelectedTrigger(
-                        selectedTrigger === t.value ? undefined : t.value,
-                      )
-                    }
-                    aria-pressed={selectedTrigger === t.value}
-                    aria-label={
-                      masked ? `Trigger ${index + 1}` : `Trigger ${t.label}`
-                    }
-                  className="min-h-[44px] cursor-pointer rounded-xl px-3 py-2.5 text-left text-[11px] font-medium transition-all active:scale-95"
-                    style={{
-                      background:
-                        selectedTrigger === t.value
-                          ? "rgba(239,68,68,0.10)"
-                          : "rgba(255,255,255,0.03)",
-                      border:
-                        selectedTrigger === t.value
-                          ? "1px solid rgba(239,68,68,0.20)"
-                          : "1px solid rgba(255,255,255,0.05)",
-                      color:
-                        selectedTrigger === t.value ? "#f87171" : "#94a3b8",
-                    }}
-                  >
-                    {masked ? `Trigger ${index + 1}` : `${t.emoji} ${t.label}`}
-                  </button>
-                ))}
-              </div>
-
-              {/* Notitie (verplicht bij "anders") */}
-              {(selectedTrigger === "anders" || selectedTrigger) && (
-                <input
-                  type="text"
-                  value={triggerNotitie}
-                  onChange={(e) => setTriggerNotitie(e.target.value)}
-                  placeholder={
-                    selectedTrigger === "anders"
-                      ? "Beschrijf de trigger…"
-                      : "Optionele notitie…"
-                  }
-                  aria-required={selectedTrigger === "anders"}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded-xl px-3 py-2.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500/30 min-h-[44px] mb-3"
-                />
-              )}
-              {selectedTrigger === "anders" && !triggerNotitie.trim() && (
-                <p className="-mt-2 mb-3 text-[11px] text-red-400/80">Een korte beschrijving is verplicht bij &ldquo;anders&rdquo;.</p>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowTriggerModal(false);
-                    setSelectedTrigger(undefined);
-                    setTriggerNotitie("");
-                  }}
-                  className="flex-1 py-2.5 rounded-xl text-xs font-medium text-slate-400 bg-[rgba(255,255,255,0.03)] border border-[var(--color-border)] min-h-[44px] cursor-pointer active:scale-95 transition-transform"
-                >
-                  Annuleren
-                </button>
-                <button
-                  type="button"
-                  onClick={handleIncidentSubmit}
-                  disabled={
-                    selectedTrigger === "anders" && !triggerNotitie.trim()
-                  }
-                  className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white min-h-[44px] cursor-pointer active:scale-95 transition-transform disabled:opacity-30"
-                  style={{
-                    background: "linear-gradient(135deg, #ef4444, #dc2626)",
-                  }}
-                >
-                  Incident loggen
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ─── Dropdown menu ────────────────────────────────────────────────── */}
-      {showMenu && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          className="border-t border-[var(--color-border)] overflow-hidden"
-        >
-          <div
-            ref={menuListRef}
+          )}
+          {isNegative && hasIncident && onRemoveIncident && (
+            <Button onClick={onRemoveIncident} disabled={paused} loading={pending} aria-label={`Incident verwijderen voor ${displayName}`} title="Incident verwijderen" variant="danger" size="sm">
+              <RotateCcw size={14} aria-hidden="true" /><span className="hidden sm:inline">Incident verwijderen</span>
+            </Button>
+          )}
+          <Popover
+            open={showMenu}
+            onOpenChange={setShowMenu}
+            title={`Acties voor ${displayName}`}
+            ariaLabel={`Acties voor ${displayName}`}
             role="menu"
-            aria-label={`Acties voor ${displayName}`}
-            className="p-2.5 flex gap-2"
-            onKeyDown={handleMenuKeyDown}
+            align="end"
+            showDesktopHeader={false}
+            className="w-72"
+            onContentKeyDown={handleMenuKeyDown}
+            trigger={(triggerProps) => (
+              <IconButton
+                {...triggerProps}
+                label={`Acties voor ${displayName}`}
+                title="Acties"
+                icon={<MoreVertical size={16} />}
+              />
+            )}
           >
-            <MenuBtn
-              first
-              icon={<Edit3 size={15} />}
-              label="Bewerken"
-              onClick={() => {
-                onEdit();
-                setShowMenu(false);
-              }}
-            />
-            <MenuBtn
-              icon={<Pause size={15} />}
-              label={habit.isPauze ? "Hervatten" : "Pauzeren"}
-              onClick={() => {
-                onPause();
-                setShowMenu(false);
-              }}
-            />
-            <MenuBtn
-              icon={<Archive size={15} />}
-              label="Archiveer"
-              onClick={() => {
-                onArchive();
-                setShowMenu(false);
-              }}
-            />
-            <MenuBtn
-              icon={<Trash2 size={15} />}
-              label="Verwijder"
-              onClick={() => {
-                onRemove();
-                setShowMenu(false);
-              }}
-              danger
-            />
+            <div ref={menuListRef} className="grid grid-cols-2 gap-2">
+              <MenuBtn first icon={<Edit3 size={15} />} label="Bewerken" onClick={() => { onEdit(); setShowMenu(false); }} />
+              <MenuBtn icon={<Pause size={15} />} label={habit.isPauze ? "Hervatten" : "Pauzeren"} onClick={() => { onPause(); setShowMenu(false); }} />
+              <MenuBtn icon={<Archive size={15} />} label="Archiveer" onClick={() => { onArchive(); setShowMenu(false); }} />
+              <MenuBtn icon={<Trash2 size={15} />} label="Verwijder" onClick={() => { onRemove(); setShowMenu(false); }} danger />
+            </div>
+          </Popover>
+        </div>
+
+        {isQuantitative && toggleBlocked && (
+          <div className="px-3.5 pb-3"><Badge size="sm">Vandaag niet gepland</Badge></div>
+        )}
+        {isQuantitative && !toggleBlocked && (
+          <div className="px-3.5 pb-3">
+            <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-surface-active)]">
+              <motion.div
+                className="h-full rounded-full bg-[var(--habit-color)]"
+                animate={{ width: `${progress * 100}%` }}
+                transition={uiMotion.spring.progress}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <IconButton
+                onClick={() => stepBy(-stap)}
+                disabled={displayedWaarde <= 0 || paused}
+                label={`${displayName} ${stap} ${habit.eenheid ?? ""} verminderen`}
+                variant="secondary"
+                icon={<Minus size={16} />}
+              />
+              <div className="flex flex-1 items-center justify-center gap-1">
+                {masked ? (
+                  <span className="text-sm font-bold text-[var(--color-text)]">•• <span className="text-micro text-[var(--color-text-muted)]">/ ••</span></span>
+                ) : (
+                  <>
+                    <Input
+                      type="number"
+                      min={0}
+                      inputMode="decimal"
+                      value={waardeInput ?? String(displayedWaarde)}
+                      onChange={(event) => setWaardeInput(event.target.value)}
+                      onBlur={commitWaardeInput}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      disabled={paused}
+                      aria-label={`${displayName} waarde (${habit.eenheid ?? "aantal"})`}
+                      className={cn("w-20 text-center text-sm font-bold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none", displayedCompleted && "text-[var(--habit-color-contrast)]")}
+                    />
+                    <span className="text-micro text-[var(--color-text-muted)]">/ {habit.doelWaarde} {habit.eenheid ?? ""}</span>
+                  </>
+                )}
+              </div>
+              <IconButton
+                onClick={() => stepBy(stap)}
+                disabled={displayedCompleted || paused}
+                label={`${displayName} ${stap} ${habit.eenheid ?? ""} verhogen`}
+                variant="secondary"
+                className="border-[var(--habit-color-border)] bg-[var(--habit-color-soft)] text-[var(--habit-color-contrast)]"
+                icon={<Plus size={16} />}
+              />
+            </div>
           </div>
-        </motion.div>
-      )}
+        )}
+
+        <AnimatePresence>
+          {showDetail && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: uiMotion.durationSeconds.standard, ease: "easeInOut" }} className="overflow-hidden">
+              <div className="border-t border-[var(--color-border)] px-3.5 pb-3 pt-3">
+                {habit.beschrijving && !masked && <p className="mb-3 text-micro leading-relaxed text-[var(--color-text-muted)]">{habit.beschrijving}</p>}
+                {isNegative && !masked && (
+                  <Surface tone="danger" radius="sm" padding="xs" className="mb-3 text-micro leading-relaxed text-[var(--color-text-muted)]">
+                    Elke dag zonder incident bouwt je streak op; een gelogd incident zet de streak terug op nul.
+                  </Surface>
+                )}
+                <div className="mb-3 grid grid-cols-3 gap-2">
+                  <DetailStat icon={<Calendar size={12} className="text-[var(--color-info)]" />} label="Frequentie" value={frequencyLabel} tone="info" />
+                  <DetailStat icon={<Trophy size={12} className="text-[var(--color-primary-hover)]" />} label="Langste streak" value={formatStreakShort(habit.langsteStreak, habit.frequentie)} tone="accent" />
+                  <DetailStat icon={<Target size={12} className="text-[var(--color-success)]" />} label="Totaal voltooid" value={`${habit.totaalVoltooid}x`} tone="success" />
+                </div>
+                {(() => {
+                  const levelInfo = getLevel(habit.totaalXP);
+                  return (
+                    <Surface tone="subtle" radius="sm" padding="xs" className="border-[var(--habit-color-border)] bg-[var(--habit-color-soft)]">
+                      <div className="mb-1.5 flex items-center justify-between gap-2">
+                        <span className="flex min-w-0 items-center gap-1.5 text-micro font-bold text-[var(--habit-color-contrast)]"><Zap size={12} aria-hidden="true" />Lv.{levelInfo.level} {levelInfo.titel}</span>
+                        <span className="shrink-0 text-micro text-[var(--color-text-muted)]">{formatXP(habit.totaalXP)}{levelInfo.nextXP > 0 && <span className="text-[var(--color-text-subtle)]"> · nog {levelInfo.nextXP}</span>}</span>
+                      </div>
+                      <div className="h-1 overflow-hidden rounded-full bg-[var(--color-surface-active)]">
+                        <motion.div className="h-full rounded-full bg-[var(--habit-color)]" animate={{ width: `${levelInfo.progress * 100}%` }} transition={uiMotion.spring.progress} />
+                      </div>
+                    </Surface>
+                  );
+                })()}
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  {habit.roosterFilter && habit.roosterFilter !== "alle" && <Badge tone="info" size="sm"><TrendingUp size={11} aria-hidden="true" />Rooster: {ROOSTER_LABELS[habit.roosterFilter] ?? habit.roosterFilter}</Badge>}
+                  <Badge size="sm">Aangemaakt {new Date(habit.aangemaakt).toLocaleDateString("nl-NL", { day: "numeric", month: "short", year: "numeric" })}</Badge>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showTriggerModal && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-[var(--color-danger-border)]">
+              <div className="p-3.5">
+                <p className="mb-2.5 text-micro font-medium text-[var(--color-text-muted)]">Wat was de trigger?</p>
+                <div className="mb-3 grid grid-cols-2 gap-1.5">
+                  {INCIDENT_TRIGGERS.map((trigger, index) => (
+                    <Button
+                      key={trigger.value}
+                      onClick={() => setSelectedTrigger(selectedTrigger === trigger.value ? undefined : trigger.value)}
+                      aria-pressed={selectedTrigger === trigger.value}
+                      aria-label={masked ? `Trigger ${index + 1}` : `Trigger ${trigger.label}`}
+                      variant={selectedTrigger === trigger.value ? "danger" : "secondary"}
+                      size="sm"
+                      className="h-auto min-h-11 justify-start text-left text-micro"
+                    >
+                      {masked ? `Trigger ${index + 1}` : `${trigger.emoji} ${trigger.label}`}
+                    </Button>
+                  ))}
+                </div>
+                {(selectedTrigger === "anders" || selectedTrigger) && (
+                  <Input
+                    type="text"
+                    value={triggerNotitie}
+                    onChange={(event) => setTriggerNotitie(event.target.value)}
+                    placeholder={selectedTrigger === "anders" ? "Beschrijf de trigger…" : "Optionele notitie…"}
+                    aria-required={selectedTrigger === "anders"}
+                    aria-label="Notitie bij incident"
+                    className="mb-3 w-full text-xs"
+                  />
+                )}
+                {selectedTrigger === "anders" && !triggerNotitie.trim() && <p className="-mt-2 mb-3 text-micro text-[var(--color-danger)]">Een korte beschrijving is verplicht bij &ldquo;anders&rdquo;.</p>}
+                <div className="flex gap-2">
+                  <Button onClick={() => { setShowTriggerModal(false); setSelectedTrigger(undefined); setTriggerNotitie(""); }} variant="secondary" size="sm" fullWidth>Annuleren</Button>
+                  <Button onClick={handleIncidentSubmit} disabled={selectedTrigger === "anders" && !triggerNotitie.trim()} variant="danger" size="sm" fullWidth>Incident loggen</Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+
+      </Surface>
     </motion.div>
   );
 }
-
 function MenuBtn({
   icon,
   label,
@@ -866,21 +525,17 @@ function MenuBtn({
   first?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <Button
       role="menuitem"
       tabIndex={first ? 0 : -1}
       onClick={onClick}
       aria-label={label}
-      className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-xl transition-all active:scale-95 min-h-[52px] cursor-pointer"
-      style={{
-        background: danger ? "rgba(239,68,68,0.06)" : "rgba(255,255,255,0.03)",
-        color: danger ? "#f87171" : "#94a3b8",
-      }}
+      variant={danger ? "danger" : "ghost"}
+      className="min-h-[52px] flex-1 flex-col gap-1 py-3"
     >
       {icon}
-      <span className="text-[10px] font-medium">{label}</span>
-    </button>
+      <span className="text-micro font-medium">{label}</span>
+    </Button>
   );
 }
 
@@ -888,23 +543,18 @@ function DetailStat({
   icon,
   label,
   value,
-  color,
+  tone,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
-  color: string;
+  tone: "accent" | "info" | "success";
 }) {
   return (
-    <div
-      className="rounded-lg p-2 text-center"
-      style={{ background: `${color}08`, border: `1px solid ${color}12` }}
-    >
-      <div className="flex justify-center mb-1" style={{ color }}>
-        {icon}
-      </div>
-      <div className="text-[11px] font-bold text-slate-200">{value}</div>
-      <div className="text-[9px] text-[var(--color-text-muted)] mt-0.5">{label}</div>
-    </div>
+    <Surface tone={tone} radius="sm" padding="xs" className="text-center">
+      <div className="mb-1 flex justify-center" aria-hidden="true">{icon}</div>
+      <div className="text-micro font-bold text-[var(--color-text)]">{value}</div>
+      <div className="mt-0.5 text-micro text-[var(--color-text-muted)]">{label}</div>
+    </Surface>
   );
 }

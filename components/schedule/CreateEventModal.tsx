@@ -4,12 +4,19 @@ import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { personalEventsApi, type PersonalEventRow } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
 import { applyEventRowToCache, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { getAmsterdamTodayIso } from "@/components/schedule/AgendaUtils";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { FormField } from "@/components/ui/FormField";
+import { Input } from "@/components/ui/Input";
+import { ModalCancelButton } from "@/components/ui/ModalCancelButton";
+import { Switch } from "@/components/ui/Switch";
+import { Textarea } from "@/components/ui/Textarea";
 import { AppIcon } from "@/components/ui/AppIcon";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
 import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
@@ -402,9 +409,9 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
       isOpen={isOpen}
       onClose={() => void handleCloseAttempt()}
       title={prefillEvent ? "Afspraak wijzigen" : "Nieuwe afspraak"}
-      icon={<AppIcon name="agenda" tone="indigo" size="sm" />}
+      icon={<AppIcon name="agenda" tone="info" size="sm" />}
       maxWidth="lg"
-      theme="surface"
+      tone="info"
       closeDisabled={loading}
       closeOnBackdrop={!loading}
       closeOnEscape={!loading}
@@ -412,8 +419,28 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
       dataAppModal="agenda-event"
       className="max-h-[calc(100dvh-0.5rem)] sm:max-h-[calc(100dvh-2rem)]"
       contentClassName="overflow-hidden p-0"
+      footer={
+        <div className="grid gap-2 sm:flex sm:items-center sm:justify-end">
+          <ModalCancelButton
+            onFallback={() => void handleCloseAttempt()}
+            disabled={loading}
+            className="w-full sm:w-auto"
+          />
+          <Button
+            type="submit"
+            form="agenda-event-form"
+            loading={loading}
+            loadingLabel="Bezig…"
+            variant="info"
+            className="w-full sm:w-auto"
+          >
+            <AppIcon name={editEvent ? "save" : "add"} tone="info" size="xs" />
+            {editEvent ? "Opslaan" : "Aanmaken"}
+          </Button>
+        </div>
+      }
     >
-              <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <form id="agenda-event-form" onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 {/* overflow-x-hidden: a scroll box with overflow-y:auto computes
                     overflow-x to `auto` too, so any over-wide child (e.g. the
                     native date/time inputs below) produced a horizontal scroll on
@@ -422,43 +449,38 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-5 py-4">
 
                 {/* Titel */}
-                <div>
-                  <label htmlFor="agenda-event-titel" className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                    Titel *
-                  </label>
-                  <input
-                    id="agenda-event-titel"
-                    type="text"
-                    value={titel}
-                    onChange={e => setTitel(e.target.value)}
-                    placeholder="bijv. Verjaardag Mama"
-                    required
-                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
-                  />
-                  {detectedContext && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2 py-1 text-xs font-semibold text-cyan-200">
-                        <AppIcon name={detectedContext.eventSymbol} tone="cyan" size="xs" />
-                        {detectedContext.label}
-                        <span className="text-cyan-300/70">#{detectedContext.tag}</span>
-                      </span>
-                    </div>
+                <FormField id="agenda-event-title" label="Titel *">
+                  {(controlProps) => (
+                    <>
+                      <Input
+                        {...controlProps}
+                        type="text"
+                        value={titel}
+                        onChange={e => setTitel(e.target.value)}
+                        placeholder="bijv. Verjaardag Mama"
+                        required
+                        className="w-full placeholder:text-[var(--color-text-subtle)]"
+                      />
+                      {detectedContext ? (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] px-2 py-1 text-xs font-semibold text-[var(--color-info)]">
+                            <AppIcon name={detectedContext.eventSymbol} tone="info" size="xs" />
+                            {detectedContext.label}
+                            <span className="text-[var(--color-info)]">#{detectedContext.tag}</span>
+                          </span>
+                        </div>
+                      ) : null}
+                    </>
                   )}
-                </div>
+                </FormField>
 
                 {/* Hele dag toggle */}
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] text-slate-500 uppercase tracking-wider">
-                    Hele dag
-                  </label>
-                  <button type="button" onClick={() => setHeledag(v => !v)}
-                    role="switch" aria-checked={heledag} aria-label="Hele dag"
-                    className="relative w-10 h-5 rounded-full transition-colors cursor-pointer"
-                    style={{ background: heledag ? "#6366f1" : "rgba(255,255,255,0.1)" }}>
-                    <span className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all"
-                      style={{ left: heledag ? "calc(100% - 18px)" : "2px" }} />
-                  </button>
-                </div>
+                <Switch
+                  label="Hele dag"
+                  checked={heledag}
+                  onCheckedChange={setHeledag}
+                  className="px-0"
+                />
 
                 {/* Datum. Like the time fields, a date is fixed-length content, so a
                     half-width grid box left it looking like a wide empty bar. Let each
@@ -466,24 +488,37 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                     would either clip long dates or pad short ones) and lay them out
                     with flex-wrap so they hug the value and only stack when too narrow. */}
                 <div className="flex flex-wrap gap-x-4 gap-y-3">
-                  <div className="min-w-0">
-                    <label htmlFor="agenda-event-start-datum" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                      <AppIcon name="calendar" tone="slate" size="xs" /> Start
-                    </label>
-                    <input id="agenda-event-start-datum" type="date" value={startDatum}
-                      onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
-                      className="max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label htmlFor="agenda-event-eind-datum" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                      <AppIcon name="calendar" tone="slate" size="xs" /> Eind
-                    </label>
-                    <input id="agenda-event-eind-datum" type="date" value={eindDatum} min={startDatum}
-                      onChange={e => setEindDatum(e.target.value)}
-                      className="max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
-                    />
-                  </div>
+                  <FormField
+                    id="agenda-event-start-date"
+                    label={<span className="flex items-center gap-1"><AppIcon name="calendar" tone="neutral" size="xs" /> Start</span>}
+                    className="min-w-0"
+                  >
+                    {(controlProps) => (
+                      <Input
+                        {...controlProps}
+                        type="date"
+                        value={startDatum}
+                        onChange={e => { setStartDatum(e.target.value); if (e.target.value > eindDatum) setEindDatum(e.target.value); }}
+                        className="w-auto max-w-full cursor-pointer [color-scheme:dark]"
+                      />
+                    )}
+                  </FormField>
+                  <FormField
+                    id="agenda-event-end-date"
+                    label={<span className="flex items-center gap-1"><AppIcon name="calendar" tone="neutral" size="xs" /> Eind</span>}
+                    className="min-w-0"
+                  >
+                    {(controlProps) => (
+                      <Input
+                        {...controlProps}
+                        type="date"
+                        value={eindDatum}
+                        min={startDatum}
+                        onChange={e => setEindDatum(e.target.value)}
+                        className="w-auto max-w-full cursor-pointer [color-scheme:dark]"
+                      />
+                    )}
+                  </FormField>
                 </div>
 
                 {/* Tijd (alleen bij niet-hele-dag). A time value (HH:MM) is short,
@@ -494,35 +529,56 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 {!heledag && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }} className="flex flex-wrap gap-x-4 gap-y-3 overflow-hidden">
-                    <div className="min-w-0">
-                      <label htmlFor="agenda-event-start-tijd" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                        <AppIcon name="time" tone="slate" size="xs" /> Van
-                      </label>
-                      <input id="agenda-event-start-tijd" type="time" value={startTijd} onChange={e => setStartTijd(e.target.value)}
-                        className="w-36 max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <label htmlFor="agenda-event-eind-tijd" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                        <AppIcon name="time" tone="slate" size="xs" /> Tot
-                      </label>
-                      <input id="agenda-event-eind-tijd" type="time" value={eindTijd} onChange={e => setEindTijd(e.target.value)}
-                        className="w-36 max-w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm focus:outline-none focus:border-indigo-500/50 transition-colors cursor-pointer"
-                      />
-                    </div>
+                    <FormField
+                      id="agenda-event-start-time"
+                      label={<span className="flex items-center gap-1"><AppIcon name="time" tone="neutral" size="xs" /> Van</span>}
+                      className="min-w-0"
+                    >
+                      {(controlProps) => (
+                        <Input
+                          {...controlProps}
+                          type="time"
+                          value={startTijd}
+                          onChange={e => setStartTijd(e.target.value)}
+                          className="w-36 max-w-full cursor-pointer [color-scheme:dark]"
+                        />
+                      )}
+                    </FormField>
+                    <FormField
+                      id="agenda-event-end-time"
+                      label={<span className="flex items-center gap-1"><AppIcon name="time" tone="neutral" size="xs" /> Tot</span>}
+                      className="min-w-0"
+                    >
+                      {(controlProps) => (
+                        <Input
+                          {...controlProps}
+                          type="time"
+                          value={eindTijd}
+                          onChange={e => setEindTijd(e.target.value)}
+                          className="w-36 max-w-full cursor-pointer [color-scheme:dark]"
+                        />
+                      )}
+                    </FormField>
                   </motion.div>
                 )}
 
                 {/* Locatie */}
-                <div>
-                  <label htmlFor="agenda-event-locatie" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                    <AppIcon name="location" tone="slate" size="xs" /> Locatie (optioneel)
-                  </label>
-                  <input id="agenda-event-locatie" type="text" value={locatie} onChange={e => setLocatie(e.target.value)}
-                    placeholder="bijv. Amsterdam"
-                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
-                  />
-                </div>
+                <FormField
+                  id="agenda-event-location"
+                  label={<span className="flex items-center gap-1"><AppIcon name="location" tone="neutral" size="xs" /> Locatie</span>}
+                  optional
+                >
+                  {(controlProps) => (
+                    <Input
+                      {...controlProps}
+                      type="text"
+                      value={locatie}
+                      onChange={e => setLocatie(e.target.value)}
+                      placeholder="bijv. Amsterdam"
+                      className="w-full placeholder:text-[var(--color-text-subtle)]"
+                    />
+                  )}
+                </FormField>
 
                 <BusinessContextPicker
                   value={businessContext}
@@ -537,34 +593,31 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 />
 
                 {/* Categorie */}
-                <div>
-                  <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                    Categorie
-                  </label>
+                <fieldset>
+                  <legend className="mb-1.5 text-sm font-medium text-[var(--color-text)]">Categorie</legend>
                   <div className="grid grid-cols-3 gap-1.5">
                     {CATEGORIES.map(({ id, icon, label }) => (
-                      <button
+                      <Button
                         key={id}
-                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        aria-pressed={categorie === id}
                         onClick={() => handleCategoryChange(id)}
-                        className={`flex min-w-0 items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border cursor-pointer ${
-                          categorie === id
-                            ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30"
-                            : "bg-[var(--color-surface)] text-slate-500 border-[var(--color-border)] hover:bg-[var(--color-surface-hover)] hover:text-slate-300"
-                        }`}
+                        className={cn(
+                          "min-w-0 justify-start",
+                          categorie === id && "border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)]",
+                        )}
                       >
-                        <AppIcon name={icon} tone={categorie === id ? "indigo" : "slate"} size="xs" className="shrink-0" />
+                        <AppIcon name={icon} tone={categorie === id ? "info" : "neutral"} size="xs" className="shrink-0" />
                         <span className="truncate">{label}</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
-                </div>
+                </fieldset>
 
                 {/* Symbool */}
-                <div>
-                  <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                    Symbool
-                  </label>
+                <fieldset>
+                  <legend className="mb-1.5 text-sm font-medium text-[var(--color-text)]">Symbool</legend>
                   <SymbolPicker
                     value={symbol}
                     options={EVENT_SYMBOL_OPTIONS}
@@ -572,32 +625,39 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                       setSymbolTouched(true);
                       setSymbol(value);
                     }}
-                    tone="indigo"
+                    tone="info"
                     fallback={categoryIcon(categorie)}
                     gridClassName="grid-cols-2 sm:grid-cols-3"
                   />
-                </div>
+                </fieldset>
 
                 {/* Beschrijving */}
-                <div>
-                  <label htmlFor="agenda-event-notitie" className="flex items-center gap-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1.5">
-                    <AppIcon name="note" tone="slate" size="xs" /> Notitie (optioneel)
-                  </label>
-                  <textarea id="agenda-event-notitie" value={beschrijving} onChange={e => setBeschrijving(e.target.value)}
-                    rows={2} placeholder="Aantekeningen..."
-                    className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3 py-2 text-base text-white sm:text-sm placeholder-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors resize-none"
-                  />
-                </div>
+                <FormField
+                  id="agenda-event-note"
+                  label={<span className="flex items-center gap-1"><AppIcon name="note" tone="neutral" size="xs" /> Notitie</span>}
+                  optional
+                >
+                  {(controlProps) => (
+                    <Textarea
+                      {...controlProps}
+                      value={beschrijving}
+                      onChange={e => setBeschrijving(e.target.value)}
+                      rows={2}
+                      placeholder="Aantekeningen..."
+                      className="min-h-24 w-full resize-none placeholder:text-[var(--color-text-subtle)]"
+                    />
+                  )}
+                </FormField>
 
                 {/* Error */}
                 {error && (
-                  <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                  <p className="text-xs text-[var(--color-danger)] bg-[var(--color-danger-subtle)] border border-[var(--color-danger-border)] rounded-lg px-3 py-2">
                     {error}
                   </p>
                 )}
 
                 {/* Info */}
-                <p className="text-[10px] text-slate-600">
+                <p className="text-micro text-[var(--color-text-subtle)]">
                   {editEvent
                     ? "Wijzigingen worden direct naar Google Calendar gepusht. Als Google niet reageert, blijft de wijziging in de wachtrij (nog niet in Google)."
                     : "Afspraak wordt direct naar Google Calendar gepusht. Als Google niet reageert, blijft de afspraak in de wachtrij (nog niet in Google)."
@@ -605,18 +665,6 @@ export function CreateEventModal({ open, onClose, onSuccess, editEvent, initialD
                 </p>
                 </div>
 
-                {/* Actions */}
-                <div className="flex shrink-0 gap-2 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 pb-[calc(0.875rem+env(safe-area-inset-bottom,0px))]">
-                  <button type="button" onClick={() => void handleCloseAttempt()}
-                    className="min-h-[44px] flex-1 rounded-xl border border-[var(--color-border)] text-sm font-semibold text-slate-500 transition-all hover:bg-[var(--color-surface-hover)] hover:text-slate-300 cursor-pointer">
-                    Annuleren
-                  </button>
-                  <button type="submit" disabled={loading}
-                    className="flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/15 text-sm font-semibold text-indigo-300 transition-all hover:bg-indigo-500/25 cursor-pointer disabled:opacity-50">
-                    <AppIcon name={editEvent ? "save" : "add"} tone="indigo" size="xs" />
-                    {loading ? "Bezig..." : (editEvent ? "Opslaan" : "Aanmaken")}
-                  </button>
-                </div>
               </form>
     </Modal>
   );

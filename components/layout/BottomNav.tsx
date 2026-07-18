@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { AppIcon } from "@/components/ui/AppIcon";
+import { uiMotion } from "@/lib/ui/motion";
+import { NavigationIcon } from "@/components/layout/NavigationIcon";
 import { FocusModeShortcut } from "@/components/layout/FocusModeControl";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -38,7 +39,7 @@ function BottomNavContent({ isPhone }: { isPhone: boolean }) {
     <>
       <nav
         aria-label="Mobiele hoofdnavigatie"
-        className="app-bottom-nav fixed bottom-0 left-0 right-0 z-[60] border-t border-[var(--color-border)] px-2 pt-2 backdrop-blur-xl md:hidden"
+        className="app-bottom-nav fixed bottom-0 left-0 right-0 z-[var(--layer-navigation)] border-t border-[var(--color-border)] px-2 pt-2 backdrop-blur-xl md:hidden"
       >
         <div className="grid grid-cols-5 gap-1">
           {MOBILE_PRIMARY_ITEMS.map((item) => (
@@ -54,19 +55,19 @@ function BottomNavContent({ isPhone }: { isPhone: boolean }) {
             className={cn(
               "relative flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-xl border px-1 transition-colors",
               moreActive || moreOpen
-                ? "border-amber-500/25 bg-amber-500/[0.12] text-amber-300"
+                ? "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]"
                 : "border-transparent text-[var(--color-text-muted)] active:bg-[var(--color-surface-hover)]",
             )}
           >
             {(moreActive || moreOpen) && (
               <motion.span
                 layoutId="mobile-nav-active"
-                className="absolute inset-0 rounded-xl bg-amber-500/[0.08]"
-                transition={{ type: "spring", stiffness: 440, damping: 36 }}
+                className="absolute inset-0 rounded-xl bg-[var(--color-primary-subtle)]"
+                transition={uiMotion.spring.navigation}
               />
             )}
             <span className="relative z-10 flex h-7 w-7 items-center justify-center rounded-lg">
-              <AppIcon name="more" tone={moreActive || moreOpen ? "amber" : "slate"} size="md" />
+              <NavigationIcon name="more" tone={moreActive || moreOpen ? "accent" : "neutral"} size="md" />
             </span>
             <span className="relative z-10 max-w-full truncate text-xs font-bold leading-none">
               {moreActive && activeItem ? activeItem.shortLabel : "Meer"}
@@ -114,23 +115,23 @@ function BottomNavLink({
       onClick={onNavigate}
     >
       <motion.div
-        whileTap={{ scale: 0.92 }}
+        whileTap={uiMotion.press.navigation}
         className={cn(
           "relative flex min-h-[62px] flex-col items-center justify-center gap-1 rounded-xl border px-1 transition-colors",
           active
-            ? "border-amber-500/25 bg-amber-500/[0.12] text-amber-300"
+            ? "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]"
             : "border-transparent text-[var(--color-text-muted)] active:bg-[var(--color-surface-hover)]",
         )}
       >
         {active && (
           <motion.span
             layoutId="mobile-nav-active"
-            className="absolute inset-0 rounded-xl bg-amber-500/[0.08]"
-            transition={{ type: "spring", stiffness: 440, damping: 36 }}
+            className="absolute inset-0 rounded-xl bg-[var(--color-primary-subtle)]"
+            transition={uiMotion.spring.navigation}
           />
         )}
         <span className="relative z-10 flex h-7 w-7 items-center justify-center rounded-lg">
-          <AppIcon name={item.icon} tone={active ? "amber" : "slate"} size="md" />
+          <NavigationIcon name={item.icon} tone={active ? "accent" : "neutral"} size="md" />
         </span>
         <span className="relative z-10 max-w-full truncate text-xs font-bold leading-none">
           {item.shortLabel}
@@ -163,23 +164,23 @@ function MoreNavLink({
       className={cn(
         "flex min-h-16 items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors",
         active
-          ? "border-amber-500/25 bg-amber-500/[0.12] text-amber-100"
-          : "border-[var(--color-border)] bg-[var(--color-surface)] text-slate-300 hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)]",
+          ? "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]"
+          : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] active:bg-[var(--color-surface-hover)]",
       )}
     >
       <span
         className={cn(
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
           active
-            ? "border-amber-500/25 bg-amber-500/15 text-amber-300"
+            ? "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]"
             : "border-[var(--color-border)] bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]",
         )}
       >
-        <AppIcon name={item.icon} tone={active ? "amber" : "slate"} size="md" />
+        <NavigationIcon name={item.icon} tone={active ? "accent" : "neutral"} size="md" />
       </span>
       <span className="min-w-0">
         <span className="block truncate text-sm font-bold">{item.label}</span>
-        <span className={cn("mt-0.5 block truncate text-[11px]", active ? "text-amber-100/[0.55]" : "text-[var(--color-text-subtle)]")}>
+        <span className="mt-0.5 block truncate text-micro text-[var(--color-text-subtle)]">
           {item.description}
         </span>
       </span>

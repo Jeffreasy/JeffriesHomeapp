@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 import { reportClientError } from "@/lib/observability/client-events";
 
 function isChunkLoadError(error: Error) {
@@ -25,8 +25,8 @@ export default function ErrorPage({
 
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-6 py-12 text-center">
-      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10">
-        <AlertTriangle size={22} className="text-rose-300" aria-hidden="true" />
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)]">
+        <AlertTriangle size={22} className="text-[var(--color-danger)]" aria-hidden="true" />
       </div>
       <h1 className="text-base font-semibold text-[var(--color-text)]">
         {chunkError ? "Nieuwe versie beschikbaar" : "Er ging iets mis"}
@@ -44,12 +44,9 @@ export default function ErrorPage({
           <RefreshCw size={14} aria-hidden="true" />
           {chunkError ? "App herladen" : "Opnieuw proberen"}
         </Button>
-        <Link
-          href="/"
-          className="inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-semibold text-amber-300 transition-colors hover:bg-amber-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-        >
+        <ButtonLink href="/" variant="ghost">
           Naar Dashboard
-        </Link>
+        </ButtonLink>
       </div>
     </div>
   );

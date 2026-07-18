@@ -10,8 +10,10 @@ import {
 } from "react";
 import { X } from "lucide-react";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-import { cn } from "@/lib/utils";
+import { IconButton } from "@/components/ui/IconButton";
 import { OverlaySurface, type OverlayPresentation } from "@/components/ui/OverlaySurface";
+import type { UiTone } from "@/lib/ui/tones";
+import { cn } from "@/lib/utils";
 
 const ModalCloseContext = createContext<(() => void) | null>(null);
 
@@ -19,28 +21,7 @@ export function useModalRequestClose() {
   return useContext(ModalCloseContext);
 }
 
-export function ModalCancelButton({
-  className,
-  children = "Annuleren",
-  onFallback,
-}: {
-  className?: string;
-  children?: ReactNode;
-  onFallback?: () => void;
-}) {
-  const requestClose = useContext(ModalCloseContext);
-  return (
-    <button
-      type="button"
-      onClick={requestClose ?? onFallback}
-      className={cn("inline-flex min-h-11 items-center justify-center", className)}
-    >
-      {children}
-    </button>
-  );
-}
-
-interface ModalProps {
+export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
@@ -53,7 +34,7 @@ interface ModalProps {
   contentClassName?: string;
   headerClassName?: string;
   footerClassName?: string;
-  theme?: "primary" | "sky" | "emerald" | "rose" | "violet" | "slate" | "amber" | "surface";
+  tone?: UiTone | "surface";
   presentation?: OverlayPresentation;
   dirty?: boolean;
   dirtyMessage?: string;
@@ -66,15 +47,14 @@ interface ModalProps {
   initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
-const themeClasses = {
-  primary: "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]",
-  sky: "border-sky-500/20 bg-sky-500/10",
-  emerald: "border-emerald-500/20 bg-emerald-500/10",
-  rose: "border-rose-500/20 bg-rose-500/10",
-  violet: "border-violet-500/20 bg-violet-500/10",
-  slate: "border-slate-500/20 bg-slate-500/10",
-  amber: "border-amber-500/20 bg-amber-500/10",
+const modalToneClasses: Record<UiTone | "surface", string> = {
   surface: "border-[var(--color-border)] bg-[var(--color-surface)]",
+  neutral: "border-[var(--color-border-strong)] bg-[var(--color-surface-elevated)]",
+  accent: "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)]",
+  info: "border-[var(--color-info-border)] bg-[var(--color-info-subtle)]",
+  success: "border-[var(--color-success-border)] bg-[var(--color-success-subtle)]",
+  warning: "border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)]",
+  danger: "border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)]",
 };
 
 export function Modal({
@@ -90,7 +70,7 @@ export function Modal({
   contentClassName,
   headerClassName,
   footerClassName,
-  theme = "primary",
+  tone = "surface",
   presentation = "responsive",
   dirty = false,
   dirtyMessage = "Niet-opgeslagen invoer gaat verloren.",
@@ -135,15 +115,15 @@ export function Modal({
       initialFocusRef={initialFocusRef}
       dataAppModal={dataAppModal}
       ariaBusy={ariaBusy}
-      className={cn("glass", themeClasses[theme], className)}
+      className={cn("shadow-[var(--shadow-overlay)]", modalToneClasses[tone], className)}
     >
       <ModalCloseContext.Provider value={requestClose}>
         <div className="flex min-h-0 flex-1 flex-col">
-          {presentation !== "dialog" && (
+          {presentation !== "dialog" ? (
             <div className="flex shrink-0 justify-center pb-1 pt-3 sm:hidden" aria-hidden="true">
-              <div className="h-1 w-10 rounded-full bg-white/20" />
+              <div className="h-1 w-10 rounded-full bg-[var(--color-border-strong)]" />
             </div>
-          )}
+          ) : null}
 
           <header
             className={cn(
@@ -152,34 +132,36 @@ export function Modal({
             )}
           >
             <div className="flex min-w-0 items-center gap-3">
-              {icon && <div className="shrink-0 text-white/80" aria-hidden="true">{icon}</div>}
+              {icon ? (
+                <div className="shrink-0 text-[var(--color-text-muted)]" aria-hidden="true">
+                  {icon}
+                </div>
+              ) : null}
               <div className="min-w-0">
-                <h2 id={titleId} className="truncate text-base font-bold tracking-tight text-white sm:text-lg">
+                <h2 id={titleId} className="truncate text-base font-bold tracking-tight text-[var(--color-text)] sm:text-lg">
                   {title}
                 </h2>
-                {subtitle && (
+                {subtitle ? (
                   <div id={subtitleId} className="mt-0.5 truncate text-xs text-[var(--color-text-muted)]">
                     {subtitle}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
-            <button
-              type="button"
+            <IconButton
+              icon={<X size={20} />}
+              label={closeLabel}
               onClick={requestClose}
               disabled={closeDisabled}
-              className="-mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white/55 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70 disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label={closeLabel}
-            >
-              <X size={20} aria-hidden="true" />
-            </button>
+              className="-mr-1"
+            />
           </header>
 
-          <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 custom-scrollbar sm:p-6", contentClassName)}>
+          <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6", contentClassName)}>
             {children}
           </div>
 
-          {footer && (
+          {footer ? (
             <footer
               className={cn(
                 "shrink-0 border-t border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:px-6 sm:pb-3",
@@ -188,7 +170,7 @@ export function Modal({
             >
               {footer}
             </footer>
-          )}
+          ) : null}
         </div>
       </ModalCloseContext.Provider>
     </OverlaySurface>

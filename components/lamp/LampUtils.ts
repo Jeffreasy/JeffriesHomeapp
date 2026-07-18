@@ -2,7 +2,6 @@ import type { Device, Room } from "@/lib/api";
 import { getLightingSummary } from "@/lib/lighting";
 
 export type FilterMode = "all" | "on" | "off" | "offline";
-export type Tone = "amber" | "blue" | "green" | "rose" | "slate";
 
 export type RoomGroup = {
   room: Room;

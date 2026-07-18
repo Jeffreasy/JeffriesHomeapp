@@ -9,6 +9,10 @@ import {
   ShoppingBag,
   Wallet,
 } from "lucide-react";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Surface } from "@/components/ui/Surface";
 import { InsightRow, SectionTitle } from "./FinanceCards";
 import { CategoryCard } from "./CategoryCard";
 import { getDeltaTone } from "./FinanceUtils";
@@ -130,13 +134,13 @@ export function FinanceInsights({
   return (
     <>
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="glass p-4">
+        <Surface padding="md">
           <SectionTitle
             icon={ShoppingBag}
             title="Uitgaven per categorie"
-            subtitle={`${stats.aantalCategorieen} categorieën - ${formatPrivateEuro(stats.totaalUit)} totaal`}
+            subtitle={stats.aantalCategorieen + " categorieën - " + formatPrivateEuro(stats.totaalUit) + " totaal"}
           />
-          <div className="category-grid mt-5">
+          <div className="mt-5 grid grid-cols-2 gap-2.5 lg:grid-cols-3">
             {stats.uitPerCategorie.map((cat) => (
               <CategoryCard
                 key={cat.categorie}
@@ -150,9 +154,9 @@ export function FinanceInsights({
               />
             ))}
           </div>
-        </div>
+        </Surface>
 
-        <div className="glass p-4">
+        <Surface padding="md">
           <SectionTitle icon={Receipt} title="Top uitgaven" subtitle="Per tegenpartij" />
           <div className="mt-4">
             {stats.topMerchants?.length ? (
@@ -160,39 +164,39 @@ export function FinanceInsights({
                 {stats.topMerchants.map((merchant, index) => {
                   const isActive = zoekterm === merchant.naam;
                   return (
-                  <button
+                  <Button
                     key={merchant.naam}
                     type="button"
+                    variant={isActive ? "primary" : "ghost"}
+                    fullWidth
                     onClick={() => setZoekterm(merchant.naam)}
                     aria-pressed={isActive}
-                    className={`grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${
-                      isActive
-                        ? "bg-amber-500/10 ring-1 ring-amber-500/30"
-                        : "hover:bg-[rgba(255,255,255,0.04)]"
-                    }`}
+                    className="grid h-auto min-h-11 grid-cols-[2rem_minmax(0,1fr)_auto] items-center justify-normal gap-3 px-2 py-2 text-left"
                   >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 text-xs font-bold text-amber-200">
+                    <Badge tone="accent" className="h-7 w-7 justify-center px-0">
                       {index + 1}
-                    </span>
+                    </Badge>
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-slate-200">{merchant.naam}</span>
-                      <span className="mt-0.5 block text-xs text-slate-500">{merchant.count} transacties</span>
+                      <span className="block truncate text-sm font-semibold text-[var(--color-text)]">{merchant.naam}</span>
+                      <span className="mt-0.5 block text-xs text-[var(--color-text-subtle)]">{merchant.count} transacties</span>
                     </span>
-                    <span className="text-sm font-bold text-slate-100">{formatPrivateEuroExact(merchant.bedrag)}</span>
-                  </button>
+                    <span className="text-sm font-bold tabular-nums text-[var(--color-text)]">{formatPrivateEuroExact(merchant.bedrag)}</span>
+                  </Button>
                   );
                 })}
               </div>
             ) : (
-              <div className="glass p-4 text-sm text-slate-500">
-                Geen topuitgaven in deze periode.
-              </div>
+              <FeedbackState
+                compact
+                title="Geen topuitgaven"
+                description="Er zijn geen topuitgaven in deze periode."
+              />
             )}
           </div>
-        </div>
+        </Surface>
       </section>
 
-      <section className="glass p-4">
+      <Surface padding="md">
         <SectionTitle
           icon={RefreshCw}
           title="Terugkerende uitgaven"
@@ -204,42 +208,41 @@ export function FinanceInsights({
               {recurring.map((item) => {
                 const isActive = zoekterm === item.naam;
                 return (
-                  <button
+                  <Button
                     key={item.naam}
                     type="button"
+                    variant={isActive ? "primary" : "ghost"}
+                    fullWidth
                     onClick={() => setZoekterm(item.naam)}
                     aria-pressed={isActive}
-                    className={`grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors ${
-                      isActive
-                        ? "bg-amber-500/10 ring-1 ring-amber-500/30"
-                        : "hover:bg-[rgba(255,255,255,0.04)]"
-                    }`}
+                    className="grid h-auto min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center justify-normal gap-3 px-2 py-2 text-left"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-slate-200">
+                      <span className="block truncate text-sm font-semibold text-[var(--color-text)]">
                         Terugkerend: {item.naam}
                       </span>
-                      <span className="mt-0.5 block text-xs text-slate-500">
+                      <span className="mt-0.5 block text-xs text-[var(--color-text-subtle)]">
                         {item.maanden} maanden · vrijwel gelijk bedrag
                       </span>
                     </span>
-                    <span className="text-sm font-bold text-slate-100">
+                    <span className="text-sm font-bold tabular-nums text-[var(--color-text)]">
                       ~{formatPrivateEuroExact(item.gemiddeld)}/maand
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
           ) : (
-            <div className="glass p-4 text-sm text-slate-500">
-              Geen terugkerende uitgaven herkend in de geladen transacties
-              (zelfde tegenpartij in minstens {RECURRING_MIN_MONTHS} maanden met een vrijwel gelijk bedrag).
-            </div>
+            <FeedbackState
+              compact
+              title="Geen terugkerende uitgaven herkend"
+              description={"Geen patroon gevonden met dezelfde tegenpartij in minstens " + RECURRING_MIN_MONTHS + " maanden en een vrijwel gelijk bedrag."}
+            />
           )}
         </div>
-      </section>
+      </Surface>
 
-      <section className="glass p-4">
+      <Surface padding="md">
         <SectionTitle icon={Wallet} title="Financiële signalen" subtitle="Korte checks op de geselecteerde periode" />
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <InsightRow
@@ -252,28 +255,28 @@ export function FinanceInsights({
                 : "Laatste maand"
             }
             value={latestCashflow ? `${formatPrivateSignedEuro(latestCashflow.netto)}` : "Geen data"}
-            tone={latestCashflow ? getDeltaTone(latestCashflow.netto) : "slate"}
+            tone={latestCashflow ? getDeltaTone(latestCashflow.netto) : "neutral"}
           />
           <InsightRow
             icon={ShoppingBag}
             label="Grootste categorie"
             value={topCategory ? `${topCategory.categorie} (${topCategory.percentage}%)` : "Geen data"}
-            tone="indigo"
+            tone="info"
           />
           <InsightRow
             icon={Receipt}
             label="Grootste tegenpartij"
             value={topMerchant ? `${topMerchant.naam} · ${formatPrivateEuroExact(topMerchant.bedrag)}` : "Geen data"}
-            tone="amber"
+            tone="accent"
           />
           <InsightRow
             icon={ShieldCheck}
             label="Interne boekingen"
             value={filters.excludeIntern === false ? "Zichtbaar" : "Verborgen"}
-            tone={filters.excludeIntern === false ? "sky" : "green"}
+            tone={filters.excludeIntern === false ? "info" : "success"}
           />
         </div>
-      </section>
+      </Surface>
     </>
   );
 }

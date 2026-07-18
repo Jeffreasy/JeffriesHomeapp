@@ -1,48 +1,60 @@
-export type CoreTone = "amber" | "green" | "rose" | "sky" | "indigo" | "slate";
+export type UiTone =
+  | "neutral"
+  | "accent"
+  | "info"
+  | "success"
+  | "warning"
+  | "danger";
 
-export type ToneClasses = {
+export interface ToneClasses {
   border: string;
   surface: string;
   icon: string;
   text: string;
-};
+  dot: string;
+}
 
-/** Canonical semantic tones for shared UI. Domain-specific meaning stays in domain code. */
-export const coreToneClasses: Record<CoreTone, ToneClasses> = {
-  amber: {
-    border: "border-amber-500/25",
-    surface: "bg-amber-500/10",
-    icon: "text-amber-300",
-    text: "text-amber-200",
-  },
-  green: {
-    border: "border-emerald-500/20",
-    surface: "bg-emerald-500/10",
-    icon: "text-emerald-300",
-    text: "text-emerald-200",
-  },
-  rose: {
-    border: "border-rose-500/20",
-    surface: "bg-rose-500/10",
-    icon: "text-rose-300",
-    text: "text-rose-200",
-  },
-  sky: {
-    border: "border-sky-500/20",
-    surface: "bg-sky-500/10",
-    icon: "text-sky-300",
-    text: "text-sky-200",
-  },
-  indigo: {
-    border: "border-indigo-500/20",
-    surface: "bg-indigo-500/10",
-    icon: "text-indigo-300",
-    text: "text-indigo-200",
-  },
-  slate: {
+export const uiToneClasses: Record<UiTone, ToneClasses> = {
+  neutral: {
     border: "border-[var(--color-border)]",
-    surface: "bg-[var(--color-surface)]",
+    surface: "bg-[var(--color-surface-muted)]",
     icon: "text-[var(--color-text-muted)]",
     text: "text-[var(--color-text)]",
+    dot: "bg-[var(--color-text-muted)]",
+  },
+  accent: {
+    border: "border-[var(--color-primary-border)]",
+    surface: "bg-[var(--color-primary-subtle)]",
+    icon: "text-[var(--color-primary-hover)]",
+    text: "text-[var(--color-primary-hover)]",
+    dot: "bg-[var(--color-primary)]",
+  },
+  info: {
+    border: "border-[var(--color-info-border)]",
+    surface: "bg-[var(--color-info-subtle)]",
+    icon: "text-[var(--color-info)]",
+    text: "text-[var(--color-info)]",
+    dot: "bg-[var(--color-info)]",
+  },
+  success: {
+    border: "border-[var(--color-success-border)]",
+    surface: "bg-[var(--color-success-subtle)]",
+    icon: "text-[var(--color-success)]",
+    text: "text-[var(--color-success)]",
+    dot: "bg-[var(--color-success)]",
+  },
+  warning: {
+    border: "border-[var(--color-warning-border)]",
+    surface: "bg-[var(--color-warning-subtle)]",
+    icon: "text-[var(--color-warning)]",
+    text: "text-[var(--color-warning)]",
+    dot: "bg-[var(--color-warning)]",
+  },
+  danger: {
+    border: "border-[var(--color-danger-border)]",
+    surface: "bg-[var(--color-danger-subtle)]",
+    icon: "text-[var(--color-danger)]",
+    text: "text-[var(--color-danger)]",
+    dot: "bg-[var(--color-danger)]",
   },
 };

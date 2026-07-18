@@ -19,9 +19,10 @@ import {
   YAxis,
 } from "recharts";
 import { SectionTitle } from "./FinanceCards";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import { ChartTooltip, PieTooltip } from "./ChartTooltips";
 import { formatMonth } from "./FinanceUtils";
-import { cn } from "@/lib/utils";
 import { getCatColor, ibanLabel } from "@/lib/finance-constants";
 import type { TransactionFilter, TransactionFullStats } from "@/hooks/useTransactions";
 
@@ -36,14 +37,19 @@ type MonthlyCashflowWithSalary =
 // "Overige categorieën"-slice zodat pie, legenda en center-totaal kloppen.
 const PIE_TOP_SLICES = 7;
 const PIE_REST_LABEL = "Overige categorieën";
-// Duidelijk anders dan de échte categorie "Overig" (#64748b) — de
+// Duidelijk anders dan de échte categorie "Overig" — de
 // geaggregeerde rest-slice mag niet met die categorie verward worden (C2).
-const PIE_REST_COLOR = "#cbd5e1";
+const PIE_REST_COLOR = "var(--color-text-muted)";
 
 // C3: uitgaven in oranje i.p.v. rood — rood/groen naast elkaar is voor
 // rood-groen-kleurenblinden niet te onderscheiden; oranje/groen wél.
-const INCOME_COLOR = "#22c55e";
-const EXPENSE_COLOR = "#f97316";
+const INCOME_COLOR = "var(--color-success)";
+const EXPENSE_COLOR = "var(--color-warning)";
+const SALARY_COLOR = "var(--color-info)";
+const ACCENT_COLOR = "var(--color-primary)";
+const GRID_COLOR = "var(--color-border)";
+const AXIS_COLOR = "var(--color-text-subtle)";
+const TEXT_COLOR = "var(--color-text)";
 
 // Onder de €2.000 zegt "€0k"/"€1k" niets — toon dan hele euro's.
 function yAxisEuro(value: number) {
@@ -109,34 +115,32 @@ export function FinanceCharts({
 
   return (
     <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="glass p-4">
+      <Surface padding="md">
         <SectionTitle
           icon={BarChart3}
           title={chartView === "saldo" ? "Saldo verloop" : "Inkomsten versus uitgaven"}
           subtitle={ibanFilter ? ibanLabel(ibanFilter) : "Alle rekeningen"}
           action={
-            <div className="flex glass p-1">
-              <button
+            <Surface tone="subtle" radius="sm" padding="xs" className="flex gap-1">
+              <Button
                 type="button"
+                variant={chartView === "saldo" ? "primary" : "ghost"}
+                size="sm"
                 onClick={() => setChartView("saldo")}
-                className={cn(
-                  "h-9 rounded-md px-3 text-sm font-semibold transition-colors",
-                  chartView === "saldo" ? "bg-amber-500/15 text-amber-200" : "text-slate-400 hover:text-slate-200"
-                )}
+                aria-pressed={chartView === "saldo"}
               >
                 Saldo
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant={chartView === "inuit" ? "primary" : "ghost"}
+                size="sm"
                 onClick={() => setChartView("inuit")}
-                className={cn(
-                  "h-9 rounded-md px-3 text-sm font-semibold transition-colors",
-                  chartView === "inuit" ? "bg-amber-500/15 text-amber-200" : "text-slate-400 hover:text-slate-200"
-                )}
+                aria-pressed={chartView === "inuit"}
               >
                 In/uit
-              </button>
-            </div>
+              </Button>
+            </Surface>
           }
         />
 
@@ -154,37 +158,37 @@ export function FinanceCharts({
               <AreaChart data={stats.saldoPerMaand} margin={{ top: 10, right: 14, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="financeSaldoGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.32} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                    <stop offset="5%" stopColor={ACCENT_COLOR} stopOpacity={0.32} />
+                    <stop offset="95%" stopColor={ACCENT_COLOR} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="maand" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatMonth} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
+                <XAxis dataKey="maand" tick={{ fill: AXIS_COLOR, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatMonth} />
                 <YAxis
-                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  tick={{ fill: AXIS_COLOR, fontSize: 11 }}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(value) => privacyOn ? "••••" : yAxisEuro(Number(value))}
                 />
-                <ReferenceLine y={0} stroke="rgba(255,255,255,0.14)" />
+                <ReferenceLine y={0} stroke="var(--color-border-strong)" />
                 <Tooltip content={<ChartTooltip valueFormatter={formatPrivateEuro} />} />
                 <Area
                   type="monotone"
                   dataKey="saldo"
                   name="Saldo"
-                  stroke="#f59e0b"
+                  stroke={ACCENT_COLOR}
                   strokeWidth={2.5}
                   fill="url(#financeSaldoGradient)"
                   dot={false}
-                  activeDot={{ r: 5, fill: "#f59e0b", strokeWidth: 0 }}
+                  activeDot={{ r: 5, fill: ACCENT_COLOR, strokeWidth: 0 }}
                 />
               </AreaChart>
             ) : (
               <BarChart data={inUitMetSalaris} margin={{ top: 10, right: 14, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="maand" tick={{ fill: "#64748b", fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatMonth} />
+                <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} />
+                <XAxis dataKey="maand" tick={{ fill: AXIS_COLOR, fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={formatMonth} />
                 <YAxis
-                  tick={{ fill: "#64748b", fontSize: 11 }}
+                  tick={{ fill: AXIS_COLOR, fontSize: 11 }}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(value) => privacyOn ? "••••" : yAxisEuro(Number(value))}
@@ -196,15 +200,15 @@ export function FinanceCharts({
                 <Bar dataKey="inkomsten" name="Inkomsten" fill={INCOME_COLOR} radius={[4, 4, 0, 0]} opacity={0.86} />
                 <Bar dataKey="uitgaven" name="Uitgaven" fill={EXPENSE_COLOR} radius={[4, 4, 0, 0]} opacity={0.86} />
                 {loonstrokenCount > 0 && (
-                  <Bar dataKey="salaris" name="Netto salaris" fill="#818cf8" radius={[4, 4, 0, 0]} opacity={0.76} />
+                  <Bar dataKey="salaris" name="Netto salaris" fill={SALARY_COLOR} radius={[4, 4, 0, 0]} opacity={0.76} />
                 )}
               </BarChart>
             )}
           </ResponsiveContainer>
         </div>
-      </div>
+      </Surface>
 
-      <div className="glass p-4">
+      <Surface padding="md">
         <SectionTitle
           icon={PieChartIcon}
           title="Verdeling"
@@ -243,10 +247,10 @@ export function FinanceCharts({
                   position="center"
                   content={() => (
                     <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central">
-                      <tspan x="50%" dy="-7" fill="#f8fafc" fontSize="0.92rem" fontWeight="700">
+                      <tspan x="50%" dy="-7" fill={TEXT_COLOR} fontSize="0.92rem" fontWeight="700">
                         {formatPrivateEuro(stats.totaalUit)}
                       </tspan>
-                      <tspan x="50%" dy="16" fill="#64748b" fontSize="0.62rem">
+                      <tspan x="50%" dy="16" fill={AXIS_COLOR} fontSize="0.62rem">
                         totaal uitgaven (periode)
                       </tspan>
                     </text>
@@ -265,30 +269,31 @@ export function FinanceCharts({
             entry.isRest ? (
               <div
                 key={entry.categorie}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left"
+                className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left"
               >
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PIE_REST_COLOR }} />
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-400">{entry.categorie}</span>
-                <span className="text-xs font-semibold text-slate-500">{entry.percentage}%</span>
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--color-text-muted)]" />
+                <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text-muted)]">{entry.categorie}</span>
+                <span className="text-xs font-semibold text-[var(--color-text-subtle)]">{entry.percentage}%</span>
               </div>
             ) : (
-              <button
+              <Button
                 key={entry.categorie}
                 type="button"
+                variant={filters.categorieFilter === entry.categorie ? "primary" : "ghost"}
+                size="sm"
+                fullWidth
                 onClick={() => toggleCategoryFilter(entry.categorie)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors",
-                  filters.categorieFilter === entry.categorie ? "bg-amber-500/10" : "hover:bg-[rgba(255,255,255,0.04)]"
-                )}
+                aria-pressed={filters.categorieFilter === entry.categorie}
+                className="justify-start px-3"
               >
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: getCatColor(entry.categorie) }} />
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-300">{entry.categorie}</span>
-                <span className="text-xs font-semibold text-slate-500">{entry.percentage}%</span>
-              </button>
+                <span className="min-w-0 flex-1 truncate text-left">{entry.categorie}</span>
+                <span className="text-xs font-semibold text-[var(--color-text-subtle)]">{entry.percentage}%</span>
+              </Button>
             )
           )}
         </div>
-      </div>
+      </Surface>
     </section>
   );
 }

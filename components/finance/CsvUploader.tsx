@@ -2,10 +2,15 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Upload, FileText, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Upload, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { Progress } from "@/components/ui/Progress";
+import { Surface, surfaceVariants } from "@/components/ui/Surface";
 import { parseRabobankCsv, type ParseResult } from "@/lib/rabobank-csv";
 import { importTransactionsBatch } from "@/lib/financeImport";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 type UploadState = "idle" | "parsing" | "preview" | "importing" | "done" | "stopped" | "error";
 
@@ -38,6 +43,7 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
   // Elke import-run krijgt een eigen id; een verouderde run mag de state van
   // een nieuwere flow (na reset of nieuwe upload) niet meer overschrijven.
   const runIdRef                    = useRef(0);
+  const fileInputRef                = useRef<HTMLInputElement>(null);
 
   const { user } = useUser();
   const userId = user?.id ?? "";
@@ -132,99 +138,143 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
   const progressPct = progress ? Math.round((progress.chunk / progress.total) * 100) : 0;
 
   return (
-    <div className="finance-uploader">
+    <div className="flex min-h-40 items-stretch">
       <AnimatePresence mode="wait">
         {/* ─── DROP ZONE ───────────────────────────────────────────────────── */}
         {(state === "idle" || state === "error") && (
           <motion.div
             key="dropzone"
             initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-            className={`dropzone ${isDragOver ? "dropzone--over" : ""}`}
+            className={cn(
+              surfaceVariants({
+                tone: state === "error" ? "danger" : isDragOver ? "accent" : "subtle",
+                radius: "lg",
+                padding: "lg",
+              }),
+              "flex min-h-44 flex-1 flex-col items-center justify-center gap-3 border-2 border-dashed text-center transition-colors",
+              isDragOver && "border-[var(--color-primary)]",
+            )}
             onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}
             onDrop={handleDrop}
           >
-            <Upload className="dropzone__icon" size={28} />
-            <p className="dropzone__title">Sleep je Rabobank CSV hier naartoe</p>
-            {/* L13: input vóór het label zodat peer-focus-visible werkt — een
-                toetsenbordgebruiker die naar de (verborgen) input tabt ziet nu
-                een zichtbare focusring op de "Kies bestand"-knop. */}
-            <input id="csv-input" type="file" accept=".csv" className="peer visually-hidden"
+            <Upload className="text-[var(--color-text-muted)]" size={28} aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-[var(--color-text)]">Sleep je Rabobank CSV hier naartoe</p>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">Alleen .csv-bestanden worden geaccepteerd</p>
+            </div>
+            <input
+              ref={fileInputRef}
+              id="csv-input"
+              type="file"
+              accept=".csv"
+              className="sr-only"
+              tabIndex={-1}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleFile(file);
                 // Reset zodat hetzelfde bestand opnieuw kiezen wél een change-event geeft.
                 e.target.value = "";
-              }} />
-            <label
-              className="btn btn--primary peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-amber-400"
-              htmlFor="csv-input"
-            >
+              }}
+            />
+            <Button type="button" variant="primary" onClick={() => fileInputRef.current?.click()}>
               Kies bestand
-            </label>
+            </Button>
             {state === "error" && errorMsg && (
-              <div className="dropzone__error"><AlertCircle size={15} /><span>{errorMsg}</span></div>
+              <p role="alert" className="flex items-start gap-2 text-sm font-medium text-[var(--color-danger)]">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <span>{errorMsg}</span>
+              </p>
             )}
           </motion.div>
         )}
 
         {/* ─── PARSING ─────────────────────────────────────────────────────── */}
         {state === "parsing" && (
-          <motion.div key="parsing" className="uploader-status" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <Loader2 className="spinner" size={24} /><p>CSV verwerken…</p>
+          <motion.div key="parsing" className="flex-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <FeedbackState
+              tone="loading"
+              compact
+              title="CSV verwerken"
+              description="Het bestand wordt gecontroleerd en voorbereid."
+              className="h-full"
+            />
           </motion.div>
         )}
 
         {/* ─── PREVIEW ─────────────────────────────────────────────────────── */}
         {state === "preview" && parseResult && (
-          <motion.div key="preview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="upload-preview">
-            <FileText className="upload-preview__icon" size={24} />
-            <h3 className="upload-preview__title">Klaar om te importeren</h3>
-            <div className="preview-stats">
-              <div className="preview-stat">
-                <span className="preview-stat__value">{parseResult.transactions.length.toLocaleString("nl")}</span>
-                <span className="preview-stat__label">transacties</span>
-              </div>
-              <div className="preview-stat">
-                <span className="preview-stat__value">{parseResult.vanDatum}</span>
-                <span className="preview-stat__label">van</span>
-              </div>
-              <div className="preview-stat">
-                <span className="preview-stat__value">{parseResult.totDatum}</span>
-                <span className="preview-stat__label">tot</span>
-              </div>
-              <div className="preview-stat preview-stat--warn">
-                <span className="preview-stat__value">{parseResult.aantalIntern.toLocaleString("nl")}</span>
-                <span className="preview-stat__label">intern</span>
+          <motion.div
+            key="preview"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={cn(surfaceVariants({ tone: "default", radius: "lg", padding: "md" }), "flex-1")}
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-info-subtle)]">
+                <FileText className="text-[var(--color-info)]" size={20} aria-hidden="true" />
+              </span>
+              <div>
+                <h3 className="font-semibold text-[var(--color-text)]">Klaar om te importeren</h3>
+                <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">Controleer de samenvatting voor je doorgaat.</p>
               </div>
             </div>
-            <div className="upload-preview__actions">
-              <button className="btn btn--primary" onClick={handleImport}>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Surface tone="subtle" radius="sm" padding="xs">
+                <span className="block text-lg font-bold tabular-nums text-[var(--color-text)]">{parseResult.transactions.length.toLocaleString("nl")}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">transacties</span>
+              </Surface>
+              <Surface tone="subtle" radius="sm" padding="xs">
+                <span className="block text-sm font-semibold tabular-nums text-[var(--color-text)]">{parseResult.vanDatum}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">van</span>
+              </Surface>
+              <Surface tone="subtle" radius="sm" padding="xs">
+                <span className="block text-sm font-semibold tabular-nums text-[var(--color-text)]">{parseResult.totDatum}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">tot</span>
+              </Surface>
+              <Surface tone="warning" radius="sm" padding="xs">
+                <span className="block text-lg font-bold tabular-nums text-[var(--color-warning)]">{parseResult.aantalIntern.toLocaleString("nl")}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">intern</span>
+              </Surface>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Button type="button" variant="primary" onClick={handleImport}>
                 Importeer {parseResult.transactions.length.toLocaleString("nl")} transacties
-              </button>
-              <button className="btn btn--ghost" onClick={reset}>Annuleren</button>
+              </Button>
+              <Button type="button" variant="ghost" onClick={reset}>Annuleren</Button>
             </div>
           </motion.div>
         )}
 
         {/* ─── IMPORTING ───────────────────────────────────────────────────── */}
         {state === "importing" && (
-          <motion.div key="importing" className="uploader-status uploader-status--progress" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <Loader2 className="spinner" size={22} />
-            <p>Opslaan in database… {progressPct}%</p>
-            <div className="progress-bar">
-              <div className="progress-bar__fill" style={{ width: `${progressPct}%` }} />
+          <motion.div
+            key="importing"
+            className={cn(surfaceVariants({ tone: "subtle", radius: "lg", padding: "md" }), "flex flex-1 flex-col justify-center")}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-[var(--color-text)]">Opslaan in database</p>
+                <p className="mt-1 text-xs text-[var(--color-text-muted)]">{progressPct}% verwerkt</p>
+              </div>
+              <span className="text-sm font-bold tabular-nums text-[var(--color-primary)]">{progressPct}%</span>
             </div>
+            <Progress value={progressPct} label="Voortgang CSV-import" className="mt-4" />
             {progress && (
-              <p className="progress-sub">
+              <p className="mt-2 text-xs text-[var(--color-text-subtle)]">
                 +{progress.toegevoegd} nieuw · {progress.overgeslagen} al bekend
               </p>
             )}
             {/* Alleen de abort-vlag zetten: de importlus rondt de lopende chunk
                 af en toont daarna de "gestopt"-state met het echte resultaat.
                 F6: de knop is daarna disabled + "Stoppen…" tot die chunk landt. */}
-            <button
-              className="btn btn--ghost btn--sm"
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-4 self-start"
               disabled={stopRequested}
               onClick={() => {
                 abortRef.current = true;
@@ -232,47 +282,58 @@ export function CsvUploader({ onImported }: CsvUploaderProps = {}) {
               }}
             >
               {stopRequested ? "Stoppen…" : "Stoppen"}
-            </button>
+            </Button>
           </motion.div>
         )}
 
         {/* ─── STOPPED ─────────────────────────────────────────────────────── */}
         {state === "stopped" && progress && (
-          <motion.div key="stopped" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="upload-done">
-            <AlertCircle className="upload-done__icon" size={28} style={{ color: "#fbbf24" }} />
-            <p className="upload-done__title">
-              Import gestopt — {progress.verwerkt.toLocaleString("nl")} van {progress.totaalTx.toLocaleString("nl")} geïmporteerd
+          <motion.div
+            key="stopped"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={cn(surfaceVariants({ tone: "warning", radius: "lg", padding: "md" }), "flex flex-1 flex-col items-center justify-center text-center")}
+          >
+            <AlertCircle className="text-[var(--color-warning)]" size={28} aria-hidden="true" />
+            <p className="mt-3 font-semibold text-[var(--color-text)]">Import gestopt</p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+              {progress.verwerkt.toLocaleString("nl")} van {progress.totaalTx.toLocaleString("nl")} transacties verwerkt
             </p>
-            <div className="preview-stats">
-              <div className="preview-stat preview-stat--success">
-                <span className="preview-stat__value">+{progress.toegevoegd.toLocaleString("nl")}</span>
-                <span className="preview-stat__label">nieuw</span>
-              </div>
-              <div className="preview-stat">
-                <span className="preview-stat__value">{progress.overgeslagen.toLocaleString("nl")}</span>
-                <span className="preview-stat__label">al bekend</span>
-              </div>
+            <div className="mt-4 grid w-full max-w-sm grid-cols-2 gap-2">
+              <Surface tone="success" radius="sm" padding="xs">
+                <span className="block text-lg font-bold tabular-nums text-[var(--color-success)]">+{progress.toegevoegd.toLocaleString("nl")}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">nieuw</span>
+              </Surface>
+              <Surface tone="subtle" radius="sm" padding="xs">
+                <span className="block text-lg font-bold tabular-nums text-[var(--color-text)]">{progress.overgeslagen.toLocaleString("nl")}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">al bekend</span>
+              </Surface>
             </div>
-            <button className="btn btn--ghost" onClick={reset}>Nog een CSV</button>
+            <Button type="button" variant="ghost" className="mt-4" onClick={reset}>Nog een CSV</Button>
           </motion.div>
         )}
 
         {/* ─── DONE ────────────────────────────────────────────────────────── */}
         {state === "done" && progress && (
-          <motion.div key="done" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="upload-done">
-            <CheckCircle className="upload-done__icon" size={28} />
-            <p className="upload-done__title">Import geslaagd!</p>
-            <div className="preview-stats">
-              <div className="preview-stat preview-stat--success">
-                <span className="preview-stat__value">+{progress.toegevoegd.toLocaleString("nl")}</span>
-                <span className="preview-stat__label">nieuw</span>
-              </div>
-              <div className="preview-stat">
-                <span className="preview-stat__value">{progress.overgeslagen.toLocaleString("nl")}</span>
-                <span className="preview-stat__label">al bekend</span>
-              </div>
+          <motion.div
+            key="done"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={cn(surfaceVariants({ tone: "success", radius: "lg", padding: "md" }), "flex flex-1 flex-col items-center justify-center text-center")}
+          >
+            <CheckCircle className="text-[var(--color-success)]" size={28} aria-hidden="true" />
+            <p className="mt-3 font-semibold text-[var(--color-text)]">Import geslaagd</p>
+            <div className="mt-4 grid w-full max-w-sm grid-cols-2 gap-2">
+              <Surface tone="success" radius="sm" padding="xs">
+                <span className="block text-lg font-bold tabular-nums text-[var(--color-success)]">+{progress.toegevoegd.toLocaleString("nl")}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">nieuw</span>
+              </Surface>
+              <Surface tone="subtle" radius="sm" padding="xs">
+                <span className="block text-lg font-bold tabular-nums text-[var(--color-text)]">{progress.overgeslagen.toLocaleString("nl")}</span>
+                <span className="text-xs text-[var(--color-text-muted)]">al bekend</span>
+              </Surface>
             </div>
-            <button className="btn btn--ghost" onClick={reset}>Nog een CSV</button>
+            <Button type="button" variant="ghost" className="mt-4" onClick={reset}>Nog een CSV</Button>
           </motion.div>
         )}
       </AnimatePresence>

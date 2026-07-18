@@ -1,7 +1,9 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Surface } from "@/components/ui/Surface";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
 import type { Device } from "@/lib/api";
@@ -10,7 +12,6 @@ import { LampCard } from "@/components/lamp/LampCard";
 import {
   EmptyState,
   ErrorState,
-  Panel,
   SectionHeader,
 } from "@/components/dashboard/DashboardPrimitives";
 
@@ -55,7 +56,7 @@ export function DashboardLampPanel({
         className={className}
         data-testid="dashboard-lamp-panel"
       >
-        <Panel className="overflow-hidden">
+        <Surface className="overflow-hidden">
           <SectionHeader
             icon="lights"
             label="Direct bedienen"
@@ -74,11 +75,7 @@ export function DashboardLampPanel({
           {loading && devices.length === 0 ? (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {Array.from({ length: HOME_LAMP_LIMIT }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-[72px] animate-pulse rounded-2xl border border-[var(--color-border)] bg-white/[0.03]"
-                  aria-hidden="true"
-                />
+                <Skeleton key={index} className="h-[72px] rounded-2xl" />
               ))}
             </div>
           ) : failed && devices.length === 0 ? (
@@ -108,17 +105,20 @@ export function DashboardLampPanel({
               </ul>
 
               {remainingDevices > 0 && (
-                <Link
+                <ButtonLink
                   href="/lampen"
-                  className="mt-3 flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] bg-white/[0.025] px-3 text-xs font-semibold text-slate-300 transition-colors hover:bg-[var(--color-surface-hover)]"
+                  variant="secondary"
+                  size="sm"
+                  fullWidth
+                  className="mt-3"
                 >
                   Bedien nog {remainingDevices} {remainingDevices === 1 ? "lamp" : "lampen"}
                   <ArrowRight size={14} aria-hidden="true" />
-                </Link>
+                </ButtonLink>
               )}
             </>
           )}
-        </Panel>
+        </Surface>
       </section>
 
       {selectedDevice && (

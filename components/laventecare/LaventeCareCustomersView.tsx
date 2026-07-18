@@ -1,7 +1,10 @@
 "use client";
 
+import { IconButton } from "@/components/ui/IconButton";
+import { Button } from "@/components/ui/Button";
+import { SearchField } from "@/components/ui/SearchField";
 import { useMemo, useState } from "react";
-import { Building2, CalendarClock, FileText, FolderOpen, Mail, Pencil, Phone, Plus, Search, UserRound, Workflow } from "lucide-react";
+import { Building2, CalendarClock, FileText, FolderOpen, Mail, Pencil, Phone, Plus, UserRound, Workflow } from "lucide-react";
 import type { CompanyItem, ContactItem, DossierDocumentItem, LeadItem, ProjectItem, WorkstreamItem } from "./LaventeCareTypes";
 import { formatDate, isDossierDocumentForCompany, label } from "./LaventeCareUtils";
 
@@ -49,22 +52,22 @@ export function LaventeCareCustomersView({
 
   if (companies.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-5">
+      <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white">Nog geen klantenbasis</p>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+            <p className="text-sm font-bold text-[var(--color-text)]">Nog geen klantenbasis</p>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--color-text-muted)]">
               Maak je eerste klant aan of vul een klantnaam bij een lead/opdracht in. Het systeem hergebruikt die daarna voor dossiers, PDFs, notities en agenda-context.
             </p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={onShowCompanyForm}
-            className="btn btn--primary w-full justify-center sm:w-auto"
+            variant="primary" fullWidth className="sm:w-auto"
           >
             <Plus size={16} />
             Klant toevoegen
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -78,19 +81,16 @@ export function LaventeCareCustomersView({
         <Metric label="Actief" value={activeCompanyIds.size} sub="met open werk" />
       </div>
 
-      <div className="relative">
-        <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Zoek klant op naam of sector..."
-          aria-label="Zoek klant"
-          className="w-full rounded-lg border border-white/10 bg-white/[0.03] py-2 pl-9 pr-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-amber-400/50"
-        />
-      </div>
+      <SearchField
+        label="Zoek klant"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onClear={() => setQuery("")}
+        placeholder="Zoek klant op naam of sector..."
+      />
 
       {filteredCompanies.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-4 text-sm text-slate-500">
+        <p className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4 text-sm text-[var(--color-text-muted)]">
           Geen klanten gevonden voor &ldquo;{query}&rdquo;.
         </p>
       ) : null}
@@ -110,46 +110,43 @@ export function LaventeCareCustomersView({
           ].filter(Boolean);
 
           return (
-            <article key={id} className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] p-4">
+            <article key={id} className="min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
               <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <Building2 size={16} className="shrink-0 text-amber-300" />
-                    <h3 className="truncate text-base font-bold text-white">{company.naam}</h3>
+                    <Building2 size={16} className="shrink-0 text-[var(--color-primary-hover)]" />
+                    <h3 className="truncate text-base font-bold text-[var(--color-text)]">{company.naam}</h3>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">
                     {label(company.relatie_type)} - {label(company.status)}
                     {company.sector ? ` - ${company.sector}` : ""}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
-                  <button
-                    type="button"
-                    onClick={() => onEditCompany(company)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
-                    aria-label={`${company.naam} bewerken`}
+                  <IconButton
+                    label={`${company.naam} bewerken`}
                     title="Klant bewerken"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onOpenDossier(company)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300 transition hover:bg-amber-500/20"
-                    aria-label={`${company.naam} dossier openen`}
+                    onClick={() => onEditCompany(company)}
+                    icon={<Pencil size={15} />}
+                    variant="ghost"
+                    className="border-[var(--color-border)] bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+                  />
+                  <IconButton
+                    label={`${company.naam} dossier openen`}
                     title="Klantdossier"
-                  >
-                    <FolderOpen size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onStartWorkstream(company)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-violet-500/20 bg-violet-500/10 text-violet-300 transition hover:bg-violet-500/20"
-                    aria-label={`Nieuwe opdracht voor ${company.naam}`}
+                    onClick={() => onOpenDossier(company)}
+                    icon={<FolderOpen size={15} />}
+                    variant="ghost"
+                    className="border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)] hover:bg-[var(--color-primary-border)]"
+                  />
+                  <IconButton
+                    label={`Nieuwe opdracht voor ${company.naam}`}
                     title="Nieuwe opdracht"
-                  >
-                    <Workflow size={15} />
-                  </button>
+                    onClick={() => onStartWorkstream(company)}
+                    icon={<Workflow size={15} />}
+                    variant="ghost"
+                    className="border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)] hover:bg-[var(--color-info-border)]"
+                  />
                 </div>
               </div>
 
@@ -159,49 +156,43 @@ export function LaventeCareCustomersView({
                 <MiniStat label="Actie" value={company.volgendeActie ? formatDate(company.volgendeActie) : "Geen datum"} />
               </div>
 
-              <button
-                type="button"
-                onClick={() => onOpenDossier(company)}
-                className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20"
-              >
-                <FolderOpen size={15} />
+              <Button type="button" variant="primary" fullWidth onClick={() => onOpenDossier(company)} className="mt-3">
+                <FolderOpen size={15} aria-hidden="true" />
                 Open klantdossier
-              </button>
+              </Button>
 
-              <div className="mt-4 rounded-lg border border-white/10 bg-black/10 p-3">
+              <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-active)] p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Contacten</p>
-                  <button
-                    type="button"
-                    onClick={() => onAddContact(company)}
-                    className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-sky-500/20 bg-sky-500/10 px-2 text-xs font-semibold text-sky-300 transition hover:bg-sky-500/20"
-                  >
-                    <Plus size={13} />
+                  <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Contacten</p>
+                  <Button type="button" size="sm" variant="secondary" onClick={() => onAddContact(company)}>
+                    <Plus size={13} aria-hidden="true" />
                     Contact
-                  </button>
+                  </Button>
                 </div>
 
                 {companyContacts.length > 0 ? (
                   <div className="mt-3 space-y-2">
                     {companyContacts.map((contact) => (
-                      <button
+                      <Button
                         key={contact._id ?? contact.id}
                         type="button"
+                        variant="secondary"
+                        fullWidth
                         onClick={() => onEditContact(contact)}
-                        className="flex w-full items-start gap-2 rounded-lg border border-white/5 bg-white/[0.02] p-2 text-left transition hover:border-sky-500/20 hover:bg-sky-500/10"
+                        className="h-auto items-start justify-start p-3 text-left"
                       >
-                        <UserRound size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                        <UserRound size={15} className="mt-0.5 shrink-0 text-[var(--color-text-muted)]" />
                         <span className="min-w-0 flex-1">
-                          <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-200">
+                          <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-[var(--color-text)]">
                             <span className="truncate">{contact.naam}</span>
                             {contact.is_primary ? (
-                              <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-1.5 py-0.5 text-[10px] uppercase tracking-normal text-sky-300">
+                              <span className="rounded-full border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] px-1.5 py-0.5 text-micro uppercase tracking-normal text-[var(--color-info)]">
                                 primair
                               </span>
                             ) : null}
                           </span>
-                          {contact.rol ? <span className="mt-0.5 block truncate text-xs text-slate-500">{contact.rol}</span> : null}
-                          <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                          {contact.rol ? <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">{contact.rol}</span> : null}
+                          <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--color-text-muted)]">
                             {contact.email ? (
                               <span className="inline-flex items-center gap-1">
                                 <Mail size={12} />
@@ -216,11 +207,11 @@ export function LaventeCareCustomersView({
                             ) : null}
                           </span>
                         </span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-3 text-xs text-slate-500">Nog geen contactpersoon gekoppeld.</p>
+                  <p className="mt-3 text-xs text-[var(--color-text-muted)]">Nog geen contactpersoon gekoppeld.</p>
                 )}
 
                 {company.website ? (
@@ -228,7 +219,7 @@ export function LaventeCareCustomersView({
                     href={toExternalHref(company.website)}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-2 block truncate text-xs font-semibold text-sky-300 hover:text-sky-200"
+                    className="mt-2 block truncate text-xs font-semibold text-[var(--color-info)] hover:text-[var(--color-info)]"
                   >
                     {company.website}
                   </a>
@@ -236,7 +227,7 @@ export function LaventeCareCustomersView({
               </div>
 
               {company.notities ? (
-                <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{company.notities}</p>
+                <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--color-text-muted)]">{company.notities}</p>
               ) : null}
             </article>
           );
@@ -255,22 +246,22 @@ function toExternalHref(url: string) {
 
 function Metric({ label, value, sub }: { label: string; value: number; sub: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-      <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-white">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{sub}</p>
+    <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-3">
+      <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-[var(--color-text)]">{value}</p>
+      <p className="mt-1 text-xs text-[var(--color-text-muted)]">{sub}</p>
     </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-      <p className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-normal text-slate-500">
+    <div className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2">
+      <p className="flex items-center gap-1 text-micro font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">
         {label === "Actie" ? <CalendarClock size={11} /> : label === "Dossier" ? <FileText size={11} /> : null}
         {label}
       </p>
-      <p className="mt-1 truncate text-xs font-semibold text-slate-200">{value}</p>
+      <p className="mt-1 truncate text-xs font-semibold text-[var(--color-text)]">{value}</p>
     </div>
   );
 }

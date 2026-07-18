@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, useId, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Archive,
@@ -22,7 +21,6 @@ import {
   Quote,
   RefreshCw,
   RotateCcw,
-  Search,
   Sparkles,
   Tag,
   Trash2,
@@ -34,11 +32,18 @@ import type { NoteCreateData, NoteRecord, NoteRevisionRecord } from "@/hooks/use
 import { formatDateRange, getTimeLabel, type PersonalEvent } from "@/hooks/usePersonalEvents";
 import { NoteConflictError } from "@/lib/noteConflict";
 import { AppIcon } from "@/components/ui/AppIcon";
-import { useOverlayLifecycle } from "@/hooks/useOverlayLifecycle";
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { Input } from "@/components/ui/Input";
+import {
+  SearchablePicker,
+  type SearchablePickerOptionProps,
+} from "@/components/ui/SearchablePicker";
+import { Textarea } from "@/components/ui/Textarea";
+import { OverlaySurface } from "@/components/ui/OverlaySurface";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { SymbolPicker } from "@/components/ui/SymbolPicker";
 import { BusinessContextPicker } from "@/components/laventecare/BusinessContextPicker";
-import { getOverlayPortalRoot } from "@/lib/overlays/overlay-manager";
 import { useLaventeCareBusinessContextOptions } from "@/hooks/useLaventeCareBusinessContexts";
 import {
   isGenericLaventeCareBusinessContext,
@@ -46,6 +51,7 @@ import {
   resolveLaventeCareBusinessContextFromText,
 } from "@/lib/laventecare/business-context";
 import { NOTE_SYMBOL_OPTIONS, resolveAppIconName, type AppIconName } from "@/lib/symbols";
+import { cn } from "@/lib/utils";
 import {
   businessContextFromEvent,
   businessContextFromWorkspaceContext,
@@ -66,16 +72,18 @@ import {
   type NoteTemplate,
 } from "@/components/notes/NoteEditorTemplates";
 
-const NOTE_EDITOR_LAYER_CLASSES = [
-  "z-[100]",
-  "z-[102]",
-  "z-[104]",
-  "z-[106]",
-  "z-[108]",
-  "z-[110]",
-  "z-[112]",
-  "z-[114]",
-] as const;
+function normalizeNoteColor(value: unknown) {
+  if (typeof value !== "string") return "";
+  const normalized = value.trim().toLowerCase();
+  return KLEUREN.find((color) => color.toLowerCase() === normalized) ?? "";
+}
+
+function noteEditorBackground(value: string) {
+  const paletteColor = normalizeNoteColor(value);
+  return paletteColor
+    ? `linear-gradient(145deg, color-mix(in srgb, ${paletteColor} 7%, transparent) 0%, var(--color-surface) 48%)`
+    : "var(--color-surface)";
+}
 
 type LinkSearchItem = {
   id?: string;
@@ -149,7 +157,7 @@ function readDraft(key: string): NoteDraft | null {
       savedAt: parsed.savedAt,
       tags: Array.isArray(parsed.tags) ? parsed.tags.filter((t): t is string => typeof t === "string") : undefined,
       deadline: typeof parsed.deadline === "string" ? parsed.deadline : undefined,
-      kleur: typeof parsed.kleur === "string" ? parsed.kleur : undefined,
+      kleur: parsed.kleur === undefined ? undefined : normalizeNoteColor(parsed.kleur),
       ...(hasParsedContext ? { businessContext: parsedContext } : {}),
     };
   } catch {
@@ -224,24 +232,10 @@ export function NoteEditor({
   const titleId = useId();
   const textRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
   // Tags the user explicitly removed (lower-cased) — auto-context-merge must not
   // re-add them, otherwise removing a context tag is impossible.
   const removedTagsRef = useRef<Set<string>>(new Set());
   const { openConfirm } = useConfirm();
-  const { isTopMost, layerIndex, overlayId } = useOverlayLifecycle(
-    true,
-    modalRef,
-    {
-      initialFocusRef: textRef,
-      priority: "standard",
-    },
-  );
-  const overlayLayerClass =
-    NOTE_EDITOR_LAYER_CLASSES[
-      Math.min(Math.max(layerIndex, 0), NOTE_EDITOR_LAYER_CLASSES.length - 1)
-    ];
 
   const [saving, setSaving] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingEditorAction>(null);
@@ -254,7 +248,7 @@ export function NoteEditor({
   const [titel, setTitel] = useState(note?.titel ?? initialTitle ?? "");
   const [inhoud, setInhoud] = useState(note?.inhoud ?? "");
   const [tags, setTags] = useState<string[]>(() => normalizeTags(note?.tags ?? initialTags ?? []));
-  const [kleur, setKleur] = useState(note?.kleur ?? "");
+  const [kleur, setKleur] = useState(() => normalizeNoteColor(note?.kleur));
   const [tagInput, setTagInput] = useState("");
   const [deadline, setDeadline] = useState(note?.deadline ?? initialDeadline ?? "");
   const [linkedEventId, setLinkedEventId] = useState(note?.linkedEventId ?? note?.linked_event_id ?? initialLinkedEventId ?? "");
@@ -545,7 +539,7 @@ export function NoteEditor({
   // the "modal jumps around" effect.
   useEffect(() => {
     const vv = window.visualViewport;
-    const overlay = overlayRef.current;
+    const overlay = document.querySelector<HTMLElement>('[data-overlay-layer][data-app-modal="note-editor"]');
     if (!vv || !overlay) return;
 
     const sync = () => {
@@ -702,7 +696,7 @@ export function NoteEditor({
         // which silently appended body-hashtag tags the user never saw and made
         // the stored record diverge from the baseline/dirty-state.
         tags: tags.length > 0 ? tags : isEditing ? [] : undefined,
-        kleur: kleur || (isEditing ? "" : undefined),
+        kleur: normalizeNoteColor(kleur) || (isEditing ? "" : undefined),
         deadline: normalizeDeadlineForSave(deadline) || (isEditing ? "" : undefined),
         linkedEventId: cleanLinkedEventId || (isEditing ? "" : undefined),
         prioriteit,
@@ -855,7 +849,7 @@ export function NoteEditor({
     // drafts zonder deze velden herstellen zoals voorheen.
     if (pendingDraft.tags) setTags(normalizeTags(pendingDraft.tags));
     if (pendingDraft.deadline !== undefined) setDeadline(pendingDraft.deadline);
-    if (pendingDraft.kleur !== undefined) setKleur(pendingDraft.kleur);
+    if (pendingDraft.kleur !== undefined) setKleur(normalizeNoteColor(pendingDraft.kleur));
     if (pendingDraft.businessContext !== undefined) {
       setBusinessContext(normalizeBusinessContext(pendingDraft.businessContext));
       setBusinessContextTouched(true);
@@ -997,8 +991,14 @@ export function NoteEditor({
   // Escape stays local so editor popups can close before the editor itself.
   const keydownRef = useRef<(event: KeyboardEvent) => void>(() => {});
   keydownRef.current = (event: KeyboardEvent) => {
-    // Nested overlays own keyboard input; editor shortcuts only run while topmost.
-    if (!isTopMost || confirmOpenRef.current) return;
+    // OverlaySurface marks every non-topmost layer aria-hidden. Keep editor
+    // shortcuts local without creating a second overlay registration.
+    const editorLayer = document.querySelector<HTMLElement>(
+      '[data-overlay-layer][data-app-modal="note-editor"]',
+    );
+    if (!editorLayer || editorLayer.getAttribute("aria-hidden") === "true" || confirmOpenRef.current) {
+      return;
+    }
 
     if (event.key === "Escape") {
       event.preventDefault();
@@ -1100,55 +1100,31 @@ export function NoteEditor({
   };
 
   const editorModal = (
-    <motion.div
-      ref={overlayRef}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      data-app-modal="note-editor"
-      data-overlay-layer={overlayId}
-      aria-hidden={isTopMost ? undefined : true}
-      inert={isTopMost ? undefined : true}
-      className={`fixed inset-0 flex items-end justify-center sm:items-center sm:p-4 ${overlayLayerClass} ${
-        isTopMost ? "" : "pointer-events-none"
-      }`}
+    <OverlaySurface
+      open
+      onClose={() => void handleCloseAttempt()}
+      ariaLabelledBy={titleId}
+      presentation="responsive"
+      maxWidth="5xl"
+      initialFocusRef={textRef}
+      closeOnEscape={false}
+      dataAppModal="note-editor"
+      containerClassName="items-end justify-center p-0 sm:items-center sm:p-4"
+      className="h-full max-h-full rounded-none border-0 shadow-[var(--shadow-overlay)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:border"
+      style={{ background: noteEditorBackground(kleur) }}
     >
-      <div
-        className="absolute inset-0 cursor-pointer bg-black/65 backdrop-blur-sm"
-        onClick={isTopMost ? () => void handleCloseAttempt() : undefined}
-      />
-
-      <motion.div
-        ref={modalRef}
-        tabIndex={-1}
-        initial={{ opacity: 0, y: 48, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 48, scale: 0.98 }}
-        transition={{ type: "spring", damping: 28, stiffness: 300 }}
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        data-app-modal="note-editor"
-        className="relative flex h-full max-h-full w-full flex-col overflow-hidden rounded-none border-0 border-[var(--color-border)] shadow-2xl shadow-black/40 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-5xl sm:rounded-2xl sm:border"
-        style={{
-          background: kleur
-            ? `linear-gradient(145deg, ${kleur}12 0%, var(--color-surface) 48%)`
-            : "var(--color-surface)",
-        }}
-      >
         {!keyboardOpen && (
           <div className="flex justify-center pb-0 pt-[max(0.5rem,env(safe-area-inset-top))] sm:hidden">
-            <div className="h-1 w-10 rounded-full bg-white/20" />
+            <div className="h-1 w-10 rounded-full bg-[var(--color-border-strong)]" />
           </div>
         )}
 
         <header className={`flex shrink-0 items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 sm:px-6 ${keyboardOpen ? "py-2" : "py-3"}`}>
           <div className="flex min-w-0 items-center gap-3">
-            <AppIcon name={symbol} tone="amber" size="md" framed active />
+            <AppIcon name={symbol} tone="accent" size="md" framed active />
             <div className="min-w-0">
               {!keyboardOpen && (
-                <p className="text-[11px] font-semibold uppercase text-[var(--color-text-subtle)]">
+                <p className="text-micro font-semibold uppercase text-[var(--color-text-subtle)]">
                   {note ? "Notitie bewerken" : "Nieuwe notitie"}
                 </p>
               )}
@@ -1157,10 +1133,10 @@ export function NoteEditor({
               </h2>
               {primaryContext && !keyboardOpen && (
                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
-                    <AppIcon name={primaryContext.noteSymbol} tone="cyan" size="xs" />
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] px-2 py-0.5 text-micro font-semibold text-[var(--color-info)]">
+                    <AppIcon name={primaryContext.noteSymbol} tone="info" size="xs" />
                     <span className="truncate">{primaryContext.label}</span>
-                    <span className="text-cyan-300/70">#{primaryContext.tag}</span>
+                    <span className="text-[var(--color-info)]">#{primaryContext.tag}</span>
                   </span>
                 </div>
               )}
@@ -1171,37 +1147,29 @@ export function NoteEditor({
             <span
               className={`hidden rounded-full border px-2.5 py-1 text-xs font-medium sm:inline-flex ${
                 isDirty
-                  ? "border-amber-500/25 bg-amber-500/10 text-amber-300"
-                  : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                  ? "border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)]"
+                  : "border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)]"
               }`}
             >
               {isDirty ? "Onopgeslagen" : "Opgeslagen"}
             </span>
             {note && onTogglePin && (
-              <button
-                type="button"
+              <IconButton
+                label={isPinned ? "Ontpinnen" : "Pinnen"}
+                icon={<Pin size={18} className={isPinned ? "fill-current" : ""} />}
+                variant={isPinned ? "primary" : "ghost"}
                 onClick={() => void handlePinClick()}
                 disabled={actionBusy}
-                className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl p-2 transition-colors ${
-                  isPinned
-                    ? "text-amber-300 hover:bg-amber-500/10"
-                    : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
-                } disabled:cursor-not-allowed disabled:opacity-45`}
-                title={isPinned ? "Ontpinnen" : "Pinnen"}
-                aria-label={isPinned ? "Ontpinnen" : "Pinnen"}
+                className="rounded-xl"
                 aria-pressed={isPinned}
-              >
-                <Pin size={18} className={isPinned ? "fill-amber-300" : ""} />
-              </button>
+              />
             )}
-            <button
-              type="button"
+            <IconButton
+              label="Sluiten"
+              icon={<X size={19} />}
               onClick={() => void handleCloseAttempt()}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl p-2 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
-              aria-label="Sluiten"
-            >
-              <X size={19} />
-            </button>
+              className="rounded-xl"
+            />
           </div>
         </header>
 
@@ -1209,38 +1177,38 @@ export function NoteEditor({
           <div className="grid min-h-full gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
             <section className="min-w-0 space-y-3">
               {pendingDraft && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2">
-                  <p className="min-w-0 flex-1 text-xs font-medium text-amber-200">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2">
+                  <p className="min-w-0 flex-1 text-xs font-medium text-[var(--color-warning)]">
                     Onopgeslagen concept gevonden ({formatDutchDateTime(new Date(pendingDraft.savedAt).toISOString())})
                   </p>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    <button
-                      type="button"
+                    <Button
+                      size="sm"
+                      variant="warning"
                       onClick={restoreDraft}
-                      className="inline-flex h-8 items-center rounded-lg border border-amber-500/30 bg-amber-500/15 px-2.5 text-xs font-bold text-amber-200 transition-colors hover:bg-amber-500/25"
                     >
                       Herstellen
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
                       onClick={discardDraft}
-                      className="inline-flex h-8 items-center rounded-lg border border-[var(--color-border)] px-2.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
                     >
                       Verwijderen
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
-              <input
+              <Input
                 type="text"
                 placeholder="Titel"
                 aria-label="Titel"
                 value={titel}
                 onChange={(event) => setTitel(event.target.value)}
-                className="min-h-[48px] w-full rounded-xl border border-transparent bg-transparent px-1 text-xl font-bold text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border)] focus:bg-black/10 focus:px-3 sm:text-2xl"
+                className="min-h-[48px] w-full rounded-xl border border-transparent bg-transparent px-1 text-xl font-bold text-[var(--color-text)] outline-none transition-colors placeholder:text-[var(--color-text-subtle)] focus:border-[var(--color-border)] focus:bg-[var(--color-surface-muted)] focus:px-3 sm:text-2xl"
               />
 
-              <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-black/10">
+              <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-muted)]">
                 <div className="flex flex-wrap items-center gap-1 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]/70 px-2 py-2">
                   <ToolbarButton icon={ListChecks} label="Checklist" onClick={insertChecklist} />
                   <ToolbarButton icon={List} label="Opsomming" onClick={insertBulletList} />
@@ -1250,7 +1218,7 @@ export function NoteEditor({
                   <ToolbarButton icon={Link2} label="Wiki-link" onClick={insertWikiLink} />
                   <ToolbarButton icon={Clock} label="Tijdstempel" onClick={insertTimestamp} />
                   <ToolbarButton icon={Sparkles} label="Templates" onClick={() => setShowTemplates((value) => !value)} active={showTemplates} />
-                  <div className="ml-auto flex min-h-[40px] items-center gap-2 px-2 text-[11px] text-[var(--color-text-subtle)]">
+                  <div className="ml-auto flex min-h-[40px] items-center gap-2 px-2 text-micro text-[var(--color-text-subtle)]">
                     <Clock size={12} />
                     <span>{wordCount}w</span>
                     <span>{charCount}c</span>
@@ -1268,7 +1236,7 @@ export function NoteEditor({
                       <div className="max-h-[min(56dvh,560px)] overflow-y-auto p-3">
                         <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                           <div>
-                            <p className="text-xs font-semibold uppercase text-amber-300">
+                            <p className="text-xs font-semibold uppercase text-[var(--color-primary)]">
                               Templatebibliotheek
                             </p>
                             <p className="mt-1 text-xs text-[var(--color-text-muted)]">
@@ -1282,22 +1250,24 @@ export function NoteEditor({
                           {NOTE_TEMPLATE_GROUPS.map((group) => (
                             <section key={group.category} className="space-y-2">
                               <div className="flex items-center justify-between gap-3">
-                                <p className="text-[11px] font-semibold uppercase text-[var(--color-text-subtle)]">
+                                <p className="text-micro font-semibold uppercase text-[var(--color-text-subtle)]">
                                   {group.category}
                                 </p>
                                 <span className="h-px flex-1 bg-[var(--color-border)]" />
                               </div>
                               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                                 {group.templates.map((template) => (
-                                  <button
+                                  <Button
                                     key={template.id}
-                                    type="button"
+                                    size="sm"
+                                    variant="secondary"
+                                    fullWidth
                                     onClick={() => applyTemplate(template)}
                                     aria-label={`${template.label} template invoegen`}
-                                    className="flex min-h-[112px] min-w-0 flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-left transition-colors hover:border-amber-500/35 hover:bg-amber-500/10 focus:outline-none focus:ring-2 focus:ring-amber-500/35"
+                                    className="min-h-28 min-w-0 flex-col items-stretch justify-start gap-3 p-3 text-left"
                                   >
                                     <span className="flex min-w-0 items-center gap-3">
-                                      <AppIcon name={template.icon} tone="amber" size="sm" framed active />
+                                      <AppIcon name={template.icon} tone="accent" size="sm" framed active />
                                       <span className="min-w-0 truncate text-sm font-semibold text-[var(--color-text)]">
                                         {template.label}
                                       </span>
@@ -1307,20 +1277,20 @@ export function NoteEditor({
                                     </span>
                                     <span className="mt-auto flex min-w-0 flex-wrap gap-1.5">
                                       {template.priority && (
-                                        <span className="rounded-full border border-red-500/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-red-200">
+                                        <span className="rounded-full border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-2 py-0.5 text-micro font-semibold uppercase text-[var(--color-danger)]">
                                           {template.priority}
                                         </span>
                                       )}
                                       {template.tags?.slice(0, 2).map((tag) => (
                                         <span
                                           key={tag}
-                                          className="max-w-full truncate rounded-full border border-[var(--color-border)] px-2 py-0.5 text-[10px] text-[var(--color-text-muted)]"
+                                          className="max-w-full truncate rounded-full border border-[var(--color-border)] px-2 py-0.5 text-micro text-[var(--color-text-muted)]"
                                         >
                                           #{tag}
                                         </span>
                                       ))}
                                     </span>
-                                  </button>
+                                  </Button>
                                 ))}
                               </div>
                             </section>
@@ -1332,7 +1302,7 @@ export function NoteEditor({
                 </AnimatePresence>
 
                 <div className="relative">
-                  <textarea
+                  <Textarea
                     ref={textRef}
                     placeholder="Schrijf je notitie…"
                     aria-label="Notitie-inhoud"
@@ -1357,8 +1327,7 @@ export function NoteEditor({
                         }
                       }
                     }}
-                    className="block w-full resize-none bg-transparent px-4 py-4 text-base leading-relaxed text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] sm:text-sm"
-                    style={{ minHeight: 280 }}
+                    className="min-h-72 resize-none rounded-none border-0 bg-transparent px-4 py-4 text-base shadow-none hover:border-transparent focus:border-transparent focus:ring-0 sm:text-sm"
                   />
 
                   <AnimatePresence>
@@ -1367,21 +1336,22 @@ export function NoteEditor({
                         initial={{ opacity: 0, y: -4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        className="absolute left-3 right-3 top-3 z-20 max-h-[220px] overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] shadow-lg shadow-black/30"
+                        className="absolute left-3 right-3 top-3 z-20 max-h-[220px] overflow-y-auto rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)] shadow-[var(--shadow-overlay)]"
                       >
                         {linkResults.map((result) => (
-                          <button
+                          <Button
                             key={result.id}
-                            type="button"
+                            variant="ghost"
+                            fullWidth
                             onClick={(event) => {
                               event.stopPropagation();
                               insertLink(result.titel);
                             }}
-                            className="flex min-h-[44px] w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-[var(--color-text)] transition-colors hover:bg-[var(--color-surface-hover)]"
+                            className="justify-start rounded-none border-0 px-3 py-2.5 text-left shadow-none"
                           >
-                            <Link2 size={14} className="shrink-0 text-amber-400/70" />
+                            <Link2 size={14} className="shrink-0 text-[var(--color-primary)]" />
                             <span className="truncate">{result.titel}</span>
-                          </button>
+                          </Button>
                         ))}
                       </motion.div>
                     )}
@@ -1411,22 +1381,19 @@ export function NoteEditor({
                     <PanelSection title="Planning">
                       <div className="grid grid-cols-[1rem_minmax(0,1fr)_auto] items-center gap-2">
                         <Clock size={15} className="text-[var(--color-text-subtle)]" />
-                        <input
+                        <Input
                           type="datetime-local"
                           aria-label="Deadline"
                           value={formatDeadlineForInput(deadline)}
                           onChange={(event) => setDeadline(event.target.value ? localDateTimeToIso(event.target.value) : "")}
-                          className="min-h-[44px] min-w-0 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-base text-[var(--color-text)] outline-none [color-scheme:dark] sm:text-sm"
+                          density="compact"
+                          className="min-w-0 [color-scheme:dark]"
                         />
-                        <button
-                          type="button"
+                        <IconButton
+                          icon={<X size={15} />}
+                          label="Deadline verwijderen"
                           onClick={() => setDeadline("")}
-                          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
-                          aria-label="Deadline verwijderen"
-                          title="Deadline verwijderen"
-                        >
-                          <X size={15} />
-                        </button>
+                        />
                       </div>
                       <div className="grid grid-cols-4 gap-1.5">
                         <QuickButton label="Vandaag" onClick={() => setQuickDeadline(0, 17)} />
@@ -1439,19 +1406,26 @@ export function NoteEditor({
                     <PanelSection title="Prioriteit">
                       <div className="grid grid-cols-3 gap-1.5">
                         {PRIORITEITEN.map((item) => (
-                          <button
+                          <Button
                             key={item.value}
-                            type="button"
+                            size="sm"
+                            variant={prioriteit === item.value ? "secondary" : "ghost"}
                             onClick={() => setPrioriteit(item.value)}
-                            className={`flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-semibold transition-colors ${
+                            className={`min-w-0 gap-1.5 px-2 ${
                               prioriteit === item.value
-                                ? "border-white/15 bg-white/10 text-[var(--color-text)]"
-                                : "border-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+                                ? "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary)]"
+                                : ""
                             }`}
                           >
-                            <span className={`h-2 w-2 shrink-0 rounded-full ${item.dot}`} />
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${
+                              item.value === "hoog"
+                                ? "bg-[var(--color-danger)]"
+                                : item.value === "laag"
+                                  ? "bg-[var(--color-info)]"
+                                  : "bg-[var(--color-text-subtle)]"
+                            }`} />
                             <span className="truncate">{item.label}</span>
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </PanelSection>
@@ -1502,7 +1476,7 @@ export function NoteEditor({
                           setSymbolTouched(true);
                           setSymbol(value);
                         }}
-                        tone="amber"
+                        tone="accent"
                         fallback="note"
                         className="border-0 bg-transparent p-0"
                         gridClassName="grid-cols-2"
@@ -1511,33 +1485,31 @@ export function NoteEditor({
 
                     <PanelSection title="Kleur">
                       <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
+                        <IconButton
+                          label="Geen kleur"
+                          icon={!kleur ? <X size={14} /> : <span />}
+                          variant={!kleur ? "secondary" : "ghost"}
                           onClick={() => setKleur("")}
-                          className={`flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${
+                          className={`rounded-xl ${
                             !kleur
-                              ? "border-white/30 bg-[var(--color-surface-hover)]"
-                              : "border-[var(--color-border)] bg-[var(--color-surface)] hover:border-white/20"
+                              ? "border-[var(--color-border-strong)] bg-[var(--color-surface-hover)]"
+                              : "border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-strong)]"
                           }`}
-                          aria-label="Geen kleur"
-                          title="Geen kleur"
-                        >
-                          {!kleur && <X size={14} className="text-[var(--color-text-muted)]" />}
-                        </button>
+                          aria-pressed={!kleur}
+                        />
                         {KLEUREN.map((item) => (
-                          <button
+                          <IconButton
                             key={item}
-                            type="button"
+                            label={`Kleur ${item}`}
+                            icon={kleur === item ? <Check size={15} className="text-[var(--color-text)] drop-shadow" /> : <span />}
+                            variant="ghost"
                             onClick={() => setKleur(item)}
-                            className={`flex h-11 w-11 items-center justify-center rounded-xl border-2 transition-all ${
-                              kleur === item ? "scale-105 border-white/60" : "border-transparent hover:scale-105"
+                            className={`rounded-xl border-2 ${
+                              kleur === item ? "scale-105 border-[var(--color-border-strong)]" : "border-transparent hover:scale-105"
                             }`}
                             style={{ background: item }}
-                            aria-label={`Kleur ${item}`}
-                            title={`Kleur ${item}`}
-                          >
-                            {kleur === item && <Check size={15} className="text-white drop-shadow" />}
-                          </button>
+                            aria-pressed={kleur === item}
+                          />
                         ))}
                       </div>
                     </PanelSection>
@@ -1545,10 +1517,11 @@ export function NoteEditor({
                     <PanelSection title="Tags">
                       <div className="flex flex-wrap gap-1.5">
                         {tags.map((tag) => (
-                          <button
+                          <Button
                             key={tag}
-                            type="button"
-                            className="inline-flex min-h-[38px] min-w-0 items-center gap-1 rounded-lg border border-amber-500/15 bg-amber-500/10 px-2.5 py-1.5 text-xs font-semibold text-amber-300/85 transition-colors hover:border-red-500/25 hover:bg-red-500/15 hover:text-red-300"
+                            size="sm"
+                            variant="danger"
+                            className="min-w-0 gap-1 rounded-lg px-2.5"
                             onClick={() => removeTag(tag)}
                             aria-label={`Tag ${tag} verwijderen`}
                             title={`Tag ${tag} verwijderen`}
@@ -1556,13 +1529,13 @@ export function NoteEditor({
                             <Tag size={11} />
                             <span className="max-w-[9rem] truncate">{tag}</span>
                             <X size={11} />
-                          </button>
+                          </Button>
                         ))}
                       </div>
                       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                         <div className="grid min-h-[44px] grid-cols-[1rem_minmax(0,1fr)] items-center gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3">
                           <Hash size={14} className="text-[var(--color-text-subtle)]" />
-                          <input
+                          <Input
                             type="text"
                             placeholder="Nieuwe tag"
                             aria-label="Nieuwe tag"
@@ -1574,16 +1547,16 @@ export function NoteEditor({
                                 addTag();
                               }
                             }}
-                            className="min-w-0 bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] sm:text-sm"
+                            className="min-h-[var(--touch-target)] min-w-0 rounded-none border-0 bg-transparent px-0 text-base shadow-none hover:border-transparent focus:border-transparent focus:ring-0 sm:text-sm"
                           />
                         </div>
-                        <button
-                          type="button"
+                        <Button
+                          size="sm"
+                          variant="secondary"
                           onClick={addTag}
-                          className="min-h-[44px] rounded-xl border border-[var(--color-border)] px-3 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
                         >
                           Toevoegen
-                        </button>
+                        </Button>
                       </div>
                     </PanelSection>
                   </motion.div>
@@ -1600,16 +1573,12 @@ export function NoteEditor({
                     <PanelSection
                       title="Geschiedenis"
                       action={note && onLoadRevisions ? (
-                        <button
-                          type="button"
+                        <IconButton
+                          icon={<RefreshCw size={14} className={revisionLoading ? "animate-spin motion-reduce:animate-none" : ""} />}
+                          label="Geschiedenis vernieuwen"
                           onClick={() => void reloadRevisions()}
                           disabled={revisionLoading}
-                          className="flex min-h-[34px] min-w-[34px] items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:opacity-45"
-                          aria-label="Geschiedenis vernieuwen"
-                          title="Geschiedenis vernieuwen"
-                        >
-                          <RefreshCw size={13} className={revisionLoading ? "animate-spin" : ""} />
-                        </button>
+                        />
                       ) : null}
                     >
                       {!note ? (
@@ -1625,7 +1594,7 @@ export function NoteEditor({
                           Versies laden...
                         </p>
                       ) : revisionError ? (
-                        <p className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                        <p className="rounded-xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-3 py-2 text-sm text-[var(--color-danger)]">
                           {revisionError}
                         </p>
                       ) : revisions.length === 0 ? (
@@ -1650,19 +1619,20 @@ export function NoteEditor({
                                       {formatDutchDateTime(revision.aangemaakt)}
                                     </p>
                                   </div>
-                                  <button
-                                    type="button"
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
                                     onClick={() => void handleRestoreRevision(revision)}
                                     disabled={!onRestoreRevision || actionBusy}
-                                    className="flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-lg border border-[var(--color-border)] px-2.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:opacity-50"
+                                    className="shrink-0 px-2.5"
                                   >
                                     <RotateCcw size={13} />
                                     {restoringId === revision.id ? "…" : "Herstel"}
-                                  </button>
+                                  </Button>
                                 </div>
                                 {/* M-K: volledige inhoud inzien vóór herstellen */}
                                 {expanded ? (
-                                  <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--color-border)] bg-black/15 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                                  <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2.5 py-2 font-mono text-micro leading-relaxed text-[var(--color-text-muted)]">
                                     {revision.inhoud || "Geen inhoud"}
                                   </pre>
                                 ) : (
@@ -1670,20 +1640,21 @@ export function NoteEditor({
                                     {revision.inhoud || "Geen inhoud"}
                                   </p>
                                 )}
-                                <button
-                                  type="button"
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
                                   onClick={() =>
                                     setExpandedRevisionId(expanded ? null : revision.id)
                                   }
                                   aria-expanded={expanded}
-                                  className="mt-1.5 flex min-h-[34px] items-center gap-1 rounded-lg px-1.5 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+                                  className="mt-1.5 gap-1 px-1.5"
                                 >
                                   <ChevronDown
                                     size={13}
                                     className={`transition-transform ${expanded ? "rotate-180" : ""}`}
                                   />
                                   {expanded ? "Inhoud verbergen" : "Volledige inhoud bekijken"}
-                                </button>
+                                </Button>
                               </div>
                             );
                           })}
@@ -1708,14 +1679,16 @@ export function NoteEditor({
           {/* H2 (R3): 409 recovery — load newest (draft stays in the restore
               banner) or overwrite with the refreshed token. No more dead-end. */}
           {conflict.open && (
-            <div role="alert" className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200">
+            <div role="alert" className="mb-3 rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2.5 text-sm text-[var(--color-warning)]">
               <p className="font-semibold">Deze notitie is elders gewijzigd.</p>
-              <p className="mt-0.5 text-xs text-amber-200/80">
+              <p className="mt-0.5 text-xs text-[var(--color-warning)]">
                 Er is een nieuwere versie op de server. Kies hoe je verder wilt.
               </p>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
+                <Button
+                  size="sm"
+                  variant="warning"
+                  fullWidth
                   onClick={() => {
                     const fresh = conflict.freshNote;
                     if (fresh) {
@@ -1728,28 +1701,30 @@ export function NoteEditor({
                     setConflict({ open: false, freshNote: null });
                   }}
                   disabled={!conflict.freshNote}
-                  className="min-h-[40px] flex-1 rounded-lg border border-amber-500/30 bg-amber-500/15 px-3 text-xs font-semibold text-amber-100 transition-colors hover:bg-amber-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="flex-1"
                 >
                   Nieuwste versie laden (jouw concept blijft in de banner)
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  fullWidth
                   onClick={() => void handleSave(true)}
                   disabled={saving}
-                  className="min-h-[40px] flex-1 rounded-lg border border-red-500/25 bg-red-500/10 px-3 text-xs font-semibold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="flex-1"
                 >
                   Toch overschrijven
-                </button>
+                </Button>
               </div>
             </div>
           )}
           {saveError && (
-            <p role="alert" className="mb-3 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+            <p role="alert" className="mb-3 rounded-xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-3 py-2 text-sm text-[var(--color-danger)]">
               {saveError}
             </p>
           )}
           {note && onToggleComplete && isDirty && !keyboardOpen && (
-            <p className="mb-3 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 sm:hidden">
+            <p className="mb-3 rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2 text-xs font-medium text-[var(--color-warning)] sm:hidden">
               Sla je wijzigingen eerst op om deze notitie af te ronden.
             </p>
           )}
@@ -1757,36 +1732,39 @@ export function NoteEditor({
             {!keyboardOpen && (
             <div className={`grid gap-2 sm:flex sm:w-auto ${note ? "grid-cols-3" : "grid-cols-2"}`}>
               {isDirty && (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => void handleResetChanges()}
                   disabled={actionBusy}
-                  className={`flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-3 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-45 sm:col-auto ${
+                  className={`min-w-0 sm:col-auto ${
                     note ? "col-span-3" : "col-span-2"
                   }`}
                 >
                   <RotateCcw size={16} />
                   <span className="truncate">Terugzetten</span>
-                </button>
+                </Button>
               )}
               {note && onDelete && (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
+                  variant="danger"
                   onClick={() => void handleDeleteClick()}
                   disabled={actionBusy}
-                  className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-red-500/20 px-3 text-sm font-semibold text-red-400 transition-colors hover:border-red-500/35 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="min-w-0"
                 >
                   <Trash2 size={16} />
                   <span className="truncate sm:hidden">{pendingAction === "delete" ? "…" : "Wissen"}</span>
                   <span className="hidden truncate sm:inline">{pendingAction === "delete" ? "Bezig…" : "Verwijderen"}</span>
-                </button>
+                </Button>
               )}
               {note && onArchive && (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => void handleArchiveClick()}
                   disabled={actionBusy}
-                  className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-[var(--color-border)] px-3 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:cursor-not-allowed disabled:opacity-45"
+                  className="min-w-0"
                 >
                   <Archive size={16} />
                   <span className="truncate sm:hidden">
@@ -1795,15 +1773,16 @@ export function NoteEditor({
                   <span className="hidden truncate sm:inline">
                     {pendingAction === "archive" ? "Bezig…" : note.isArchived ? "Dearchiveren" : "Archiveren"}
                   </span>
-                </button>
+                </Button>
               )}
               {note && onToggleComplete && (
-                <button
-                  type="button"
+                <Button
+                  size="sm"
+                  variant="success"
                   onClick={() => void handleCompleteClick()}
                   disabled={actionBusy || isDirty}
                   title={isDirty ? "Sla wijzigingen eerst op" : isCompleted ? "Heropenen" : "Afronden"}
-                  className="flex min-h-[44px] min-w-0 items-center justify-center gap-2 rounded-xl border border-emerald-500/20 px-3 text-sm font-semibold text-emerald-300 transition-colors hover:border-emerald-500/35 hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="min-w-0"
                 >
                   <CheckCircle2 size={16} />
                   <span className="truncate sm:hidden">
@@ -1812,38 +1791,41 @@ export function NoteEditor({
                   <span className="hidden truncate sm:inline">
                     {pendingAction === "complete" ? "Bezig…" : isCompleted ? "Heropenen" : "Afronden"}
                   </span>
-                </button>
+                </Button>
               )}
             </div>
             )}
 
             <div className="grid grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={() => void handleCloseAttempt()}
                 disabled={actionBusy}
-                className="min-h-[44px] min-w-0 rounded-xl border border-[var(--color-border)] px-4 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)] disabled:opacity-50 sm:min-w-[112px]"
+                className="min-w-0 sm:min-w-[112px]"
               >
                 Annuleren
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => void handleSave()}
                 disabled={!canSave || actionBusy}
-                className="min-h-[44px] min-w-0 rounded-xl bg-amber-500 px-4 text-sm font-bold text-[var(--color-primary-foreground)] transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-35 sm:min-w-[120px]"
+                loading={saving}
+                loadingLabel="Opslaan…"
+                className="min-w-0 sm:min-w-[120px]"
               >
-                {saving ? "Opslaan…" : note ? canSave ? "Opslaan" : "Opgeslagen" : "Aanmaken"}
-              </button>
+                {note ? canSave ? "Opslaan" : "Opgeslagen" : "Aanmaken"}
+              </Button>
             </div>
           </div>
         </footer>
-      </motion.div>
-    </motion.div>
+    </OverlaySurface>
   );
 
-  return typeof document === "undefined" ? editorModal : createPortal(editorModal, getOverlayPortalRoot());
+  return editorModal;
 }
 
+
+const NO_LINKED_EVENT_OPTION = "__no-linked-event__";
 
 function EventLinkPicker({
   groups,
@@ -1860,30 +1842,7 @@ function EventLinkPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const rootRef = useRef<HTMLDivElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handlePointerDown = (event: MouseEvent) => {
-      const root = rootRef.current;
-      if (root && event.target instanceof Node && !root.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const timer = window.setTimeout(() => {
-      rootRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }, 40);
-    return () => window.clearTimeout(timer);
-  }, [open]);
 
   const filteredGroups = useMemo(() => {
     const defaultLimit = 6;
@@ -1898,11 +1857,22 @@ function EventLinkPicker({
         return {
           ...group,
           events: matches.slice(0, normalizedQuery ? searchLimit : groupLimit),
-          hiddenCount: Math.max(0, matches.length - (normalizedQuery ? searchLimit : groupLimit)),
+          hiddenCount: Math.max(
+            0,
+            matches.length - (normalizedQuery ? searchLimit : groupLimit),
+          ),
         };
       })
       .filter((group) => group.events.length > 0);
   }, [groups, normalizedQuery]);
+
+  const optionKeys = useMemo(
+    () => [
+      NO_LINKED_EVENT_OPTION,
+      ...filteredGroups.flatMap((group) => group.events.map((event) => event.eventId)),
+    ],
+    [filteredGroups],
+  );
 
   const selectedLabel = selectedEvent
     ? `${formatDateRange(selectedEvent)} · ${getTimeLabel(selectedEvent)}`
@@ -1916,108 +1886,81 @@ function EventLinkPicker({
     setOpen(false);
   };
 
-  const selectEvent = (eventId: string) => {
-    onChange(eventId);
-    setQuery("");
-    setOpen(false);
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) setQuery("");
+  };
+
+  const handleSelectOption = (optionKey: string) => {
+    onChange(optionKey === NO_LINKED_EVENT_OPTION ? "" : optionKey);
   };
 
   return (
-    <div ref={rootRef} className="space-y-2">
+    <div className="space-y-2">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          aria-haspopup="listbox"
-          className="flex min-h-[54px] min-w-0 items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-left transition-colors hover:border-cyan-500/25 hover:bg-cyan-500/[0.04]"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cyan-500/20 bg-cyan-500/10 text-cyan-200">
-            <CalendarDays size={16} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-[var(--color-text)]">
-              {selectedEvent?.titel ?? "Geen afspraak gekoppeld"}
-            </span>
-            <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
-              {selectedLabel}
-            </span>
-          </span>
-          <ChevronDown
-            size={16}
-            className={`shrink-0 text-[var(--color-text-subtle)] transition-transform ${open ? "rotate-180" : ""}`}
-          />
-        </button>
-
-        {selectedEventId && (
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="flex min-h-[54px] min-w-[46px] items-center justify-center rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-muted)] transition-colors hover:bg-red-500/10 hover:text-red-300"
-            aria-label="Afspraak ontkoppelen"
-            title="Afspraak ontkoppelen"
-          >
-            <X size={16} />
-          </button>
-        )}
-      </div>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            className="overflow-hidden rounded-xl border border-cyan-500/15 bg-[var(--color-surface)] shadow-xl shadow-black/25"
-          >
-            <div className="border-b border-[var(--color-border)] p-2">
-              <div className="flex min-h-[42px] items-center gap-2 rounded-lg border border-[var(--color-border)] bg-black/15 px-3">
-                <Search size={14} className="shrink-0 text-[var(--color-text-subtle)]" />
-                <input
-                  type="search"
-                  aria-label="Zoek een afspraak om te koppelen"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      // stopPropagation so the editor's window keydown handler
-                      // doesn't also fire (which would stack the dirty-confirm on
-                      // top of just closing this picker) — item R3-10.
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setOpen(false);
-                    }
-                  }}
-                  placeholder="Zoek op titel, datum of kalender…"
-                  className="min-w-0 flex-1 bg-transparent text-base text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-subtle)] sm:text-sm"
-                  autoFocus
-                />
-                {query && (
-                  <button
-                    type="button"
-                    onClick={() => setQuery("")}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
-                    aria-label="Zoekterm wissen"
-                  >
-                    <X size={13} />
-                  </button>
+        <SearchablePicker
+          open={open}
+          onOpenChange={handleOpenChange}
+          title="Afspraak koppelen"
+          ariaLabel="Kies een afspraak om aan deze notitie te koppelen"
+          closeLabel="Afspraken sluiten"
+          query={query}
+          onQueryChange={setQuery}
+          searchLabel="Afspraak zoeken"
+          searchPlaceholder="Zoek op titel, datum of kalender…"
+          listboxLabel="Beschikbare afspraken"
+          optionKeys={optionKeys}
+          selectedOptionKey={selectedEventId || NO_LINKED_EVENT_OPTION}
+          onSelectOption={handleSelectOption}
+          rootClassName="min-w-0"
+          className="w-[32rem]"
+          listboxClassName="max-h-[min(48dvh,360px)]"
+          trigger={(triggerProps) => (
+            <Button
+              {...triggerProps}
+              variant="secondary"
+              fullWidth
+              className="min-h-[54px] min-w-0 justify-start gap-3 px-3 py-2 text-left"
+              aria-label={`Afspraak koppelen: ${selectedEvent?.titel ?? "geen afspraak"}`}
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)]">
+                <CalendarDays size={16} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-[var(--color-text)]">
+                  {selectedEvent?.titel ?? "Geen afspraak gekoppeld"}
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
+                  {selectedLabel}
+                </span>
+              </span>
+              <ChevronDown
+                size={16}
+                aria-hidden="true"
+                className={cn(
+                  "shrink-0 text-[var(--color-text-subtle)] transition-transform",
+                  open && "rotate-180",
                 )}
-              </div>
-            </div>
-
-            <div className="max-h-[min(48dvh,360px)] overflow-y-auto p-2" role="listbox">
-              <button
-                type="button"
-                onClick={clearSelection}
-                className={`mb-2 flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold transition-colors ${
-                  !selectedEventId
-                    ? "bg-amber-500/15 text-amber-200"
-                    : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
-                }`}
+              />
+            </Button>
+          )}
+          renderOptions={({ activeOptionKey, getOptionProps }) => (
+            <>
+              <Button
+                {...getOptionProps(NO_LINKED_EVENT_OPTION)}
+                variant={!selectedEventId ? "secondary" : "ghost"}
+                fullWidth
+                className={cn(
+                  "mb-2 justify-start rounded-lg px-3 text-left",
+                  !selectedEventId &&
+                    "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]",
+                  activeOptionKey === NO_LINKED_EVENT_OPTION &&
+                    "ring-2 ring-[var(--color-primary)] ring-offset-1 ring-offset-[var(--color-surface)]",
+                )}
               >
-                <X size={14} />
+                <X size={14} aria-hidden="true" />
                 Geen afspraak koppelen
-              </button>
+              </Button>
 
               {filteredGroups.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-[var(--color-border)] px-3 py-5 text-center text-sm text-[var(--color-text-muted)]">
@@ -2028,22 +1971,23 @@ function EventLinkPicker({
                   {filteredGroups.map((group) => (
                     <div key={group.id} className="space-y-1.5">
                       <div className="flex items-center justify-between gap-2 px-1">
-                        <p className="text-[11px] font-bold uppercase text-[var(--color-text-subtle)]">
+                        <p className="text-micro font-bold uppercase text-[var(--color-text-subtle)]">
                           {group.label}
                         </p>
-                        {group.hiddenCount > 0 && (
-                          <span className="text-[10px] text-[var(--color-text-subtle)]">
+                        {group.hiddenCount > 0 ? (
+                          <span className="text-micro text-[var(--color-text-subtle)]">
                             +{group.hiddenCount} meer
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <div className="space-y-1">
                         {group.events.map((event) => (
                           <EventOptionButton
                             key={event.eventId}
                             event={event}
-                            active={selectedEventId === event.eventId}
-                            onSelect={() => selectEvent(event.eventId)}
+                            selected={selectedEventId === event.eventId}
+                            active={activeOptionKey === event.eventId}
+                            optionProps={getOptionProps(event.eventId)}
                           />
                         ))}
                       </div>
@@ -2051,63 +1995,78 @@ function EventLinkPicker({
                   ))}
                 </div>
               )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </>
+          )}
+        />
 
-      {selectedEventId && !linkedEventExists && (
-        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.07] px-3 py-2">
-          <p className="text-xs font-semibold text-amber-200">Koppeling niet meer beschikbaar</p>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
-            Deze notitie verwijst naar een afspraak of dienst die niet meer in de agenda staat. Bij opslaan wordt de koppeling opgeschoond.
-          </p>
-          <button
-            type="button"
-            onClick={clearSelection}
-            className="mt-2 inline-flex h-8 items-center justify-center rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-500/15"
-          >
+        {selectedEventId ? (
+          <Button size="sm" variant="secondary" onClick={clearSelection} className="self-center">
             Nu ontkoppelen
-          </button>
+          </Button>
+        ) : null}
+      </div>
+
+      {selectedEventId && !linkedEventExists ? (
+        <div className="rounded-xl border border-[var(--color-warning-border)] bg-[var(--color-warning-subtle)] px-3 py-2">
+          <p className="text-xs font-semibold text-[var(--color-warning)]">
+            Koppeling niet meer beschikbaar
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--color-text-muted)]">
+            Deze notitie verwijst naar een afspraak of dienst die niet meer in de agenda staat.
+            Bij opslaan wordt de koppeling opgeschoond.
+          </p>
+          <Button size="sm" variant="secondary" onClick={clearSelection} className="mt-2">
+            Nu ontkoppelen
+          </Button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
 function EventOptionButton({
   event,
+  selected,
   active,
-  onSelect,
+  optionProps,
 }: {
   event: PersonalEvent;
+  selected: boolean;
   active: boolean;
-  onSelect: () => void;
+  optionProps: SearchablePickerOptionProps;
 }) {
   return (
-    <button
-      type="button"
-      role="option"
-      aria-selected={active}
-      onClick={onSelect}
-      className={`flex min-h-[54px] w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
-        active
-          ? "border-cyan-500/30 bg-cyan-500/12 text-cyan-100"
-          : "border-transparent text-[var(--color-text)] hover:border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
-      }`}
+    <Button
+      {...optionProps}
+      variant={selected ? "secondary" : "ghost"}
+      fullWidth
+      className={cn(
+        "min-h-[54px] justify-start gap-3 rounded-lg px-3 py-2 text-left",
+        selected
+          ? "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary-hover)]"
+          : "border-transparent text-[var(--color-text)] hover:border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]",
+        active &&
+          "ring-2 ring-[var(--color-primary)] ring-offset-1 ring-offset-[var(--color-surface)]",
+      )}
     >
-      <AppIcon name={resolveAppIconName(event.symbol, "agenda")} tone={active ? "cyan" : "slate"} size="sm" framed />
+      <AppIcon
+        name={resolveAppIconName(event.symbol, "agenda")}
+        tone={selected ? "accent" : "neutral"}
+        size="sm"
+        framed
+      />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold">{event.titel}</span>
         <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
           {formatDateRange(event)} · {getTimeLabel(event)} · {event.kalender}
         </span>
       </span>
-      {active && <Check size={15} className="shrink-0 text-cyan-200" />}
-    </button>
+      {selected ? (
+        <Check size={15} className="shrink-0 text-[var(--color-primary-hover)]" aria-hidden="true" />
+      ) : null}
+    </Button>
   );
 }
-
 function eventMatchesQuery(event: PersonalEvent, query: string) {
   return normalizeEventSearchText(formatEventOption(event)).includes(query);
 }
@@ -2128,20 +2087,14 @@ function ToolbarButton({
   active?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <IconButton
+      icon={<Icon size={16} />}
+      label={label}
       onClick={onClick}
-      className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg p-2 transition-colors ${
-        active
-          ? "bg-amber-500/15 text-amber-300"
-          : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
-      }`}
-      title={label}
-      aria-label={label}
+      variant={active ? "secondary" : "ghost"}
       aria-pressed={active}
-    >
-      <Icon size={16} />
-    </button>
+      className={active ? "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] text-[var(--color-primary)]" : undefined}
+    />
   );
 }
 
@@ -2157,21 +2110,21 @@ function PanelButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      variant={active ? "secondary" : "ghost"}
       onClick={onClick}
-      className={`flex min-h-[42px] min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition-colors ${
-        active
-          ? "bg-amber-500/15 text-amber-200"
-          : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
-      }`}
       title={label}
       aria-label={label}
       aria-pressed={active}
+      className={active
+        ? "min-w-0 gap-1.5 px-2 text-[var(--color-primary)]"
+        : "min-w-0 gap-1.5 px-2"
+      }
     >
       <Icon size={14} />
       <span className="truncate">{label}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -2189,20 +2142,21 @@ function PanelSection({ title, action, children }: { title: string; action?: Rea
 
 function QuickButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      variant="secondary"
       onClick={onClick}
-      className="min-h-[38px] min-w-0 rounded-lg border border-[var(--color-border)] px-2 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]"
+      className="min-w-0 px-2"
     >
       <span className="truncate">{label}</span>
-    </button>
+    </Button>
   );
 }
 
 function Metric({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-lg bg-black/10 px-2 py-2 text-center">
-      <p className="truncate text-[10px] uppercase text-[var(--color-text-subtle)]">{label}</p>
+    <div className="min-w-0 rounded-lg bg-[var(--color-surface-muted)] px-2 py-2 text-center">
+      <p className="truncate text-micro uppercase text-[var(--color-text-subtle)]">{label}</p>
       <p className="mt-0.5 text-sm font-bold text-[var(--color-text)]">{value}</p>
     </div>
   );
@@ -2369,7 +2323,7 @@ function snapshotFromNote(note: NoteRecord): NoteEditorSnapshot {
     titel: note.titel ?? "",
     inhoud: note.inhoud ?? "",
     tags: note.tags ?? [],
-    kleur: note.kleur ?? "",
+    kleur: normalizeNoteColor(note.kleur),
     deadline: note.deadline ?? "",
     linkedEventId: note.linkedEventId ?? note.linked_event_id ?? "",
     prioriteit: note.prioriteit ?? "normaal",
@@ -2405,7 +2359,7 @@ function normalizeEditorSnapshot(snapshot: NoteEditorSnapshot): NoteEditorSnapsh
     titel: snapshot.titel.trim(),
     inhoud: snapshot.inhoud.trimEnd(),
     tags: normalizeTags(snapshot.tags),
-    kleur: snapshot.kleur,
+    kleur: normalizeNoteColor(snapshot.kleur),
     deadline: snapshot.deadline,
     linkedEventId: snapshot.linkedEventId,
     prioriteit: snapshot.prioriteit || "normaal",

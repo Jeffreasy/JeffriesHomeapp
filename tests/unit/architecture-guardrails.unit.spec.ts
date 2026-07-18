@@ -111,8 +111,9 @@ test("every discovered standard page composes the canonical application shell", 
 
 test("portal and document-lock mechanics remain centralized", () => {
   expect(filesMatching(/\bcreatePortal\s*\(/)).toEqual([
-    "components/notes/NoteEditor.tsx",
+    "components/ui/InputAnchoredListbox.tsx",
     "components/ui/OverlaySurface.tsx",
+    "components/ui/Popover.tsx",
     "components/ui/Toast.tsx",
   ]);
 

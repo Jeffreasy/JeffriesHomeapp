@@ -1,16 +1,15 @@
-"use client";
-
-import type { ReactNode } from "react";
-import { ChevronRight, AlertTriangle, RefreshCw, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { type Tone, toneClasses } from "./DashboardUtils";
+import type { Tone } from "./DashboardUtils";
+import { toneClasses } from "./DashboardUtils";
 import { AppIcon } from "@/components/ui/AppIcon";
-import { buttonVariants } from "@/components/ui/Button";
-import { Surface } from "@/components/ui/Surface";
+import { ButtonLink } from "@/components/ui/ButtonLink";
+import { FeedbackState } from "@/components/ui/FeedbackState";
+import { surfaceVariants } from "@/components/ui/Surface";
 import { SurfaceHeader as CoreSurfaceHeader } from "@/components/ui/SurfaceHeader";
-import { cn } from "@/lib/utils";
 import type { AppIconName } from "@/lib/symbols";
+import { cn } from "@/lib/utils";
 
 type IconSource = LucideIcon | AppIconName;
 
@@ -28,35 +27,7 @@ function RenderIcon({
   }
 
   const Icon = icon;
-  return <Icon size={size} className={className} />;
-}
-
-export function Panel({
-  children,
-  className,
-  padding = "md",
-}: {
-  children: ReactNode;
-  className?: string;
-  padding?: "none" | "md";
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="min-w-0"
-    >
-      <Surface
-        padding={padding}
-        className={cn(
-          "rounded-xl bg-[rgba(255,255,255,0.035)] shadow-[0_18px_50px_rgba(0,0,0,0.22)] backdrop-blur-xl sm:rounded-2xl",
-          className,
-        )}
-      >
-        {children}
-      </Surface>
-    </motion.div>
-  );
+  return <Icon size={size} className={className} aria-hidden="true" />;
 }
 
 export function SectionHeader({
@@ -75,21 +46,20 @@ export function SectionHeader({
   compact?: boolean;
 }) {
   const action = href ? (
-    <Link
+    <ButtonLink
       href={href}
-      className={cn(
-        buttonVariants({ variant: "ghost", size: "sm" }),
-        "shrink-0 gap-1 text-amber-300/80 hover:bg-amber-500/10 hover:text-amber-200",
-      )}
+      variant="ghost"
+      size="sm"
+      className="shrink-0 gap-1 text-[var(--color-primary-hover)]"
     >
       {actionLabel ?? "Open"}
       <ChevronRight size={14} aria-hidden="true" />
-    </Link>
+    </ButtonLink>
   ) : undefined;
 
   return (
     <CoreSurfaceHeader
-      icon={<RenderIcon icon={icon} size={16} className="text-amber-300" />}
+      icon={<RenderIcon icon={icon} size={16} className="text-[var(--color-primary-hover)]" />}
       eyebrow={label}
       title={title}
       action={action}
@@ -97,9 +67,6 @@ export function SectionHeader({
     />
   );
 }
-
-// (MetricTile is verwijderd — H2: de home-metrics dupliceerden de
-// OverviewPanel-cellen, die nu zelf klikbare links zijn.)
 
 export function RouteTile({
   href,
@@ -117,17 +84,25 @@ export function RouteTile({
   const classes = toneClasses[tone];
 
   return (
-    <Link href={href} className="group block min-w-0">
-      <div className="flex min-h-[86px] items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.03)] p-3 transition-colors hover:bg-[var(--color-surface-hover)] sm:rounded-2xl">
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border sm:h-11 sm:w-11 ${classes.border} ${classes.surface}`}>
-          <RenderIcon icon={icon} size={18} className={classes.icon} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-white">{label}</p>
-          <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">{sub}</p>
-        </div>
-        <ChevronRight size={15} className="shrink-0 text-[var(--color-text-subtle)] transition-colors group-hover:text-slate-300" />
+    <Link
+      href={href}
+      className={cn(
+        surfaceVariants({ tone: "subtle", radius: "md", padding: "sm" }),
+        "group flex min-h-[86px] items-center gap-3 transition-colors hover:bg-[var(--color-surface-hover)]",
+      )}
+    >
+      <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border", classes.border, classes.surface)}>
+        <RenderIcon icon={icon} size={18} className={classes.icon} />
       </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-[var(--color-text)]">{label}</p>
+        <p className="mt-1 truncate text-xs text-[var(--color-text-muted)]">{sub}</p>
+      </div>
+      <ChevronRight
+        size={15}
+        aria-hidden="true"
+        className="shrink-0 text-[var(--color-text-subtle)] transition-colors group-hover:text-[var(--color-text)]"
+      />
     </Link>
   );
 }
@@ -146,13 +121,13 @@ export function StatusRow({
   const classes = toneClasses[tone];
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.025)] px-3 py-3">
-      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${classes.surface}`}>
+    <div className={cn(surfaceVariants({ tone: "subtle", radius: "md", padding: "sm" }), "flex items-center gap-3")}>
+      <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", classes.surface)}>
         <RenderIcon icon={icon} size={15} className={classes.icon} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-slate-400">{label}</p>
-        <p className="mt-0.5 truncate text-sm font-semibold text-white">{value}</p>
+        <p className="text-xs font-medium text-[var(--color-text-muted)]">{label}</p>
+        <p className="mt-0.5 truncate text-sm font-semibold text-[var(--color-text)]">{value}</p>
       </div>
     </div>
   );
@@ -160,18 +135,19 @@ export function StatusRow({
 
 export function EmptyState({ icon, title, text }: { icon: IconSource; title: string; text: string }) {
   return (
-    <div className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-4 py-6 text-center">
+    <div
+      className={cn(
+        surfaceVariants({ tone: "subtle", radius: "md", padding: "md" }),
+        "flex min-h-[140px] flex-col items-center justify-center border-dashed text-center",
+      )}
+    >
       <RenderIcon icon={icon} size={22} className="text-[var(--color-text-subtle)]" />
-      <p className="mt-3 text-sm font-semibold text-slate-300">{title}</p>
+      <p className="mt-3 text-sm font-semibold text-[var(--color-text)]">{title}</p>
       <p className="mt-1 max-w-sm text-xs leading-5 text-[var(--color-text-muted)]">{text}</p>
     </div>
   );
 }
 
-/**
- * ErrorState — shown when a data load FAILS, so it is visually distinct from an
- * empty result (a failed fetch must never look like "no data"). Offers a retry.
- */
 export function ErrorState({
   title = "Kon niet laden",
   text = "Er ging iets mis bij het ophalen van deze gegevens. Probeer het opnieuw.",
@@ -182,23 +158,13 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div
-      role="alert"
-      className="flex min-h-[140px] flex-col items-center justify-center rounded-xl border border-dashed border-red-500/30 bg-red-500/5 px-4 py-6 text-center"
-    >
-      <AlertTriangle size={22} className="text-red-400" aria-hidden="true" />
-      <p className="mt-3 text-sm font-semibold text-slate-200">{title}</p>
-      <p className="mt-1 max-w-sm text-xs leading-5 text-slate-400">{text}</p>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-1.5 text-xs font-medium text-slate-200 transition-colors hover:bg-[var(--color-surface-hover)]"
-        >
-          <RefreshCw size={13} aria-hidden="true" />
-          Opnieuw proberen
-        </button>
-      )}
-    </div>
+    <FeedbackState
+      tone="error"
+      title={title}
+      description={text}
+      actionLabel={onRetry ? "Opnieuw proberen" : undefined}
+      onAction={onRetry}
+      compact
+    />
   );
 }

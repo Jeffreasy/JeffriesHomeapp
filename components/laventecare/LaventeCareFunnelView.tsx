@@ -1,6 +1,12 @@
 "use client";
 
-import { ArrowRight, CheckCircle2, ChevronDown, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck, Plus } from "lucide-react";
+import { FormField } from "@/components/ui/FormField";
+import { Select } from "@/components/ui/Select";
+
+import { Button } from "@/components/ui/Button";
+import { IconButton } from "@/components/ui/IconButton";
+import { surfaceVariants } from "@/components/ui/Surface";
+import { ArrowRight, CheckCircle2, Flag, FolderKanban, Handshake, Layers3, Loader2, ShieldCheck, Plus } from "lucide-react";
 import { LAVENTECARE_FIT_CRITERIA, LAVENTECARE_NO_FIT_SIGNALS, LAVENTECARE_PROCESS_STAGES } from "@/lib/laventecare";
 import { cn } from "@/lib/utils";
 import { fitTone, formatDate, formatMoney, label, projectFaseLabel, projectStatusLabel, toneClasses } from "./LaventeCareUtils";
@@ -29,44 +35,44 @@ export function LaventeCareFunnelView({
 }) {
   return (
     <>
-      <details className="glass min-w-0 overflow-hidden">
+      <details className={cn(surfaceVariants({ padding: "none" }), "min-w-0 overflow-hidden")}>
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4 marker:hidden">
           <span className="flex min-w-0 items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-300">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--color-success-border)] bg-[var(--color-success-subtle)] text-[var(--color-success)]">
               <Layers3 size={17} />
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-bold text-white">Proces en fit guardrails</span>
-              <span className="mt-0.5 block truncate text-xs text-slate-500">
+              <span className="block text-sm font-bold text-[var(--color-text)]">Proces en fit guardrails</span>
+              <span className="mt-0.5 block truncate text-xs text-[var(--color-text-muted)]">
                 Intake, discovery, realisatie en no-fit signalering
               </span>
             </span>
           </span>
-          <span className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-bold text-slate-400">
+          <span className="shrink-0 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-2 py-0.5 text-micro font-bold text-[var(--color-text-muted)]">
             {LAVENTECARE_PROCESS_STAGES.length} fases
           </span>
         </summary>
 
-        <div className="grid grid-cols-1 gap-4 border-t border-white/10 p-4 xl:grid-cols-[1.4fr_0.9fr]">
+        <div className="grid grid-cols-1 gap-4 border-t border-[var(--color-border)] p-4 xl:grid-cols-[1.4fr_0.9fr]">
           <div className="min-w-0">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Proces</p>
-                <h2 className="mt-1 text-lg font-bold text-white">Van intake naar doorontwikkeling</h2>
+                <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Proces</p>
+                <h2 className="mt-1 text-lg font-bold text-[var(--color-text)]">Van intake naar doorontwikkeling</h2>
               </div>
-              <Layers3 size={20} className="text-slate-400" />
+              <Layers3 size={20} className="text-[var(--color-text-muted)]" />
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {LAVENTECARE_PROCESS_STAGES.map((stage, index) => (
-                <div key={stage.key} className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <div key={stage.key} className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-4">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm font-bold text-slate-200">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm font-bold text-[var(--color-text)]">
                       {index + 1}
                     </span>
-                    <h3 className="font-semibold text-white">{stage.title}</h3>
+                    <h3 className="font-semibold text-[var(--color-text)]">{stage.title}</h3>
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-400">{stage.summary}</p>
-                  <p className="mt-3 text-xs font-semibold text-slate-500">{stage.output}</p>
+                  <p className="mt-3 text-sm leading-6 text-[var(--color-text-muted)]">{stage.summary}</p>
+                  <p className="mt-3 text-xs font-semibold text-[var(--color-text-muted)]">{stage.output}</p>
                 </div>
               ))}
             </div>
@@ -74,23 +80,23 @@ export function LaventeCareFunnelView({
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <ShieldCheck size={18} className="text-emerald-300" />
-              <h2 className="text-lg font-bold text-white">Fit guardrails</h2>
+              <ShieldCheck size={18} className="text-[var(--color-success)]" />
+              <h2 className="text-lg font-bold text-[var(--color-text)]">Fit guardrails</h2>
             </div>
             <div className="mt-4 space-y-3">
               {LAVENTECARE_FIT_CRITERIA.slice(0, 5).map((item) => (
-                <div key={item} className="flex min-w-0 gap-3 rounded-lg border border-emerald-500/15 bg-emerald-500/[0.06] p-3">
-                  <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-300" />
-                  <p className="text-sm leading-5 text-slate-300">{item}</p>
+                <div key={item} className="flex min-w-0 gap-3 rounded-lg border border-[var(--color-success-border)] bg-[var(--color-success-subtle)] p-3">
+                  <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[var(--color-success)]" />
+                  <p className="text-sm leading-5 text-[var(--color-text-muted)]">{item}</p>
                 </div>
               ))}
             </div>
-            <div className="mt-5 min-w-0 rounded-lg border border-rose-500/15 bg-rose-500/[0.06] p-4">
-              <p className="text-sm font-semibold text-rose-100">No-fit signalen</p>
+            <div className="mt-5 min-w-0 rounded-lg border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] p-4">
+              <p className="text-sm font-semibold text-[var(--color-danger)]">No-fit signalen</p>
               <ul className="mt-3 space-y-2">
                 {LAVENTECARE_NO_FIT_SIGNALS.slice(0, 3).map((item) => (
-                  <li key={item} className="flex gap-2 text-sm leading-5 text-slate-400">
-                    <Flag size={14} className="mt-0.5 shrink-0 text-rose-300" />
+                  <li key={item} className="flex gap-2 text-sm leading-5 text-[var(--color-text-muted)]">
+                    <Flag size={14} className="mt-0.5 shrink-0 text-[var(--color-danger)]" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -101,13 +107,13 @@ export function LaventeCareFunnelView({
       </details>
 
       <section className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <div className="glass min-w-0 p-5">
+        <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-5")}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Funnel</p>
-              <h2 className="mt-1 text-lg font-bold text-white">Actieve leads</h2>
+              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Funnel</p>
+              <h2 className="mt-1 text-lg font-bold text-[var(--color-text)]">Actieve leads</h2>
             </div>
-            <Handshake size={20} className="text-sky-300" />
+            <Handshake size={20} className="text-[var(--color-info)]" />
           </div>
           <div className="mt-4 space-y-3">
             {activeLeads.length === 0 ? (
@@ -117,11 +123,11 @@ export function LaventeCareFunnelView({
                 const tone = toneClasses[fitTone(lead.fitScore)];
                 const leadBusy = Boolean(lead._id && processingLead?.startsWith(`${lead._id}:`));
                 return (
-                  <div key={lead._id ?? lead.titel} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
+                  <div key={lead._id ?? lead.titel} className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-white">{lead.titel}</h3>
-                        <p className="mt-1 text-xs text-slate-500">{label(lead.status)} - {lead.bron}</p>
+                        <h3 className="font-semibold text-[var(--color-text)]">{lead.titel}</h3>
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">{label(lead.status)} - {lead.bron}</p>
                       </div>
                       <span className={cn("rounded-full border px-2.5 py-1 text-xs font-bold", tone.border, tone.surface, tone.text)}>
                         {typeof lead.fitScore === "number"
@@ -129,9 +135,9 @@ export function LaventeCareFunnelView({
                           : "Nog geen fit-score"}
                       </span>
                     </div>
-                    {lead.pijnpunt && <p className="mt-3 text-sm leading-6 text-slate-400">{lead.pijnpunt}</p>}
+                    {lead.pijnpunt && <p className="mt-3 text-sm leading-6 text-[var(--color-text-muted)]">{lead.pijnpunt}</p>}
                     {lead.volgendeStap && (
-                      <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-sky-200">
+                      <p className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-info)]">
                         <ArrowRight size={15} />
                         {lead.volgendeStap}
                       </p>
@@ -143,57 +149,68 @@ export function LaventeCareFunnelView({
                             const busy = processingLead === `${lead._id}:${status}`;
                             const isCurrent = lead.status === status;
                             return (
-                              <button
+                              <Button
                                 key={status}
                                 type="button"
                                 onClick={() => handleLeadStatus(lead, status)}
                                 disabled={leadBusy}
                                 aria-pressed={isCurrent}
                                 title={isCurrent ? "Huidige status" : undefined}
+                                variant="ghost"
+                                size="sm"
                                 className={cn(
-                                  "btn btn--ghost btn--sm justify-center px-2 disabled:cursor-not-allowed disabled:opacity-60",
+                                  "px-2",
                                   isCurrent &&
-                                    "border-sky-400/50 bg-sky-500/15 text-sky-100 ring-1 ring-inset ring-sky-400/40",
+                                    "border-[var(--color-info-border)] bg-[var(--color-info-subtle)] text-[var(--color-info)] ring-1 ring-inset ring-[var(--color-info)]",
                                 )}
                               >
-                                {busy && <Loader2 size={13} className="animate-spin" />}
+                                {busy && <Loader2 size={13} className="animate-spin motion-reduce:animate-none" />}
                                 {label(status)}
-                              </button>
+                              </Button>
                             );
                           })}
-                          <button
+                          <Button
                             type="button"
+                            variant="success"
+                            size="sm"
                             onClick={() => handleLeadToProject(lead)}
                             disabled={leadBusy}
-                            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2 text-xs font-bold text-emerald-100 transition-colors hover:bg-emerald-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                            loading={processingLead === `${lead._id}:project`}
+                            loadingLabel="Project"
                           >
-                            {processingLead === `${lead._id}:project` ? <Loader2 size={13} className="animate-spin" /> : <FolderKanban size={13} />}
+                            <FolderKanban size={13} aria-hidden="true" />
                             Project
-                          </button>
+                          </Button>
                         </div>
                         {/* Close a lead out of the funnel: lost or not-a-fit. The
                             backend marks these terminal so the lead leaves the
                             active funnel automatically. */}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="text-[11px] font-semibold text-slate-600">Sluiten:</span>
-                          <button
+                          <span className="text-micro font-semibold text-[var(--color-text-subtle)]">Sluiten:</span>
+                          <Button
                             type="button"
+                            variant="danger"
+                            size="sm"
                             onClick={() => handleLeadStatus(lead, "verloren")}
                             disabled={leadBusy}
-                            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-rose-500/20 bg-rose-500/[0.06] px-2.5 text-[11px] font-semibold text-rose-200 transition-colors hover:bg-rose-500/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
+                            loading={processingLead === `${lead._id}:verloren`}
+                            loadingLabel="Verloren"
                           >
-                            {processingLead === `${lead._id}:verloren` ? <Loader2 size={12} className="animate-spin" /> : <Flag size={12} />}
+                            <Flag size={12} aria-hidden="true" />
                             Verloren
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
+                            variant="secondary"
+                            size="sm"
                             onClick={() => handleLeadStatus(lead, "gediskwalificeerd")}
                             disabled={leadBusy}
-                            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 text-[11px] font-semibold text-slate-400 transition-colors hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+                            loading={processingLead === `${lead._id}:gediskwalificeerd`}
+                            loadingLabel="Niet-fit"
                           >
-                            {processingLead === `${lead._id}:gediskwalificeerd` ? <Loader2 size={12} className="animate-spin" /> : <ShieldCheck size={12} />}
+                            <ShieldCheck size={12} aria-hidden="true" />
                             Niet-fit
-                          </button>
+                          </Button>
                         </div>
                       </>
                     )}
@@ -204,25 +221,23 @@ export function LaventeCareFunnelView({
           </div>
         </div>
 
-        <div className="glass min-w-0 p-5">
+        <div className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-5")}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-normal text-slate-500">Delivery</p>
-              <h2 className="mt-1 text-lg font-bold text-white">Actieve projecten</h2>
+              <p className="text-xs font-semibold uppercase tracking-normal text-[var(--color-text-muted)]">Delivery</p>
+              <h2 className="mt-1 text-lg font-bold text-[var(--color-text)]">Actieve projecten</h2>
             </div>
             <div className="flex items-center gap-3">
               {onShowProjectForm && (
-                <button
-                  type="button"
+                <IconButton
                   onClick={onShowProjectForm}
-                  aria-label="Nieuw LaventeCare project starten"
+                  label="Nieuw LaventeCare project starten"
                   title="Nieuw project starten"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 transition-colors hover:bg-emerald-500/20"
-                >
-                  <Plus size={16} />
-                </button>
+                  variant="success"
+                  icon={<Plus size={16} />}
+                />
               )}
-              <FolderKanban size={20} className="text-emerald-300" />
+              <FolderKanban size={20} className="text-[var(--color-success)]" />
             </div>
           </div>
           <div className="mt-4 space-y-3">
@@ -233,59 +248,57 @@ export function LaventeCareFunnelView({
                 const projectId = project._id ?? project.id;
                 const projectBusy = Boolean(projectId && processingProject?.startsWith(`${projectId}:`));
                 return (
-                  <div key={projectId ?? project.naam} className="glass min-w-0 p-4 bg-[var(--color-surface)]">
+                  <div key={projectId ?? project.naam} className={cn(surfaceVariants({ padding: "none" }), "min-w-0 p-4")}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-white">{project.naam}</h3>
-                        <p className="mt-1 text-xs text-slate-500">{projectFaseLabel(project.fase)} - {projectStatusLabel(project.status)}</p>
+                        <h3 className="font-semibold text-[var(--color-text)]">{project.naam}</h3>
+                        <p className="mt-1 text-xs text-[var(--color-text-muted)]">{projectFaseLabel(project.fase)} - {projectStatusLabel(project.status)}</p>
                       </div>
-                      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-bold text-emerald-200">
+                      <span className="rounded-full border border-[var(--color-success-border)] bg-[var(--color-success-subtle)] px-2.5 py-1 text-xs font-bold text-[var(--color-success)]">
                         {formatMoney(project.waardeIndicatie)}
                       </span>
                     </div>
-                    {project.samenvatting && <p className="mt-3 text-sm leading-6 text-slate-400">{project.samenvatting}</p>}
-                    {project.deadline && <p className="mt-3 text-xs font-semibold text-slate-500">Deadline: {formatDate(project.deadline)}</p>}
+                    {project.samenvatting && <p className="mt-3 text-sm leading-6 text-[var(--color-text-muted)]">{project.samenvatting}</p>}
+                    {project.deadline && <p className="mt-3 text-xs font-semibold text-[var(--color-text-muted)]">Deadline: {formatDate(project.deadline)}</p>}
                     {projectId && (
                       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        <label className="block">
-                          <span className="sr-only">Projectfase</span>
-                          <span className="relative block">
-                            <select
+                        <FormField id={`laventecare-project-${projectId}-phase`} label="Projectfase">
+                          {(controlProps) => (
+                            <Select
+                              {...controlProps}
                               value={project.fase}
                               onChange={(event) => handleProjectStatus(project, { fase: event.target.value })}
                               disabled={projectBusy}
-                              className="min-h-9 w-full appearance-none rounded-lg border border-white/10 bg-white/[0.03] py-2 pl-3 pr-8 text-xs font-bold text-slate-200 outline-none transition hover:border-white/20 focus:border-emerald-400/50 disabled:cursor-not-allowed disabled:opacity-60"
+                              density="compact"
                             >
                               {LAVENTECARE_PROJECT_PHASES.map((phase) => (
                                 <option key={phase.value} value={phase.value}>
                                   {phase.label}
                                 </option>
                               ))}
-                            </select>
-                            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                          </span>
-                        </label>
-                        <label className="block">
-                          <span className="sr-only">Projectstatus</span>
-                          <span className="relative block">
-                            <select
+                            </Select>
+                          )}
+                        </FormField>
+                        <FormField id={`laventecare-project-${projectId}-status`} label="Projectstatus">
+                          {(controlProps) => (
+                            <Select
+                              {...controlProps}
                               value={project.status}
                               onChange={(event) => handleProjectStatus(project, { status: event.target.value })}
                               disabled={projectBusy}
-                              className="min-h-9 w-full appearance-none rounded-lg border border-white/10 bg-white/[0.03] py-2 pl-3 pr-8 text-xs font-bold text-slate-200 outline-none transition hover:border-white/20 focus:border-amber-400/50 disabled:cursor-not-allowed disabled:opacity-60"
+                              density="compact"
                             >
                               {LAVENTECARE_PROJECT_STATUSES.map((status) => (
                                 <option key={status.value} value={status.value}>
                                   {status.label}
                                 </option>
                               ))}
-                            </select>
-                            <ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
-                          </span>
-                        </label>
+                            </Select>
+                          )}
+                        </FormField>
                         {projectBusy ? (
-                          <p className="sm:col-span-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
-                            <Loader2 size={13} className="animate-spin" />
+                          <p className="sm:col-span-2 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-text-muted)]">
+                            <Loader2 size={13} className="animate-spin motion-reduce:animate-none" />
                             Project wordt bijgewerkt
                           </p>
                         ) : null}

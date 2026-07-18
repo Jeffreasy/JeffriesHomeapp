@@ -4,7 +4,10 @@ import { ClerkProvider, useAuth } from "@clerk/nextjs";
 import { MotionConfig } from "framer-motion";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState } from "react";
+import { Lock } from "lucide-react";
 import { ToastProvider } from "@/components/ui/Toast";
+import { Button } from "@/components/ui/Button";
+import { Surface } from "@/components/ui/Surface";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { OverlaySurface } from "@/components/ui/OverlaySurface";
 import { PwaRegistry } from "@/components/pwa/PwaRegistry";
@@ -30,7 +33,7 @@ function AuthLoadingState() {
       aria-live="polite"
     >
       <div>
-        <span className="mx-auto block h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-primary)]" />
+        <span className="mx-auto block h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-border)] border-t-[var(--color-primary)] motion-reduce:animate-none" />
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">Veilige sessie controleren…</p>
       </div>
     </div>
@@ -74,40 +77,26 @@ function SessionExpiredOverlay() {
       closeOnEscape={false}
       priority="critical"
       initialFocusRef={reloginRef}
-      backdropClassName="bg-black/70"
-      className="rounded-2xl border border-[var(--color-border)] bg-[rgba(15,23,42,0.97)] p-6 text-center shadow-2xl"
+      backdropClassName="bg-[var(--color-overlay)]"
+      className="rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface-elevated)] p-6 text-center shadow-[var(--shadow-overlay)]"
     >
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10">
-        <svg
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          className="text-amber-400"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-      </div>
+      <Surface
+        tone="warning"
+        radius="lg"
+        padding="none"
+        className="mx-auto mb-4 flex h-12 w-12 items-center justify-center text-[var(--color-warning)]"
+      >
+        <Lock size={22} aria-hidden="true" />
+      </Surface>
       <h2 id={titleId} className="mb-1 text-base font-semibold text-[var(--color-text)]">
         Je sessie is verlopen
       </h2>
       <p id={descriptionId} className="mb-5 text-sm text-[var(--color-text-muted)]">
         Log opnieuw in om verder te gaan. Je openstaande invoer blijft staan tot je hierop klikt.
       </p>
-      <button
-        ref={reloginRef}
-        type="button"
-        onClick={relogin}
-        className="min-h-11 w-full rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 px-4 text-sm font-bold text-[var(--color-primary-foreground)] transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-      >
+      <Button ref={reloginRef} type="button" variant="primary" fullWidth onClick={relogin}>
         Opnieuw inloggen
-      </button>
+      </Button>
     </OverlaySurface>
   );
 }
@@ -137,9 +126,7 @@ function SessionDataProviders({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <ConfirmProvider>
-          <ErrorBoundary>
-            <MotionConfig reducedMotion="user">{children}</MotionConfig>
-          </ErrorBoundary>
+          <ErrorBoundary>{children}</ErrorBoundary>
         </ConfirmProvider>
       </ToastProvider>
       <SessionExpiredOverlay />
@@ -175,8 +162,10 @@ function IdentityScopedProviders({ children }: { children: React.ReactNode }) {
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-in">
-      <PwaRegistry />
-      <IdentityScopedProviders>{children}</IdentityScopedProviders>
+      <MotionConfig reducedMotion="user">
+        <PwaRegistry />
+        <IdentityScopedProviders>{children}</IdentityScopedProviders>
+      </MotionConfig>
     </ClerkProvider>
   );
 }
