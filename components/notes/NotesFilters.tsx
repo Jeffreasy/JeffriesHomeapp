@@ -129,9 +129,10 @@ export function NotesFilters({
           variant={activeFilters > 0 || showAdvanced ? "primary" : "secondary"}
           size="sm"
           onClick={() => setShowAdvanced((value) => !value)}
+          aria-label={activeFilters > 0 ? `Filters, ${activeFilters} actief` : "Filters"}
           aria-expanded={showAdvanced}
           title="Sorteren, filters en tags"
-          className="shrink-0 gap-1.5 px-2.5 sm:px-3"
+          className="min-w-[var(--touch-target)] shrink-0 gap-1.5 px-2.5 sm:px-3"
         >
           <SlidersHorizontal size={15} className="shrink-0" />
           <span className="hidden sm:inline">Filters</span>

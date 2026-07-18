@@ -57,7 +57,7 @@ function RoomOverviewRow({ group }: { group: RoomGroup }) {
         </p>
       </div>
       <span
-        aria-label={allOnline ? "Alle lampen online" : group.onlineCount > 0 ? "Een deel online" : "Alle lampen offline"}
+        aria-hidden="true"
         className={cn(
           "h-2.5 w-2.5 shrink-0 rounded-full",
           allOnline

@@ -37,6 +37,14 @@ export function ContractWidget({
       : "success";
   const DeltaIcon = isOver ? TrendingUp : isUnder ? TrendingDown : CheckCircle2;
 
+  const trendWeeks = stats.weeklyBalances.slice(-15);
+  const trendLabel = `Contracttrend over maximaal vijftien weken: ${trendWeeks
+    .map(
+      (week) =>
+        `${formatWeekLabel(week.weeknr)} ${week.delta > 0 ? "+" : ""}${hoursValue(week.delta)} uur${week.future ? " gepland" : ""}`,
+    )
+    .join("; ")}`;
+
   return (
     <Surface tone={currentTone} radius="lg" padding="lg" className="mb-6">
       <SurfaceHeader
@@ -89,8 +97,8 @@ export function ContractWidget({
           </div>
 
           <div>
-            <div className="flex h-8 w-full items-end gap-1 opacity-80" aria-label="Contracttrend over maximaal vijftien weken">
-              {stats.weeklyBalances.slice(-15).map((week) => {
+            <div className="flex h-8 w-full items-end gap-1 opacity-80" role="img" aria-label={trendLabel}>
+              {trendWeeks.map((week) => {
                 const height = Math.max(2, Math.min(32, Math.abs(week.delta) * 2));
                 const barTone = week.future
                   ? "bg-[var(--color-text-subtle)]"

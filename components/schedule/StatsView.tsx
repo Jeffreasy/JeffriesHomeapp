@@ -15,7 +15,7 @@ import {
 import { hoursValue, getAmsterdamTodayIso } from "./RoosterUtils";
 import { formatWeekLabel } from "./scheduleUtils";
 import { FeedbackState } from "@/components/ui/FeedbackState";
-import { Tabs } from "@/components/ui/Tabs";
+import { TabPanel, Tabs } from "@/components/ui/Tabs";
 import { surfaceVariants } from "@/components/ui/Surface";
 import { cn } from "@/lib/utils";
 import { shiftPresentation } from "./schedulePresentation";
@@ -263,6 +263,7 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
         className="mb-6 sm:mb-8"
       />
 
+      <TabPanel idPrefix="schedule-year" value={selectedYear} className="space-y-6">
       {/* Year Hero */}
       {yearData && <YearSummaryHero year={yearData} />}
 
@@ -311,6 +312,7 @@ export function StatsView({ diensten }: { diensten: DienstRow[] }) {
           
         </div>
       )}
+      </TabPanel>
     </div>
   );
 }

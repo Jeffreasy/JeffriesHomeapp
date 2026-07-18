@@ -226,10 +226,13 @@ export function DienstWekkerSection({ automations, busyType, listReady = true, o
               key={profile.type}
               aria-pressed={selected}
               onClick={() => setActiveType(profile.type)}
-              variant={selected ? "primary" : "secondary"}
+              variant="secondary"
               size="sm"
               fullWidth
-              className="h-auto min-h-28 flex-col items-stretch justify-start p-3 text-left"
+              className={cn(
+                "h-auto min-h-28 flex-col items-stretch justify-start p-3 text-left",
+                selected && "border-[var(--color-primary-border)] bg-[var(--color-primary-subtle)] ring-1 ring-[var(--color-primary)]",
+              )}
             >
               <span className="flex items-start justify-between gap-3">
                 <span className="flex min-w-0 items-center gap-2">

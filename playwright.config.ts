@@ -1,11 +1,23 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import {
   clerkNonOwnerStateFile,
   clerkOwnerStateFile,
 } from "./tests/e2e/support/clerk-state";
+import {
+  READ_ONLY_BACKEND_API_KEY,
+  READ_ONLY_BACKEND_BASE_URL,
+  READ_ONLY_BACKEND_ORIGIN,
+  READ_ONLY_BACKEND_READY_PATH,
+} from "./tests/e2e/support/read-only-backend.mjs";
+
+const localEnvFile = resolve(process.cwd(), ".env.local");
+if (!process.env.CI && existsSync(localEnvFile)) process.loadEnvFile(localEnvFile);
 
 const e2eBaseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 const useExternalServer = process.env.E2E_EXTERNAL_SERVER === "1";
+const ownerUserId = process.env.HOMEAPP_OWNER_USER_ID?.trim() || "user_ci_owner";
 const authenticatedSpecs = /(?:authenticated-navigation|enterprise-shell)\.e2e\.spec\.ts/;
 const protectedBrowserPolicy = {
   serviceWorkers: "block",
@@ -103,10 +115,32 @@ export default defineConfig({
   ],
   webServer: useExternalServer
     ? undefined
-    : {
-        command: process.env.CI ? "npm run start" : "npm run dev",
-        url: `${e2eBaseURL}/sign-in`,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
-      },
+    : [
+        {
+          name: "Read-only backend",
+          command: "node tests/e2e/support/read-only-backend.mjs",
+          url: `${READ_ONLY_BACKEND_ORIGIN}${READ_ONLY_BACKEND_READY_PATH}`,
+          env: {
+            E2E_BACKEND_API_KEY: READ_ONLY_BACKEND_API_KEY,
+            HOMEAPP_OWNER_USER_ID: ownerUserId,
+          },
+          reuseExistingServer: false,
+          timeout: 120_000,
+          stdout: "ignore",
+          stderr: "pipe",
+          gracefulShutdown: { signal: "SIGTERM", timeout: 1_000 },
+        },
+        {
+          name: "Homeapp",
+          command: process.env.CI ? "npm run start" : "npm run dev",
+          url: `${e2eBaseURL}/sign-in`,
+          env: {
+            BACKEND_API_URL: READ_ONLY_BACKEND_BASE_URL,
+            BACKEND_API_KEY: READ_ONLY_BACKEND_API_KEY,
+            HOMEAPP_OWNER_USER_ID: ownerUserId,
+          },
+          reuseExistingServer: false,
+          timeout: 120_000,
+        },
+      ],
 });

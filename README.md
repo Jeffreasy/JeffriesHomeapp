@@ -66,6 +66,8 @@ npm run test:e2e
 
 De altijd actieve security-E2E draait zonder sessie. `npm run test:e2e:authenticated` maakt via afhankelijke Clerk setup-projecten afzonderlijke ignored owner- en non-ownerstates, controleert de read-only desktop-, tablet- en mobiele ownerflows plus de echte 403-grens en verwijdert beide states via teardowns. Gebruik daarvoor uitsluitend een Clerk testtenant; zie [docs/testing.md](docs/testing.md).
 
+De geauthenticeerde flow stuurt veilige reads door de echte Clerk-/owner-BFF naar een door Playwright beheerde read-only loopbackstub. Browsermutaties en niet-gemodelleerde endpoints falen gesloten; tests gebruiken nooit de productiebackend of een echte backendcredential.
+
 ## LaventeCare intakebridge
 
 De publieke website stuurt een contactaanvraag eerst naar LaventeCareAuthSystems. AuthSystems zet die server-to-server door naar JeffriesBackend:

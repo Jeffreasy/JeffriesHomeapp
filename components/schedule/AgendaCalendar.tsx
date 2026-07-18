@@ -25,7 +25,7 @@ import type { NoteRecord } from "@/hooks/useNotes";
 import type { ConflictInfo } from "@/lib/conflictDetection";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "@/components/ui/AppIcon";
-import { Tabs } from "@/components/ui/Tabs";
+import { TabPanel, Tabs } from "@/components/ui/Tabs";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -247,7 +247,7 @@ export function AgendaCalendar({
   };
 
   return (
-    <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-active)] shadow-[var(--shadow-surface)]">
+    <section className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-surface)]">
       <div className="border-b border-[var(--color-border)] px-3 py-3 sm:px-4">
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -332,6 +332,7 @@ export function AgendaCalendar({
               onClick={() => onCreateEvent(selectedDate)}
               variant="primary"
               size="sm"
+              className="min-w-[var(--touch-target)]"
               aria-label={`Afspraak maken op ${formatCompactDate(selectedDate)}`}
             >
               <Plus size={14} />
@@ -342,7 +343,11 @@ export function AgendaCalendar({
       </div>
 
       {/* ── Mobile (< sm): agenda list or month-dots overview ─────────────── */}
-      <div className="sm:hidden">
+      <TabPanel
+        idPrefix="agenda-mobile-view"
+        value={mobileView}
+        className="sm:hidden"
+      >
         {mobileView === "agenda" ? (
           <>
             {!showPastDays && hiddenPastCount > 0 && (
@@ -486,10 +491,14 @@ export function AgendaCalendar({
             </div>
           </div>
         )}
-      </div>
+      </TabPanel>
 
       {/* ── Desktop (sm+): month grid + selected-day panel ───────────────── */}
-      <div className="hidden grid-cols-1 sm:grid xl:grid-cols-[minmax(0,1fr)_300px]">
+      <TabPanel
+        idPrefix="agenda-calendar-mode"
+        value={mode}
+        className="hidden grid-cols-1 sm:grid xl:grid-cols-[minmax(0,1fr)_300px]"
+      >
         <div
           role="grid"
           aria-label={`Kalender, ${title}`}
@@ -539,7 +548,7 @@ export function AgendaCalendar({
           onEditEvent={onEditEvent}
           onEditNote={onEditNote}
         />
-      </div>
+      </TabPanel>
     </section>
   );
 }
@@ -583,7 +592,7 @@ function CalendarDayCell({
       className={cn(
         "group/day min-w-0 cursor-pointer touch-manipulation border-b border-r border-[var(--color-border)] p-1 transition-colors last:border-r-0 sm:p-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-info)]",
         day.isSelected ? "bg-[var(--color-info-subtle)]" : "bg-[var(--color-surface-muted)] hover:bg-[var(--color-surface-hover)]",
-        !day.inMonth && mode === "month" && "bg-[var(--color-surface-active)] opacity-55",
+        !day.inMonth && mode === "month" && "bg-[var(--color-surface-active)]",
       )}
     >
       <div className="mb-1 flex items-center justify-between gap-1">

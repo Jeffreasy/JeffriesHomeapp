@@ -445,21 +445,27 @@ export default function RoosterPage() {
         {/* Tijdens de koude load géén "Rooster ophalen"-CTA flashen (audit M18):
             eerst een lichte skeleton, pas bij een écht lege dataset de empty state. */}
         {tab === "overzicht" && !hasScheduleData && isLoading && (
-          <div className="space-y-4" aria-hidden="true">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-4 w-40 rounded" />
-                <Skeleton className="h-12 rounded-lg" />
-                <Skeleton className="h-12 rounded-lg" />
-              </div>
-            ))}
-          </div>
+          <TabPanel idPrefix="rooster" value="overzicht">
+            <div className="space-y-4" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-4 w-40 rounded" />
+                  <Skeleton className="h-12 rounded-lg" />
+                  <Skeleton className="h-12 rounded-lg" />
+                </div>
+              ))}
+            </div>
+          </TabPanel>
         )}
 
         {/* Failed ≠ empty (audit DEEL 2 #2): een 500 zonder data toont een
             foutpaneel met retry, niet de uitnodigende "Rooster ophalen"-CTA. */}
         {tab === "overzicht" && !hasScheduleData && !isLoading && scheduleIsError && (
-          <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-6 py-12 text-center">
+          <TabPanel
+            idPrefix="rooster"
+            value="overzicht"
+            className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-[var(--color-danger-border)] bg-[var(--color-danger-subtle)] px-6 py-12 text-center"
+          >
             <AlertTriangle size={28} className="text-[var(--color-danger)]" />
             <h3 className="mt-4 text-lg font-semibold text-[var(--color-danger)]">Rooster kon niet worden geladen</h3>
             <p className="mt-2 max-w-md text-sm leading-6 text-[var(--color-text-muted)]">
@@ -469,15 +475,17 @@ export default function RoosterPage() {
               <RefreshCw size={15} />
               Opnieuw proberen
             </Button>
-          </div>
+          </TabPanel>
         )}
 
         {tab === "overzicht" && !hasScheduleData && !isLoading && !scheduleIsError && (
-          <EmptyRoster
-            syncing={calSyncing}
-            onSync={handleCalendarSync}
-            onUpload={() => fileRef.current?.click()}
-          />
+          <TabPanel idPrefix="rooster" value="overzicht">
+            <EmptyRoster
+              syncing={calSyncing}
+              onSync={handleCalendarSync}
+              onUpload={() => fileRef.current?.click()}
+            />
+          </TabPanel>
         )}
 
         {/* Overzicht toont zijn hero/tijdlijn alleen mét data; de overige tabs
@@ -489,57 +497,55 @@ export default function RoosterPage() {
                 they're irrelevant on Statistieken/Salaris/Beheer and previously
                 rendered there too, walling off the actual content. */}
             {tab === "overzicht" && hasScheduleData && (
-              <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_420px]">
-                <div className="order-2 hidden md:block xl:order-1">
-                  <OverviewPanel
-                    upcomingHours={upcomingHours}
-                    upcomingCount={upcoming.length}
-                    eventCount={upcomingEvents.length}
-                    todayEventCount={todayEvents.length}
-                    hardConflicts={hardConflicts}
-                    conflicts={withConflicts.length}
-                    nextDienst={nextDienst}
-                    shifts={shifts}
-                    teams={teams}
-                  />
-                </div>
-
-                <div className="order-1 space-y-3 xl:order-2">
-                  {/* Beide varianten renderen en via CSS tonen — voorkomt de
-                      compact↔full flip na hydration met matchMedia (audit N5). */}
-                  <div className="md:hidden">
-                    <NextShiftCard
-                      dienst={nextDienst}
-                      compact
-                      onImport={handleCalendarSync}
-                      afspraken={nextShiftEvents}
-                      conflictMap={conflictMap}
-                      todayIso={todayIso}
+              <TabPanel idPrefix="rooster" value="overzicht" className="space-y-6">
+                <section className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_420px]">
+                  <div className="order-2 hidden md:block xl:order-1">
+                    <OverviewPanel
+                      upcomingHours={upcomingHours}
+                      upcomingCount={upcoming.length}
+                      eventCount={upcomingEvents.length}
+                      todayEventCount={todayEvents.length}
+                      hardConflicts={hardConflicts}
+                      conflicts={withConflicts.length}
+                      nextDienst={nextDienst}
+                      shifts={shifts}
+                      teams={teams}
                     />
                   </div>
-                  <div className="hidden md:block">
-                    <NextShiftCard
-                      dienst={nextDienst}
-                      onImport={handleCalendarSync}
-                      afspraken={nextShiftEvents}
-                      conflictMap={conflictMap}
-                      todayIso={todayIso}
+
+                  <div className="order-1 space-y-3 xl:order-2">
+                    {/* Beide varianten renderen en via CSS tonen — voorkomt de
+                        compact↔full flip na hydration met matchMedia (audit N5). */}
+                    <div className="md:hidden">
+                      <NextShiftCard
+                        dienst={nextDienst}
+                        compact
+                        onImport={handleCalendarSync}
+                        afspraken={nextShiftEvents}
+                        conflictMap={conflictMap}
+                        todayIso={todayIso}
+                      />
+                    </div>
+                    <div className="hidden md:block">
+                      <NextShiftCard
+                        dienst={nextDienst}
+                        onImport={handleCalendarSync}
+                        afspraken={nextShiftEvents}
+                        conflictMap={conflictMap}
+                        todayIso={todayIso}
+                      />
+                    </div>
+                    <MobileRosterSnapshot
+                      upcomingHours={upcomingHours}
+                      upcomingCount={upcoming.length}
+                      eventCount={upcomingEvents.length}
+                      todayEventCount={todayEvents.length}
+                      hardConflicts={hardConflicts}
+                      conflicts={withConflicts.length}
                     />
                   </div>
-                  <MobileRosterSnapshot
-                    upcomingHours={upcomingHours}
-                    upcomingCount={upcoming.length}
-                    eventCount={upcomingEvents.length}
-                    todayEventCount={todayEvents.length}
-                    hardConflicts={hardConflicts}
-                    conflicts={withConflicts.length}
-                  />
-                </div>
-              </section>
-            )}
+                </section>
 
-            {tab === "overzicht" && hasScheduleData && (
-              <TabPanel idPrefix="rooster" value="overzicht">
                 <OverviewTab
                   unifiedWeeks={unifiedWeeks}
                   isWeekOpen={isWeekOpen}

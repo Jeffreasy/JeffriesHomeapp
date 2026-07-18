@@ -53,7 +53,7 @@ Browserquerydata wordt niet persistent opgeslagen. Iedere Clerk-identiteit krijg
 
 ### Altijd actieve security-E2E
 
-`npm run test:e2e` draait uitsluitend het geïsoleerde `security-chromium`-project. Lokaal start Playwright `npm run dev`; in CI wordt eerst gebouwd en daarna `npm run start` gebruikt.
+`npm run test:e2e` draait uitsluitend het geïsoleerde `security-chromium`-project. Lokaal start Playwright de geïsoleerde loopbackstub plus `npm run dev`; in CI wordt eerst gebouwd en start Playwright dezelfde stub naast `npm run start`.
 
 De suite bewijst dat:
 
@@ -85,7 +85,7 @@ Vereiste lokale variabelen:
 - `E2E_CLERK_OWNER_EMAIL`;
 - `E2E_CLERK_NON_OWNER_EMAIL` van een geldig tweede account in dezelfde testtenant;
 - `HOMEAPP_OWNER_USER_ID` van exact dezelfde test-owner;
-- de normale buildvariabelen voor de backend-BFF.
+- synthetische buildvariabelen `BACKEND_API_URL=http://127.0.0.1:18080/api/v1` en `BACKEND_API_KEY=authenticated-e2e-read-only`; Playwright forceert deze waarden ook op de gestarte Homeapp.
 
 De owner- en non-owner-e-mailadressen moeten verschillend zijn. De non-owner mag niet overeenkomen met `HOMEAPP_OWNER_USER_ID`. Voor een gerichte controle van alleen de toegangsgrens kan `npm run test:e2e:non-owner` worden gebruikt; die flow vereist geen `E2E_CLERK_OWNER_EMAIL`, maar de build blijft wel de owner-user-id nodig hebben.
 
@@ -96,6 +96,8 @@ npm run build
 npm run test:e2e:authenticated
 ~~~
 
+De geauthenticeerde suite vereist de door Playwright beheerde webservers. `E2E_EXTERNAL_SERVER=1` faalt daarom bewust voor deze tests: een extern proces kan niet betrouwbaar naar de lokale stub worden geforceerd en zou echte private backenddata kunnen lezen.
+
 De geauthenticeerde suite:
 
 - bezoekt alle elf routes uit de centrale hoofdnavigatie op desktop, tablet en mobiel;
@@ -104,8 +106,11 @@ De geauthenticeerde suite:
   ook onder de fold, op de minimale 44px touchmaat en bewaakt het focusherstel van de Meer-sheet;
 - opent de automatiseringsmodal en het responsive lampdetail zonder op te slaan of lampcommando's te sturen;
 - voert Axe WCAG A/AA-scans uit op alle elf hoofdroutes;
-- onderschept alle `/api/backend/**`-requests met deterministische, synthetische GET-data;
-- blokkeert en faalt op iedere backendmutatie;
+- start een dependencyvrije, uitsluitend op `127.0.0.1:18080` luisterende read-only backendstub en forceert de gestarte Homeapp-BFF naar die stub;
+- laat `GET`- en `HEAD`-requests door de echte Clerk-/owner-BFF lopen; de stub valideert de synthetische API-key, `X-Request-ID` en de canonieke `userId`;
+- controleert via `/api/backend/health` expliciet dat door de browser aangeleverde `userId` en `user_id` door de BFF worden vervangen door de ingelogde owner;
+- blokkeert serviceworkers bewust; een no-op registratie is geldige graceful degradation en mag geen runtimefout veroorzaken;
+- blokkeert iedere browsermutatie vóór netwerkverkeer en faalt erop; een niet-gemodelleerde backend-GET eindigt fail-closed als 501 en wordt als first-party 5xx gedetecteerd;
 - meldt een echte, geldige non-owner aan en controleert de redirect naar `/access-denied`;
 - controleert met dezelfde non-owner-sessie dat `/api/backend/health` JSON 403 retourneert;
 - faalt op first-party page errors, console errors, 5xx-responses en onverwachte request failures.
@@ -128,7 +133,7 @@ Configureer in die Environment uitsluitend test-tenantsecrets:
 - `E2E_CLERK_OWNER_USER_ID`;
 - `E2E_CLERK_NON_OWNER_EMAIL`.
 
-De job bouwt opnieuw met de test-tenant, handhaaft de performancebudgetten en draait daarna de drie read-only ownerprojecten plus de non-owner-toegangstest. Environment approvals begrenzen toegang tot de testtenant; branch protection verplicht de fail-closed gate voor iedere merge.
+De job bouwt opnieuw met de test-tenant, handhaaft de performancebudgetten en draait daarna de drie read-only ownerprojecten plus de non-owner-toegangstest. Environment approvals begrenzen toegang tot de testtenant; branch protection verplicht de fail-closed gate voor iedere merge. Playwright start en stopt de loopbackstub binnen dezelfde job; CI heeft daarvoor geen echte backend of backendcredential nodig.
 
 ### Performance
 

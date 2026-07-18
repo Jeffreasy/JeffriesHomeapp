@@ -300,7 +300,7 @@ export const AutomationForm = forwardRef<AutomationFormHandle, AutomationFormPro
               )
             )}
           </div>
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-4 gap-1 sm:grid-cols-7">
             {DAY_LABELS.map((label, dayIndex) => (
               <Button
                 key={label}

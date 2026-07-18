@@ -16,8 +16,11 @@ const mainRoutes = [
   "/settings",
 ] as const;
 
-async function waitForLoadedFrames(page: Page) {
+type WaitForReadOnlyPage = () => Promise<void>;
+
+async function waitForLoadedFrames(page: Page, waitForReadOnlyPage: WaitForReadOnlyPage) {
   await page.waitForLoadState("load");
+  await waitForReadOnlyPage();
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {
@@ -120,13 +123,13 @@ function sanitizeAxeViolations(
 
 test.describe("enterprise application shell", () => {
   for (const route of mainRoutes) {
-    test(route + " keeps the standard shell within the viewport", async ({ page }, testInfo) => {
+    test(route + " keeps the standard shell within the viewport", async ({ page, waitForReadOnlyPage }, testInfo) => {
       await page.goto(route, { waitUntil: "domcontentloaded" });
 
       await expect(page.locator("main")).toHaveCount(1);
       await expect(page.locator("main#main")).toHaveCount(1);
       await expect(page.locator("[data-app-page]")).toBeVisible();
-      await waitForLoadedFrames(page);
+      await waitForLoadedFrames(page, waitForReadOnlyPage);
 
       await expect
         .poll(() =>
@@ -148,10 +151,10 @@ test.describe("enterprise application shell", () => {
   }
 
   for (const route of mainRoutes) {
-    test(route + " has no WCAG A/AA axe violations", async ({ page }) => {
+    test(route + " has no WCAG A/AA axe violations", async ({ page, waitForReadOnlyPage }) => {
       await page.goto(route, { waitUntil: "domcontentloaded" });
       await expect(page.locator("[data-app-page]")).toBeVisible();
-      await waitForLoadedFrames(page);
+      await waitForLoadedFrames(page, waitForReadOnlyPage);
 
       const results = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
@@ -161,16 +164,20 @@ test.describe("enterprise application shell", () => {
     });
   }
 
-  test("responsive navigation stays professional and touch-safe", async ({ page }, testInfo) => {
+  test("responsive navigation stays professional and touch-safe", async ({ page, waitForReadOnlyPage }, testInfo) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.locator("[data-app-page]")).toBeVisible();
-    await waitForLoadedFrames(page);
+    await waitForLoadedFrames(page, waitForReadOnlyPage);
 
     const isMobile = testInfo.project.name === "auth-mobile";
     const bottomNavigation = page.getByRole("navigation", {
       name: "Mobiele hoofdnavigatie",
+      exact: true,
     });
-    const sidebarNavigation = page.getByRole("navigation", { name: "Hoofdnavigatie" });
+    const sidebarNavigation = page.getByRole("navigation", {
+      name: "Hoofdnavigatie",
+      exact: true,
+    });
 
     if (isMobile) {
       await expect(bottomNavigation).toBeVisible();
@@ -198,33 +205,39 @@ test.describe("enterprise application shell", () => {
     }
   });
 
-  test("feature overlays remain touch-safe on mobile", async ({ page }, testInfo) => {
+  test("feature overlays remain touch-safe on mobile", async ({ page, waitForReadOnlyPage }, testInfo) => {
     test.skip(testInfo.project.name !== "auth-mobile", "Mobile interaction contract");
 
     await page.goto("/automations", { waitUntil: "domcontentloaded" });
     await expect(page.locator("[data-app-page]")).toBeVisible();
+    await waitForReadOnlyPage();
     await page.getByRole("button", { name: "Nieuwe automatisering toevoegen" }).click();
 
     const automationDialog = page.getByRole("dialog", { name: "Nieuwe automatisering" });
     await expect(automationDialog).toBeVisible();
-    expect(
-      await findUndersizedRenderedTouchTargets(page),
-      "The automation dialog contains touch targets below 44 by 44 pixels",
+    await expect.poll(
+      () => findUndersizedRenderedTouchTargets(page),
+      {
+        message: "The automation dialog contains touch targets below 44 by 44 pixels",
+      },
     ).toEqual([]);
     await page.keyboard.press("Escape");
     await expect(automationDialog).not.toBeVisible();
 
     await page.goto("/lampen", { waitUntil: "domcontentloaded" });
     await expect(page.locator("[data-app-page]")).toBeVisible();
+    await waitForReadOnlyPage();
     const lampDetails = page.getByRole("button", { name: / details openen$/ }).first();
     await expect(lampDetails).toBeVisible();
     await lampDetails.click();
 
     const lampDialog = page.getByRole("dialog").last();
     await expect(lampDialog).toBeVisible();
-    expect(
-      await findUndersizedRenderedTouchTargets(page),
-      "The lamp detail sheet contains touch targets below 44 by 44 pixels",
+    await expect.poll(
+      () => findUndersizedRenderedTouchTargets(page),
+      {
+        message: "The lamp detail sheet contains touch targets below 44 by 44 pixels",
+      },
     ).toEqual([]);
     await page.keyboard.press("Escape");
     await expect(lampDialog).not.toBeVisible();

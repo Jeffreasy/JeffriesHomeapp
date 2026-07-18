@@ -135,7 +135,7 @@ export function LaventeCarePortalHero({
       </div>
 
       <details className="mt-3" open>
-        <summary className="cursor-pointer text-micro font-semibold uppercase tracking-normal text-[var(--color-text-muted)] marker:hidden">
+        <summary className="flex min-h-[var(--touch-target)] cursor-pointer items-center rounded-lg text-micro font-semibold uppercase tracking-normal text-[var(--color-text-muted)] marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-background)]">
           Kerncijfers
         </summary>
         <div className="mt-2 flex flex-wrap gap-2">

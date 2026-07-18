@@ -174,6 +174,7 @@ test("the single-owner sign-in surface cannot start an enrollment flow", () => {
 test("dashboard and lighting flows compose canonical UI and touch contracts", () => {
   const dashboardPrimitives = readSource("components/dashboard/DashboardPrimitives.tsx");
   const lampCards = readSource("components/lamp/LampCards.tsx");
+  const lampToolbar = readSource("components/lamp/LampToolbar.tsx");
 
   for (const source of [dashboardPrimitives, lampCards]) {
     expect(source).toContain('from "@/components/ui/Surface"');
@@ -189,4 +190,6 @@ test("dashboard and lighting flows compose canonical UI and touch contracts", ()
       /\b(?:h-9|h-10|min-h-9)\b|min-h-\[36px\]/,
     );
   }
+
+  expect(lampToolbar).toContain("min-w-[var(--touch-target)]");
 });

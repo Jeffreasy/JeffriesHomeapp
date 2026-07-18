@@ -137,7 +137,7 @@ export function Tabs<T extends string>({
               type="button"
               role="tab"
               aria-selected={selected}
-              aria-controls={tabPanelId(idPrefix, id)}
+              aria-controls={selected ? tabPanelId(idPrefix, id) : undefined}
               tabIndex={selected ? 0 : -1}
               disabled={disabled}
               onClick={() => onValueChange(id)}

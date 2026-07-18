@@ -36,25 +36,24 @@ export function PwaRegistry() {
       inspectInstallingWorker(registration?.installing ?? null);
     };
 
-    const registerServiceWorker = () => {
+    const registerServiceWorker = async () => {
       if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
 
-      navigator.serviceWorker
-        .register("/sw.js")
-        .then((nextRegistration) => {
-          if (cancelled) return;
-          registration = nextRegistration;
-          if (registration.waiting) setUpdateReady(true);
-          inspectInstallingWorker(registration.installing);
-          registration.addEventListener("updatefound", handleUpdateFound);
-          updateInterval = setInterval(() => {
-            registration?.update().catch((error) => reportClientError(error, "pwa"));
-          }, 60 * 60 * 1000);
-        })
-        .catch((error) => {
-          if (!cancelled) reportClientError(error, "pwa");
-        });
+      try {
+        const nextRegistration = await navigator.serviceWorker.register("/sw.js");
+        if (cancelled || !nextRegistration) return;
+        registration = nextRegistration;
+        if (registration.waiting) setUpdateReady(true);
+        inspectInstallingWorker(registration.installing);
+        registration.addEventListener("updatefound", handleUpdateFound);
+        updateInterval = setInterval(() => {
+          registration?.update().catch((error) => reportClientError(error, "pwa"));
+        }, 60 * 60 * 1000);
+      } catch (error) {
+        if (!cancelled) reportClientError(error, "pwa");
+      }
     };
+    const handleWindowLoad = () => void registerServiceWorker();
 
     const handleControllerChange = () => {
       const decision = decideControllerChange(hadController);
@@ -67,8 +66,8 @@ export function PwaRegistry() {
       setIsOffline(!window.navigator.onLine);
     });
 
-    if (document.readyState === "complete") registerServiceWorker();
-    else window.addEventListener("load", registerServiceWorker);
+    if (document.readyState === "complete") void registerServiceWorker();
+    else window.addEventListener("load", handleWindowLoad);
     navigator.serviceWorker?.addEventListener("controllerchange", handleControllerChange);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
@@ -76,7 +75,7 @@ export function PwaRegistry() {
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(connectionSyncFrame);
-      window.removeEventListener("load", registerServiceWorker);
+      window.removeEventListener("load", handleWindowLoad);
       navigator.serviceWorker?.removeEventListener("controllerchange", handleControllerChange);
       registration?.removeEventListener("updatefound", handleUpdateFound);
       window.removeEventListener("online", handleOnline);

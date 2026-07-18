@@ -51,7 +51,7 @@ export function LampToolbar({
                 onClick={() => onFilterChange(item.id)}
                 aria-pressed={filter === item.id}
                 className={cn(
-                  "min-h-[var(--touch-target)] shrink-0 rounded-lg border border-transparent px-3 text-xs font-semibold transition-colors",
+                  "min-h-[var(--touch-target)] min-w-[var(--touch-target)] shrink-0 rounded-lg border border-transparent px-3 text-xs font-semibold transition-colors",
                   filter === item.id
                     ? "border-[var(--lamp-ambient-border)] bg-[var(--lamp-ambient-soft)] text-[var(--lamp-text)]"
                     : "text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text)]",

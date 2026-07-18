@@ -867,3 +867,29 @@ test("feature tab panels compose the canonical TabPanel contract", () => {
     ),
   ).toEqual([]);
 });
+test("generic elements cannot expose an aria-label without a semantic role", () => {
+  const invalidElements: string[] = [];
+
+  for (const filePath of scriptFiles) {
+    const sourceFile = parseSource(filePath);
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+        const tagName = node.tagName.getText(sourceFile);
+        if (tagName === "div" || tagName === "span") {
+          const attributeNames = new Set(
+            node.attributes.properties
+              .filter(ts.isJsxAttribute)
+              .map((attribute) => attribute.name.getText(sourceFile)),
+          );
+          if (attributeNames.has("aria-label") && !attributeNames.has("role")) {
+            invalidElements.push(sourceLocation(sourceFile, node));
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    ts.forEachChild(sourceFile, visit);
+  }
+
+  expect(invalidElements).toEqual([]);
+});

@@ -89,6 +89,7 @@ Een backend-`401` veroorzaakt geen stille redirect. De app toont een blokkerende
 De PWA:
 
 - cachet API-, navigatie-, HTML- en RSC-requests nooit;
+- degradeert zonder runtimefout wanneer browserbeleid geen serviceworkerregistratie teruggeeft;
 - toont netwerkverlies als persistente status;
 - meldt een gereedstaande serviceworkerupdate zonder onverwachte autoreload;
 - laat de gebruiker zelf het veilige reloadmoment kiezen.

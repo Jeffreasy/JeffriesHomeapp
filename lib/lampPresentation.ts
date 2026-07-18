@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Device } from "@/lib/api";
 import { hexToRgb, kelvinToHex, rgbToHex } from "@/lib/utils";
-import { contrastRatio } from "@/lib/ui/colorContrast";
+import { contrastRatio, type RgbColor } from "@/lib/ui/colorContrast";
 
 export type LampVisualMode = "offline" | "off" | "white" | "color";
 export type LampDeliveryPhase = "reported" | "pending";
@@ -33,10 +33,73 @@ export interface LampPresentation {
 const DARK_SURFACE = { r: 10, g: 10, b: 15 };
 const OFF_ACCENT = "#94a3b8";
 const OFFLINE_ACCENT = "#64748b";
+const LAMP_BASE_SURFACES: readonly RgbColor[] = [
+  DARK_SURFACE,
+  { r: 18, g: 18, b: 26 },
+  { r: 26, g: 26, b: 38 },
+];
+const ACTIVE_AMBIENT_ALPHAS = [0.08, 0.14, 0.28] as const;
+const INACTIVE_AMBIENT_ALPHAS = [0.025, 0.05] as const;
+const MINIMUM_LAMP_TEXT_CONTRAST = 4.75;
 
 function alphaColor(hex: string, alpha: number): string {
   const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, alpha))})`;
+}
+
+function mixWithWhite(source: RgbColor, mix: number): RgbColor {
+  return {
+    r: source.r + (255 - source.r) * mix,
+    g: source.g + (255 - source.g) * mix,
+    b: source.b + (255 - source.b) * mix,
+  };
+}
+
+function toRenderedRgb(source: RgbColor): RgbColor {
+  return hexToRgb(rgbToHex(source.r, source.g, source.b));
+}
+
+function compositeColor(
+  foreground: RgbColor,
+  background: RgbColor,
+  alpha: number,
+): RgbColor {
+  return {
+    r: foreground.r * alpha + background.r * (1 - alpha),
+    g: foreground.g * alpha + background.g * (1 - alpha),
+    b: foreground.b * alpha + background.b * (1 - alpha),
+  };
+}
+function hasMinimumLampAccentContrast(candidate: RgbColor, minimumContrast: number): boolean {
+  return LAMP_BASE_SURFACES.every((surface) =>
+    ACTIVE_AMBIENT_ALPHAS.every(
+      (alpha) =>
+        contrastRatio(candidate, compositeColor(candidate, surface, alpha)) >=
+        minimumContrast,
+    ),
+  );
+}
+
+function ensureReadableLampText(accent: string, active: boolean): string {
+  const source = hexToRgb(accent);
+  const alphas = active ? ACTIVE_AMBIENT_ALPHAS : INACTIVE_AMBIENT_ALPHAS;
+  const backgrounds = LAMP_BASE_SURFACES.flatMap((surface) =>
+    alphas.map((alpha) => compositeColor(source, surface, alpha)),
+  );
+
+  for (let mix = 0; mix <= 1; mix += 0.04) {
+    const candidate = toRenderedRgb(mixWithWhite(source, mix));
+    if (
+      backgrounds.every(
+        (background) =>
+          contrastRatio(candidate, background) >= MINIMUM_LAMP_TEXT_CONTRAST,
+      )
+    ) {
+      return rgbToHex(candidate.r, candidate.g, candidate.b);
+    }
+  }
+
+  return "#ffffff";
 }
 
 /**
@@ -45,17 +108,17 @@ function alphaColor(hex: string, alpha: number): string {
  */
 export function ensureVisibleLampAccent(hex: string, minimumContrast = 3): string {
   const source = hexToRgb(hex);
-  if (contrastRatio(source, DARK_SURFACE) >= minimumContrast) {
+  if (hasMinimumLampAccentContrast(source, minimumContrast)) {
     return rgbToHex(source.r, source.g, source.b);
   }
 
   for (let mix = 0.08; mix <= 0.8; mix += 0.08) {
-    const candidate = {
+    const candidate = toRenderedRgb({
       r: source.r + (255 - source.r) * mix,
       g: source.g + (255 - source.g) * mix,
       b: source.b + (255 - source.b) * mix,
-    };
-    if (contrastRatio(candidate, DARK_SURFACE) >= minimumContrast) {
+    });
+    if (hasMinimumLampAccentContrast(candidate, minimumContrast)) {
       return rgbToHex(candidate.r, candidate.g, candidate.b);
     }
   }
@@ -66,7 +129,7 @@ export function ensureVisibleLampAccent(hex: string, minimumContrast = 3): strin
 /** Runtime CSS variables are the only bridge from a physical colour into UI styling. */
 export function createLampAmbientStyle(accent: string, active: boolean): LampAmbientStyle {
   const safeAccent = active ? ensureVisibleLampAccent(accent) : accent;
-  const textAccent = ensureVisibleLampAccent(safeAccent, 4.5);
+  const textAccent = ensureReadableLampText(safeAccent, active);
   return {
     "--lamp-accent": safeAccent,
     "--lamp-text": textAccent,

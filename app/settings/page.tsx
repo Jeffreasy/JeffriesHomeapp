@@ -407,6 +407,7 @@ export default function SettingsPage() {
                 variant="primary"
                 onClick={handleAllSync}
                 disabled={syncing !== null && syncing !== "all"}
+                aria-label="Alle gegevens synchroniseren"
                 loading={syncing === "all"}
                 loadingLabel="Synchroniseren…"
               >

@@ -23,9 +23,12 @@ test.describe("provider architecture", () => {
     expect(pwaRegistry).toBeGreaterThan(providersExport);
     expect(providersSource.slice(0, providersExport)).not.toContain("<PwaRegistry");
   });
-});
 
-  test("hydrates connectivity state deterministically before browser synchronization", () => {
+  test("hydrates connectivity and service-worker state defensively", () => {
     expect(pwaSource).toContain("useState(false)");
     expect(pwaSource).toContain("setIsOffline(!window.navigator.onLine)");
+    expect(pwaSource).toContain("const registerServiceWorker = async () => {");
+    expect(pwaSource).toContain('await navigator.serviceWorker.register("/sw.js")');
+    expect(pwaSource).toContain("if (cancelled || !nextRegistration) return;");
   });
+});
